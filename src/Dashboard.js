@@ -1,11 +1,10 @@
 import React from 'react';
+import ClientDashboard from './components/ClientDashboard';
+import ManagerDashboard from './components/ManagerDashboard';
 
 export default function Dashboard({ user }) {
-  return (
-    <div style={{ padding: '2rem', textAlign: 'center' }}>
-      <h1>Welcome, {user?.name || 'User'}!</h1>
-      <p>Your role: {user?.role}</p>
-      <p>This is your dashboard.</p>
-    </div>
-  );
+  if (user?.role === 'admin' || user?.role === 'manager') {
+    return <ManagerDashboard user={user} />;
+  }
+  return <ClientDashboard user={user} />;
 }
