@@ -91,6 +91,9 @@ export default function Login({ onLogin }) {
             }}
           />
         </div>
+         <div style={{ textAlign: 'end', marginTop: '1rem', marginBottom: '1.5rem' }}>
+           <a href="/forgot-password" style={{ color: '#2563eb', textDecoration: 'none', fontWeight: 500, marginRight: '1rem' }}>Forgot password?</a>
+         </div>
         <button
           type="submit"
           style={{
@@ -109,8 +112,7 @@ export default function Login({ onLogin }) {
         >Login</button>
         {error && <div style={{ color: '#ef4444', textAlign: 'center', marginTop: '0.5rem', fontWeight: 500 }}>{error}</div>}
         <div style={{ textAlign: 'center', marginTop: '1rem' }}>
-          <a href="/forgot-password" style={{ color: '#2563eb', textDecoration: 'none', fontWeight: 500, marginRight: '1rem' }}>Forgot password?</a>
-          <a href="/register" style={{ color: '#6366f1', textDecoration: 'none', fontWeight: 500 }}>Sign up</a>
+          <a href="/register" style={{ color: '#6366f1', textDecoration: 'none', fontWeight: 500 }}>If you don't have an account, Sign up</a>
         </div>
       </form>
     </div>
