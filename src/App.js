@@ -13,7 +13,7 @@ import Analytics from './components/Analytics';
 import TechnicianManagement from './components/TechnicianManagement';
 import TechnicianDashboard from './components/TechnicianDashboard';
 import Technicianissue from './components/ManagementIssues';
-import ManagementIssues, { initialIssues as managementInitialIssues } from './components/ManagementIssues';
+import ManagementIssues from './components/ManagementIssues';
 
 function ResetPasswordWrapper() {
   const { token } = useParams();
@@ -26,7 +26,7 @@ function App() {
     const user = localStorage.getItem('user');
     return token && user ? { token, user: JSON.parse(user) } : null;
   });
-  const [issues, setIssues] = useState(managementInitialIssues);
+  const [issues, setIssues] = useState([]); // State for issues, required by ManagementIssues
   const navigate = useNavigate();
 
   const handleLogin = (token, user) => {

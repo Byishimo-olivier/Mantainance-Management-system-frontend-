@@ -1,22 +1,6 @@
 import Header from "./Header";
-import React, { useState } from "react";
-
-import ManagementIssues, { initialIssues as managementInitialIssues } from "./ManagementIssues";
-
-const technicians = [
-  {
-    name: "Patrick Niyonsenga",
-    email: "patrick.n@propcare.rw",
-  },
-  {
-    name: "Eric Habimana",
-    email: "eric.h@propcare.rw",
-  },
-  {
-    name: "Jean Baptiste",
-    email: "jean.b@propcare.rw",
-  },
-];
+import React, { useState, useEffect } from "react";
+import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
 const statusCards = [
@@ -72,8 +56,19 @@ const tagColors = {
 function ManagerDashboard() {
   const navigate = useNavigate();
   const [showRecent, setShowRecent] = useState(true);
-  // Use ManagementIssues as the single source of truth for issues and assignments
-  const [issues, setIssues] = useState(managementInitialIssues);
+  const [issues, setIssues] = useState([]);
+  const [summary, setSummary] = useState({ pending: 0, inProgress: 0, completed: 0, overdue: 0 });
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+    axios.get("http://localhost:5000/api/issues", config)
+      .then(res => setIssues(res.data))
+      .catch(() => setIssues([]));
+    axios.get("http://localhost:5000/api/managers/dashboard/summary", config)
+      .then(res => setSummary(res.data))
+      .catch(() => setSummary({ pending: 0, inProgress: 0, completed: 0, overdue: 0 }));
+  }, []);
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -82,20 +77,11 @@ function ManagerDashboard() {
   };
 
 
-  // Analytics summary
-  const totalIssues = issues.length;
-  const completed = issues.filter(i => i.tags && i.tags.includes('COMPLETED')).length;
-  const overdue = issues.filter(i => i.overdue).length;
-  const completionRate = totalIssues ? Math.round((completed / totalIssues) * 100) : 0;
 
-  // Status bar chart data
-  const statusLabels = ['Pending', 'In Progress', 'Completed', 'Overdue'];
-  const statusCounts = [
-    issues.filter(i => i.tags.includes('PENDING')).length,
-    issues.filter(i => i.tags.includes('IN PROGRESS')).length,
-    completed,
-    overdue,
-  ];
+  const totalIssues = summary.pending + summary.inProgress + summary.completed + summary.overdue;
+  const completed = summary.completed;
+  const overdue = summary.overdue;
+  const completionRate = totalIssues ? Math.round((completed / totalIssues) * 100) : 0;
 
 
   return (
@@ -141,10 +127,15 @@ function ManagerDashboard() {
           className="mb-4 md:mb-6"
         />
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 md:gap-6 mb-8">
           <div className="bg-white rounded-xl shadow p-6 flex flex-col items-start hover:shadow-lg transition-shadow">
             <span className="text-gray-500 mb-1">Total Issues</span>
             <span className="text-3xl font-bold">{totalIssues}</span>
+            <span className="text-gray-400 text-sm">issues</span>
+          </div>
+          <div className="bg-white rounded-xl shadow p-6 flex flex-col items-start hover:shadow-lg transition-shadow">
+            <span className="text-gray-500 mb-1">Pending</span>
+            <span className="text-3xl font-bold text-yellow-600">{summary.pending}</span>
             <span className="text-gray-400 text-sm">issues</span>
           </div>
           <div className="bg-white rounded-xl shadow p-6 flex flex-col items-start hover:shadow-lg transition-shadow">
@@ -184,6 +175,24 @@ function ManagerDashboard() {
             <div className="px-4 md:px-6 pb-4">
               {issues.map((issue, idx) => (
                 <div className="flex flex-col md:flex-row items-start justify-between border-t border-gray-100 py-4 md:py-5 gap-4 md:gap-6 transition hover:bg-gray-50" key={idx}>
+                  {/* Image section */}
+                  {(issue.photo || issue.image) ? (
+                    <div className="flex-shrink-0 w-full md:w-32 flex items-center justify-center">
+                      <img
+                        src={(() => {
+                          const img = issue.photo || issue.image;
+                          if (!img) return '/default-issue.png';
+                          return img.startsWith('http')
+                            ? img
+                            : `http://localhost:5000/uploads/${img.replace(/^\/uploads\//, '')}`;
+                        })()}
+                        alt="Issue"
+                        className="w-24 h-24 object-cover rounded-lg shadow border mx-auto mb-2"
+                        style={{ aspectRatio: '1/1', maxWidth: '100px', maxHeight: '100px' }}
+                        onError={e => { e.target.src = '/default-issue.png'; }}
+                      />
+                    </div>
+                  ) : null}
                   <div className="flex-1">
                     <div className="text-base md:text-lg font-semibold mb-1">{issue.title}</div>
                     <div className="text-gray-500 mb-2">{issue.location}</div>

@@ -1,100 +1,9 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "./Header";
+import axios from "axios";
 
-// Dummy issues and technicians (can be replaced with backend data)
-export const initialIssues = [
-  {
-    title: "Leaking roof in penthouse",
-    description: "Water is dripping from the ceiling during rain.",
-    location: "Block D - Floor 6 - Unit 601",
-    tags: ["URGENT", "PENDING"],
-    assignees: ["Patrick Niyonsenga"],
-    overdue: true,
-    time: "2d 4h",
-  },
-  {
-    title: "Elevator malfunction",
-    description: "Elevator stops between floors intermittently.",
-    location: "Block B - Lobby",
-    tags: ["HIGH", "IN PROGRESS"],
-    assignees: ["Eric Habimana", "Jean Baptiste"],
-    overdue: false,
-    time: "1d 7h",
-  },
-  {
-    title: "Broken window latch",
-    description: "Window latch in bedroom is broken, can't close properly.",
-    location: "Block C - Floor 2 - Unit 210",
-    tags: ["MEDIUM", "ASSIGNED"],
-    assignees: ["Jean Baptiste"],
-    overdue: false,
-    time: "3h",
-  },
-  {
-    title: "Internet outage",
-    description: "No internet connectivity in the entire block.",
-    location: "Block A - Floor 1 - Unit 101",
-    tags: ["URGENT", "IN PROGRESS"],
-    assignees: ["Patrick Niyonsenga"],
-    overdue: true,
-    time: "5d 2h",
-  },
-  {
-    title: "Water leak in bathroom",
-    description: "The bathroom sink is leaking continuously",
-    location: "Block A - Floor 3 - Unit 301",
-    tags: ["URGENT", "IN PROGRESS"],
-    assignees: [],
-    overdue: true,
-    time: "4d 6h",
-  },
-  {
-    title: "Broken door lock",
-    description: "Main door lock is broken and needs urgent replacement",
-    location: "Block B - Floor 2 - Unit 205",
-    tags: ["MEDIUM", "PENDING"],
-    assignees: [],
-    overdue: false,
-    time: "1d 2h",
-  },
-  {
-    title: "Power outage in unit",
-    description: "No power in the entire unit, possible circuit issue",
-    location: "Block A - Floor 5 - Unit 502",
-    tags: ["URGENT", "ASSIGNED"],
-    assignees: [],
-    overdue: true,
-    time: "3d 23h",
-  },
-  {
-    title: "Paint peeling in living room",
-    description: "Paint is peeling off the living room wall",
-    location: "Block C - Floor 1 - Unit 103",
-    tags: ["LOW", "PENDING"],
-    assignees: [],
-    overdue: true,
-    time: "4h",
-  },
-  {
-    title: "HVAC not cooling",
-    description: "AC is running but not cooling the room",
-    location: "Block B - Floor 4 - Unit 408",
-    tags: ["HIGH", "COMPLETED"],
-    assignees: [],
-    overdue: false,
-    time: "-",
-  },
-];
-
-const technicians = [
-  { name: "Patrick Niyonsenga", email: "patrick.n@propcare.rw" },
-  { name: "Eric Habimana", email: "eric.h@propcare.rw" },
-  { name: "Jean Baptiste", email: "jean.b@propcare.rw" },
-  { name: "Alice Kayitesi", email: "alice.k@propcare.rw" },
-  { name: "Samuel Mugisha", email: "samuel.m@propcare.rw" },
-  { name: "Grace Uwase", email: "grace.u@propcare.rw" },
-];
+const ManagementIssues = () => {
 
 const tagColors = {
   URGENT: "bg-red-100 text-red-700",
@@ -105,20 +14,45 @@ const tagColors = {
   LOW: "bg-gray-100 text-gray-600",
 };
 
-function ManagementIssues() {
-  const [issues, setIssues] = React.useState(initialIssues);
-  const [assigning, setAssigning] = React.useState(null); // index of issue being assigned
+
+  const [issues, setIssues] = useState([]);
+  const [technicians, setTechnicians] = useState([]);
+  const [assigning, setAssigning] = useState(null); // index of issue being assigned
+
+  // Fetch issues and technicians from backend
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setIssues([]);
+      setTechnicians([]);
+      return;
+    }
+    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    axios.get("http://localhost:5000/api/issues")
+      .then(res => setIssues(res.data))
+      .catch(() => setIssues([]));
+    axios.get("http://localhost:5000/api/technicians")
+      .then(res => setTechnicians(res.data))
+      .catch(() => setTechnicians([]));
+  }, []);
 
   const handleAssignClick = idx => {
     setAssigning(idx);
   };
 
-  const handleAssignTech = (idx, techName) => {
-    setIssues(prev => prev.map((issue, i) => {
-      if (i !== idx) return issue;
-      if (issue.assignees.includes(techName)) return issue;
-      return { ...issue, assignees: [...issue.assignees, techName] };
-    }));
+  const handleAssignTech = async (idx, techName) => {
+    const issue = issues[idx];
+    if (issue.assignees.includes(techName)) {
+      setAssigning(null);
+      return;
+    }
+    try {
+      const updated = { ...issue, assignees: [...issue.assignees, techName] };
+      await axios.put(`http://localhost:5000/api/issues/${issue.id}`, updated);
+      setIssues(prev => prev.map((iss, i) => i === idx ? updated : iss));
+    } catch (err) {
+      alert("Failed to assign technician");
+    }
     setAssigning(null);
   };
 
@@ -177,6 +111,14 @@ function ManagementIssues() {
               {issue.tags.includes('COMPLETED') && <span className="ml-2 px-2 py-0.5 rounded bg-green-100 text-green-700 text-xs font-medium">Completed</span>}
             </div>
             <div className="text-gray-500 text-sm mb-1">{issue.location}</div>
+            {(issue.photo || issue.image) && (
+              <img
+                src={`http://localhost:5000${issue.photo || issue.image}`}
+                alt="Issue"
+                className="w-full h-32 max-w-xs object-cover rounded mb-2 mx-auto"
+                style={{ aspectRatio: '4/3' }}
+              />
+            )}
             <div className="text-gray-700 text-sm mb-2">{issue.description}</div>
             <div className="flex flex-wrap gap-2 mb-2">
               {issue.tags.map((tag, i) => (

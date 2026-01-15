@@ -1,45 +1,25 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
 
-const initialTechnicians = [
-  {
-    name: "Patrick Niyonsenga",
-    email: "patrick.n@propcare.rw",
-    phone: "+250 788 123 456",
-    specialization: ["Plumbing", "Water Systems", "HVAC"],
-    rating: 4.5,
-    completed: 48,
-    status: "Active",
-  },
-  {
-    name: "Eric Habimana",
-    email: "eric.h@propcare.rw",
-    phone: "+250 788 234 567",
-    specialization: ["Electrical", "HVAC", "Power Systems"],
-    rating: 4.8,
-    completed: 62,
-    status: "Active",
-  },
-  {
-    name: "Jean Baptiste",
-    email: "jean.b@propcare.rw",
-    phone: "+250 788 345 678",
-    specialization: ["Carpentry", "Door Repair", "Painting"],
-    rating: 4.2,
-    completed: 35,
-    status: "Active",
-  },
-];
+
 
 function TechnicianManagement() {
-const navigate = useNavigate();
-  const [technicians, setTechnicians] = useState(initialTechnicians);
+  const navigate = useNavigate();
+  const [technicians, setTechnicians] = useState([]);
+    // Fetch technicians from backend
+    useEffect(() => {
+      axios.get("http://localhost:5000/api/technicians")
+        .then(res => setTechnicians(res.data))
+        .catch(() => setTechnicians([]));
+    }, []);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
     name: '',
     email: '',
     phone: '',
+     password: '',
     specialization: [],
   });
   const [saving, setSaving] = useState(false);
@@ -70,23 +50,23 @@ const navigate = useNavigate();
     }
   };
 
-  const handleSave = e => {
+  const handleSave = async e => {
     e.preventDefault();
     setSaving(true);
-    setTimeout(() => {
-      setTechnicians(ts => [
-        ...ts,
-        {
-          ...form,
-          rating: 4.0,
-          completed: 0,
-          status: 'Active',
-        },
-      ]);
-      setForm({ name: '', email: '', phone: '', specialization: [] });
-      setShowForm(false);
-      setSaving(false);
-    }, 600);
+    try {
+      const res = await axios.post("http://localhost:5000/api/technicians", {
+        ...form,
+        rating: 4.0,
+        completed: 0,
+        status: 'Active',
+      });
+          setTechnicians(ts => [...ts, res.data]);
+          setForm({ name: '', email: '', phone: '', password: '', specialization: [] });
+          setShowForm(false);
+    } catch (err) {
+      alert("Failed to add technician");
+    }
+    setSaving(false);
   };
 
   const handleCancel = () => {
@@ -153,6 +133,10 @@ const navigate = useNavigate();
               <label className="block font-medium mb-1">Email</label>
               <input name="email" value={form.email} onChange={handleFormChange} required className="w-full rounded-lg border border-gray-200 px-4 py-3 outline-none" placeholder="Enter email address" type="email" />
             </div>
+                <div>
+                  <label className="block font-medium mb-1">Password</label>
+                  <input name="password" value={form.password} onChange={handleFormChange} required className="w-full rounded-lg border border-gray-200 px-4 py-3 outline-none" placeholder="Enter password" type="password" />
+                </div>
           </div>
           <div>
             <label className="block font-medium mb-1">Phone</label>
@@ -203,11 +187,11 @@ const navigate = useNavigate();
                   <span>{tech.phone}</span>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {tech.specialization.map(spec => (
-                    <span key={spec} className="bg-indigo-100 text-indigo-600 px-3 py-1 rounded-full text-xs font-medium">
-                      {spec}
-                    </span>
-                  ))}
+                        {(Array.isArray(tech.specialization) ? tech.specialization : []).map(spec => (
+                          <span key={spec} className="bg-indigo-100 text-indigo-600 px-3 py-1 rounded-full text-xs font-medium">
+                            {spec}
+                          </span>
+                        ))}
                 </div>
               </div>
               <div className="flex flex-row items-center gap-6 mt-2 md:mt-0">

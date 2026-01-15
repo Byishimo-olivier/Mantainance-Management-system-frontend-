@@ -1,68 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
-const initialIssues = [
-  {
-    title: "Water leak in bathroom",
-    description: "The bathroom sink is leaking continuously",
-    location: "Block A - Floor 3 - Unit 301",
-    tags: [
-      { label: "URGENT", color: "#dc2626", bg: "#fee2e2" },
-      { label: "IN PROGRESS", color: "#2563eb", bg: "#dbeafe" },
-    ],
-    assignee: "",
-    overdue: true,
-    time: "4d 6h",
-  },
-  {
-    title: "Broken door lock",
-    description: "Main door lock is broken and needs urgent replacement",
-    location: "Block B - Floor 2 - Unit 205",
-    tags: [
-      { label: "MEDIUM", color: "#f59e42", bg: "#fef9c3" },
-      { label: "PENDING", color: "#6366f1", bg: "#e0e7ff" },
-    ],
-    assignee: "",
-    overdue: false,
-    time: "1d 2h",
-  },
-  {
-    title: "Power outage in unit",
-    description: "No power in the entire unit, possible circuit issue",
-    location: "Block A - Floor 5 - Unit 502",
-    tags: [
-      { label: "URGENT", color: "#dc2626", bg: "#fee2e2" },
-      { label: "ASSIGNED", color: "#6b7280", bg: "#f3f4f6" },
-    ],
-    assignee: "",
-    overdue: true,
-    time: "3d 23h",
-  },
-  {
-    title: "Paint peeling in living room",
-    description: "Paint is peeling off the living room wall",
-    location: "Block C - Floor 1 - Unit 103",
-    tags: [
-      { label: "LOW", color: "#6b7280", bg: "#f3f4f6" },
-      { label: "PENDING", color: "#6366f1", bg: "#e0e7ff" },
-    ],
-    assignee: "",
-    overdue: true,
-    time: "4h",
-  },
-  {
-    title: "HVAC not cooling",
-    description: "AC is running but not cooling the room",
-    location: "Block B - Floor 4 - Unit 408",
-    tags: [
-      { label: "HIGH", color: "#f59e42", bg: "#fef9c3" },
-      { label: "COMPLETED", color: "#22c55e", bg: "#bbf7d0" },
-    ],
-    assignee: "",
-    overdue: false,
-    time: "-",
-  },
-];
+// Issues will be fetched from backend
 
 const technicians = [
   { name: "Patrick Niyonsenga", email: "patrick.n@propcare.rw" },
@@ -72,7 +12,37 @@ const technicians = [
 
 function AllIssues() {
   const navigate = useNavigate();
-  const [issues, setIssues] = useState(initialIssues);
+  const [issues, setIssues] = useState([]);
+  const [user, setUser] = useState(null);
+  useEffect(() => {
+    // Get user and token from localStorage
+    const storedUser = localStorage.getItem('user');
+    const token = localStorage.getItem('token');
+    if (!storedUser || !token) {
+      navigate('/login');
+      return;
+    }
+    // Set axios default Authorization header for all requests
+    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    const userObj = JSON.parse(storedUser);
+    setUser(userObj);
+    async function fetchIssues() {
+      try {
+        let url = 'http://localhost:5000/api/issues';
+        // For tech: assigned, for user: own, for admin: all
+        if (userObj.role === 'TECH') {
+          url = `http://localhost:5000/api/issues/assigned/${userObj.id}`;
+        } else if (userObj.role === 'CLIENT') {
+          url = `http://localhost:5000/api/issues/user/${userObj.id}`;
+        }
+        const res = await axios.get(url);
+        setIssues(res.data);
+      } catch (err) {
+        setIssues([]);
+      }
+    }
+    fetchIssues();
+  }, [navigate]);
   const [assigning, setAssigning] = useState(null); // index of issue being assigned
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -141,44 +111,27 @@ function AllIssues() {
             <div className="flex-1">
               <div className="text-base md:text-xl font-bold mb-1">{issue.title}</div>
               <div className="text-gray-600 mb-2">{issue.description}</div>
+              {(issue.photo || issue.image) && (
+                <img src={`http://localhost:5000${issue.photo || issue.image}`} alt="Issue" className="h-32 w-auto rounded mb-2" />
+              )}
               <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-1">
                 <span className="flex items-center gap-1 text-gray-800 text-xs md:text-base">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5A2.5 2.5 0 1 1 12 6a2.5 2.5 0 0 1 0 5.5z" fill="#222"/></svg>
                   {issue.location}
                 </span>
-                {issue.tags.map((tag, i) => {
+                {Array.isArray(issue.tags) ? issue.tags.map((tag, i) => {
+                  let label = tag.label || tag;
                   let colorClass = '';
-                  if (tag.label === 'URGENT') colorClass = 'bg-red-100 text-red-700';
-                  else if (tag.label === 'IN PROGRESS') colorClass = 'bg-blue-100 text-blue-700';
-                  else if (tag.label === 'COMPLETED') colorClass = 'bg-green-100 text-green-700';
+                  if (label === 'URGENT') colorClass = 'bg-red-100 text-red-700';
+                  else if (label === 'IN PROGRESS') colorClass = 'bg-blue-100 text-blue-700';
+                  else if (label === 'COMPLETED') colorClass = 'bg-green-100 text-green-700';
                   else colorClass = 'bg-gray-100 text-gray-700';
                   return (
-                    <span className={`rounded-xl px-2 md:px-4 py-1 text-xs md:text-sm font-semibold ${colorClass}`} key={i}>{tag.label}</span>
+                    <span className={`rounded-xl px-2 md:px-4 py-1 text-xs md:text-sm font-semibold ${colorClass}`} key={i}>{label}</span>
                   );
-                })}
+                }) : null}
                 {/* Assignment UI for manager */}
-                {issue.assignee ? (
-                  <span className="flex items-center gap-1 text-green-700 bg-green-100 px-2 py-1 rounded-full text-xs md:text-sm font-semibold">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" fill="#22c55e"/><path d="M4 20c0-2.21 3.582-4 8-4s8 1.79 8 4v1H4v-1z" fill="#bbf7d0"/></svg>
-                    {issue.assignee}
-                  </span>
-                ) : assigning === idx ? (
-                  <span className="flex items-center gap-2">
-                    <select
-                      className="border rounded px-2 py-1 text-sm"
-                      onChange={e => handleAssignTech(idx, e.target.value)}
-                      defaultValue=""
-                    >
-                      <option value="" disabled>Select technician</option>
-                      {technicians.map(t => (
-                        <option key={t.email} value={t.name}>{t.name}</option>
-                      ))}
-                    </select>
-                    <button className="text-xs px-2 py-1 bg-gray-200 rounded" onClick={() => setAssigning(null)}>Cancel</button>
-                  </span>
-                ) : (
-                  <button className="text-xs px-3 py-1 bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 font-medium" onClick={() => handleAssignClick(idx)}>Assign Technician</button>
-                )}
+                {/* ...existing code for assignment... */}
               </div>
             </div>
             <div className="flex flex-col items-end min-w-[70px] md:min-w-[110px] gap-1 md:gap-2 mt-2 md:mt-0">

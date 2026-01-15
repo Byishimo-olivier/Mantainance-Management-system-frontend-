@@ -1,11 +1,12 @@
 import React from "react";
 import Header from "./Header";
 import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import axios from "axios";
 
 const statusCards = [
   {
     label: "Pending",
-    count: 0,
     colorClass: "text-yellow-700",
     bgClass: "bg-yellow-100 border-yellow-100",
     icon: (
@@ -14,7 +15,6 @@ const statusCards = [
   },
   {
     label: "In Progress",
-    count: 1,
     colorClass: "text-blue-700",
     bgClass: "bg-blue-100 border-blue-100",
     icon: (
@@ -23,7 +23,6 @@ const statusCards = [
   },
   {
     label: "Completed",
-    count: 0,
     colorClass: "text-green-700",
     bgClass: "bg-green-100 border-green-100",
     icon: (
@@ -32,7 +31,6 @@ const statusCards = [
   },
   {
     label: "Overdue",
-    count: 1,
     colorClass: "text-red-700",
     bgClass: "bg-red-100 border-red-100",
     icon: (
@@ -41,21 +39,53 @@ const statusCards = [
   },
 ];
 
-const recentIssues = [
-  {
-    title: "Water leak in bathroom",
-    location: "Block A - 301",
-    tags: [
-      { label: "URGENT", color: "#dc2626", bg: "#fee2e2" },
-      { label: "IN PROGRESS", color: "#2563eb", bg: "#dbeafe" },
-    ],
-    time: "4d 6h",
-    overdue: true,
-  },
-];
+// Removed duplicate ClientDashboard declaration and moved state hooks into the function below.
 
 export default function ClientDashboard() {
+  const [recentIssue, setRecentIssue] = useState(null);
+  const [statusCounts, setStatusCounts] = useState({ Pending: 0, "In Progress": 0, Completed: 0, Overdue: 0 });
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem('user');
+    const token = localStorage.getItem('token');
+    if (!storedUser || !token) {
+      navigate('/login');
+      return;
+    }
+    const userObj = JSON.parse(storedUser);
+    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    async function fetchIssues() {
+      try {
+        const res = await axios.get(`http://localhost:5000/api/issues/user/${userObj.id}`);
+        const issues = res.data || [];
+        if (issues.length > 0) {
+          // Sort by createdAt descending to get the most recent
+          issues.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+          setRecentIssue(issues[0]);
+          // Count status
+          let pending = 0, inProgress = 0, completed = 0, overdue = 0;
+          issues.forEach(issue => {
+            if (Array.isArray(issue.tags)) {
+              if (issue.tags.includes('PENDING')) pending++;
+              if (issue.tags.includes('IN PROGRESS')) inProgress++;
+              if (issue.tags.includes('COMPLETED')) completed++;
+            }
+            if (issue.overdue) overdue++;
+          });
+          setStatusCounts({ Pending: pending, "In Progress": inProgress, Completed: completed, Overdue: overdue });
+        } else {
+          setRecentIssue(null);
+          setStatusCounts({ Pending: 0, "In Progress": 0, Completed: 0, Overdue: 0 });
+        }
+      } catch (err) {
+        setRecentIssue(null);
+        setStatusCounts({ Pending: 0, "In Progress": 0, Completed: 0, Overdue: 0 });
+      }
+    }
+    fetchIssues();
+  }, [navigate]);
+
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -95,12 +125,9 @@ export default function ClientDashboard() {
       </nav>
       {/* Content */}
       <div className="max-w-6xl mx-auto px-2 md:px-4 pt-6 md:pt-8 w-full">
-        <Header
-          title="Welcome back, Jean Mukaba!"
-          subtitle={<span className="bg-blue-100 text-blue-700 text-xs md:text-base rounded-full px-2 md:px-4 py-1 font-medium">Showing your issues</span>}
-          right={<span className="text-gray-500 text-base md:text-lg">Overview</span>}
-          className="mb-4 md:mb-6"
-        />
+        <div className="flex flex-col md:flex-row items-center justify-between mb-6 md:mb-8">
+          Welcome back, Jean Mukaba!
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-6 md:mb-8">
           {statusCards.map(card => (
             <div
@@ -109,7 +136,7 @@ export default function ClientDashboard() {
             >
               <div className={`text-base md:text-lg font-semibold mb-1 md:mb-2 ${card.colorClass}`}>{card.label}</div>
               <div className="flex items-center justify-between">
-                <span className={`text-xl md:text-3xl font-bold ${card.colorClass}`}>{card.count}</span>
+                <span className={`text-xl md:text-3xl font-bold ${card.colorClass}`}>{statusCounts[card.label] || 0}</span>
                 <span>{card.icon}</span>
               </div>
             </div>
@@ -121,37 +148,52 @@ export default function ClientDashboard() {
             <a href="#" className="text-indigo-600 font-medium hover:underline" onClick={e => { e.preventDefault(); navigate('/issues'); }}>View All Issues →</a>
           </div>
           <div className="px-4 md:px-6 pb-4">
-            {recentIssues.map((issue, idx) => (
-              <div className="flex flex-col md:flex-row items-start justify-between border-t border-gray-100 py-4 md:py-5 gap-4 md:gap-6" key={idx}>
+            {recentIssue ? (
+              <div className="flex flex-col md:flex-row items-start justify-between border-t border-gray-100 py-4 md:py-5 gap-4 md:gap-6">
                 <div className="flex-1">
-                  <div className="text-base md:text-lg font-semibold mb-1">{issue.title}</div>
-                  <div className="text-gray-500 mb-2">{issue.location}</div>
+                  <div className="text-base md:text-lg font-semibold mb-1">{recentIssue.title}</div>
+                  <div className="text-gray-500 mb-2">{recentIssue.location}</div>
+                  {(recentIssue.photo || recentIssue.image) ? (
+                    <img
+                      src={(() => {
+                        const img = recentIssue.photo || recentIssue.image;
+                        if (!img) return '/default-issue.png';
+                        return img.startsWith('http')
+                          ? img
+                          : `http://localhost:5000/uploads/${img.replace(/^\/uploads\//, '')}`;
+                      })()}
+                      alt="Issue"
+                      className="h-32 w-auto rounded mb-2"
+                      onError={e => { e.target.src = '/default-issue.png'; }}
+                    />
+                  ) : null}
                   <div className="flex gap-2 mb-1 flex-wrap">
-                    {issue.tags.map((tag, i) => {
-                      // Map tag colors to Tailwind classes
+                    {Array.isArray(recentIssue.tags) && recentIssue.tags.map((tag, i) => {
+                      let label = tag.label || tag;
                       let colorClass = '';
-                      if (tag.label === 'URGENT') colorClass = 'bg-red-100 text-red-700';
-                      else if (tag.label === 'IN PROGRESS') colorClass = 'bg-blue-100 text-blue-700';
-                      else if (tag.label === 'COMPLETED') colorClass = 'bg-green-100 text-green-700';
+                      if (label === 'URGENT') colorClass = 'bg-red-100 text-red-700';
+                      else if (label === 'IN PROGRESS') colorClass = 'bg-blue-100 text-blue-700';
+                      else if (label === 'COMPLETED') colorClass = 'bg-green-100 text-green-700';
                       else colorClass = 'bg-gray-100 text-gray-700';
                       return (
-                        <span className={`rounded-md px-2 md:px-3 py-1 text-xs md:text-sm font-medium ${colorClass}`} key={i}>{tag.label}</span>
+                        <span className={`rounded-md px-2 md:px-3 py-1 text-xs md:text-sm font-medium ${colorClass}`} key={i}>{label}</span>
                       );
                     })}
                   </div>
                 </div>
                 <div className="flex flex-col items-end min-w-[70px] md:min-w-[90px] gap-1">
-                  <span className="flex items-center gap-1 text-yellow-700 text-xs md:text-base font-medium"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 8v4l3 3" stroke="#b45309" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><circle cx="12" cy="12" r="9" stroke="#fbbf24" strokeWidth="2"/></svg> {issue.time}</span>
-                  {issue.overdue && <span className="text-red-600 text-xs md:text-sm font-semibold">overdue</span>}
+                  <span className="flex items-center gap-1 text-yellow-700 text-xs md:text-base font-medium"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 8v4l3 3" stroke="#b45309" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><circle cx="12" cy="12" r="9" stroke="#fbbf24" strokeWidth="2"/></svg> {recentIssue.time}</span>
+                  {recentIssue.overdue && <span className="text-red-600 text-xs md:text-sm font-semibold">overdue</span>}
                 </div>
               </div>
-            ))}
+            ) : (
+              <div className="text-gray-400 py-6 text-center">No recent issues found.</div>
+            )}
           </div>
         </div>
       </div>
     </div>
   );
 }
-
 
 
