@@ -8,7 +8,9 @@ import Dashboard from './Dashboard';
 import LandingPage from './components/LandingPage';
 import AllIssues from './components/AllIssues';
 import NewIssue from './components/NewIssue';
+import AdminDashboard from './components/AdminDashboard';
 import ManagerDashboard from './components/ManagerDashboard';
+import ClientDashboard from './components/ClientDashboard';
 import Analytics from './components/Analytics';
 import TechnicianManagement from './components/TechnicianManagement';
 import TechnicianDashboard from './components/TechnicianDashboard';
@@ -33,8 +35,14 @@ function App() {
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(user));
     setAuth({ token, user });
-    if (user.role === 'admin' || user.role === 'manager') {
+    if (user.role === 'admin') {
+      navigate('/admin-dashboard');
+    } else if (user.role === 'manager') {
       navigate('/manager-dashboard');
+    } else if (user.role === 'technician') {
+      navigate('/technician-dashboard');
+    } else if (user.role === 'client') {
+      navigate('/dashboard');
     } else {
       navigate('/dashboard');
     }
@@ -46,14 +54,19 @@ function App() {
       <Route path="/login" element={<Login onLogin={handleLogin} />} />
       <Route path="/register" element={<Register />} />
       <Route path="/dashboard" element={auth ? (
-        (auth.user?.role === 'admin' || auth.user?.role === 'manager') ? (
+        auth.user?.role === 'admin' ? (
+          <Navigate to="/admin-dashboard" replace />
+        ) : auth.user?.role === 'manager' ? (
           <Navigate to="/manager-dashboard" replace />
+        ) : auth.user?.role === 'technician' ? (
+          <Navigate to="/technician-dashboard" replace />
         ) : <Dashboard user={auth.user} />
       ) : <Login onLogin={handleLogin} />} />
       <Route path="/issues" element={auth ? <AllIssues /> : <Login onLogin={handleLogin} />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password/:token" element={<ResetPasswordWrapper />} />
       <Route path="/new-issue" element={auth ? <NewIssue /> : <Login onLogin={handleLogin} />} />
+      <Route path="/admin-dashboard" element={auth ? <AdminDashboard /> : <Login onLogin={handleLogin} />} />
       <Route path="/manager-dashboard" element={auth ? <ManagerDashboard /> : <Login onLogin={handleLogin} />} />
       <Route path="/analytics" element={auth ? <Analytics /> : <Login onLogin={handleLogin} />} />
       <Route path="/technicians" element={auth ? <TechnicianManagement /> : <Login onLogin={handleLogin} />} />

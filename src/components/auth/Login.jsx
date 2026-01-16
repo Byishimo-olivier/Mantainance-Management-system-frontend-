@@ -22,8 +22,14 @@ export default function Login({ onLogin }) {
       if (res.ok) {
         onLogin && onLogin(data.token, data.user);
         // Role-based redirect
-        if (data.user && (data.user.role === 'admin' || data.user.role === 'manager')) {
+        if (data.user && data.user.role === 'admin') {
           navigate('/manager-dashboard', { replace: true });
+        } else if (data.user && data.user.role === 'manager') {
+          navigate('/manager-dashboard', { replace: true });
+        } else if (data.user && data.user.role === 'technician') {
+          navigate('/technician-dashboard', { replace: true });
+        } else if (data.user && data.user.role === 'client') {
+          navigate('/dashboard', { replace: true });
         } else {
           navigate('/dashboard', { replace: true });
         }
