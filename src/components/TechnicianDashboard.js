@@ -1,93 +1,262 @@
-import React from "react";
-import Header from "./Header";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import axios from "axios";
+// EvidenceUploadForm replaced by inline forms below
 
-export default function TechnicianDashboard() {
-  const navigate = useNavigate();
-  // Dummy technician info
-  const technician = {
-    name: "Eric Habimana",
-    email: "eric.h@propcare.rw",
-    completed: 62,
-    rating: 4.8,
-    assignedIssues: [
-      {
-        title: "Water leak in bathroom",
-        location: "Block A - 301",
-        status: "In Progress",
-        due: "2d 4h",
-      },
-      {
-        title: "Broken door lock",
-        location: "Block B - 205",
-        status: "Completed",
-        due: "-",
-      },
-    ],
+// BEFORE EVIDENCE FORM
+function BeforeEvidenceForm({ issueId, onSuccess }) {
+  const [beforeImage, setBeforeImage] = React.useState(null);
+  const [address, setAddress] = React.useState("");
+  const [completionDate, setCompletionDate] = React.useState(() => {
+    const today = new Date();
+    return today.toISOString().split('T')[0];
+  });
+  const [completionTime, setCompletionTime] = React.useState(() => {
+    const now = new Date();
+    return now.toTimeString().slice(0,5); // 'HH:MM'
+  });
+  const [loading, setLoading] = React.useState(false);
+
+  const handleFileChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      setBeforeImage(e.target.files[0]);
+    }
+  };
+
+  const handleDateChange = (e) => {
+    setCompletionDate(e.target.value);
+  };
+
+  const handleTimeChange = (e) => {
+    setCompletionTime(e.target.value);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    const formData = new FormData();
+    formData.append("address", address);
+    if (beforeImage) formData.append("beforeImage", beforeImage);
+    if (completionDate) formData.append("completionDate", completionDate);
+    if (completionTime) formData.append("completionTime", completionTime);
+    try {
+      const token = localStorage.getItem("token");
+      await axios.post(
+        `http://localhost:5000/api/issues/${issueId}/evidence/before`,
+        formData,
+        { headers: { Authorization: `Bearer ${token}`, "Content-Type": "multipart/form-data" } }
+      );
+      setAddress("");
+      // removed setFixTime
+      setBeforeImage(null);
+      setCompletionDate(new Date().toISOString().split('T')[0]);
+      setCompletionTime(new Date().toTimeString().slice(0,5));
+      if (onSuccess) onSuccess();
+      alert("BEFORE evidence submitted. Status set to In Progress.");
+    } catch (err) {
+      alert("Failed to upload BEFORE evidence");
+    }
+    setLoading(false);
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-8">
-      <nav className="flex items-center justify-between bg-white shadow px-4 md:px-8 h-16 mb-8">
-        <div className="flex items-center gap-3">
-          <span className="bg-indigo-600 rounded-xl p-1 flex items-center justify-center">
-            <svg width="36" height="36" viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="6" fill="#6366f1"/><rect x="6" y="6" width="12" height="6" rx="2" fill="#a5b4fc"/></svg>
-          </span>
-          <div className="flex flex-col ml-1">
-            <span className="text-lg font-bold text-gray-900">PropCare</span>
-            <span className="text-sm text-gray-500">{technician.name}</span>
-          </div>
+    <form className="bg-white rounded-xl shadow p-6 max-w-lg mx-auto" onSubmit={handleSubmit}>
+      <h2 className="font-semibold text-lg mb-4">Address Issue & Upload BEFORE Evidence</h2>
+      <div className="mb-4">
+        <label className="block text-gray-700 mb-1">How did you address the issue?</label>
+        <textarea
+          className="w-full border rounded px-3 py-2"
+          value={address}
+          onChange={e => setAddress(e.target.value)}
+          required
+        />
+      </div>
+      <div className="mb-4">
+        <label className="block text-gray-700 mb-1">Upload BEFORE image</label>
+        <input type="file" accept="image/*" onChange={handleFileChange} required />
+      </div>
+      <div className="mb-4">
+        <label className="block text-gray-700 mb-1">Estimated Completion Date</label>
+        <input type="date" className="w-full border rounded px-3 py-2" value={completionDate} onChange={handleDateChange} required />
+      </div>
+      <div className="mb-4">
+        <label className="block text-gray-700 mb-1">Estimated Completion Time</label>
+        <input type="time" className="w-full border rounded px-3 py-2" value={completionTime} onChange={handleTimeChange} required />
+      </div>
+      <button
+        type="submit"
+        className="bg-indigo-600 text-white px-6 py-2 rounded font-semibold hover:bg-indigo-700"
+        disabled={loading}
+      >
+        {loading ? "Uploading..." : "Submit BEFORE Evidence"}
+      </button>
+    </form>
+  );
+}
+
+function AfterEvidenceForm({ issueId, onSuccess }) {
+  const [afterImage, setAfterImage] = React.useState(null);
+  const [loading, setLoading] = React.useState(false);
+
+  const handleFileChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      setAfterImage(e.target.files[0]);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    const formData = new FormData();
+    if (afterImage) formData.append("afterImage", afterImage);
+    try {
+      const token = localStorage.getItem("token");
+      await axios.post(
+        `http://localhost:5000/api/issues/${issueId}/evidence/after`,
+        formData,
+        { headers: { Authorization: `Bearer ${token}`, "Content-Type": "multipart/form-data" } }
+      );
+      setAfterImage(null);
+      if (onSuccess) onSuccess();
+      alert("AFTER evidence submitted. Status set to Complete.");
+    } catch (err) {
+      alert("Failed to upload AFTER evidence");
+    }
+    setLoading(false);
+  };
+
+  return (
+    <form className="bg-white rounded-xl shadow p-6 max-w-lg mx-auto" onSubmit={handleSubmit}>
+      <h2 className="font-semibold text-lg mb-4">Upload AFTER Evidence</h2>
+      <div className="mb-4">
+        <label className="block text-gray-700 mb-1">Upload AFTER image</label>
+        <input type="file" accept="image/*" onChange={handleFileChange} required />
+      </div>
+      <button
+        type="submit"
+        className="bg-green-600 text-white px-6 py-2 rounded font-semibold hover:bg-green-700"
+        // AFTER EVIDENCE FORM
+        disabled={loading}
+      >
+        {loading ? "Uploading..." : "Submit AFTER Evidence"}
+      </button>
+    </form>
+  );
+}
+
+const TechnicianDashboard = () => {
+  const [jobs, setJobs] = useState([]);
+  const [materialRequests, setMaterialRequests] = useState([]);
+  const [user, setUser] = useState({ name: "", id: "" });
+  const [showBeforeForm, setShowBeforeForm] = useState({});
+  const [showAfterForm, setShowAfterForm] = useState({});
+  const handleBeforeSuccess = (jobId) => {
+    setShowBeforeForm((prev) => ({ ...prev, [jobId]: false }));
+    // Optionally refresh jobs/status here
+  };
+
+  const handleAfterSuccess = (jobId) => {
+    setShowAfterForm((prev) => ({ ...prev, [jobId]: false }));
+    // Optionally refresh jobs/status here
+  };
+
+  const toggleBeforeForm = (jobId) => {
+    setShowBeforeForm((prev) => ({ ...prev, [jobId]: !prev[jobId] }));
+  };
+
+  const toggleAfterForm = (jobId) => {
+    setShowAfterForm((prev) => ({ ...prev, [jobId]: !prev[jobId] }));
+  };
+
+  useEffect(() => {
+    const userStr = localStorage.getItem("user");
+    if (userStr) {
+      const u = JSON.parse(userStr);
+      setUser(u);
+      const token = localStorage.getItem("token");
+      const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+      axios.get(`http://localhost:5000/api/issues/assigned/${u._id || u.id}`, config)
+        .then(res => setJobs(res.data));
+      axios.get(`http://localhost:5000/api/material-requests/tech/${u._id || u.id}`, config)
+        .then(res => setMaterialRequests(res.data));
+    }
+  }, []);
+
+  return (
+    <div className="min-h-screen bg-gray-50 p-6">
+      <h1 className="text-2xl font-bold mb-6">Technician Dashboard</h1>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <div className="bg-white rounded-xl shadow p-6">
+          <h2 className="font-semibold text-lg mb-2">Assigned Jobs</h2>
+          <div className="text-3xl font-bold">{jobs.length}</div>
+          <ul className="mt-3 text-sm">
+            {jobs.map(job => (
+              <li key={job.id || job._id} className="mb-4 border-b pb-2">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <span className="font-semibold">{job.title}</span> <span className="text-xs text-gray-400">({(job.status === 'COMPLETE' || job.status === 'COMPLETED') ? 'Complete' : (job.status || 'Pending')})</span>
+                  </div>
+                  {/* BEFORE FORM BUTTON */}
+                  {(!job.status || job.status.toUpperCase() === 'PENDING') && (
+                    <button
+                      className="mt-2 md:mt-0 bg-indigo-500 text-white px-3 py-1 rounded text-xs hover:bg-indigo-600"
+                      onClick={() => toggleBeforeForm(job.id || job._id)}
+                    >
+                      {showBeforeForm[job.id || job._id] ? 'Cancel' : 'Submit BEFORE Evidence'}
+                    </button>
+                  )}
+                  {/* AFTER FORM BUTTON */}
+                  {job.status && job.status.toUpperCase() === 'IN PROGRESS' && (
+                    <button
+                      className="mt-2 md:mt-0 bg-green-500 text-white px-3 py-1 rounded text-xs hover:bg-green-600"
+                      onClick={() => toggleAfterForm(job.id || job._id)}
+                    >
+                      {showAfterForm[job.id || job._id] ? 'Cancel' : 'Submit AFTER Evidence'}
+                    </button>
+                  )}
+                </div>
+                {/* BEFORE FORM */}
+                {showBeforeForm[job.id || job._id] && (
+                  <div className="mt-3">
+                    <BeforeEvidenceForm
+                      issueId={job.id || job._id}
+                      onSuccess={() => handleBeforeSuccess(job.id || job._id)}
+                    />
+                  </div>
+                )}
+                {/* AFTER FORM */}
+                {showAfterForm[job.id || job._id] && (
+                  <div className="mt-3">
+                    <AfterEvidenceForm
+                      issueId={job.id || job._id}
+                      onSuccess={() => handleAfterSuccess(job.id || job._id)}
+                    />
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
         </div>
-        <div className="flex gap-2 md:gap-3">
-          <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-100 text-indigo-700 font-semibold" disabled>
-            Dashboard
-          </button>
-          <button className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-gray-100 font-semibold" onClick={() => navigate('/issues')}>
-            All Issues
-          </button>
+
+        <div className="bg-white rounded-xl shadow p-6">
+          <h2 className="font-semibold text-lg mb-2">Material Requests</h2>
+          <div className="text-3xl font-bold">{materialRequests.length}</div>
+          <ul className="mt-3 text-sm">
+            {materialRequests.slice(0, 5).map(req => (
+              <li key={req.id} className="mb-1">{req.status} - {req.requestId}</li>
+            ))}
+          </ul>
         </div>
-      </nav>
-      <Header
-        title="Technician Dashboard"
-        subtitle={<span className="bg-blue-100 text-blue-700 text-xs md:text-base rounded-full px-2 md:px-4 py-1 font-medium">{technician.name}</span>}
-        right={<span className="text-gray-500">Your assigned issues and performance</span>}
-        className="mb-6"
-      />
+      </div>
       <div className="bg-white rounded-xl shadow p-6 mb-8">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
-          <div>
-            <div className="text-lg font-semibold">{technician.name}</div>
-            <div className="text-gray-500 text-sm">{technician.email}</div>
-          </div>
-          <div className="flex gap-4 items-center">
-            <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm font-medium">Completed: {technician.completed}</span>
-            <span className="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-sm font-medium">Rating: {technician.rating}</span>
-          </div>
-        </div>
-        <div>
-          <div className="font-semibold mb-2">Assigned Issues</div>
-          <table className="w-full text-left">
-            <thead>
-              <tr className="text-gray-500 text-sm">
-                <th className="pb-2">Title</th>
-                <th className="pb-2">Location</th>
-                <th className="pb-2">Status</th>
-                <th className="pb-2">Due</th>
-              </tr>
-            </thead>
-            <tbody>
-              {technician.assignedIssues.map((issue, idx) => (
-                <tr key={idx} className="border-t border-gray-100">
-                  <td className="py-2 font-medium">{issue.title}</td>
-                  <td className="py-2">{issue.location}</td>
-                  <td className="py-2">{issue.status}</td>
-                  <td className="py-2">{issue.due}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <h2 className="font-semibold text-lg mb-2">Work History</h2>
+        <ul className="text-sm">
+          {jobs.slice(0, 10).map(job => (
+            <li key={job.id || job._id} className="mb-1">{job.title} - {(job.status === 'COMPLETE' || job.status === 'COMPLETED') ? 'Complete' : (job.status || 'Pending')}</li>
+          ))}
+        </ul>
       </div>
     </div>
   );
-}
+};
+
+export default TechnicianDashboard;

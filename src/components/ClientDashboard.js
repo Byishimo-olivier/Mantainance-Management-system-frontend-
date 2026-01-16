@@ -63,15 +63,14 @@ export default function ClientDashboard() {
           // Sort by createdAt descending to get the most recent
           issues.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
           setRecentIssue(issues[0]);
-          // Count status
+          // Count status using the 'status' field
           let pending = 0, inProgress = 0, completed = 0, overdue = 0;
           issues.forEach(issue => {
-            if (Array.isArray(issue.tags)) {
-              if (issue.tags.includes('PENDING')) pending++;
-              if (issue.tags.includes('IN PROGRESS')) inProgress++;
-              if (issue.tags.includes('COMPLETED')) completed++;
-            }
-            if (issue.overdue) overdue++;
+            const status = (issue.status || '').toUpperCase();
+            if (status === 'PENDING') pending++;
+            else if (status === 'IN PROGRESS') inProgress++;
+            else if (status === 'COMPLETE' || status === 'COMPLETED') completed++;
+            else if (status === 'OVERDUE') overdue++;
           });
           setStatusCounts({ Pending: pending, "In Progress": inProgress, Completed: completed, Overdue: overdue });
         } else {
@@ -168,17 +167,26 @@ export default function ClientDashboard() {
                     />
                   ) : null}
                   <div className="flex gap-2 mb-1 flex-wrap">
-                    {Array.isArray(recentIssue.tags) && recentIssue.tags.map((tag, i) => {
+                    {Array.isArray(recentIssue.tags) && recentIssue.tags.filter(tag => tag !== 'PENDING' && tag !== 'IN PROGRESS' && tag !== 'COMPLETE' && tag !== 'OVERDUE').map((tag, i) => {
                       let label = tag.label || tag;
                       let colorClass = '';
                       if (label === 'URGENT') colorClass = 'bg-red-100 text-red-700';
-                      else if (label === 'IN PROGRESS') colorClass = 'bg-blue-100 text-blue-700';
-                      else if (label === 'COMPLETED') colorClass = 'bg-green-100 text-green-700';
                       else colorClass = 'bg-gray-100 text-gray-700';
                       return (
                         <span className={`rounded-md px-2 md:px-3 py-1 text-xs md:text-sm font-medium ${colorClass}`} key={i}>{label}</span>
                       );
                     })}
+                    {recentIssue.status && (
+                      <span className={`rounded-md px-2 md:px-3 py-1 text-xs md:text-sm font-semibold ${
+                        recentIssue.status === 'IN PROGRESS' ? 'bg-blue-100 text-blue-700' :
+                        recentIssue.status === 'PENDING' ? 'bg-yellow-100 text-yellow-700' :
+                        recentIssue.status === 'COMPLETE' ? 'bg-green-100 text-green-700' :
+                        recentIssue.status === 'OVERDUE' ? 'bg-red-100 text-red-700' :
+                        'bg-gray-100 text-gray-700'
+                      }`}>
+                        {recentIssue.status.replace('_', ' ')}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="flex flex-col items-end min-w-[70px] md:min-w-[90px] gap-1">

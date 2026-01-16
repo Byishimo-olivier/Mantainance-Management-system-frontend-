@@ -81,6 +81,7 @@ function ManagerDashboard() {
   const totalIssues = summary.pending + summary.inProgress + summary.completed + summary.overdue;
   const completed = summary.completed;
   const overdue = summary.overdue;
+  const inProgress = summary.inProgress;
   const completionRate = totalIssues ? Math.round((completed / totalIssues) * 100) : 0;
 
 
@@ -136,6 +137,11 @@ function ManagerDashboard() {
           <div className="bg-white rounded-xl shadow p-6 flex flex-col items-start hover:shadow-lg transition-shadow">
             <span className="text-gray-500 mb-1">Pending</span>
             <span className="text-3xl font-bold text-yellow-600">{summary.pending}</span>
+            <span className="text-gray-400 text-sm">issues</span>
+          </div>
+          <div className="bg-white rounded-xl shadow p-6 flex flex-col items-start hover:shadow-lg transition-shadow">
+            <span className="text-gray-500 mb-1">In Progress</span>
+            <span className="text-3xl font-bold text-blue-600">{inProgress}</span>
             <span className="text-gray-400 text-sm">issues</span>
           </div>
           <div className="bg-white rounded-xl shadow p-6 flex flex-col items-start hover:shadow-lg transition-shadow">
@@ -201,6 +207,17 @@ function ManagerDashboard() {
                         <span className={`rounded-md px-2 md:px-3 py-1 text-xs md:text-sm font-medium ${tagColors[tag] || 'bg-gray-100 text-gray-700'}`} key={i}>{tag}</span>
                       ))}
                     </div>
+                    {issue.status && (
+                      <span className={`inline-block mt-1 px-2 py-1 rounded text-xs font-semibold ${
+                        issue.status === 'IN PROGRESS' ? 'bg-blue-100 text-blue-700' :
+                        issue.status === 'PENDING' ? 'bg-yellow-100 text-yellow-700' :
+                        (issue.status === 'COMPLETE' || issue.status === 'COMPLETED') ? 'bg-green-100 text-green-700' :
+                        issue.status === 'OVERDUE' ? 'bg-red-100 text-red-700' :
+                        'bg-gray-100 text-gray-700'
+                      }`}>
+                        {(issue.status === 'COMPLETE' || issue.status === 'COMPLETED') ? 'Complete' : issue.status.replace('_', ' ')}
+                      </span>
+                    )}
                   </div>
                   <div className="flex flex-col items-end min-w-[70px] md:min-w-[90px] gap-1">
                     {issue.time && (

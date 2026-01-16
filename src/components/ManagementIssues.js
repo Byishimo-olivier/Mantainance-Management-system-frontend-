@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import Select from 'react-select';
 import { useNavigate } from "react-router-dom";
 import Header from "./Header";
 import axios from "axios";
@@ -42,16 +43,20 @@ const tagColors = {
 
   const handleAssignTech = async (idx, techName) => {
     const issue = issues[idx];
-    if (issue.assignees.includes(techName)) {
+    // Find the selected technician object
+    const tech = technicians.find(t => t.name === techName);
+    if (!tech) {
+      alert('Technician not found');
       setAssigning(null);
       return;
     }
     try {
-      const updated = { ...issue, assignees: [...issue.assignees, techName] };
-      await axios.put(`http://localhost:5000/api/issues/${issue.id}`, updated);
-      setIssues(prev => prev.map((iss, i) => i === idx ? updated : iss));
+      // Use the dedicated assign endpoint
+      const res = await axios.post(`http://localhost:5000/api/issues/${issue.id}/assign`, { techId: tech._id || tech.id });
+      // Update UI with the new issue data from backend
+      setIssues(prev => prev.map((iss, i) => i === idx ? res.data : iss));
     } catch (err) {
-      alert("Failed to assign technician");
+      alert('Failed to assign technician');
     }
     setAssigning(null);
   };
@@ -103,12 +108,21 @@ const tagColors = {
           >
             <div className="flex items-center gap-2 mb-2">
               <span className="inline-block w-2 h-2 rounded-full mr-2"
-                style={{ background: issue.overdue ? '#ef4444' : issue.tags.includes('COMPLETED') ? '#22c55e' : '#6366f1' }}
-                title={issue.overdue ? 'Overdue' : issue.tags.includes('COMPLETED') ? 'Completed' : 'Active'}
+                style={{ background: issue.overdue ? '#ef4444' : issue.status === 'COMPLETE' ? '#22c55e' : issue.status === 'IN PROGRESS' ? '#2563eb' : '#6366f1' }}
+                title={issue.overdue ? 'Overdue' : issue.status === 'COMPLETE' ? 'Completed' : issue.status === 'IN PROGRESS' ? 'In Progress' : 'Active'}
               ></span>
               <span className="text-lg font-semibold text-gray-900 flex-1">{issue.title}</span>
-              {issue.overdue && <span className="ml-2 px-2 py-0.5 rounded bg-red-100 text-red-700 text-xs font-medium">Overdue</span>}
-              {issue.tags.includes('COMPLETED') && <span className="ml-2 px-2 py-0.5 rounded bg-green-100 text-green-700 text-xs font-medium">Completed</span>}
+              {issue.status && (
+                <span className={`ml-2 px-2 py-0.5 rounded text-xs font-medium ${
+                  issue.status === 'IN PROGRESS' ? 'bg-blue-100 text-blue-700' :
+                  issue.status === 'PENDING' ? 'bg-gray-100 text-gray-600' :
+                  (issue.status === 'COMPLETE' || issue.status === 'COMPLETED') ? 'bg-green-100 text-green-700' :
+                  issue.status === 'OVERDUE' ? 'bg-red-100 text-red-700' :
+                  'bg-gray-100 text-gray-700'
+                }`}>
+                  {(issue.status === 'COMPLETE' || issue.status === 'COMPLETED') ? 'Complete' : issue.status.replace('_', ' ')}
+                </span>
+              )}
             </div>
             <div className="text-gray-500 text-sm mb-1">{issue.location}</div>
             {(issue.photo || issue.image) && (
@@ -121,22 +135,30 @@ const tagColors = {
             )}
             <div className="text-gray-700 text-sm mb-2">{issue.description}</div>
             <div className="flex flex-wrap gap-2 mb-2">
-              {issue.tags.map((tag, i) => (
+              {issue.tags.filter(tag => tag !== 'PENDING' && tag !== 'IN PROGRESS' && tag !== 'COMPLETE' && tag !== 'OVERDUE').map((tag, i) => (
                 <span key={i} className={`px-2 py-0.5 rounded text-xs font-medium ${tagColors[tag] || 'bg-gray-100 text-gray-600'}`}>{tag}</span>
               ))}
             </div>
             <div className="flex items-center gap-3 mb-2">
               <span className="text-xs text-gray-400">Reported:</span>
+              <span className="text-xs text-gray-600 font-semibold">
+                {issue.clientName || issue.userName || (issue.client && issue.client.name) || 'Unknown'}
+              </span>
+              <span className="text-xs text-gray-400">at</span>
               <span className="text-xs text-gray-600">{issue.time}</span>
             </div>
             <div className="flex flex-wrap gap-2 items-center">
-              <span className="text-xs text-gray-400">Assignees:</span>
-              {issue.assignees.length === 0 ? (
-                <span className="text-xs text-gray-400 italic">Unassigned</span>
+              <span className="text-xs text-gray-400">Assigned to:</span>
+              {issue.assignedTo ? (
+                <span className="inline-flex items-center px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 text-xs font-medium mr-1">
+                  {/* Find the technician's name from the technicians list */}
+                  {(() => {
+                    const tech = technicians.find(t => (t._id || t.id) === issue.assignedTo);
+                    return tech ? tech.name : 'Unknown';
+                  })()}
+                </span>
               ) : (
-                issue.assignees.map((a, i) => (
-                  <span key={i} className="inline-block px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 text-xs font-medium">{a}</span>
-                ))
+                <span className="text-xs text-gray-400 italic">Unassigned</span>
               )}
               <button
                 className="ml-auto px-3 py-1 rounded bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 transition"
@@ -146,17 +168,15 @@ const tagColors = {
               </button>
             </div>
             {assigning === idx && (
-              <div className="mt-3 flex flex-wrap gap-2">
-                {technicians.map((tech, i) => (
-                  <button
-                    key={i}
-                    className="px-3 py-1 rounded bg-gray-100 text-gray-700 text-xs font-medium hover:bg-indigo-100 hover:text-indigo-700 transition"
-                    onClick={() => handleAssignTech(idx, tech.name)}
-                  >
-                    {tech.name}
-                  </button>
-                ))}
-                <button className="px-3 py-1 rounded bg-red-100 text-red-700 text-xs font-medium" onClick={() => setAssigning(null)}>Cancel</button>
+              <div className="mt-3 flex flex-col gap-2 max-w-xs">
+                <Select
+                  options={technicians.map(tech => ({ value: tech._id || tech.id, label: tech.name }))}
+                  onChange={option => option && handleAssignTech(idx, option.label)}
+                  placeholder="Select technician..."
+                  isSearchable
+                  autoFocus
+                />
+                <button className="px-3 py-1 rounded bg-red-100 text-red-700 text-xs font-medium mt-2" onClick={() => setAssigning(null)}>Cancel</button>
               </div>
             )}
           </div>

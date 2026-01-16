@@ -119,17 +119,26 @@ function AllIssues() {
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5A2.5 2.5 0 1 1 12 6a2.5 2.5 0 0 1 0 5.5z" fill="#222"/></svg>
                   {issue.location}
                 </span>
-                {Array.isArray(issue.tags) ? issue.tags.map((tag, i) => {
+                {Array.isArray(issue.tags) ? issue.tags.filter(tag => tag !== 'PENDING' && tag !== 'IN PROGRESS' && tag !== 'COMPLETE' && tag !== 'OVERDUE').map((tag, i) => {
                   let label = tag.label || tag;
                   let colorClass = '';
                   if (label === 'URGENT') colorClass = 'bg-red-100 text-red-700';
-                  else if (label === 'IN PROGRESS') colorClass = 'bg-blue-100 text-blue-700';
-                  else if (label === 'COMPLETED') colorClass = 'bg-green-100 text-green-700';
                   else colorClass = 'bg-gray-100 text-gray-700';
                   return (
                     <span className={`rounded-xl px-2 md:px-4 py-1 text-xs md:text-sm font-semibold ${colorClass}`} key={i}>{label}</span>
                   );
                 }) : null}
+                {issue.status && (
+                  <span className={`rounded-xl px-2 md:px-4 py-1 text-xs md:text-sm font-semibold mt-1 ${
+                    issue.status === 'IN PROGRESS' ? 'bg-blue-100 text-blue-700' :
+                    issue.status === 'PENDING' ? 'bg-yellow-100 text-yellow-700' :
+                    (issue.status === 'COMPLETE' || issue.status === 'COMPLETED') ? 'bg-green-100 text-green-700' :
+                    issue.status === 'OVERDUE' ? 'bg-red-100 text-red-700' :
+                    'bg-gray-100 text-gray-700'
+                  }`}>
+                    {(issue.status === 'COMPLETE' || issue.status === 'COMPLETED') ? 'Complete' : issue.status.replace('_', ' ')}
+                  </span>
+                )}
                 {/* Assignment UI for manager */}
                 {/* ...existing code for assignment... */}
               </div>
