@@ -58,17 +58,59 @@ function ManagerDashboard() {
   const [showRecent, setShowRecent] = useState(true);
   const [issues, setIssues] = useState([]);
   const [summary, setSummary] = useState({ pending: 0, inProgress: 0, completed: 0, overdue: 0 });
+  const [showAssignForm, setShowAssignForm] = useState(null);
+  const [technicians, setTechnicians] = useState([]);
+  const [assignmentData, setAssignmentData] = useState({
+    priority: 'MEDIUM',
+    dueDate: '',
+    technicianId: ''
+  });
 
   useEffect(() => {
     const token = localStorage.getItem('token');
     const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+    
+    // Fetch technicians for assignment dropdown
+    axios.get("http://localhost:5000/api/technicians", config)
+      .then(res => setTechnicians(res.data))
+      .catch(() => setTechnicians([]));
+    
+    // Fetch issues
     axios.get("http://localhost:5000/api/issues", config)
       .then(res => setIssues(res.data))
       .catch(() => setIssues([]));
+    
+    // Fetch summary
     axios.get("http://localhost:5000/api/managers/dashboard/summary", config)
       .then(res => setSummary(res.data))
       .catch(() => setSummary({ pending: 0, inProgress: 0, completed: 0, overdue: 0 }));
   }, []);
+
+  const handleAssignIssue = async (issueId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const config = { headers: { Authorization: `Bearer ${token}` } };
+      
+      await axios.put(`http://localhost:5000/api/issues/${issueId}/assign`, {
+        priority: assignmentData.priority,
+        dueDate: assignmentData.dueDate,
+        assignedTo: assignmentData.technicianId
+      }, config);
+      
+      // Reset form and refresh issues
+      setShowAssignForm(null);
+      setAssignmentData({ priority: 'MEDIUM', dueDate: '', technicianId: '' });
+      
+      // Refresh issues
+      const updatedIssues = await axios.get("http://localhost:5000/api/issues", config);
+      setIssues(updatedIssues.data);
+      
+      alert('Issue assigned successfully!');
+    } catch (error) {
+      console.error('Assignment error:', error);
+      alert('Failed to assign issue');
+    }
+  };
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -224,7 +266,80 @@ function ManagerDashboard() {
                       <span className="flex items-center gap-1 text-yellow-700 text-xs md:text-base font-medium"><span role="img" aria-label="warning">⚠️</span> {issue.time}</span>
                     )}
                     {issue.overdue && <span className="text-red-600 text-xs md:text-sm font-semibold">overdue</span>}
+                    
+                    {/* Assignment Controls for Admins */}
+                    {issue.status === 'PENDING' && (
+                      <div className="flex flex-col gap-1 mt-2">
+                        <button
+                          onClick={() => setShowAssignForm(showAssignForm === issue._id ? null : issue._id)}
+                          className="px-2 py-1 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700 transition"
+                        >
+                          {showAssignForm === issue._id ? 'Cancel' : 'Assign'}
+                        </button>
+                      </div>
+                    )}
                   </div>
+                  
+                  {/* Assignment Form - Show when button is clicked */}
+                  {showAssignForm === issue._id && (
+                    <div className="col-span-full mt-4 p-4 bg-gray-50 rounded-lg">
+                      <h3 className="text-lg font-semibold mb-3">Assign Issue to Technician</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+                          <select
+                            value={assignmentData.priority}
+                            onChange={(e) => setAssignmentData({...assignmentData, priority: e.target.value})}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          >
+                            <option value="LOW">Low</option>
+                            <option value="MEDIUM">Medium</option>
+                            <option value="HIGH">High</option>
+                            <option value="URGENT">Urgent</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
+                          <input
+                            type="date"
+                            value={assignmentData.dueDate}
+                            onChange={(e) => setAssignmentData({...assignmentData, dueDate: e.target.value})}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            min={new Date().toISOString().split('T')[0]}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Assign to Technician</label>
+                          <select
+                            value={assignmentData.technicianId}
+                            onChange={(e) => setAssignmentData({...assignmentData, technicianId: e.target.value})}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          >
+                            <option value="">Select Technician</option>
+                            {technicians.map(tech => (
+                              <option key={tech.id} value={tech.id}>{tech.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 mt-4">
+                        <button
+                          type="button"
+                          onClick={() => handleAssignIssue(issue._id)}
+                          className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition"
+                        >
+                          Assign Issue
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowAssignForm(null)}
+                          className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 transition"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
