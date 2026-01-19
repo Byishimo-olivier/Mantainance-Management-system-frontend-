@@ -2,7 +2,6 @@ import Header from "./Header";
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
-import EvidenceUploadForm from "./EvidenceUploadForm";
 
 const statusCards = [
   {
@@ -59,20 +58,13 @@ function ManagerDashboard() {
   const [showRecent, setShowRecent] = useState(true);
   const [issues, setIssues] = useState([]);
   const [summary, setSummary] = useState({ pending: 0, inProgress: 0, completed: 0, overdue: 0 });
-  const [showEvidenceForm, setShowEvidenceForm] = useState(null);
 
-  const fetchIssues = () => {
+  useEffect(() => {
     const token = localStorage.getItem('token');
     const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
     axios.get("http://localhost:5000/api/issues", config)
       .then(res => setIssues(res.data))
       .catch(() => setIssues([]));
-  };
-
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
-    fetchIssues();
     axios.get("http://localhost:5000/api/managers/dashboard/summary", config)
       .then(res => setSummary(res.data))
       .catch(() => setSummary({ pending: 0, inProgress: 0, completed: 0, overdue: 0 }));
@@ -232,31 +224,7 @@ function ManagerDashboard() {
                       <span className="flex items-center gap-1 text-yellow-700 text-xs md:text-base font-medium"><span role="img" aria-label="warning">⚠️</span> {issue.time}</span>
                     )}
                     {issue.overdue && <span className="text-red-600 text-xs md:text-sm font-semibold">overdue</span>}
-                    
-                    {/* Evidence Upload Button for Admins */}
-                    {(issue.status === 'IN PROGRESS' || issue.status === 'COMPLETE' || issue.status === 'COMPLETED') && (
-                      <button
-                        onClick={() => setShowEvidenceForm(showEvidenceForm === issue._id ? null : issue._id)}
-                        className="mt-2 px-3 py-1 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700 transition"
-                      >
-                        {showEvidenceForm === issue._id ? 'Cancel' : 'Upload Evidence'}
-                      </button>
-                    )}
                   </div>
-                  
-                  {/* Evidence Upload Form - Show when button is clicked */}
-                  {showEvidenceForm === issue._id && (
-                    <div className="col-span-full mt-4">
-                      <EvidenceUploadForm 
-                        issueId={issue._id} 
-                        onSuccess={() => {
-                          setShowEvidenceForm(null);
-                          // Refresh issues data
-                          fetchIssues();
-                        }}
-                      />
-                    </div>
-                  )}
                 </div>
               ))}
             </div>
