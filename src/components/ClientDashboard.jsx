@@ -153,19 +153,60 @@ export default function ClientDashboard() {
                   <div className="text-base md:text-lg font-semibold mb-1">{recentIssue.title}</div>
                   <div className="text-gray-500 mb-2">{recentIssue.location}</div>
                   {(recentIssue.photo || recentIssue.image) ? (
-                    <img
-                      src={(() => {
-                        const img = recentIssue.photo || recentIssue.image;
-                        if (!img) return '/default-issue.png';
-                        return img.startsWith('http')
-                          ? img
-                          : `http://localhost:5000/uploads/${img.replace(/^\/uploads\//, '')}`;
-                      })()}
-                      alt="Issue"
-                      className="h-32 w-auto rounded mb-2"
-                      onError={e => { e.target.src = '/default-issue.png'; }}
-                    />
+                    <div className="mb-2">
+                      <p className="text-sm font-semibold text-gray-700 mb-1">Original Issue Photo:</p>
+                      <img
+                        src={(() => {
+                          const img = recentIssue.photo || recentIssue.image;
+                          if (!img) return '/default-issue.png';
+                          return img.startsWith('http')
+                            ? img
+                            : `http://localhost:5000/uploads/${img.replace(/^\/uploads\//, '')}`;
+                        })()}
+                        alt="Issue"
+                        className="h-32 w-auto rounded mb-2"
+                        onError={e => { e.target.src = '/default-issue.png'; }}
+                      />
+                    </div>
                   ) : null}
+                  
+                  {/* Evidence Section - Show for clients when issue is completed */}
+                  {(recentIssue.status === 'COMPLETE' || recentIssue.status === 'COMPLETED') && recentIssue.evidence && (
+                    <div className="mb-2 p-3 bg-gray-50 rounded-lg">
+                      <p className="text-sm font-semibold text-gray-700 mb-2">Maintenance Evidence:</p>
+                      
+                      {recentIssue.evidence.address && (
+                        <div className="mb-2">
+                          <p className="text-xs text-gray-600">Resolution Details:</p>
+                          <p className="text-sm text-gray-800">{recentIssue.evidence.address}</p>
+                        </div>
+                      )}
+                      
+                      <div className="flex flex-wrap gap-2">
+                        {recentIssue.evidence.beforeImage && (
+                          <div>
+                            <p className="text-xs text-gray-600 mb-1">BEFORE:</p>
+                            <img 
+                              src={`http://localhost:5000${recentIssue.evidence.beforeImage}`} 
+                              alt="Before" 
+                              className="h-24 w-auto rounded border border-gray-300" 
+                            />
+                          </div>
+                        )}
+                        
+                        {recentIssue.evidence.afterImage && (
+                          <div>
+                            <p className="text-xs text-gray-600 mb-1">AFTER:</p>
+                            <img 
+                              src={`http://localhost:5000${recentIssue.evidence.afterImage}`} 
+                              alt="After" 
+                              className="h-24 w-auto rounded border border-green-300" 
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                   <div className="flex gap-2 mb-1 flex-wrap">
                     {Array.isArray(recentIssue.tags) && recentIssue.tags.filter(tag => tag !== 'PENDING' && tag !== 'IN PROGRESS' && tag !== 'COMPLETE' && tag !== 'OVERDUE').map((tag, i) => {
                       let label = tag.label || tag;
