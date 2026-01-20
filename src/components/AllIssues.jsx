@@ -112,7 +112,48 @@ function AllIssues() {
               <div className="text-base md:text-xl font-bold mb-1">{issue.title}</div>
               <div className="text-gray-600 mb-2">{issue.description}</div>
               {(issue.photo || issue.image) && (
-                <img src={`http://localhost:5000${issue.photo || issue.image}`} alt="Issue" className="h-32 w-auto rounded mb-2" />
+                <div className="mb-2">
+                  <p className="text-sm font-semibold text-gray-700 mb-1">Original Issue Photo:</p>
+                  <img src={`http://localhost:5000${issue.photo || issue.image}`} alt="Issue" className="h-32 w-auto rounded mb-2" />
+                </div>
+              )}
+              
+              {/* Evidence Section - Show for admins and clients when issue is completed */}
+              {(issue.status === 'COMPLETE' || issue.status === 'COMPLETED') && issue.evidence && (
+                <div className="mb-2 p-3 bg-gray-50 rounded-lg">
+                  <p className="text-sm font-semibold text-gray-700 mb-2">Maintenance Evidence:</p>
+                  
+                  {issue.evidence.address && (
+                    <div className="mb-2">
+                      <p className="text-xs text-gray-600">Resolution Details:</p>
+                      <p className="text-sm text-gray-800">{issue.evidence.address}</p>
+                    </div>
+                  )}
+                  
+                  <div className="flex flex-wrap gap-2">
+                    {issue.evidence.beforeImage && (
+                      <div>
+                        <p className="text-xs text-gray-600 mb-1">BEFORE:</p>
+                        <img 
+                          src={`http://localhost:5000${issue.evidence.beforeImage}`} 
+                          alt="Before" 
+                          className="h-24 w-auto rounded border border-gray-300" 
+                        />
+                      </div>
+                    )}
+                    
+                    {issue.evidence.afterImage && (
+                      <div>
+                        <p className="text-xs text-gray-600 mb-1">AFTER:</p>
+                        <img 
+                          src={`http://localhost:5000${issue.evidence.afterImage}`} 
+                          alt="After" 
+                          className="h-24 w-auto rounded border border-green-300" 
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
               )}
               <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-1">
                 <span className="flex items-center gap-1 text-gray-800 text-xs md:text-base">

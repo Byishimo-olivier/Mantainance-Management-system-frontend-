@@ -1,7 +1,5 @@
 import React, { useEffect, useState } from "react";
 import Select from 'react-select';
-import { useNavigate } from "react-router-dom";
-import Header from "./Header";
 import axios from "axios";
 
 const ManagementIssues = () => {
@@ -61,47 +59,9 @@ const tagColors = {
     setAssigning(null);
   };
 
-  const navigate = useNavigate();
-
-  function handleLogout() {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    navigate('/login', { replace: true });
-    window.location.reload();
-  };
-
   return (
-    <section className="min-h-screen bg-gray-50 pb-8">
-
-<nav className="flex items-center justify-between bg-white shadow px-4 md:px-8 h-16 mb-8">
-        <div className="flex items-center gap-3">
-          <span className="bg-indigo-600 rounded-xl p-1 flex items-center justify-center">
-            <svg width="36" height="36" viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="6" fill="#6366f1"/><rect x="6" y="6" width="12" height="6" rx="2" fill="#a5b4fc"/></svg>
-          </span>
-          <div className="flex flex-col ml-1">
-            <span className="text-lg font-bold text-gray-900">PropCare</span>
-            <span className="text-sm text-gray-500">Manager Issue Management</span>
-          </div>
-        </div>
-        <div className="flex gap-3">
-          <button className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-gray-100 font-semibold" onClick={() => navigate('/manager-dashboard')}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="4" fill="#ede9fe"/><rect x="7" y="7" width="4" height="4" rx="1" fill="#8b5cf6"/><rect x="13" y="7" width="4" height="4" rx="1" fill="#8b5cf6"/><rect x="7" y="13" width="4" height="4" rx="1" fill="#8b5cf6"/><rect x="13" y="13" width="4" height="4" rx="1" fill="#8b5cf6"/></svg> Dashboard
-          </button>
-          <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-100 text-indigo-700 font-semibold" onClick={() => navigate('/manager-issues')}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="4" fill="#f3f4f6"/><rect x="7" y="7" width="10" height="10" rx="2" fill="#6366f1"/></svg> All Issues
-          </button>
-          <button className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-gray-100 font-semibold" onClick={() => navigate('/analytics')}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="4" fill="#fef3c7"/><path d="M7 16L10 12L13 15L17 10L21 14" stroke="#b45309" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg> Analytics
-          </button>
-            <button className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-gray-100 font-semibold" onClick={handleLogout}>
-              Logout
-            </button>
-        </div>
-      </nav>    
-
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {issues.map((issue, idx) => (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {issues.map((issue, idx) => (
           <div
             key={idx}
             className="bg-white rounded-xl shadow-lg hover:shadow-2xl transition-shadow p-6 flex flex-col gap-3 border border-gray-100 relative"
@@ -182,7 +142,6 @@ const tagColors = {
           </div>
         ))}
       </div>
-    </section>
   );
 }
 export default ManagementIssues;
