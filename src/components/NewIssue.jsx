@@ -17,7 +17,7 @@ export default function NewIssue() {
     building: "",
     floor: "",
     unit: "",
-    photo: null,
+    beforePhoto: null, // Changed from photo to beforePhoto
   });
   const [submitting, setSubmitting] = useState(false);
   const [preview, setPreview] = useState(null);
@@ -46,7 +46,7 @@ export default function NewIssue() {
       formData.append("assignees", JSON.stringify([]));
       formData.append("overdue", false);
       formData.append("time", "-");
-      if (form.photo) formData.append("photo", form.photo);
+      formData.append("beforePhoto", form.beforePhoto);
       const token = localStorage.getItem('token');
       await axios.post("http://localhost:5000/api/issues", formData, {
         headers: {
@@ -109,10 +109,10 @@ export default function NewIssue() {
               required
             />
             {/* <div>
-              <label className="block font-semibold mb-1" htmlFor="photo">Attach Image</label>
+              <label className="block font-semibold mb-1" htmlFor="beforePhoto">Attach BEFORE Photo</label>
               <input
-                id="photo"
-                name="photo"
+                id="beforePhoto"
+                name="beforePhoto"
                 type="file"
                 accept="image/*"
                 className="w-full rounded-xl border border-gray-200 px-4 py-2 text-base md:text-lg focus:outline-none focus:ring-2 focus:ring-indigo-200"
@@ -197,11 +197,11 @@ export default function NewIssue() {
             </div>
           </div>
             <div>
-              <label className="block font-semibold mb-1">Upload Photo (Optional)</label>
+              <label className="block font-semibold mb-1">Upload BEFORE Photo (Optional)</label>
               <label className="w-full flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-xl h-32 md:h-40 cursor-pointer hover:border-indigo-300 transition">
                 <input
                   type="file"
-                  name="photo"
+                  name="beforePhoto"
                   accept="image/*"
                   className="hidden"
                   onChange={handleChange}

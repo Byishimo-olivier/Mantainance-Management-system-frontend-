@@ -16,6 +16,7 @@ import TechnicianManagement from './components/TechnicianManagement';
 import TechnicianDashboard from './components/TechnicianDashboard';
 import Technicianissue from './components/ManagementIssues';
 import ManagementIssues from './components/ManagementIssues';
+import RequestsPage from './components/RequestsPage';
 
 function ResetPasswordWrapper() {
   const { token } = useParams();
@@ -66,6 +67,7 @@ function App() {
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password/:token" element={<ResetPasswordWrapper />} />
       <Route path="/new-issue" element={auth ? <NewIssue /> : <Login onLogin={handleLogin} />} />
+      <Route path="/requests" element={auth ? <RequestsPage /> : <Login onLogin={handleLogin} />} />
       <Route path="/admin-dashboard" element={auth ? <AdminDashboard /> : <Login onLogin={handleLogin} />} />
       <Route path="/manager-dashboard" element={auth ? <ManagerDashboard /> : <Login onLogin={handleLogin} />} />
       <Route path="/analytics" element={auth ? <Analytics /> : <Login onLogin={handleLogin} />} />
