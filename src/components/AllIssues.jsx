@@ -29,10 +29,10 @@ function AllIssues() {
     async function fetchIssues() {
       try {
         let url = 'http://localhost:5000/api/issues';
-        // For tech: assigned, for user: own, for admin: all
-        if (userObj.role === 'TECH') {
+        // For technician: assigned, for client: own, for admin: all
+        if (userObj.role === 'technician') {
           url = `http://localhost:5000/api/issues/assigned/${userObj.id}`;
-        } else if (userObj.role === 'CLIENT') {
+        } else if (userObj.role === 'client') {
           url = `http://localhost:5000/api/issues/user/${userObj.id}`;
         }
         const res = await axios.get(url);
