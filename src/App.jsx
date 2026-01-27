@@ -16,7 +16,11 @@ import TechnicianManagement from './components/TechnicianManagement';
 import TechnicianDashboard from './components/TechnicianDashboard';
 import Technicianissue from './components/ManagementIssues';
 import ManagementIssues from './components/ManagementIssues';
+
 import RequestsPage from './components/RequestsPage';
+
+import Feedback from './components/Feedback';
+import ManagerFeedback from './components/ManagerFeedback';
 
 function ResetPasswordWrapper() {
   const { token } = useParams();
@@ -74,6 +78,8 @@ function App() {
       <Route path="/technicians" element={auth ? <TechnicianManagement /> : <Login onLogin={handleLogin} />} />
       <Route path="/technician-dashboard" element={auth ? <TechnicianDashboard /> : <Login onLogin={handleLogin} />} />
       <Route path="/manager-issues" element={auth ? <ManagementIssues issues={issues} setIssues={setIssues} /> : <Login onLogin={handleLogin} />} />
+      <Route path="/feedback" element={auth ? <Feedback /> : <Login onLogin={handleLogin} />} />
+      <Route path="/manager-feedback" element={auth ? <ManagerFeedback /> : <Login onLogin={handleLogin} />} />
     </Routes>
   );
 }

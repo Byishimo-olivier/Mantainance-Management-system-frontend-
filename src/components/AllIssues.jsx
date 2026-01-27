@@ -25,19 +25,23 @@ function AllIssues() {
     // Set axios default Authorization header for all requests
     axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
     const userObj = JSON.parse(storedUser);
+    console.log('userObj from localStorage:', userObj);
     setUser(userObj);
     async function fetchIssues() {
       try {
         let url = 'http://localhost:5000/api/issues';
         // For technician: assigned, for client: own, for admin: all
         if (userObj.role === 'technician') {
-          url = `http://localhost:5000/api/issues/assigned/${userObj.id}`;
+          url = `http://localhost:5000/api/issues/assigned/${userObj._id}`;
         } else if (userObj.role === 'client') {
-          url = `http://localhost:5000/api/issues/user/${userObj.id}`;
+          url = `http://localhost:5000/api/issues/user/${userObj._id}`; // Uses correct userId
         }
+        console.log('Fetching issues from:', url);
         const res = await axios.get(url);
+        console.log('Fetched issues:', res.data);
         setIssues(res.data);
       } catch (err) {
+        console.error('Error fetching issues:', err);
         setIssues([]);
       }
     }
@@ -68,7 +72,7 @@ function AllIssues() {
             <svg width="36" height="36" viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="6" fill="#6366f1"/><rect x="6" y="6" width="12" height="6" rx="2" fill="#a5b4fc"/></svg>
           </span>
           <div className="flex flex-col ml-1">
-            <span className="text-lg font-bold text-gray-900">PropCare</span>
+            <span className="text-lg font-bold text-gray-900">Fixnest</span>
             <span className="text-sm text-gray-500">Jean Mukaba</span>
           </div>
         </div>
