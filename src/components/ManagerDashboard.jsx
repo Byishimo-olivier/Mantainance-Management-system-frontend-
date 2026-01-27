@@ -1,84 +1,49 @@
+// ...existing code...
+
 import Header from "./Header";
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
+// Populate feedbacks when switching to feedback tab or issues change
+// (This must be inside the component, not at the top level)
+
 const statusCards = [
   {
     label: "Pending",
     count: 1,
-    colorClass: "text-yellow-700",
-    bgClass: "bg-yellow-50 border-yellow-200",
-    icon: (
-      <span className="bg-yellow-100 rounded-lg p-2"><svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="10" stroke="#fde68a" strokeWidth="2"/><path d="M12 8v4l2 2" stroke="#b45309" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg></span>
-    ),
   },
-  {
-    label: "In Progress",
-    count: 2,
-    colorClass: "text-blue-700",
-    bgClass: "bg-blue-50 border-blue-200",
-    icon: (
-      <span className="bg-blue-100 rounded-lg p-2"><svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="10" stroke="#dbeafe" strokeWidth="2"/><path d="M12 8v4l2 2" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg></span>
-    ),
-  },
-  {
-    label: "Completed",
-    count: 2,
-    colorClass: "text-green-700",
-    bgClass: "bg-green-50 border-green-200",
-    icon: (
-      <span className="bg-green-100 rounded-lg p-2"><svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="10" stroke="#d1fae5" strokeWidth="2"/><path d="M9 12l2 2 4-4" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg></span>
-    ),
-  },
-  {
-    label: "Overdue",
-    count: 4,
-    colorClass: "text-red-700",
-    bgClass: "bg-red-50 border-red-200",
-    icon: (
-      <span className="bg-red-100 rounded-lg p-2"><svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="10" stroke="#fee2e2" strokeWidth="2"/><path d="M15 9l-6 6M9 9l6 6" stroke="#dc2626" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg></span>
-    ),
-  },
+  // Add other status cards as needed
 ];
 
-const tagColors = {
-  URGENT: "bg-red-100 text-red-600",
-  "IN PROGRESS": "bg-blue-100 text-blue-600",
-  COMPLETED: "bg-green-100 text-green-600",
-  MEDIUM: "bg-yellow-100 text-yellow-700",
-  ASSIGNED: "bg-gray-100 text-gray-600",
-  LOW: "bg-gray-100 text-gray-600",
-  PENDING: "bg-gray-100 text-gray-600",
-  HIGH: "bg-yellow-100 text-yellow-700",
-};
-
 function ManagerDashboard() {
-  const navigate = useNavigate();
+  // Debug: confirm component mount
+  console.log('[ManagerDashboard] Component mounted');
   const [activeTab, setActiveTab] = useState('overview');
-  const [summary, setSummary] = useState({ pending: 0, inProgress: 0, completed: 0, overdue: 0 });
   const [issues, setIssues] = useState([]);
+  const [allIssues, setAllIssues] = useState([]); // Store all issues for feedbacks
   const [pendingRequests, setPendingRequests] = useState([]);
   const [technicians, setTechnicians] = useState([]);
+  const [summary, setSummary] = useState({ pending: 0, inProgress: 0, completed: 0, overdue: 0 });
   const [assigning, setAssigning] = useState(null);
+  const [assignmentData, setAssignmentData] = useState({ technicianId: "", priority: "MEDIUM", dueDate: "" });
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
-  const [declineReason, setDeclineReason] = useState("");
-  const [filters, setFilters] = useState({
-    status: 'all',
-    priority: 'all',
-    assignedTo: 'all'
-  });
-  const [assignmentData, setAssignmentData] = useState({
-    technicianId: "",
-    priority: "MEDIUM",
-    dueDate: ""
-  });
+  const [declineReason, setDeclineReason] = useState('');
+  const [filters, setFilters] = useState({ status: 'all', priority: 'all', assignedTo: 'all' });
+  const [feedbacks, setFeedbacks] = useState([]);
+
+  // Debug: log feedbacks whenever they change
+  useEffect(() => {
+    console.log('[ManagerDashboard] feedbacks state changed:', feedbacks);
+  }, [feedbacks]);
+  const [loadingFeedbacks, setLoadingFeedbacks] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const token = localStorage.getItem('token');
-    const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
-    
+    const config = { headers: { Authorization: `Bearer ${token}` } };
+
     // Fetch all data
     Promise.all([
       axios.get("http://localhost:5000/api/issues", config),
@@ -86,19 +51,17 @@ function ManagerDashboard() {
       axios.get("http://localhost:5000/api/managers/dashboard/summary", config)
     ]).then(([issuesRes, techRes, summaryRes]) => {
       console.log('Data loaded successfully');
-      
       // Filter issues using consistent logic
-      const allIssues = issuesRes.data;
-      const approvedIssues = allIssues.filter(issue => 
+      const allIssuesData = issuesRes.data;
+      setAllIssues(allIssuesData); // Store all issues for feedbacks
+      const approvedIssues = allIssuesData.filter(issue => 
         issue.approved === true || issue.assignedTo || (issue.status !== 'PENDING' && issue.status !== 'REJECTED')
       );
-      const pendingRequests = allIssues.filter(issue => 
+      const pendingRequests = allIssuesData.filter(issue => 
         issue.status === 'PENDING' && !issue.assignedTo && !issue.approved
       );
-      
       console.log('Initial load - Approved issues:', approvedIssues.length);
       console.log('Initial load - Pending requests:', pendingRequests.length);
-      
       setIssues(approvedIssues);
       setPendingRequests(pendingRequests);
       setTechnicians(techRes.data);
@@ -106,6 +69,7 @@ function ManagerDashboard() {
     }).catch(err => {
       console.error('Failed to load data:', err);
       setIssues([]);
+      setAllIssues([]);
       setPendingRequests([]);
       setTechnicians([]);
       setSummary({ pending: 0, inProgress: 0, completed: 0, overdue: 0 });
@@ -481,43 +445,26 @@ function ManagerDashboard() {
   const completionRate = totalIssues ? Math.round((completed / totalIssues) * 100) : 0;
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen flex bg-gray-50">
       {/* Sidebar */}
-      <div className="w-64 bg-white shadow-lg">
-        <div className="p-6">
-          <div className="flex items-center gap-3 mb-8">
-            <span className="bg-indigo-600 rounded-xl p-1 flex items-center justify-center">
-              <svg width="36" height="36" viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="6" fill="#6366f1"/><rect x="6" y="6" width="12" height="6" rx="2" fill="#a5b4fc"/></svg>
-            </span>
-            <div className="flex flex-col">
-              <span className="text-lg font-bold text-gray-900">PropCare</span>
-              <span className="text-sm text-gray-500">Manager Portal</span>
+      <aside className="w-72 bg-white shadow-lg flex flex-col justify-between">
+        <div>
+          {/* User Info */}
+          <div className="flex flex-col items-center py-8 border-b border-gray-100">
+            <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mb-2">
+              <span className="text-2xl text-indigo-600 font-bold">AK</span>
+            </div>
+            <div className="text-center">
+              <div className="font-semibold text-gray-900 text-lg">Alice Kayitesi</div>
+              <div className="text-sm text-blue-600 font-medium">Manager</div>
             </div>
           </div>
-          
-          {/* Navigation Menu */}
-          <nav className="space-y-2">
-            <button
-              onClick={() => setActiveTab('overview')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left font-medium transition ${
-                activeTab === 'overview' 
-                  ? 'bg-indigo-100 text-indigo-700' 
-                  : 'text-gray-700 hover:bg-gray-100'
-              }`}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="4" fill="#ede9fe"/><rect x="7" y="7" width="4" height="4" rx="1" fill="#8b5cf6"/><rect x="13" y="7" width="4" height="4" rx="1" fill="#8b5cf6"/><rect x="7" y="13" width="4" height="4" rx="1" fill="#8b5cf6"/><rect x="13" y="13" width="4" height="4" rx="1" fill="#8b5cf6"/></svg>
-              Dashboard Overview
+          {/* Navigation */}
+          <nav className="flex flex-col gap-1 mt-8 px-4">
+            <button onClick={() => setActiveTab('overview')} className={`flex items-center gap-3 px-4 py-3 rounded-lg text-left font-medium transition ${activeTab === 'overview' ? 'bg-indigo-100 text-indigo-700' : 'text-gray-700 hover:bg-gray-100'}`}>
+              Overview
             </button>
-            
-            <button
-              onClick={() => setActiveTab('requests')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left font-medium transition ${
-                activeTab === 'requests' 
-                  ? 'bg-orange-100 text-orange-700' 
-                  : 'text-gray-700 hover:bg-gray-100'
-              }`}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M9 12l2 2 4-4" stroke="#ea580c" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><circle cx="12" cy="12" r="9" stroke="#ea580c" strokeWidth="2"/></svg>
+            <button onClick={() => setActiveTab('requests')} className={`flex items-center gap-3 px-4 py-3 rounded-lg text-left font-medium transition ${activeTab === 'requests' ? 'bg-orange-100 text-orange-700' : 'text-gray-700 hover:bg-gray-100'}`}>
               Pending Requests
               {pendingRequests.length > 0 && (
                 <span className="ml-auto bg-orange-500 text-white text-xs px-2 py-1 rounded-full">
@@ -525,164 +472,91 @@ function ManagerDashboard() {
                 </span>
               )}
             </button>
-            
-            <button
-              onClick={() => setActiveTab('issues')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left font-medium transition ${
-                activeTab === 'issues' 
-                  ? 'bg-blue-100 text-blue-700' 
-                  : 'text-gray-700 hover:bg-gray-100'
-              }`}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="4" fill="#f3f4f6"/><rect x="7" y="7" width="10" height="10" rx="2" fill="#6366f1"/></svg>
+            <button onClick={() => setActiveTab('issues')} className={`flex items-center gap-3 px-4 py-3 rounded-lg text-left font-medium transition ${activeTab === 'issues' ? 'bg-blue-100 text-blue-700' : 'text-gray-700 hover:bg-gray-100'}`}>
               Issue Management
             </button>
-            
-            <button
-              onClick={() => setActiveTab('all-issues')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left font-medium transition ${
-                activeTab === 'all-issues' 
-                  ? 'bg-green-100 text-green-700' 
-                  : 'text-gray-700 hover:bg-gray-100'
-              }`}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" stroke="#059669" strokeWidth="2"/></svg>
+            <button onClick={() => setActiveTab('all-issues')} className={`flex items-center gap-3 px-4 py-3 rounded-lg text-left font-medium transition ${activeTab === 'all-issues' ? 'bg-green-100 text-green-700' : 'text-gray-700 hover:bg-gray-100'}`}>
               All Issues
+            </button>
+            <button onClick={() => setActiveTab('feedback')} className={`flex items-center gap-3 px-4 py-3 rounded-lg text-left font-medium transition ${activeTab === 'feedback' ? 'bg-green-100 text-green-700' : 'text-gray-700 hover:bg-gray-100'}`}>
+              Technician Feedback
             </button>
           </nav>
         </div>
-        
-        {/* User Info & Logout */}
-        <div className="absolute bottom-0 left-0 right-0 p-6 border-t">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
-              <span className="text-indigo-600 font-semibold">AK</span>
-            </div>
-            <div>
-              <div className="font-semibold text-gray-900">Alice Kayitesi</div>
-              <div className="text-sm text-gray-500">Manager</div>
-            </div>
-          </div>
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left font-medium transition text-red-600 hover:bg-red-50"
-          >
+        {/* Logout */}
+        <div className="p-6 border-t">
+          <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left font-medium transition text-red-600 hover:bg-red-50">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5M21 12l-5 5M21 12h-9" stroke="#dc2626" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
             Logout
           </button>
         </div>
-      </div>
+      </aside>
 
       {/* Main Content */}
-      <div className="flex-1 p-8">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">
-            {activeTab === 'overview' && 'Dashboard Overview'}
-            {activeTab === 'requests' && 'Pending Requests'}
-            {activeTab === 'issues' && 'Issue Management'}
-            {activeTab === 'all-issues' && 'All Issues'}
-          </h1>
-          <p className="text-gray-600 mt-2">
-            {activeTab === 'overview' && 'Monitor and manage maintenance operations'}
-            {activeTab === 'requests' && 'Review and approve client maintenance requests'}
-            {activeTab === 'issues' && 'Assign and manage approved issues'}
-            {activeTab === 'all-issues' && 'View all maintenance issues'}
-          </p>
+      <main className="flex-1 p-10 overflow-y-auto bg-gray-50">
+        {/* Section Header */}
+        <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-extrabold text-gray-900">
+              {activeTab === 'overview' && 'Dashboard Overview'}
+              {activeTab === 'requests' && 'Pending Requests'}
+              {activeTab === 'issues' && 'Issue Management'}
+             
+              {activeTab === 'feedback' && 'Technician Feedback'}
+            </h1>
+            <p className="text-gray-600 mt-2">
+              {activeTab === 'overview' && 'Monitor and manage maintenance operations'}
+              {activeTab === 'requests' && 'Review and approve client maintenance requests'}
+              {activeTab === 'issues' && 'Assign and manage approved issues'}
+              {activeTab === 'all-issues' && 'View all maintenance issues'}
+              {activeTab === 'feedback' && 'See feedback and completion evidence from technicians'}
+            </p>
+          </div>
         </div>
 
-        {/* Overview Tab Content */}
+        {/* Overview Tab */}
         {activeTab === 'overview' && (
-          <div>
-            {/* Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              <div className="bg-white rounded-xl shadow p-6">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-gray-500">Total Issues</span>
-                  <span className="bg-blue-100 rounded-lg p-2">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="#3b82f6" strokeWidth="2"/></svg>
-                  </span>
-                </div>
-                <div className="text-3xl font-bold text-gray-900">{totalIssues}</div>
-                <div className="text-sm text-gray-500">All issues</div>
-              </div>
-              
-              <div className="bg-white rounded-xl shadow p-6">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-gray-500">Pending</span>
-                  <span className="bg-yellow-100 rounded-lg p-2">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="#eab308" strokeWidth="2"/></svg>
-                  </span>
-                </div>
-                <div className="text-3xl font-bold text-yellow-600">{summary.pending}</div>
-                <div className="text-sm text-gray-500">Awaiting action</div>
-              </div>
-              
-              <div className="bg-white rounded-xl shadow p-6">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-gray-500">In Progress</span>
-                  <span className="bg-blue-100 rounded-lg p-2">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 8v4l3 3" stroke="#3b82f6" strokeWidth="2"/></svg>
-                  </span>
-                </div>
-                <div className="text-3xl font-bold text-blue-600">{inProgress}</div>
-                <div className="text-sm text-gray-500">Being worked on</div>
-              </div>
-              
-              <div className="bg-white rounded-xl shadow p-6">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-gray-500">Completed</span>
-                  <span className="bg-green-100 rounded-lg p-2">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M9 12l2 2 4-4" stroke="#10b981" strokeWidth="2"/></svg>
-                  </span>
-                </div>
-                <div className="text-3xl font-bold text-green-600">{completed}</div>
-                <div className="text-sm text-gray-500">Resolved</div>
-              </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+            <div className="bg-white rounded-xl shadow p-6 flex flex-col items-center">
+              <span className="bg-blue-100 p-3 rounded-full mb-2">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="12" r="10" stroke="#3b82f6" strokeWidth="2"/>
+                </svg>
+              </span>
+              <div className="text-2xl font-bold text-gray-900">{totalIssues}</div>
+              <div className="text-sm text-gray-500 mt-1">Total Issues</div>
             </div>
-            
-            {/* Quick Actions */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-white rounded-xl shadow p-6 hover:shadow-lg transition cursor-pointer" onClick={() => setActiveTab('requests')}>
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M9 12l2 2 4-4" stroke="#ea580c" strokeWidth="2"/></svg>
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-900">Review Requests</h3>
-                    <p className="text-sm text-gray-600">{pendingRequests.length} pending approval</p>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="bg-white rounded-xl shadow p-6 hover:shadow-lg transition cursor-pointer" onClick={() => setActiveTab('issues')}>
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="4" stroke="#3b82f6" strokeWidth="2"/></svg>
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-900">Manage Issues</h3>
-                    <p className="text-sm text-gray-600">{issues.length} approved issues</p>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="bg-white rounded-xl shadow p-6 hover:shadow-lg transition cursor-pointer" onClick={() => setActiveTab('all-issues')}>
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" stroke="#10b981" strokeWidth="2"/></svg>
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-900">View All Issues</h3>
-                    <p className="text-sm text-gray-600">Complete overview</p>
-                  </div>
-                </div>
-              </div>
+            <div className="bg-white rounded-xl shadow p-6 flex flex-col items-center">
+              <span className="bg-yellow-100 p-3 rounded-full mb-2">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="12" r="10" stroke="#eab308" strokeWidth="2"/>
+                </svg>
+              </span>
+              <div className="text-2xl font-bold text-yellow-600">{summary.pending}</div>
+              <div className="text-sm text-gray-500 mt-1">Pending</div>
+            </div>
+            <div className="bg-white rounded-xl shadow p-6 flex flex-col items-center">
+              <span className="bg-blue-100 p-3 rounded-full mb-2">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 8v4l3 3" stroke="#3b82f6" strokeWidth="2"/>
+                </svg>
+              </span>
+              <div className="text-2xl font-bold text-blue-600">{inProgress}</div>
+              <div className="text-sm text-gray-500 mt-1">In Progress</div>
+            </div>
+            <div className="bg-white rounded-xl shadow p-6 flex flex-col items-center">
+              <span className="bg-green-100 p-3 rounded-full mb-2">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                  <path d="M9 12l2 2 4-4" stroke="#10b981" strokeWidth="2"/>
+                </svg>
+              </span>
+              <div className="text-2xl font-bold text-green-600">{completed}</div>
+              <div className="text-sm text-gray-500 mt-1">Completed</div>
             </div>
           </div>
         )}
 
-        {/* Requests Tab Content */}
+        {/* Requests Tab */}
         {activeTab === 'requests' && (
           <div>
             {pendingRequests.length === 0 ? (
@@ -696,52 +570,22 @@ function ManagerDashboard() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {pendingRequests.map(request => (
-                  <div key={request._id} className="bg-white rounded-xl shadow p-6">
-                    <div className="flex items-start justify-between mb-4">
-                      <div>
-                        <h3 className="text-lg font-semibold text-gray-900 mb-2">{request.title}</h3>
-                        <p className="text-gray-600 mb-3">{request.description}</p>
-                        <div className="flex flex-wrap gap-2">
-                          <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs">
-                            📍 {request.location}
-                          </span>
-                          <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs">
-                            {request.priority || 'MEDIUM'}
-                          </span>
-                          <span className="px-2 py-1 bg-gray-100 text-gray-500 rounded text-xs">
-                            {new Date(request.createdAt).toLocaleDateString()}
-                          </span>
-                        </div>
+                  <div key={request._id || request.id || request.title || request.createdAt} className="bg-white rounded-xl shadow p-6 flex flex-col justify-between">
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">{request.title}</h3>
+                      <p className="text-gray-600 mb-3">{request.description}</p>
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs">📍 {request.location}</span>
+                        <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs">{request.priority || 'MEDIUM'}</span>
+                        <span className="px-2 py-1 bg-gray-100 text-gray-500 rounded text-xs">{new Date(request.createdAt).toLocaleDateString()}</span>
                       </div>
                       {(request.beforePhoto || request.photo) && (
-                        <img 
-                          src={`http://localhost:5000${request.beforePhoto || request.photo}`}
-                          alt="Issue"
-                          className="w-20 h-20 object-cover rounded-lg cursor-pointer hover:opacity-80"
-                          onClick={() => window.open(`http://localhost:5000${request.beforePhoto || request.photo}`, '_blank')}
-                        />
+                        <img src={`http://localhost:5000${request.beforePhoto || request.photo}`} alt="Issue" className="w-24 h-24 object-cover rounded-lg mb-2" />
                       )}
                     </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => {
-                          setSelectedRequest(request);
-                          setShowApprovalModal(true);
-                        }}
-                        className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium"
-                      >
-                        ✅ Approve
-                      </button>
-                      <button
-                        onClick={() => {
-                          setSelectedRequest(request);
-                          setDeclineReason('');
-                          setShowApprovalModal(true);
-                        }}
-                        className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium"
-                      >
-                        ❌ Decline
-                      </button>
+                    <div className="flex gap-2 mt-4">
+                      <button onClick={() => { setSelectedRequest(request); setShowApprovalModal(true); }} className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium">✅ Approve</button>
+                      <button onClick={() => { setSelectedRequest(request); setDeclineReason(''); setShowApprovalModal(true); }} className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium">❌ Decline</button>
                     </div>
                   </div>
                 ))}
@@ -750,7 +594,7 @@ function ManagerDashboard() {
           </div>
         )}
 
-        {/* Issues Tab Content */}
+        {/* Issues Tab */}
         {activeTab === 'issues' && (
           <div>
             {issues.length === 0 ? (
@@ -764,73 +608,37 @@ function ManagerDashboard() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {issues.map((issue, idx) => (
-                  <div key={idx} className="bg-white rounded-xl shadow-lg hover:shadow-2xl transition-shadow p-6">
-                    <div className="flex items-center gap-2 mb-3">
-                      <span className="inline-block w-3 h-3 rounded-full"
-                        style={{ 
-                          background: issue.status === 'COMPLETE' || issue.status === 'COMPLETED' ? '#22c55e' : 
-                                     issue.status === 'IN PROGRESS' ? '#2563eb' : '#6366f1' 
-                        }}
-                      ></span>
-                      <span className="text-lg font-semibold text-gray-900 flex-1">{issue.title}</span>
-                      <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium">
-                        {issue.status || 'PENDING'}
-                      </span>
+                  <div key={issue._id || issue.id || issue.title || idx} className="bg-white rounded-xl shadow-lg hover:shadow-2xl transition-shadow p-6 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className="inline-block w-3 h-3 rounded-full" style={{ background: issue.status === 'COMPLETE' || issue.status === 'COMPLETED' ? '#22c55e' : issue.status === 'IN PROGRESS' ? '#2563eb' : '#6366f1' }}></span>
+                        <span className="text-lg font-semibold text-gray-900 flex-1">{issue.title}</span>
+                        <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium">{issue.status || 'PENDING'}</span>
+                      </div>
+                      <div className="text-gray-500 text-sm mb-2">{issue.location}</div>
+                      {(issue.photo || issue.image) && (
+                        <img src={`http://localhost:5000${issue.photo || issue.image}`} alt="Issue" className="w-full h-32 object-cover rounded mb-3" />
+                      )}
+                      <div className="text-gray-700 text-sm mb-3">{issue.description}</div>
                     </div>
-                    
-                    <div className="text-gray-500 text-sm mb-2">{issue.location}</div>
-                    {(issue.photo || issue.image) && (
-                      <img
-                        src={`http://localhost:5000${issue.photo || issue.image}`}
-                        alt="Issue"
-                        className="w-full h-32 object-cover rounded mb-3 cursor-pointer hover:opacity-80"
-                        onClick={() => window.open(`http://localhost:5000${issue.photo || issue.image}`, '_blank')}
-                      />
-                    )}
-                    <div className="text-gray-700 text-sm mb-3">{issue.description}</div>
-                    
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-gray-400">
-                        Assigned to: {issue.assignedTo ? 
-                          (() => {
-                            const tech = technicians.find(t => (t._id || t.id) === issue.assignedTo);
-                            return tech ? tech.name : 'Unknown';
-                          })() : 
-                          'Unassigned'
-                        }
-                      </span>
-                      <button
-                        onClick={() => handleOpenAssignment(idx)}
-                        className="px-3 py-1 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700"
-                      >
-                        Assign
-                      </button>
+                    <div className="flex items-center justify-between mt-2">
+                      <span className="text-xs text-gray-400">Assigned to: {issue.assignedTo ? (() => { const tech = technicians.find(t => (t._id || t.id) === issue.assignedTo); return tech ? tech.name : 'Unknown'; })() : 'Unassigned'}</span>
+                      <button onClick={() => handleOpenAssignment(idx)} className="px-3 py-1 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700">Assign</button>
                     </div>
-                    
                     {assigning === idx && (
                       <div className="mt-3 p-4 bg-gray-50 rounded-lg border">
                         <h4 className="font-semibold text-gray-900 mb-3">Assign Issue to Technician</h4>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">Technician</label>
-                            <select
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                              value={assignmentData.technicianId}
-                              onChange={(e) => setAssignmentData({...assignmentData, technicianId: e.target.value})}
-                            >
+                            <select className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" value={assignmentData.technicianId} onChange={(e) => setAssignmentData({...assignmentData, technicianId: e.target.value})}>
                               <option value="">Select technician...</option>
-                              {technicians.map(tech => (
-                                <option key={tech._id || tech.id} value={tech._id || tech.id}>{tech.name}</option>
-                              ))}
+                              {technicians.map(tech => (<option key={tech._id || tech.id} value={tech._id || tech.id}>{tech.name}</option>))}
                             </select>
                           </div>
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
-                            <select
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                              value={assignmentData.priority}
-                              onChange={(e) => setAssignmentData({...assignmentData, priority: e.target.value})}
-                            >
+                            <select className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" value={assignmentData.priority} onChange={(e) => setAssignmentData({...assignmentData, priority: e.target.value})}>
                               <option value="LOW">Low</option>
                               <option value="MEDIUM">Medium</option>
                               <option value="HIGH">High</option>
@@ -839,39 +647,12 @@ function ManagerDashboard() {
                           </div>
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
-                            <input
-                              type="date"
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                              value={assignmentData.dueDate}
-                              onChange={(e) => setAssignmentData({...assignmentData, dueDate: e.target.value})}
-                              min={new Date().toISOString().split('T')[0]}
-                            />
+                            <input type="date" className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" value={assignmentData.dueDate} onChange={(e) => setAssignmentData({...assignmentData, dueDate: e.target.value})} min={new Date().toISOString().split('T')[0]} />
                           </div>
                         </div>
                         <div className="flex gap-2">
-                          <button
-                            onClick={() => {
-                              const tech = technicians.find(t => (t._id || t.id) === assignmentData.technicianId);
-                              if (tech && assignmentData.dueDate) {
-                                handleAssignTech(idx, tech.name);
-                              } else {
-                                alert('Please select a technician and due date');
-                              }
-                            }}
-                            disabled={!assignmentData.technicianId || !assignmentData.dueDate}
-                            className="px-3 py-2 bg-green-600 text-white text-sm rounded hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
-                          >
-                            Assign Issue
-                          </button>
-                          <button 
-                            className="px-3 py-2 bg-red-100 text-red-700 text-sm rounded hover:bg-red-200" 
-                            onClick={() => {
-                              setAssigning(null);
-                              setAssignmentData({ technicianId: "", priority: "MEDIUM", dueDate: "" });
-                            }}
-                          >
-                            Cancel
-                          </button>
+                          <button onClick={() => { const tech = technicians.find(t => (t._id || t.id) === assignmentData.technicianId); if (tech && assignmentData.dueDate) { handleAssignTech(idx, tech.name); } else { alert('Please select a technician and due date'); } }} disabled={!assignmentData.technicianId || !assignmentData.dueDate} className="px-3 py-2 bg-green-600 text-white text-sm rounded hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed">Assign Issue</button>
+                          <button className="px-3 py-2 bg-red-100 text-red-700 text-sm rounded hover:bg-red-200" onClick={() => { setAssigning(null); setAssignmentData({ technicianId: '', priority: 'MEDIUM', dueDate: '' }); }}>Cancel</button>
                         </div>
                       </div>
                     )}
@@ -882,7 +663,7 @@ function ManagerDashboard() {
           </div>
         )}
 
-        {/* All Issues Tab Content */}
+        {/* All Issues Tab */}
         {activeTab === 'all-issues' && (
           <div>
             {/* Filters */}
@@ -891,11 +672,7 @@ function ManagerDashboard() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                  <select
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                    value={filters.status}
-                    onChange={(e) => setFilters({...filters, status: e.target.value})}
-                  >
+                  <select className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" value={filters.status} onChange={(e) => setFilters({...filters, status: e.target.value})}>
                     <option value="all">All Status</option>
                     <option value="pending-approval">Pending Approval</option>
                     <option value="in-progress">In Progress</option>
@@ -904,11 +681,7 @@ function ManagerDashboard() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
-                  <select
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                    value={filters.priority}
-                    onChange={(e) => setFilters({...filters, priority: e.target.value})}
-                  >
+                  <select className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" value={filters.priority} onChange={(e) => setFilters({...filters, priority: e.target.value})}>
                     <option value="all">All Priorities</option>
                     <option value="LOW">Low</option>
                     <option value="MEDIUM">Medium</option>
@@ -918,11 +691,7 @@ function ManagerDashboard() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Assignment</label>
-                  <select
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                    value={filters.assignedTo}
-                    onChange={(e) => setFilters({...filters, assignedTo: e.target.value})}
-                  >
+                  <select className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" value={filters.assignedTo} onChange={(e) => setFilters({...filters, assignedTo: e.target.value})}>
                     <option value="all">All Issues</option>
                     <option value="unassigned">Unassigned</option>
                     <option value="assigned">Assigned</option>
@@ -948,7 +717,7 @@ function ManagerDashboard() {
                     </div>
                   ) : (
                     getFilteredIssues().map((issue, idx) => (
-                      <div key={idx} className="border-b pb-4 last:border-b-0">
+                      <div key={issue._id || issue.id || issue.title || idx} className="border-b pb-4 last:border-b-0">
                         <div className="flex items-center justify-between">
                           <div className="flex-1">
                             <div className="flex items-center gap-3 mb-2">
@@ -1013,110 +782,143 @@ function ManagerDashboard() {
             </div>
           </div>
         )}
-      </div>
 
-      {/* Approval Modal */}
-      {showApprovalModal && selectedRequest && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex justify-between items-start mb-4">
-                <h2 className="text-xl font-bold">Review Client Request</h2>
-                <button
-                  onClick={() => {
-                    setShowApprovalModal(false);
-                    setSelectedRequest(null);
-                    setDeclineReason('');
-                  }}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  ✕
-                </button>
+        {/* Feedback Tab */}
+        {activeTab === 'feedback' && (
+          <div>
+            {console.log('[ManagerDashboard] Feedback tab render. feedbacks:', feedbacks, 'loadingFeedbacks:', loadingFeedbacks)}
+            {loadingFeedbacks ? (
+              <div className="text-gray-400 text-center py-8">Loading feedback...</div>
+            ) : feedbacks.length === 0 ? (
+              <div className="text-gray-400 text-center py-8">No feedback from technicians yet.</div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {feedbacks.map((fb, idx) => (
+                  <div key={fb._id || fb.id || fb.title || idx} className="bg-gradient-to-r from-green-50 via-white to-gray-50 rounded-2xl p-6 shadow border border-green-100 flex flex-col">
+                    <div className="flex items-center gap-3 mb-2">
+                      <span className="text-lg font-semibold text-green-700">{fb.assignees && fb.assignees.length > 0 ? (fb.assignees[0].name || 'Technician') : 'Technician'}</span>
+                      <span className="text-xs bg-green-100 text-green-700 rounded px-2 py-1 font-medium">{fb.updatedAt ? new Date(fb.updatedAt).toLocaleDateString() : ''}</span>
+                    </div>
+                    {fb.afterImage && (
+                      <img
+                        src={fb.afterImage.startsWith('/uploads/') ? `http://localhost:5000${fb.afterImage}` : fb.afterImage}
+                        alt="After evidence"
+                        className="w-32 h-32 object-cover rounded mb-2 border"
+                      />
+                    )}
+                    <div className="text-gray-700 text-base">
+                      {fb.address ? fb.address : <span className="italic text-gray-400">No completion details provided.</span>}
+                    </div>
+                    <div className="text-xs text-gray-400 mt-2">Related Issue: {fb.title || fb._id || fb.id}</div>
+                  </div>
+                ))}
               </div>
-              
-              <div className="space-y-4">
-                <div>
-                  <h3 className="font-semibold text-gray-700">Title</h3>
-                  <p className="text-gray-900">{selectedRequest.title}</p>
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-700">Description</h3>
-                  <p className="text-gray-900">{selectedRequest.description}</p>
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-700">Location</h3>
-                  <p className="text-gray-900">{selectedRequest.location}</p>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <h3 className="font-semibold text-gray-700">Priority</h3>
-                    <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${
-                      selectedRequest.priority === 'HIGH' ? 'bg-red-100 text-red-700' :
-                      selectedRequest.priority === 'MEDIUM' ? 'bg-yellow-100 text-yellow-700' :
-                      'bg-gray-100 text-gray-700'
-                    }`}>
-                      {selectedRequest.priority || 'MEDIUM'}
-                    </span>
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-700">Submitted</h3>
-                    <p className="text-gray-900">{new Date(selectedRequest.createdAt).toLocaleDateString()}</p>
-                  </div>
-                </div>
-                
-                {(selectedRequest.beforePhoto || selectedRequest.photo) && (
-                  <div>
-                    <h3 className="font-semibold text-gray-700 mb-2">Client Photo</h3>
-                    <img 
-                      src={`http://localhost:5000${selectedRequest.beforePhoto || selectedRequest.photo}`}
-                      alt="Issue"
-                      className="w-32 h-32 object-cover rounded border cursor-pointer hover:opacity-80"
-                      onClick={() => window.open(`http://localhost:5000${selectedRequest.beforePhoto || selectedRequest.photo}`, '_blank')}
-                    />
-                  </div>
-                )}
-                
-                <div>
-                  <h3 className="font-semibold text-gray-700 mb-2">Decline Reason (if declining)</h3>
-                  <textarea
-                    className="w-full border rounded px-3 py-2"
-                    rows="3"
-                    value={declineReason}
-                    onChange={(e) => setDeclineReason(e.target.value)}
-                    placeholder="Please provide a reason for declining this request..."
-                  />
-                </div>
-                
-                <div className="flex gap-2 pt-4">
-                  <button
-                    onClick={() => handleApproveRequest(selectedRequest)}
-                    className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-                  >
-                    Approve Request
-                  </button>
-                  <button
-                    onClick={handleDeclineRequest}
-                    disabled={!declineReason.trim()}
-                    className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
-                  >
-                    Decline Request
-                  </button>
+            )}
+          </div>
+        )}
+
+        {/* Approval Modal */}
+        {showApprovalModal && selectedRequest && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6">
+                <div className="flex justify-between items-start mb-4">
+                  <h2 className="text-xl font-bold">Review Client Request</h2>
                   <button
                     onClick={() => {
                       setShowApprovalModal(false);
                       setSelectedRequest(null);
                       setDeclineReason('');
                     }}
-                    className="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+                    className="text-gray-500 hover:text-gray-700"
                   >
-                    Cancel
+                    ✕
                   </button>
+                </div>
+                
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="font-semibold text-gray-700">Title</h3>
+                    <p className="text-gray-900">{selectedRequest.title}</p>
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-700">Description</h3>
+                    <p className="text-gray-900">{selectedRequest.description}</p>
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-700">Location</h3>
+                    <p className="text-gray-900">{selectedRequest.location}</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <h3 className="font-semibold text-gray-700">Priority</h3>
+                      <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${
+                        selectedRequest.priority === 'HIGH' ? 'bg-red-100 text-red-700' :
+                        selectedRequest.priority === 'MEDIUM' ? 'bg-yellow-100 text-yellow-700' :
+                        'bg-gray-100 text-gray-700'
+                      }`}>
+                        {selectedRequest.priority || 'MEDIUM'}
+                      </span>
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-gray-700">Submitted</h3>
+                      <p className="text-gray-900">{new Date(selectedRequest.createdAt).toLocaleDateString()}</p>
+                    </div>
+                  </div>
+                  
+                  {(selectedRequest.beforePhoto || selectedRequest.photo) && (
+                    <div>
+                      <h3 className="font-semibold text-gray-700 mb-2">Client Photo</h3>
+                      <img 
+                        src={`http://localhost:5000${selectedRequest.beforePhoto || selectedRequest.photo}`}
+                        alt="Issue"
+                        className="w-32 h-32 object-cover rounded border"
+                      />
+                    </div>
+                  )}
+                  
+                  <div>
+                    <h3 className="font-semibold text-gray-700 mb-2">Decline Reason (if declining)</h3>
+                    <textarea
+                      className="w-full border rounded px-3 py-2"
+                      rows="3"
+                      value={declineReason}
+                      onChange={(e) => setDeclineReason(e.target.value)}
+                      placeholder="Please provide a reason for declining this request..."
+                    />
+                  </div>
+                  
+                  <div className="flex gap-2 pt-4">
+                    <button
+                      onClick={() => handleApproveRequest(selectedRequest)}
+                      className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                    >
+                      Approve Request
+                    </button>
+                    <button
+                      onClick={handleDeclineRequest}
+                      disabled={!declineReason.trim()}
+                      className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                    >
+                      Decline Request
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowApprovalModal(false);
+                        setSelectedRequest(null);
+                        setDeclineReason('');
+                      }}
+                      className="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </main>
     </div>
   );
 }

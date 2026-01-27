@@ -23,7 +23,7 @@ const AdminDashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
-      <h1 className="text-2xl font-bold mb-6">Admin Dashboard</h1>
+      <h1 className="text-2xl font-bold mb-6">Fixnest Admin Dashboard</h1>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
         <div className="bg-white rounded-xl shadow p-6">
           <h2 className="font-semibold text-lg mb-2">Active Jobs</h2>

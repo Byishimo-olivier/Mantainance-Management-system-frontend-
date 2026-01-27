@@ -46,8 +46,10 @@ export default function NewIssue() {
       formData.append("assignees", JSON.stringify([]));
       formData.append("overdue", false);
       formData.append("time", "-");
-      formData.append("beforePhoto", form.beforePhoto);
+      formData.append("photo", form.beforePhoto);
       const token = localStorage.getItem('token');
+      const user = JSON.parse(localStorage.getItem('user'));
+      formData.append("userId", user?.id || "");
       await axios.post("http://localhost:5000/api/issues", formData, {
         headers: {
           "Content-Type": "multipart/form-data",
