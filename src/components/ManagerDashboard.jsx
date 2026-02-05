@@ -10,7 +10,7 @@ import { useNavigate } from "react-router-dom";
 
 const statusCards = [
   {
-    label: "Pending",
+    label: "ASSIGNED",
     count: 1,
   },
   // Add other status cards as needed
@@ -114,7 +114,7 @@ function ManagerDashboard() {
       try {
         // First try: PUT with approval fields
         response = await axios.put(`http://localhost:5000/api/issues/${issueId}`, {
-          status: 'PENDING',
+          status: 'APPROVED',
           approved: true,
           approvedBy: JSON.parse(localStorage.getItem('user')).id,
           approvedAt: new Date().toISOString()
@@ -246,7 +246,7 @@ function ManagerDashboard() {
       try {
         // First try: PUT with rejection fields
         response = await axios.put(`http://localhost:5000/api/issues/${issueId}`, {
-          status: 'REJECTED',
+          status: 'DECLINED',
           rejected: true,
           rejectedBy: JSON.parse(localStorage.getItem('user')).id,
           rejectedAt: new Date().toISOString(),
@@ -268,7 +268,7 @@ function ManagerDashboard() {
           try {
             // Third try: Just update status and add reason to description
             response = await axios.put(`http://localhost:5000/api/issues/${issueId}`, {
-              status: 'REJECTED',
+              status: 'DECLINED',
               description: `${selectedRequest.description}\n\nREJECTED: ${declineReason}`
             }, config);
             console.log('Rejection successful (method 3):', response.data);
@@ -352,7 +352,8 @@ function ManagerDashboard() {
         response = await axios.post(`http://localhost:5000/api/issues/${issueId}/assign`, { 
           techId: tech._id || tech.id,
           priority: assignmentData.priority,
-          dueDate: assignmentData.dueDate
+          dueDate: assignmentData.dueDate,
+          status: 'ASSIGNED'
         }, config);
         console.log('Assignment successful (method 1):', response.data);
       } catch (err1) {
@@ -373,7 +374,8 @@ function ManagerDashboard() {
             response = await axios.put(`http://localhost:5000/api/issues/${issueId}/assign`, { 
               technicianId: tech._id || tech.id,
               priority: assignmentData.priority,
-              dueDate: assignmentData.dueDate
+              dueDate: assignmentData.dueDate,
+              status: 'ASSIGNED'
             }, config);
             console.log('Assignment successful (method 3):', response.data);
           } catch (err3) {
@@ -494,67 +496,6 @@ function ManagerDashboard() {
 
       {/* Main Content */}
       <main className="flex-1 p-10 overflow-y-auto bg-gray-50">
-        {/* Section Header */}
-        <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-extrabold text-gray-900">
-              {activeTab === 'overview' && 'Dashboard Overview'}
-              {activeTab === 'requests' && 'Pending Requests'}
-              {activeTab === 'issues' && 'Issue Management'}
-             
-              {activeTab === 'feedback' && 'Technician Feedback'}
-            </h1>
-            <p className="text-gray-600 mt-2">
-              {activeTab === 'overview' && 'Monitor and manage maintenance operations'}
-              {activeTab === 'requests' && 'Review and approve client maintenance requests'}
-              {activeTab === 'issues' && 'Assign and manage approved issues'}
-              {activeTab === 'all-issues' && 'View all maintenance issues'}
-              {activeTab === 'feedback' && 'See feedback and completion evidence from technicians'}
-            </p>
-          </div>
-        </div>
-
-        {/* Overview Tab */}
-        {activeTab === 'overview' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-            <div className="bg-white rounded-xl shadow p-6 flex flex-col items-center">
-              <span className="bg-blue-100 p-3 rounded-full mb-2">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                  <circle cx="12" cy="12" r="10" stroke="#3b82f6" strokeWidth="2"/>
-                </svg>
-              </span>
-              <div className="text-2xl font-bold text-gray-900">{totalIssues}</div>
-              <div className="text-sm text-gray-500 mt-1">Total Issues</div>
-            </div>
-            <div className="bg-white rounded-xl shadow p-6 flex flex-col items-center">
-              <span className="bg-yellow-100 p-3 rounded-full mb-2">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                  <circle cx="12" cy="12" r="10" stroke="#eab308" strokeWidth="2"/>
-                </svg>
-              </span>
-              <div className="text-2xl font-bold text-yellow-600">{summary.pending}</div>
-              <div className="text-sm text-gray-500 mt-1">Pending</div>
-            </div>
-            <div className="bg-white rounded-xl shadow p-6 flex flex-col items-center">
-              <span className="bg-blue-100 p-3 rounded-full mb-2">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                  <path d="M12 8v4l3 3" stroke="#3b82f6" strokeWidth="2"/>
-                </svg>
-              </span>
-              <div className="text-2xl font-bold text-blue-600">{inProgress}</div>
-              <div className="text-sm text-gray-500 mt-1">In Progress</div>
-            </div>
-            <div className="bg-white rounded-xl shadow p-6 flex flex-col items-center">
-              <span className="bg-green-100 p-3 rounded-full mb-2">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                  <path d="M9 12l2 2 4-4" stroke="#10b981" strokeWidth="2"/>
-                </svg>
-              </span>
-              <div className="text-2xl font-bold text-green-600">{completed}</div>
-              <div className="text-sm text-gray-500 mt-1">Completed</div>
-            </div>
-          </div>
-        )}
 
         {/* Requests Tab */}
         {activeTab === 'requests' && (
