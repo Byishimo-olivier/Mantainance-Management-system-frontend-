@@ -74,6 +74,18 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
       formData.append("overdue", false);
       formData.append("time", "-");
       formData.append("photo", form.beforePhoto);
+        // contact info
+        formData.append("name", form.name);
+        formData.append("email", form.email);
+        formData.append("phone", form.phone);
+        // include assetId(s) if available from prefill
+        if (prefill && prefill.assetId) formData.append('assetId', prefill.assetId);
+        else if (prefilledAsset && (prefilledAsset.id || prefilledAsset._id)) formData.append('assetId', prefilledAsset.id || prefilledAsset._id);
+        if (prefill && prefill.selectedItems && Array.isArray(prefill.selectedItems) && prefill.selectedItems.length > 0) {
+          const ids = prefill.selectedItems.map(si => si.assetId).filter(Boolean);
+          if (ids.length === 1) formData.append('assetId', ids[0]);
+          formData.append('assetIds', JSON.stringify(ids));
+        }
       const token = localStorage.getItem('token');
       const user = JSON.parse(localStorage.getItem('user'));
       formData.append("userId", user?.id || "");
