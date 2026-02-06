@@ -1505,7 +1505,7 @@ function PropertiesPage() {
       {/* Property Details Modal */}
       <PropertyDetailsModal />
       {showNewIssueModal && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center bg-black bg-opacity-60 p-4">
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 p-4" style={{ zIndex: 9999 }} role="dialog" aria-modal="true">
           <div className="w-full max-w-4xl h-[90vh] bg-white rounded-xl overflow-hidden shadow-lg">
             <div className="h-full overflow-y-auto">
               <NewIssue asModal={true} model={newIssueModel} onClose={(refresh) => { setShowNewIssueModal(false); setNewIssueModel(null); if (refresh) fetchPropertyDetails(selectedProperty); }} />
