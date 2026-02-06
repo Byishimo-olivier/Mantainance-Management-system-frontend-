@@ -63,6 +63,7 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
     e.preventDefault();
     setSubmitting(true);
     try {
+      // allow unauthenticated submissions; server will accept or reject accordingly
       const location = `Block ${form.building} - Floor ${form.floor} - Unit ${form.unit}`;
       const tags = [form.category.toUpperCase(), "PENDING"];
       const formData = new FormData();
@@ -89,12 +90,9 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
       const token = localStorage.getItem('token');
       const user = JSON.parse(localStorage.getItem('user'));
       formData.append("userId", user?.id || "");
-      await axios.post("http://localhost:5000/api/issues", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-          Authorization: `Bearer ${token}`
-        },
-      });
+      const headers = { "Content-Type": "multipart/form-data" };
+      if (token) headers.Authorization = `Bearer ${token}`;
+      await axios.post("http://localhost:5000/api/issues", formData, { headers });
       setSubmitting(false);
       // If used as a modal/component, call onClose(true) to signal success; otherwise navigate
       if (onClose && typeof onClose === 'function') {
@@ -150,6 +148,7 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
           </div>
         </div>
       )}
+      
       {/* Main Form */}
       <form className="max-w-3xl mx-auto mt-10 bg-white rounded-2xl shadow-lg p-6 md:p-10" onSubmit={handleSubmit}>
         <div className="flex flex-col gap-6">
