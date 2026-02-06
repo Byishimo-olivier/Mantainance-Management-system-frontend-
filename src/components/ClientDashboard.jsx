@@ -105,7 +105,8 @@ function ClientDashboard() {
   const [propertyFiles, setPropertyFiles] = useState(null);
   const [editingAsset, setEditingAsset] = useState(null);
   const [selectedAssetId, setSelectedAssetId] = useState(null);
-  const [assetForm, setAssetForm] = useState({ name: '', type: '', description: '', propertyId: '', quantity: 1, building: '', block: '' });
+  const [assetForm, setAssetForm] = useState({ name: '', type: '', description: '', propertyId: '', quantity: 1, building: '', blocks: [] });
+  const [originalAssetBlocks, setOriginalAssetBlocks] = useState([]);
   const [editingTech, setEditingTech] = useState(null);
   const [techForm, setTechForm] = useState({ name: '', email: '', phone: '', specialty: [], rating: 0, completed: 0, propertyId: '' });
   const [editingTemplate, setEditingTemplate] = useState(null);
@@ -1207,17 +1208,21 @@ function ClientDashboard() {
                 onSubmit={async (e) => {
                   e.preventDefault();
                   try {
+                    const payload = { ...assetForm };
                     if (editingAsset) {
-                      await axios.put(
-                        `http://localhost:5000/api/assets/${editingAsset._id || editingAsset.id}`,
-                        assetForm
-                      );
+                      // compute removed blocks
+                      const prev = Array.isArray(originalAssetBlocks) ? originalAssetBlocks.map(String) : [];
+                      const now = Array.isArray(assetForm.blocks) ? assetForm.blocks.map(String) : [];
+                      const remove = prev.filter(p => !now.includes(p));
+                      if (remove.length > 0) payload.removeBlocks = remove;
+                      await axios.put(`http://localhost:5000/api/assets/${editingAsset._id || editingAsset.id}`, payload);
                       setEditingAsset(null);
+                      setOriginalAssetBlocks([]);
                     } else {
-                      await axios.post('http://localhost:5000/api/assets', assetForm);
+                      await axios.post('http://localhost:5000/api/assets', payload);
                     }
                     
-                    setAssetForm({ name: '', type: '', description: '', propertyId: '', quantity: 1, building: '', block: '' });
+                    setAssetForm({ name: '', type: '', description: '', propertyId: '', quantity: 1, building: '', blocks: [] });
                     const res = await axios.get('http://localhost:5000/api/assets');
                     setAssets(res.data || []);
                   } catch (err) {
@@ -1247,15 +1252,19 @@ function ClientDashboard() {
                     value={assetForm.description}
                     onChange={(e) => setAssetForm(f => ({ ...f, description: e.target.value }))}
                   />
-                  <input
-                    className="border border-blue-200 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    type="number"
-                    min="1"
-                    placeholder="Quantity"
-                    value={assetForm.quantity}
-                    onChange={(e) => setAssetForm(f => ({ ...f, quantity: parseInt(e.target.value) || 1 }))}
-                    required
-                  />
+                  <div className="flex items-center gap-2 border border-blue-200 rounded px-3 py-2">
+                    <button type="button" className="px-2 py-1 bg-gray-100 rounded" onClick={() => setAssetForm(f => ({ ...f, quantity: Math.max(1, (f.quantity || 1) - 1) }))}>-</button>
+                    <input
+                      className="w-16 text-center outline-none"
+                      type="number"
+                      min="1"
+                      placeholder="Quantity"
+                      value={assetForm.quantity}
+                      onChange={(e) => setAssetForm(f => ({ ...f, quantity: Math.max(1, parseInt(e.target.value) || 1) }))}
+                      required
+                    />
+                    <button type="button" className="px-2 py-1 bg-gray-100 rounded" onClick={() => setAssetForm(f => ({ ...f, quantity: (f.quantity || 1) + 1 }))}>+</button>
+                  </div>
                   
                   <select
                     className="border border-blue-200 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -1263,7 +1272,7 @@ function ClientDashboard() {
                     onChange={(e) => {
                       const pid = e.target.value;
                       const prop = properties.find(p => (p.id || p._id) === pid);
-                      setAssetForm(f => ({ ...f, propertyId: pid, building: prop?.name || '', block: '' }));
+                      setAssetForm(f => ({ ...f, propertyId: pid, building: prop?.name || '', blocks: [] }));
                     }}
                     required
                   >
@@ -1275,32 +1284,44 @@ function ClientDashboard() {
                     ))}
                   </select>
 
-                  {(() => {
-                    const prop = properties.find(p => (p.id || p._id) === assetForm.propertyId);
-                    const blocksCount = parseInt(prop?.blocks) || 0;
-                    if (blocksCount > 0) {
+                    {(() => {
+                      const prop = properties.find(p => (p.id || p._id) === assetForm.propertyId);
+                      const blocksCount = parseInt(prop?.blocks) || 0;
+                      if (blocksCount > 0) {
+                        // render checkboxes to select multiple blocks
+                        return (
+                          <div className="col-span-6">
+                            <div className="text-sm text-gray-600 mb-1">Select Blocks (optional)</div>
+                            <div className="grid grid-cols-6 gap-2">
+                              {Array.from({ length: blocksCount }).map((_, idx) => {
+                                const val = String(idx + 1);
+                                const checked = (assetForm.blocks || []).includes(val);
+                                return (
+                                  <label key={val} className={`px-2 py-1 border rounded text-center ${checked ? 'bg-blue-600 text-white' : 'bg-white text-gray-700'}`}>
+                                    <input type="checkbox" className="mr-1" checked={checked} onChange={() => {
+                                      setAssetForm(f => {
+                                        const cur = f.blocks || [];
+                                        if (cur.includes(val)) return { ...f, blocks: cur.filter(x => x !== val) };
+                                        return { ...f, blocks: [...cur, val] };
+                                      });
+                                    }} />
+                                    {`Block ${val}`}
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      }
                       return (
-                        <select
+                        <input
                           className="border border-blue-200 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          value={assetForm.block}
-                          onChange={(e) => setAssetForm(f => ({ ...f, block: e.target.value }))}
-                        >
-                          <option value="">Select Block (optional)</option>
-                          {Array.from({ length: blocksCount }).map((_, idx) => (
-                            <option key={idx + 1} value={String(idx + 1)}>{`Block ${idx + 1}`}</option>
-                          ))}
-                        </select>
+                          placeholder="Block (optional)"
+                          value={(assetForm.blocks || []).join(', ')}
+                          onChange={(e) => setAssetForm(f => ({ ...f, blocks: e.target.value.split(/[;,|]/).map(s => s.trim()).filter(Boolean) }))}
+                        />
                       );
-                    }
-                    return (
-                      <input
-                        className="border border-blue-200 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="Block (optional)"
-                        value={assetForm.block}
-                        onChange={(e) => setAssetForm(f => ({ ...f, block: e.target.value }))}
-                      />
-                    );
-                  })()}
+                    })()}
                   <div className="flex gap-2">
                     <button
                       className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition flex-1 font-medium"
@@ -1314,7 +1335,7 @@ function ClientDashboard() {
                         type="button"
                         onClick={() => {
                           setEditingAsset(null);
-                          setAssetForm({ name: '', type: '', description: '', propertyId: '', quantity: 1, building: '', block: '' });
+                          setAssetForm({ name: '', type: '', description: '', propertyId: '', quantity: 1, building: '', blocks: [] });
                         }}
                       >
                         Cancel
@@ -1363,7 +1384,22 @@ function ClientDashboard() {
                         <button
                           className="text-blue-600 hover:text-blue-800 px-3 py-1 rounded hover:bg-blue-50 transition border border-blue-200"
                           onClick={() => {
+                            // normalize blocks for editing
+                            let blocksArr = [];
+                            if (asset.blocks && Array.isArray(asset.blocks)) blocksArr = asset.blocks.map(String);
+                            else if (asset.block) {
+                              if (Array.isArray(asset.block)) blocksArr = asset.block.map(String);
+                              else blocksArr = String(asset.block).split(/[;,|]/).map(s => s.trim()).filter(Boolean);
+                            } else if (asset.location) {
+                              const loc = asset.location;
+                              if (typeof loc === 'string') {
+                                try { const parsed = JSON.parse(loc); if (parsed && parsed.block) blocksArr = Array.isArray(parsed.block) ? parsed.block.map(String) : String(parsed.block).split(/[;,|]/).map(s=>s.trim()).filter(Boolean); } catch(e) {}
+                              } else if (typeof loc === 'object' && loc.block) {
+                                blocksArr = Array.isArray(loc.block) ? loc.block.map(String) : String(loc.block).split(/[;,|]/).map(s=>s.trim()).filter(Boolean);
+                              }
+                            }
                             setEditingAsset(asset);
+                            setOriginalAssetBlocks(blocksArr || []);
                             setAssetForm({
                               name: asset.name,
                               type: asset.type,
@@ -1371,7 +1407,7 @@ function ClientDashboard() {
                               propertyId: asset.propertyId,
                               quantity: asset.quantity || 1,
                               building: asset.building || asset.property?.name || '',
-                              block: asset.block || '',
+                              blocks: blocksArr || [],
                             });
                           }}
                         >

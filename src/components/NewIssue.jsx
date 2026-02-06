@@ -1,22 +1,33 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
-export default function NewIssue() {
+export default function NewIssue({ model: propModel = null, onClose = null, asModal = false }) {
   const navigate = useNavigate();
+  const location = useLocation();
+  const prefill = propModel || (location && location.state && location.state.model) ? (propModel || location.state.model) : {};
+  const [prefilledAsset] = useState(prefill.asset || null);
+  const [selectedItems] = useState(prefill.selectedItems || []);
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     navigate('/login', { replace: true });
     window.location.reload();
   };
+  // Build a selected-items description fragment and set unit count
+  const selectedItemsDescription = (selectedItems && selectedItems.length > 0)
+    ? '\n\nSelected items:\n' + selectedItems.map(it => `${it.assetName || (it.asset && (it.asset.name || it.assetId)) || it.assetId}${it.index != null ? ' #' + ((it.index || 0) + 1) : ''} — ${it.building || it.blockId || ''}`).join('\n')
+    : '';
+
+  const buildingFromAsset = (() => { try { const loc = prefill.asset && prefill.asset.location; if (!loc) return ''; if (typeof loc === 'object') return loc.building || loc.buildingName || ''; return ''; } catch (e) { return ''; } })();
+
   const [form, setForm] = useState({
-    title: "",
-    description: "",
-    category: "",
-    building: "",
-    floor: "",
-    unit: "",
+    title: prefill.title || "",
+    description: (prefill.description || "") + selectedItemsDescription,
+    category: prefill.category || "",
+    building: prefill.building || prefill.block || buildingFromAsset || "",
+    floor: prefill.floor || (prefill.asset && prefill.asset.location && prefill.asset.location.floor) || "",
+    unit: prefill.unit || (selectedItems && selectedItems.length ? String(selectedItems.length) : ""),
     beforePhoto: null, // Changed from photo to beforePhoto
     name: "",
     email: "",
@@ -63,9 +74,6 @@ export default function NewIssue() {
       formData.append("overdue", false);
       formData.append("time", "-");
       formData.append("photo", form.beforePhoto);
-      formData.append("name", form.name);
-      formData.append("email", form.email);
-      formData.append("phone", form.phone);
       const token = localStorage.getItem('token');
       const user = JSON.parse(localStorage.getItem('user'));
       formData.append("userId", user?.id || "");
@@ -76,7 +84,12 @@ export default function NewIssue() {
         },
       });
       setSubmitting(false);
-      navigate("/issues");
+      // If used as a modal/component, call onClose(true) to signal success; otherwise navigate
+      if (onClose && typeof onClose === 'function') {
+        try { onClose(true); } catch (e) { /* ignore */ }
+      } else {
+        navigate("/issues");
+      }
     } catch (err) {
       setSubmitting(false);
       alert("Failed to submit issue");
@@ -84,36 +97,47 @@ export default function NewIssue() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-8">
-      {/* Navbar */}
-      <nav className="flex items-center justify-between bg-white shadow px-4 md:px-8 h-16">
-        <div className="flex items-center gap-3">
-          <span className="bg-indigo-600 rounded-xl p-1 flex items-center justify-center">
-            <svg width="36" height="36" viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="6" fill="#6366f1"/><rect x="6" y="6" width="12" height="6" rx="2" fill="#a5b4fc"/></svg>
-          </span>
-          <div className="flex flex-col ml-1">
-            <span className="text-lg font-bold text-gray-900">PropCare</span>
-            <span className="text-sm text-gray-500">Jean Mukaba</span>
+    <div className={asModal ? 'bg-transparent' : 'min-h-screen bg-gray-50 pb-8'}>
+      {/* Navbar or modal header */}
+      {!asModal ? (
+        <nav className="flex items-center justify-between bg-white shadow px-4 md:px-8 h-16">
+          <div className="flex items-center gap-3">
+            <span className="bg-indigo-600 rounded-xl p-1 flex items-center justify-center">
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="6" fill="#6366f1"/><rect x="6" y="6" width="12" height="6" rx="2" fill="#a5b4fc"/></svg>
+            </span>
+            <div className="flex flex-col ml-1">
+              <span className="text-lg font-bold text-gray-900">PropCare</span>
+              <span className="text-sm text-gray-500">Jean Mukaba</span>
+            </div>
+          </div>
+          <div className="flex gap-3">
+            <button className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-gray-100 font-semibold" onClick={() => navigate('/dashboard')}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="4" fill="#ede9fe"/><rect x="7" y="7" width="4" height="4" rx="1" fill="#8b5cf6"/><rect x="13" y="7" width="4" height="4" rx="1" fill="#8b5cf6"/><rect x="7" y="13" width="4" height="4" rx="1" fill="#8b5cf6"/><rect x="13" y="13" width="4" height="4" rx="1" fill="#8b5cf6"/></svg> Dashboard
+            </button>
+            <button className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-gray-100 font-semibold" onClick={() => navigate('/issues')}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="4" fill="#f3f4f6"/><rect x="7" y="7" width="10" height="10" rx="2" fill="#6366f1"/></svg> All Issues
+            </button>
+            <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-50 text-indigo-600 font-semibold" disabled>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" fill="#eef2ff"/><path d="M12 8v4l3 3" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg> New Issue
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <button className="bg-gray-100 rounded-lg px-2 py-1 flex items-center justify-center">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" fill="#f3f4f6"/><path d="M8 12h8" stroke="#222" strokeWidth="2" strokeLinecap="round"/></svg>
+            </button>
+            <button className="px-4 py-2 rounded-lg bg-gray-100 font-semibold" onClick={handleLogout}>Logout</button>
+          </div>
+        </nav>
+      ) : (
+        <div className="flex items-center justify-between p-4 border-b">
+          <h3 className="text-lg font-semibold">New Issue</h3>
+          <div>
+            <button className="px-3 py-1 rounded bg-gray-100" onClick={() => { if (onClose && typeof onClose === 'function') return onClose(false); navigate('/dashboard'); }}>
+              Close
+            </button>
           </div>
         </div>
-        <div className="flex gap-3">
-          <button className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-gray-100 font-semibold" onClick={() => navigate('/dashboard')}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="4" fill="#ede9fe"/><rect x="7" y="7" width="4" height="4" rx="1" fill="#8b5cf6"/><rect x="13" y="7" width="4" height="4" rx="1" fill="#8b5cf6"/><rect x="7" y="13" width="4" height="4" rx="1" fill="#8b5cf6"/><rect x="13" y="13" width="4" height="4" rx="1" fill="#8b5cf6"/></svg> Dashboard
-          </button>
-          <button className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-gray-100 font-semibold" onClick={() => navigate('/issues')}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="4" fill="#f3f4f6"/><rect x="7" y="7" width="10" height="10" rx="2" fill="#6366f1"/></svg> All Issues
-          </button>
-          <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-50 text-indigo-600 font-semibold" disabled>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" fill="#eef2ff"/><path d="M12 8v4l3 3" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg> New Issue
-          </button>
-        </div>
-        <div className="flex items-center gap-2">
-          <button className="bg-gray-100 rounded-lg px-2 py-1 flex items-center justify-center">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" fill="#f3f4f6"/><path d="M8 12h8" stroke="#222" strokeWidth="2" strokeLinecap="round"/></svg>
-          </button>
-          <button className="px-4 py-2 rounded-lg bg-gray-100 font-semibold" onClick={handleLogout}>Logout</button>
-        </div>
-      </nav>
+      )}
       {/* Main Form */}
       <form className="max-w-3xl mx-auto mt-10 bg-white rounded-2xl shadow-lg p-6 md:p-10" onSubmit={handleSubmit}>
         <div className="flex flex-col gap-6">
@@ -292,7 +316,10 @@ export default function NewIssue() {
           <button
             type="button"
             className="w-full md:w-auto py-3 rounded-xl bg-gray-100 text-gray-700 text-base md:text-lg font-semibold shadow hover:bg-gray-200 transition"
-            onClick={() => navigate('/dashboard')}
+            onClick={() => {
+              if (onClose && typeof onClose === 'function') return onClose(false);
+              return navigate('/dashboard');
+            }}
             disabled={submitting}
           >
             Cancel
