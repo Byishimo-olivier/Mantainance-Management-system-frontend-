@@ -1050,19 +1050,16 @@ function PropertiesPage() {
                                 assetId: first.assetId,
                                 selectedItems,
                               };
-                              // If user not authenticated, redirect to login; otherwise open NewIssue as modal
+                              // Open NewIssue modal. If user is not authenticated, mark model so NewIssue can prompt/login on submit.
                               const token = localStorage.getItem('token');
-                              if (!token) {
-                                navigate('/login');
-                              } else {
-                                // close property details modal and open new-issue modal directly
-                                setShowDetailsModal(false);
-                                setShowFloorMap(false);
-                                setSelectedBlock(null);
-                                setSelectedSeats({});
-                                setNewIssueModel(model);
-                                setShowNewIssueModal(true);
-                              }
+                              const modelToOpen = { ...model, requiresAuth: !token };
+                              // close property details modal and open new-issue modal directly
+                              setShowDetailsModal(false);
+                              setShowFloorMap(false);
+                              setSelectedBlock(null);
+                              setSelectedSeats({});
+                              setNewIssueModel(modelToOpen);
+                              setShowNewIssueModal(true);
                             }}
                             className="px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white font-medium rounded-lg transition-colors flex items-center gap-2"
                           >
