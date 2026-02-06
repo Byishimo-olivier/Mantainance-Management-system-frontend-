@@ -16,6 +16,10 @@ import TechnicianManagement from './components/TechnicianManagement';
 import TechnicianDashboard from './components/TechnicianDashboard';
 import Technicianissue from './components/ManagementIssues';
 import ManagementIssues from './components/ManagementIssues';
+import PropertiesPage from './components/PropertiesPage';
+import PropertyPublicView from './components/PropertyPublicView';
+import PropertiesCards from './components/PropertiesCards';
+import PropertyDetails from './components/PropertyDetails';
 
 import RequestsPage from './components/RequestsPage';
 
@@ -55,7 +59,9 @@ function App() {
 
   return (
     <Routes>
-      <Route path="/" element={<LandingPage />} />
+      <Route path="/" element={<PropertiesPage />} />
+      <Route path= "/Home" element={<LandingPage/>}/>
+      <Route path="/dashboard" element={<Dashboard user={auth?.user} />} />
       <Route path="/login" element={<Login onLogin={handleLogin} />} />
       <Route path="/register" element={<Register />} />
       <Route path="/dashboard" element={auth ? (
@@ -78,6 +84,11 @@ function App() {
       <Route path="/technicians" element={auth ? <TechnicianManagement /> : <Login onLogin={handleLogin} />} />
       <Route path="/technician-dashboard" element={auth ? <TechnicianDashboard /> : <Login onLogin={handleLogin} />} />
       <Route path="/manager-issues" element={auth ? <ManagementIssues issues={issues} setIssues={setIssues} /> : <Login onLogin={handleLogin} />} />
+      <Route path="/properties" element={auth ? <PropertiesPage /> : <Login onLogin={handleLogin} />} />
+      <Route path="/properties-cards" element={<PropertiesCards />} />
+      <Route path="/property-details/:id" element={auth ? <PropertyDetails /> : <Login onLogin={handleLogin} />} />
+      <Route path="/property/:id" element={<PropertyPublicView />} />
+      <Route path="/property/:id" element={<PropertyPublicView />} />
       <Route path="/feedback" element={auth ? <Feedback /> : <Login onLogin={handleLogin} />} />
       <Route path="/manager-feedback" element={auth ? <ManagerFeedback /> : <Login onLogin={handleLogin} />} />
     </Routes>
