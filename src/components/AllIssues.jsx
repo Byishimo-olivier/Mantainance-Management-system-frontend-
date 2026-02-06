@@ -22,8 +22,7 @@ function AllIssues() {
       navigate('/login');
       return;
     }
-    // Set axios default Authorization header for all requests
-    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    // Note: Authorization header will be set per request to avoid conflicts
     const userObj = JSON.parse(storedUser);
     console.log('userObj from localStorage:', userObj);
     setUser(userObj);
@@ -62,6 +61,108 @@ function AllIssues() {
   const handleAssignTech = (idx, techName) => {
     setIssues(prev => prev.map((issue, i) => i === idx ? { ...issue, assignee: techName } : issue));
     setAssigning(null);
+  };
+
+  const fetchIssues = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const userObj = JSON.parse(localStorage.getItem('user'));
+      let url = 'http://localhost:5000/api/issues';
+      // For technician: assigned, for client: own, for admin: all
+      if (userObj.role === 'technician') {
+        url = `http://localhost:5000/api/issues/assigned/${userObj._id}`;
+      } else if (userObj.role === 'client') {
+        url = `http://localhost:5000/api/issues/user/${userObj._id}`;
+      }
+      const config = { headers: { Authorization: `Bearer ${token}` } };
+      const res = await axios.get(url, config);
+      setIssues(res.data);
+    } catch (err) {
+      console.error('Error fetching issues:', err);
+      setIssues([]);
+    }
+  };
+
+  const handleAccept = async (issue) => {
+    try {
+      const token = localStorage.getItem('token');
+      const config = { headers: { Authorization: `Bearer ${token}` } };
+
+      // Ensure we're using the correct ID format with proper null checks
+      let issueId;
+      if (typeof issue === 'string') {
+        issueId = issue;
+      } else if (issue && typeof issue === 'object') {
+        issueId = issue._id || issue.id;
+      } else {
+        throw new Error('Invalid issue format');
+      }
+
+      if (!issueId) {
+        throw new Error('No valid issue ID found');
+      }
+
+      console.log('Accepting issue:', issueId);
+
+      // Try different endpoint structures like ManagerDashboard
+      let response;
+      try {
+        // First try: PUT with status update
+        response = await axios.put(`http://localhost:5000/api/issues/${issueId}`, {
+          status: 'APPROVED'
+        }, config);
+        console.log('Accept successful (method 1):', response.data);
+      } catch (err1) {
+        console.log('Method 1 failed:', err1.response?.data);
+        throw err1;
+      }
+
+      // Refresh issues from backend
+      await fetchIssues();
+    } catch (err) {
+      console.error('Error accepting issue:', err.response?.data || err.message);
+    }
+  };
+
+  const handleReject = async (issue) => {
+    try {
+      const token = localStorage.getItem('token');
+      const config = { headers: { Authorization: `Bearer ${token}` } };
+
+      // Ensure we're using the correct ID format with proper null checks
+      let issueId;
+      if (typeof issue === 'string') {
+        issueId = issue;
+      } else if (issue && typeof issue === 'object') {
+        issueId = issue._id || issue.id;
+      } else {
+        throw new Error('Invalid issue format');
+      }
+
+      if (!issueId) {
+        throw new Error('No valid issue ID found');
+      }
+
+      console.log('Rejecting issue:', issueId);
+
+      // Try different endpoint structures like ManagerDashboard
+      let response;
+      try {
+        // First try: PUT with status update
+        response = await axios.put(`http://localhost:5000/api/issues/${issueId}`, {
+          status: 'REJECTED'
+        }, config);
+        console.log('Reject successful (method 1):', response.data);
+      } catch (err1) {
+        console.log('Method 1 failed:', err1.response?.data);
+        throw err1;
+      }
+
+      // Refresh issues from backend
+      await fetchIssues();
+    } catch (err) {
+      console.error('Error rejecting issue:', err.response?.data || err.message);
+    }
   };
 
   return (
@@ -183,6 +284,23 @@ function AllIssues() {
                   }`}>
                     {(issue.status === 'COMPLETE' || issue.status === 'COMPLETED') ? 'Complete' : issue.status.replace('_', ' ')}
                   </span>
+                )}
+                {/* Accept and Reject buttons for clients on PENDING issues */}
+                {issue.status === 'PENDING' && user?.role === 'client' && (
+                  <div className="flex gap-2 mt-2">
+                    <button
+                      className="bg-green-500 text-white px-3 py-1 rounded text-sm font-semibold hover:bg-green-600"
+                      onClick={() => handleAccept(issue)}
+                    >
+                      Accept
+                    </button>
+                    <button
+                      className="bg-red-500 text-white px-3 py-1 rounded text-sm font-semibold hover:bg-red-600"
+                      onClick={() => handleReject(issue)}
+                    >
+                      Reject
+                    </button>
+                  </div>
                 )}
                 {/* Assignment UI for manager */}
                 {/* ...existing code for assignment... */}

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
@@ -18,7 +18,23 @@ export default function NewIssue() {
     floor: "",
     unit: "",
     beforePhoto: null, // Changed from photo to beforePhoto
+    name: "",
+    email: "",
+    phone: "",
   });
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      const userObj = JSON.parse(storedUser);
+      setForm(prev => ({
+        ...prev,
+        name: userObj.name || "",
+        email: userObj.email || "",
+        phone: userObj.phone || "",
+      }));
+    }
+  }, []);
   const [submitting, setSubmitting] = useState(false);
   const [preview, setPreview] = useState(null);
 
@@ -47,6 +63,9 @@ export default function NewIssue() {
       formData.append("overdue", false);
       formData.append("time", "-");
       formData.append("photo", form.beforePhoto);
+      formData.append("name", form.name);
+      formData.append("email", form.email);
+      formData.append("phone", form.phone);
       const token = localStorage.getItem('token');
       const user = JSON.parse(localStorage.getItem('user'));
       formData.append("userId", user?.id || "");
@@ -153,6 +172,50 @@ export default function NewIssue() {
           </div>
           <div className="text-yellow-700 flex items-center gap-2 text-base font-medium">
             <span role="img" aria-label="bulb">💡</span> Priority will be automatically assigned based on category
+          </div>
+          <div>
+            <h3 className="text-xl font-bold mb-2 mt-2">Contact Information</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block font-semibold mb-1" htmlFor="name">Name <span className="text-red-500">*</span></label>
+                <input
+                  id="name"
+                  name="name"
+                  type="text"
+                  className="w-full rounded-xl border border-gray-200 px-4 py-3 text-base md:text-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                  placeholder="Your full name"
+                  value={form.name}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
+              <div>
+                <label className="block font-semibold mb-1" htmlFor="email">Email <span className="text-red-500">*</span></label>
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  className="w-full rounded-xl border border-gray-200 px-4 py-3 text-base md:text-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                  placeholder="your.email@example.com"
+                  value={form.email}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
+              <div>
+                <label className="block font-semibold mb-1" htmlFor="phone">Phone Number <span className="text-red-500">*</span></label>
+                <input
+                  id="phone"
+                  name="phone"
+                  type="tel"
+                  className="w-full rounded-xl border border-gray-200 px-4 py-3 text-base md:text-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                  placeholder="+1234567890"
+                  value={form.phone}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
+            </div>
           </div>
           <div>
             <h3 className="text-xl font-bold mb-2 mt-2">Property Location</h3>

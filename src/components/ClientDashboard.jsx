@@ -333,7 +333,9 @@ function ClientDashboard() {
 
   async function approveIssue(issueId) {
     try {
-      await axios.post(`http://localhost:5000/api/issues/${issueId}/approve`);
+      await axios.put(`http://localhost:5000/api/issues/${issueId}`, {
+        status: 'APPROVED'
+      });
       // refresh issues
       const res = await axios.get('http://localhost:5000/api/issues');
       setIssues(res.data || []);
@@ -346,8 +348,10 @@ function ClientDashboard() {
 
   async function declineIssue(issueId) {
     try {
-      const reason = prompt('Decline reason (optional):');
-      await axios.post(`http://localhost:5000/api/issues/${issueId}/decline`, { reason });
+      await axios.put(`http://localhost:5000/api/issues/${issueId}`, {
+        status: 'REJECTED'
+      });
+      // refresh issues
       const res = await axios.get('http://localhost:5000/api/issues');
       setIssues(res.data || []);
       setAllIssues(res.data || []);
@@ -814,25 +818,21 @@ function ClientDashboard() {
                             )}
                           </div>
 
-                          {/* Approve / Decline controls for managers/admins or owners */}
-                          {(currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager' || currentUser.id === issue.userId || currentUser._id === issue.userId)) && (
+                          {/* Accept and Decline buttons for clients on PENDING issues */}
+                          {issue.status === 'PENDING' && currentUser?.role === 'client' && (
                             <div className="mt-3 flex gap-2">
-                              {!issue.approved && (
-                                <button 
-                                  className="px-3 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200 transition border border-green-200"
-                                  onClick={() => approveIssue(issue.id || issue._id)}
-                                >
-                                  Approve
-                                </button>
-                              )}
-                              {!issue.rejected && (
-                                <button 
-                                  className="px-3 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 transition border border-red-200"
-                                  onClick={() => declineIssue(issue.id || issue._id)}
-                                >
-                                  Decline
-                                </button>
-                              )}
+                              <button
+                                className="bg-green-500 text-white px-3 py-1 rounded text-sm font-semibold hover:bg-green-600"
+                                onClick={() => approveIssue(issue.id || issue._id)}
+                              >
+                                Accept
+                              </button>
+                              <button
+                                className="bg-red-500 text-white px-3 py-1 rounded text-sm font-semibold hover:bg-red-600"
+                                onClick={() => declineIssue(issue.id || issue._id)}
+                              >
+                                Decline
+                              </button>
                             </div>
                           )}
                         </div>
