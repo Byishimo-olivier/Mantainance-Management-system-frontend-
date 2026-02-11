@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import ScheduleMaintenanceForm from './ScheduleMaintenanceForm';
 import AssetDetail from './AssetDetail';
 import AssetMovementForm from './AssetMovementForm';
-import AssetMovementForm from './AssetMovementForm';
+
 import api from "../api/axios";
 import { useNavigate } from "react-router-dom";
 import AssetDetails from './AssetDetails';
