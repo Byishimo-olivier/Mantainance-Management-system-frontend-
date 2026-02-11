@@ -2,7 +2,8 @@ import React, { useState, useEffect } from "react";
 import ScheduleMaintenanceForm from './ScheduleMaintenanceForm';
 import AssetDetail from './AssetDetail';
 import AssetMovementForm from './AssetMovementForm';
-import axios from "axios";
+import AssetMovementForm from './AssetMovementForm';
+import api from "../api/axios";
 import { useNavigate } from "react-router-dom";
 import AssetDetails from './AssetDetails';
 import SparePartsList from './SparePartsList';
@@ -203,14 +204,15 @@ function ClientDashboard() {
       const userObj = JSON.parse(storedUser);
       setUserName(userObj.name || "");
       setCurrentUser(userObj);
-      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+      setCurrentUser(userObj);
+      // axios.defaults.headers.common["Authorization"] is handled in api/axios.js
 
       async function fetchEntities() {
         setLoading(l => ({ ...l, properties: true, assets: true, internalTechnicians: true, maintenanceTemplates: true }));
         setErrors(e => ({ ...e, properties: '', assets: '', internalTechnicians: '', maintenanceTemplates: '' }));
 
         try {
-          const propRes = await axios.get(import.meta.env.VITE_API_URL + '/api/properties');
+          const propRes = await api.get('/api/properties');
           const propertiesData = propRes.data || [];
 
           setProperties(propertiesData);
@@ -219,7 +221,7 @@ function ClientDashboard() {
             try {
               const techPromises = propertiesData.map(p => {
                 const pid = p.id || p._id || p._oid || p.$oid;
-                return axios.get(`${backendBase}/api/internal-technicians/by-property/${pid}`);
+                return api.get(`/api/internal-technicians/by-property/${pid}`);
               });
               const settled = await Promise.allSettled(techPromises);
               let combined = [];
@@ -234,7 +236,7 @@ function ClientDashboard() {
               try {
                 const assetPromises = propertiesData.map(p => {
                   const pid = p.id || p._id || p._oid || p.$oid;
-                  return axios.get(`${backendBase}/api/assets?propertyId=${pid}`);
+                  return api.get(`/api/assets?propertyId=${pid}`);
                 });
                 const settledAssets = await Promise.allSettled(assetPromises);
                 let combinedAssets = [];
@@ -265,7 +267,7 @@ function ClientDashboard() {
           // fetched per-property inside `fetchEntities` above. Only fetch the
           // global assets list for non-client roles.
           if (!(userObj && userObj.role === 'client')) {
-            const assetRes = await axios.get(import.meta.env.VITE_API_URL + '/api/assets');
+            const assetRes = await api.get('/api/assets');
             setAssets(assetRes.data || []);
           }
         } catch (err) {
@@ -280,7 +282,7 @@ function ClientDashboard() {
         try {
           // If client user we already attempted to fetch internal technicians per-property above.
           if (!(userObj && userObj.role === 'client')) {
-            const techRes = await axios.get(import.meta.env.VITE_API_URL + '/api/internal-technicians');
+            const techRes = await api.get('/api/internal-technicians');
 
             setInternalTechnicians(techRes.data || []);
           }
@@ -293,11 +295,11 @@ function ClientDashboard() {
         // fetch technicians: admin/manager get minimal assign list; clients get public list for their property
         try {
           if (userObj && (userObj.role === 'manager' || userObj.role === 'admin')) {
-            const assignRes = await axios.get(`${backendBase}/api/technicians/for-assignment`);
+            const assignRes = await api.get(`/api/technicians/for-assignment`);
             setTechnicians(assignRes.data || []);
           } else {
             // clients and other roles: fetch public list of technicians so clients can request assignment
-            const allTechRes = await axios.get(`${backendBase}/api/technicians`);
+            const allTechRes = await api.get(`/api/technicians`);
             setTechnicians(allTechRes.data || []);
           }
         } catch (e) {
@@ -305,7 +307,7 @@ function ClientDashboard() {
         }
 
         try {
-          const tmplRes = await axios.get(import.meta.env.VITE_API_URL + '/api/maintenance-templates');
+          const tmplRes = await api.get('/api/maintenance-templates');
           setMaintenanceTemplates(tmplRes.data || []);
         } catch (err) {
           setMaintenanceTemplates([]);
@@ -315,7 +317,7 @@ function ClientDashboard() {
         }
 
         try {
-          const schedRes = await axios.get(import.meta.env.VITE_API_URL + '/api/maintenance-schedules');
+          const schedRes = await api.get('/api/maintenance-schedules');
           setMaintenanceSchedules(schedRes.data || []);
 
           // Compute upcoming reminders within next 24 hours
@@ -378,7 +380,7 @@ function ClientDashboard() {
               const id = s._id || s.id;
               if (!id) continue;
               try {
-                await axios.post(`${import.meta.env.VITE_API_URL}/api/maintenance-schedules/${id}/emailReminder`);
+                await api.post(`/api/maintenance-schedules/${id}/emailReminder`);
               } catch (e) {
                 console.error('Failed to send email for schedule', id, e?.message || e);
               }
@@ -386,7 +388,7 @@ function ClientDashboard() {
 
             // Refresh schedules after emails
             try {
-              const refreshed = await axios.get(import.meta.env.VITE_API_URL + '/api/maintenance-schedules');
+              const refreshed = await api.get('/api/maintenance-schedules');
               setMaintenanceSchedules(refreshed.data || []);
               const now2 = new Date();
               const cutoff2 = new Date(now2.getTime() + 24 * 60 * 60 * 1000);
@@ -435,9 +437,8 @@ function ClientDashboard() {
       async function fetchIssues() {
         try {
           // Fetch issues (backend now handles filtering for clients)
-          const res = await axios.get(`${backendBase}/api/issues`, {
-            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-          });
+          // Fetch issues (backend now handles filtering for clients)
+          const res = await api.get(`/api/issues`);
           const fetched = res.data || [];
 
           // Group issues by propertyId for the UI
@@ -480,11 +481,11 @@ function ClientDashboard() {
 
   async function approveIssue(issueId) {
     try {
-      await axios.put(`${import.meta.env.VITE_API_URL}/api/issues/${issueId}`, {
+      await api.put(`/api/issues/${issueId}`, {
         status: 'APPROVED'
       });
       // refresh issues
-      const res = await axios.get(import.meta.env.VITE_API_URL + '/api/issues');
+      const res = await api.get('/api/issues');
       setIssues(res.data || []);
       setAllIssues(res.data || []);
     } catch (e) {
@@ -495,11 +496,11 @@ function ClientDashboard() {
 
   async function declineIssue(issueId) {
     try {
-      await axios.put(`${import.meta.env.VITE_API_URL}/api/issues/${issueId}`, {
+      await api.put(`/api/issues/${issueId}`, {
         status: 'REJECTED'
       });
       // refresh issues
-      const res = await axios.get(import.meta.env.VITE_API_URL + '/api/issues');
+      const res = await api.get('/api/issues');
       setIssues(res.data || []);
       setAllIssues(res.data || []);
     } catch (e) {
@@ -510,9 +511,9 @@ function ClientDashboard() {
 
   async function resubmitIssue(issueId) {
     try {
-      await axios.post(`${import.meta.env.VITE_API_URL}/api/issues/${issueId}/resubmit`);
+      await api.post(`/api/issues/${issueId}/resubmit`);
       // refresh issues
-      const res = await axios.get(import.meta.env.VITE_API_URL + '/api/issues');
+      const res = await api.get('/api/issues');
       setIssues(res.data || []);
       setAllIssues(res.data || []);
     } catch (e) {
@@ -525,9 +526,9 @@ function ClientDashboard() {
     try {
       if (!internalTechId) return;
       setAssignLoading(s => ({ ...s, [issueId]: true }));
-      await axios.post(`${import.meta.env.VITE_API_URL}/api/issues/${issueId}/assign-internal`, { internalTechId });
+      await api.post(`/api/issues/${issueId}/assign-internal`, { internalTechId });
       // refresh issues
-      const res = await axios.get(import.meta.env.VITE_API_URL + '/api/issues');
+      const res = await api.get('/api/issues');
       setIssues(res.data || []);
       setAllIssues(res.data || []);
       setAssignLoading(s => ({ ...s, [issueId]: false }));
@@ -542,9 +543,9 @@ function ClientDashboard() {
     try {
       if (!techId) return;
       setAssignLoading(s => ({ ...s, [issueId]: true }));
-      await axios.post(`${import.meta.env.VITE_API_URL}/api/issues/${issueId}/assign`, { techId });
+      await api.post(`/api/issues/${issueId}/assign`, { techId });
       // refresh issues
-      const res = await axios.get(import.meta.env.VITE_API_URL + '/api/issues');
+      const res = await api.get('/api/issues');
       setIssues(res.data || []);
       setAllIssues(res.data || []);
       setAssignLoading(s => ({ ...s, [issueId]: false }));
@@ -580,10 +581,10 @@ function ClientDashboard() {
       for (const s of reminders) {
         const id = s._id || s.id;
         if (!id) continue;
-        await axios.post(`${import.meta.env.VITE_API_URL}/api/maintenance-schedules/${id}/dismiss`, { userId });
+        await api.post(`/api/maintenance-schedules/${id}/dismiss`, { userId });
       }
 
-      const schedRes = await axios.get(import.meta.env.VITE_API_URL + '/api/maintenance-schedules');
+      const schedRes = await api.get('/api/maintenance-schedules');
       setMaintenanceSchedules(schedRes.data || []);
       setReminders([]);
     } catch (e) {
@@ -600,10 +601,10 @@ function ClientDashboard() {
       for (const s of reminders) {
         const id = s._id || s.id;
         if (!id) continue;
-        await axios.post(`${import.meta.env.VITE_API_URL}/api/maintenance-schedules/${id}/snooze`, { minutes, userId });
+        await api.post(`/api/maintenance-schedules/${id}/snooze`, { minutes, userId });
       }
 
-      const schedRes = await axios.get(import.meta.env.VITE_API_URL + '/api/maintenance-schedules');
+      const schedRes = await api.get('/api/maintenance-schedules');
       setMaintenanceSchedules(schedRes.data || []);
       setReminders([]);
     } catch (e) {
@@ -617,9 +618,9 @@ function ClientDashboard() {
       let userId = null;
       try { userId = stored ? JSON.parse(stored).id || JSON.parse(stored)._id : null; } catch (e) { userId = null; }
 
-      await axios.post(`${import.meta.env.VITE_API_URL}/api/maintenance-schedules/${id}/dismiss`, { userId });
+      await api.post(`/api/maintenance-schedules/${id}/dismiss`, { userId });
       setReminders(r => r.filter(x => (x._id || x.id) !== id));
-      axios.get(import.meta.env.VITE_API_URL + '/api/maintenance-schedules').then(res => setMaintenanceSchedules(res.data || [])).catch(() => { });
+      api.get('/api/maintenance-schedules').then(res => setMaintenanceSchedules(res.data || [])).catch(() => { });
     } catch (e) {
       console.error('Failed to dismiss reminder', e);
     }
@@ -631,9 +632,9 @@ function ClientDashboard() {
       let userId = null;
       try { userId = stored ? JSON.parse(stored).id || JSON.parse(stored)._id : null; } catch (e) { userId = null; }
 
-      await axios.post(`${import.meta.env.VITE_API_URL}/api/maintenance-schedules/${id}/snooze`, { minutes, userId });
+      await api.post(`/api/maintenance-schedules/${id}/snooze`, { minutes, userId });
       setReminders(r => r.filter(x => (x._id || x.id) !== id));
-      axios.get(import.meta.env.VITE_API_URL + '/api/maintenance-schedules').then(res => setMaintenanceSchedules(res.data || [])).catch(() => { });
+      api.get('/api/maintenance-schedules').then(res => setMaintenanceSchedules(res.data || [])).catch(() => { });
     } catch (e) {
       console.error('Failed to snooze reminder', e);
       console.error('Failed to snooze reminder', e);
@@ -2333,8 +2334,8 @@ function ClientDashboard() {
                 onClick={handleAssignSubmit}
                 disabled={!selectedIssueForAssign || assignableIssues.length === 0}
                 className={`px-4 py-2 rounded-lg text-white font-medium transition shadow-sm ${!selectedIssueForAssign || assignableIssues.length === 0
-                    ? 'bg-gray-300 cursor-not-allowed'
-                    : 'bg-blue-600 hover:bg-blue-700 hover:shadow-md'
+                  ? 'bg-gray-300 cursor-not-allowed'
+                  : 'bg-blue-600 hover:bg-blue-700 hover:shadow-md'
                   }`}
               >
                 Confirm Assignment

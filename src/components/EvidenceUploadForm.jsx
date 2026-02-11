@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import axios from "axios";
+import api from "../api/axios";
 
 const EvidenceUploadForm = ({ issueId, onSuccess }) => {
   const [beforeImage, setBeforeImage] = useState(null);
@@ -21,11 +21,11 @@ const EvidenceUploadForm = ({ issueId, onSuccess }) => {
     if (beforeImage) formData.append("beforeImage", beforeImage);
     if (afterImage) formData.append("afterImage", afterImage);
     try {
-      const token = localStorage.getItem("token");
-      await axios.post(
-        `${import.meta.env.VITE_API_URL}/api/issues/${issueId}/evidence`,
+      // Auth handled by interceptor
+      await api.post(
+        `/api/issues/${issueId}/evidence`,
         formData,
-        { headers: { Authorization: `Bearer ${token}`, "Content-Type": "multipart/form-data" } }
+        { headers: { "Content-Type": "multipart/form-data" } }
       );
       setAddress("");
       setBeforeImage(null);

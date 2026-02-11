@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import axios from "axios";
+import api from "../api/axios";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -50,7 +50,7 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
     phone: "",
   });
 
-  const backendBase = import.meta.env.VITE_API_URL + '';
+  // backendBase removed, using api instance
   const [submitting, setSubmitting] = useState(false);
   const [preview, setPreview] = useState(null);
   const [properties, setProperties] = useState([]);
@@ -108,9 +108,8 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
   const loadProperties = async () => {
     setIsLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
-      const res = await axios.get(`${backendBase}/api/properties`, config);
+      // Auth handled by interceptor
+      const res = await api.get('/api/properties');
       const list = Array.isArray(res.data) ? res.data : [];
       setProperties(list);
 
@@ -134,9 +133,8 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
 
   async function loadAssetsForProperty(propertyId) {
     try {
-      const token = localStorage.getItem('token');
-      const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
-      const res = await axios.get(`${backendBase}/api/assets?propertyId=${propertyId}`, config);
+      // Auth handled by interceptor
+      const res = await api.get(`/api/assets?propertyId=${propertyId}`);
       const list = Array.isArray(res.data) ? res.data : [];
       setAssetsOptions(list);
     } catch (e) {
@@ -146,9 +144,8 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
 
   async function loadInternalTechnicians(propertyId) {
     try {
-      const token = localStorage.getItem('token');
-      const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
-      const res = await axios.get(`${backendBase}/api/internal-technicians/by-property/${propertyId}`, config);
+      // Auth handled by interceptor
+      const res = await api.get(`/api/internal-technicians/by-property/${propertyId}`);
       setInternalTechnicians(Array.isArray(res.data) ? res.data : []);
     } catch (e) {
       console.error("Failed to load internal technicians:", e);
@@ -230,9 +227,9 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
       }
 
       const headers = { "Content-Type": "multipart/form-data" };
-      if (token) headers.Authorization = `Bearer ${token}`;
+      // Auth handled by interceptor if token exists in localStorage
 
-      await axios.post(import.meta.env.VITE_API_URL + "/api/issues", formData, { headers });
+      await api.post("/api/issues", formData, { headers });
 
       clearInterval(progressInterval);
       setUploadProgress(100);
