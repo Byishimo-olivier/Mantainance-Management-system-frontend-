@@ -68,6 +68,11 @@ export default function PropertyDetails() {
   async function submitIssue(e) {
     e.preventDefault();
     if (!property) return;
+    // Try to get the property owner's userId (clientId or userId)
+    let userId = property.clientId || property.userId || (property.user && (property.user.id || property.user._id));
+    if (!userId && property.owner) {
+      userId = property.owner.id || property.owner._id;
+    }
     const payload = {
       title: newIssue.title,
       description: newIssue.description,
@@ -75,6 +80,8 @@ export default function PropertyDetails() {
       location: property.name,
       address: property.address,
       assetId: newIssue.assetId || undefined,
+      propertyId: property.id || property._id,
+      userId: userId || undefined,
     };
     try {
       await axios.post('http://localhost:5000/api/issues', payload);

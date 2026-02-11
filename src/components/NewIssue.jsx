@@ -1,42 +1,146 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 
-export default function NewIssue() {
+export default function NewIssue({ model: propModel = null, onClose = null, asModal = false }) {
   const navigate = useNavigate();
+  const location = useLocation();
+  const formRef = useRef(null);
+  
+  // Enhanced gradient background
+  const backgroundGradient = "linear-gradient(135deg, #667eea 0%, #764ba2 25%, #f093fb 50%, #f5576c 75%, #ff7eb3 100%)";
+  
+  const prefill = propModel || (location && location.state && location.state.model) ? (propModel || location.state.model) : {};
+  const [prefilledAsset] = useState(prefill.asset || null);
+  const [selectedItems] = useState(prefill.selectedItems || []);
+  
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     navigate('/login', { replace: true });
     window.location.reload();
   };
+
+  const selectedItemsDescription = (selectedItems && selectedItems.length > 0)
+    ? '\n\nSelected items:\n' + selectedItems.map(it => `${it.assetName || (it.asset && (it.asset.name || it.assetId)) || it.assetId}${it.index != null ? ' #' + ((it.index || 0) + 1) : ''} — ${it.building || it.blockId || ''}`).join('\n')
+    : '';
+
+  const buildingFromAsset = (() => {
+    try {
+      const loc = prefill.asset && prefill.asset.location;
+      if (!loc) return '';
+      if (typeof loc === 'object') return loc.building || loc.buildingName || '';
+      return '';
+    } catch (e) {
+      return '';
+    }
+  })();
+
   const [form, setForm] = useState({
-    title: "",
-    description: "",
-    category: "",
-    building: "",
-    floor: "",
-    unit: "",
-    beforePhoto: null, // Changed from photo to beforePhoto
+    title: prefill.title || "",
+    description: (prefill.description || "") + selectedItemsDescription,
+    category: prefill.category || "",
+    building: prefill.building || prefill.block || buildingFromAsset || "",
+    floor: prefill.floor || (prefill.asset && prefill.asset.location && prefill.asset.location.floor) || "",
+    unit: prefill.unit || (selectedItems && selectedItems.length ? String(selectedItems.length) : ""),
+    beforePhoto: null,
     name: "",
     email: "",
     phone: "",
   });
 
+  const backendBase = 'http://localhost:5000';
+  const [submitting, setSubmitting] = useState(false);
+  const [preview, setPreview] = useState(null);
+  const [properties, setProperties] = useState([]);
+  const [assetsOptions, setAssetsOptions] = useState([]);
+  const [selectedPropertyId, setSelectedPropertyId] = useState(prefill.propertyId || (prefill.property && (prefill.property.id || prefill.property._id)) || '');
+  const [selectedAssetId, setSelectedAssetId] = useState(prefill.assetId || (prefilledAsset && (prefilledAsset.id || prefilledAsset._id)) || '');
+  const [formStep, setFormStep] = useState(1);
+  const [isLoading, setIsLoading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [userId, setUserId] = useState(null);
+  const [anonId, setAnonId] = useState(null);
+
+  // Floating particles animation
+  const [particles, setParticles] = useState([]);
+
   useEffect(() => {
+    // Initialize particles
+    const newParticles = Array.from({ length: 30 }).map((_, i) => ({
+      id: i,
+      x: Math.random() * 100,
+      y: Math.random() * 100,
+      size: Math.random() * 20 + 5,
+      speed: Math.random() * 0.5 + 0.1,
+      color: `rgba(255, 255, 255, ${Math.random() * 0.3 + 0.1})`,
+    }));
+    setParticles(newParticles);
+
+    // Load user data and check authentication
     const storedUser = localStorage.getItem('user');
-    if (storedUser) {
+    const storedToken = localStorage.getItem('token');
+    
+    if (storedUser && storedToken) {
       const userObj = JSON.parse(storedUser);
+      setIsAuthenticated(true);
+      setUserId(userObj.id || userObj._id);
       setForm(prev => ({
         ...prev,
         name: userObj.name || "",
         email: userObj.email || "",
         phone: userObj.phone || "",
       }));
+    } else {
+      // Generate anonymous ID for guest submissions
+      setIsAuthenticated(false);
+      const generatedAnonId = `ANON-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+      setAnonId(generatedAnonId);
     }
+
+    // Fetch properties
+    loadProperties();
   }, []);
-  const [submitting, setSubmitting] = useState(false);
-  const [preview, setPreview] = useState(null);
+
+  const loadProperties = async () => {
+    setIsLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+      const res = await axios.get(`${backendBase}/api/properties`, config);
+      const list = Array.isArray(res.data) ? res.data : [];
+      setProperties(list);
+      
+      if (selectedPropertyId) {
+        await loadAssetsForProperty(selectedPropertyId);
+      } else if (prefilledAsset) {
+        const pid = prefilledAsset.propertyId || (prefilledAsset.property && (prefilledAsset.property.id || prefilledAsset.property._id));
+        if (pid) {
+          setSelectedPropertyId(pid);
+          await loadAssetsForProperty(pid);
+        }
+      }
+    } catch (e) {
+      console.error("Failed to load properties:", e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  async function loadAssetsForProperty(propertyId) {
+    try {
+      const token = localStorage.getItem('token');
+      const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+      const res = await axios.get(`${backendBase}/api/assets?propertyId=${propertyId}`, config);
+      const list = Array.isArray(res.data) ? res.data : [];
+      setAssetsOptions(list);
+    } catch (e) {
+      setAssetsOptions([]);
+    }
+  }
 
   const handleChange = (e) => {
     const { name, value, files } = e.target;
@@ -51,10 +155,31 @@ export default function NewIssue() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
+    setUploadProgress(0);
+    
+    // For authenticated users, property is required
+    if (isAuthenticated && !selectedPropertyId) {
+      alert("Please select a property for your issue");
+      setSubmitting(false);
+      return;
+    }
+    
+    // Simulate upload progress
+    const progressInterval = setInterval(() => {
+      setUploadProgress(prev => {
+        if (prev >= 90) {
+          clearInterval(progressInterval);
+          return 90;
+        }
+        return prev + 10;
+      });
+    }, 200);
+
     try {
       const location = `Block ${form.building} - Floor ${form.floor} - Unit ${form.unit}`;
       const tags = [form.category.toUpperCase(), "PENDING"];
       const formData = new FormData();
+      
       formData.append("title", form.title);
       formData.append("description", form.description);
       formData.append("location", location);
@@ -66,239 +191,724 @@ export default function NewIssue() {
       formData.append("name", form.name);
       formData.append("email", form.email);
       formData.append("phone", form.phone);
+
+      if (prefill && prefill.assetId) formData.append('assetId', prefill.assetId);
+      else if (prefilledAsset && (prefilledAsset.id || prefilledAsset._id)) formData.append('assetId', prefilledAsset.id || prefilledAsset._id);
+      else if (selectedAssetId) formData.append('assetId', selectedAssetId);
+      
+      if (prefill && prefill.selectedItems && Array.isArray(prefill.selectedItems) && prefill.selectedItems.length > 0) {
+        const ids = prefill.selectedItems.map(si => si.assetId).filter(Boolean);
+        if (ids.length > 0) formData.append('assetIds', JSON.stringify(ids));
+      }
+
+      if (selectedPropertyId) formData.append('propertyId', selectedPropertyId);
+
       const token = localStorage.getItem('token');
-      const user = JSON.parse(localStorage.getItem('user'));
-      formData.append("userId", user?.id || "");
-      await axios.post("http://localhost:5000/api/issues", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-          Authorization: `Bearer ${token}`
-        },
-      });
-      setSubmitting(false);
-      navigate("/issues");
+      
+      // Submit with either authenticated userId or anonymous ID
+      if (isAuthenticated && userId) {
+        formData.append("userId", userId);
+        formData.append("submissionType", "authenticated");
+      } else {
+        formData.append("anonId", anonId);
+        formData.append("submissionType", "anonymous");
+      }
+
+      const headers = { "Content-Type": "multipart/form-data" };
+      if (token) headers.Authorization = `Bearer ${token}`;
+
+      await axios.post("http://localhost:5000/api/issues", formData, { headers });
+      
+      clearInterval(progressInterval);
+      setUploadProgress(100);
+      
+      // Show success animation
+      setShowSuccess(true);
+      
+      setTimeout(() => {
+        setSubmitting(false);
+        setShowSuccess(false);
+        
+        if (onClose && typeof onClose === 'function') {
+          onClose(true);
+        } else {
+          navigate("/issues");
+        }
+      }, 1500);
+
     } catch (err) {
+      clearInterval(progressInterval);
       setSubmitting(false);
       alert("Failed to submit issue");
     }
   };
 
-  return (
-    <div className="min-h-screen bg-gray-50 pb-8">
-      {/* Navbar */}
-      <nav className="flex items-center justify-between bg-white shadow px-4 md:px-8 h-16">
-        <div className="flex items-center gap-3">
-          <span className="bg-indigo-600 rounded-xl p-1 flex items-center justify-center">
-            <svg width="36" height="36" viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="6" fill="#6366f1"/><rect x="6" y="6" width="12" height="6" rx="2" fill="#a5b4fc"/></svg>
-          </span>
-          <div className="flex flex-col ml-1">
-            <span className="text-lg font-bold text-gray-900">PropCare</span>
-            <span className="text-sm text-gray-500">Jean Mukaba</span>
+  const nextStep = () => setFormStep(prev => Math.min(prev + 1, 4));
+  const prevStep = () => setFormStep(prev => Math.max(prev - 1, 1));
+
+  // Floating animation effect
+  const floatingAnimation = {
+    initial: { y: 0 },
+    animate: { 
+      y: [0, -10, 0],
+      transition: {
+        duration: 3,
+        repeat: Infinity,
+        ease: "easeInOut"
+      }
+    }
+  };
+
+  // Form steps with animations
+  const formSteps = {
+    1: (
+      <motion.div
+        key="step1"
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        exit={{ opacity: 0, x: 20 }}
+        className="space-y-6"
+      >
+        <div className="text-center mb-8">
+          <motion.h2 
+            initial={{ scale: 0.9 }}
+            animate={{ scale: 1 }}
+            className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent"
+          >
+            Issue Details
+          </motion.h2>
+          <p className="text-gray-600 mt-2">Let's start with the basic information</p>
+        </div>
+        
+        <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+          <label className="block font-semibold mb-2 text-gray-700" htmlFor="title">
+            Issue Title <span className="text-red-500">*</span>
+          </label>
+          <input
+            id="title"
+            name="title"
+            type="text"
+            className="w-full rounded-2xl border-2 border-gray-200 px-4 py-4 text-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 bg-white/80 backdrop-blur-sm"
+            placeholder="Brief description of the issue"
+            value={form.title}
+            onChange={handleChange}
+            required
+          />
+        </motion.div>
+
+        <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+          <label className="block font-semibold mb-2 text-gray-700" htmlFor="description">
+            Detailed Description <span className="text-red-500">*</span>
+          </label>
+          <textarea
+            id="description"
+            name="description"
+            className="w-full rounded-2xl border-2 border-gray-200 px-4 py-4 text-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 min-h-[150px] bg-white/80 backdrop-blur-sm"
+            placeholder="Please provide details about the issue..."
+            value={form.description}
+            onChange={handleChange}
+            required
+          />
+        </motion.div>
+
+        <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+          <label className="block font-semibold mb-2 text-gray-700" htmlFor="category">
+            Category <span className="text-red-500">*</span>
+          </label>
+          <select
+            id="category"
+            name="category"
+            className="w-full rounded-2xl border-2 border-gray-200 px-4 py-4 text-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 bg-white/80 backdrop-blur-sm"
+            value={form.category}
+            onChange={handleChange}
+            required
+          >
+            <option value="">Select category</option>
+            <option value="Plumbing">Plumbing</option>
+            <option value="Electrical">Electrical</option>
+            <option value="Cleaning">Cleaning</option>
+            <option value="Other">Other</option>
+          </select>
+        </motion.div>
+      </motion.div>
+    ),
+    2: (
+      <motion.div
+        key="step2"
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        exit={{ opacity: 0, x: 20 }}
+        className="space-y-6"
+      >
+        <div className="text-center mb-8">
+          <motion.h2 
+            initial={{ scale: 0.9 }}
+            animate={{ scale: 1 }}
+            className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent"
+          >
+            Contact Information
+          </motion.h2>
+          <p className="text-gray-600 mt-2">
+            {isAuthenticated ? "You're submitting as an authenticated user" : "You're submitting anonymously - optional contact info"}
+          </p>
+        </div>
+
+        {/* Submission Type Badge */}
+        <div className="flex justify-center mb-6">
+          <div className={`px-6 py-3 rounded-full font-semibold text-white ${isAuthenticated ? 'bg-gradient-to-r from-green-500 to-emerald-600' : 'bg-gradient-to-r from-orange-500 to-red-600'}`}>
+            {isAuthenticated ? '✓ Authenticated Submission' : '◎ Anonymous Submission'}
           </div>
         </div>
-        <div className="flex gap-3">
-          <button className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-gray-100 font-semibold" onClick={() => navigate('/dashboard')}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="4" fill="#ede9fe"/><rect x="7" y="7" width="4" height="4" rx="1" fill="#8b5cf6"/><rect x="13" y="7" width="4" height="4" rx="1" fill="#8b5cf6"/><rect x="7" y="13" width="4" height="4" rx="1" fill="#8b5cf6"/><rect x="13" y="13" width="4" height="4" rx="1" fill="#8b5cf6"/></svg> Dashboard
-          </button>
-          <button className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-gray-100 font-semibold" onClick={() => navigate('/issues')}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="4" fill="#f3f4f6"/><rect x="7" y="7" width="10" height="10" rx="2" fill="#6366f1"/></svg> All Issues
-          </button>
-          <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-50 text-indigo-600 font-semibold" disabled>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" fill="#eef2ff"/><path d="M12 8v4l3 3" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg> New Issue
-          </button>
-        </div>
-        <div className="flex items-center gap-2">
-          <button className="bg-gray-100 rounded-lg px-2 py-1 flex items-center justify-center">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" fill="#f3f4f6"/><path d="M8 12h8" stroke="#222" strokeWidth="2" strokeLinecap="round"/></svg>
-          </button>
-          <button className="px-4 py-2 rounded-lg bg-gray-100 font-semibold" onClick={handleLogout}>Logout</button>
-        </div>
-      </nav>
-      {/* Main Form */}
-      <form className="max-w-3xl mx-auto mt-10 bg-white rounded-2xl shadow-lg p-6 md:p-10" onSubmit={handleSubmit}>
-        <div className="flex flex-col gap-6">
-          <div>
-            <label className="block font-semibold mb-1" htmlFor="title">Issue Title <span className="text-red-500">*</span></label>
-            <input
-              id="title"
-              name="title"
-              type="text"
-              className="w-full rounded-xl border border-gray-200 px-4 py-3 text-base md:text-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-200"
-              placeholder="Brief description of the issue"
-              value={form.title}
-              onChange={handleChange}
-              required
-            />
-            {/* <div>
-              <label className="block font-semibold mb-1" htmlFor="beforePhoto">Attach BEFORE Photo</label>
-              <input
-                id="beforePhoto"
-                name="beforePhoto"
-                type="file"
-                accept="image/*"
-                className="w-full rounded-xl border border-gray-200 px-4 py-2 text-base md:text-lg focus:outline-none focus:ring-2 focus:ring-indigo-200"
-                onChange={handleChange}
-              />
-            </div> */}
-          </div>
-          <div>
-            <label className="block font-semibold mb-1" htmlFor="description">Detailed Description <span className="text-red-500">*</span></label>
-            <textarea
-              id="description"
-              name="description"
-              className="w-full rounded-xl border border-gray-200 px-4 py-3 text-base md:text-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-200 min-h-[100px]"
-              placeholder="Please provide details about the issue..."
-              value={form.description}
-              onChange={handleChange}
-              required
-            />
-          </div>
-          <div>
-            <label className="block font-semibold mb-1" htmlFor="category">Category <span className="text-red-500">*</span></label>
-            <select
-              id="category"
-              name="category"
-              className="w-full rounded-xl border border-gray-200 px-4 py-3 text-base md:text-lg focus:outline-none focus:ring-2 focus:ring-indigo-200"
-              value={form.category}
-              onChange={handleChange}
-              required
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {[
+            { id: 'name', label: 'Name', type: 'text', placeholder: 'Your full name' },
+            { id: 'email', label: 'Email', type: 'email', placeholder: 'your.email@example.com' },
+            { id: 'phone', label: 'Phone', type: 'tel', placeholder: '+1234567890' }
+          ].map((field, index) => (
+            <motion.div
+              key={field.id}
+              whileHover={{ scale: 1.02, y: -5 }}
+              whileTap={{ scale: 0.98 }}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.1 }}
+              className="relative"
             >
-              <option value="">Select category</option>
-              <option value="Plumbing">Plumbing</option>
-              <option value="Electrical">Electrical</option>
-              <option value="Cleaning">Cleaning</option>
-              <option value="Other">Other</option>
-            </select>
-          </div>
-          <div className="text-yellow-700 flex items-center gap-2 text-base font-medium">
-            <span role="img" aria-label="bulb">💡</span> Priority will be automatically assigned based on category
-          </div>
-          <div>
-            <h3 className="text-xl font-bold mb-2 mt-2">Contact Information</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block font-semibold mb-1" htmlFor="name">Name <span className="text-red-500">*</span></label>
-                <input
-                  id="name"
-                  name="name"
-                  type="text"
-                  className="w-full rounded-xl border border-gray-200 px-4 py-3 text-base md:text-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-200"
-                  placeholder="Your full name"
-                  value={form.name}
-                  onChange={handleChange}
-                  required
-                />
-              </div>
-              <div>
-                <label className="block font-semibold mb-1" htmlFor="email">Email <span className="text-red-500">*</span></label>
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  className="w-full rounded-xl border border-gray-200 px-4 py-3 text-base md:text-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-200"
-                  placeholder="your.email@example.com"
-                  value={form.email}
-                  onChange={handleChange}
-                  required
-                />
-              </div>
-              <div>
-                <label className="block font-semibold mb-1" htmlFor="phone">Phone Number <span className="text-red-500">*</span></label>
-                <input
-                  id="phone"
-                  name="phone"
-                  type="tel"
-                  className="w-full rounded-xl border border-gray-200 px-4 py-3 text-base md:text-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-200"
-                  placeholder="+1234567890"
-                  value={form.phone}
-                  onChange={handleChange}
-                  required
-                />
-              </div>
-            </div>
-          </div>
-          <div>
-            <h3 className="text-xl font-bold mb-2 mt-2">Property Location</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block font-semibold mb-1" htmlFor="building">Building <span className="text-red-500">*</span></label>
-                <input
-                  id="building"
-                  name="building"
-                  type="text"
-                  className="w-full rounded-xl border border-gray-200 px-4 py-3 text-base md:text-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-200"
-                  placeholder="e.g., Block A"
-                  value={form.building}
-                  onChange={handleChange}
-                  required
-                />
-              </div>
-              <div>
-                <label className="block font-semibold mb-1" htmlFor="floor">Floor <span className="text-red-500">*</span></label>
-                <input
-                  id="floor"
-                  name="floor"
-                  type="text"
-                  className="w-full rounded-xl border border-gray-200 px-4 py-3 text-base md:text-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-200"
-                  placeholder="e.g., 3"
-                  value={form.floor}
-                  onChange={handleChange}
-                  required
-                />
-              </div>
-              <div>
-                <label className="block font-semibold mb-1" htmlFor="unit">Unit Number <span className="text-red-500">*</span></label>
-                <input
-                  id="unit"
-                  name="unit"
-                  type="text"
-                  className="w-full rounded-xl border border-gray-200 px-4 py-3 text-base md:text-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-200"
-                  placeholder="e.g., 301"
-                  value={form.unit}
-                  onChange={handleChange}
-                  required
-                />
-              </div>
-            </div>
-          </div>
-            <div>
-              <label className="block font-semibold mb-1">Upload BEFORE Photo (Optional)</label>
-              <label className="w-full flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-xl h-32 md:h-40 cursor-pointer hover:border-indigo-300 transition">
-                <input
-                  type="file"
-                  name="beforePhoto"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleChange}
-                />
-                {preview ? (
-                  <img src={preview} alt="Preview" className="h-24 md:h-32 object-contain mb-2" />
-                ) : (
-                  <svg width="48" height="48" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="text-gray-400 mb-2"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 15a4 4 0 004 4h10a4 4 0 004-4M7 10V7a5 5 0 0110 0v3m-6 4v4m0 0h2m-2 0h-2" /></svg>
-                )}
-                <span className="text-gray-400">Click to upload or drag and drop</span>
-                <span className="text-gray-300 text-xs">PNG, JPG up to 10MB</span>
+              <label className="block font-semibold mb-2 text-gray-700" htmlFor={field.id}>
+                {field.label} {isAuthenticated && <span className="text-red-500">*</span>}
               </label>
+              <input
+                id={field.id}
+                name={field.id}
+                type={field.type}
+                className="w-full rounded-2xl border-2 border-gray-200 px-4 py-4 text-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300 bg-white/80 backdrop-blur-sm"
+                placeholder={field.placeholder}
+                value={form[field.id]}
+                onChange={handleChange}
+                required={isAuthenticated}
+              />
+            </motion.div>
+          ))}
+        </div>
+      </motion.div>
+    ),
+    3: (
+      <motion.div
+        key="step3"
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        exit={{ opacity: 0, x: 20 }}
+        className="space-y-6"
+      >
+        <div className="text-center mb-8">
+          <motion.h2 
+            initial={{ scale: 0.9 }}
+            animate={{ scale: 1 }}
+            className="text-3xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent"
+          >
+            Location Details
+          </motion.h2>
+          <p className="text-gray-600 mt-2">Where is the issue located?</p>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {[
+            { id: 'building', label: 'Building', placeholder: 'e.g., Block A' },
+            { id: 'floor', label: 'Floor', placeholder: 'e.g., 3' },
+            { id: 'unit', label: 'Unit Number', placeholder: 'e.g., 301' }
+          ].map((field, index) => (
+            <motion.div
+              key={field.id}
+              whileHover={{ scale: 1.02, y: -5 }}
+              whileTap={{ scale: 0.98 }}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.1 }}
+            >
+              <label className="block font-semibold mb-2 text-gray-700" htmlFor={field.id}>
+                {field.label} <span className="text-red-500">*</span>
+              </label>
+              <input
+                id={field.id}
+                name={field.id}
+                type="text"
+                className="w-full rounded-2xl border-2 border-gray-200 px-4 py-4 text-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-300 bg-white/80 backdrop-blur-sm"
+                placeholder={field.placeholder}
+                value={form[field.id]}
+                onChange={handleChange}
+                required
+              />
+            </motion.div>
+          ))}
+        </div>
+
+        <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="space-y-4">
+          <h3 className="text-xl font-bold text-gray-700">Property / Asset {isAuthenticated ? "(required)" : "(optional)"}</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block font-semibold mb-2 text-gray-700" htmlFor="property">
+                Property {isAuthenticated && <span className="text-red-500">*</span>}
+              </label>
+              <select
+                id="property"
+                name="property"
+                className="w-full rounded-2xl border-2 border-gray-200 px-4 py-4 text-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-300 bg-white/80 backdrop-blur-sm"
+                value={selectedPropertyId}
+                onChange={async (e) => {
+                  const pid = e.target.value;
+                  setSelectedPropertyId(pid);
+                  const prop = properties.find(p => (p.id || p._id) === pid);
+                  if (prop) setForm(f => ({ ...f, building: prop.name || f.building }));
+                  await loadAssetsForProperty(pid);
+                }}
+              >
+                <option value="">-- Select property {isAuthenticated ? "(required)" : "(optional)"} --</option>
+                {properties.map(p => (
+                  <option key={p.id || p._id} value={p.id || p._id}>
+                    {p.name || p.address || (p.id || p._id)}
+                  </option>
+                ))}
+              </select>
             </div>
-        </div>
-        <div className="flex flex-col md:flex-row gap-4 px-4 md:px-10 py-4 md:py-6 bg-gray-50 rounded-b-2xl">
-          <button
-            type="submit"
-            className="w-full md:w-auto py-3 rounded-xl bg-indigo-300 text-white text-base md:text-lg font-semibold shadow hover:bg-indigo-400 transition disabled:opacity-60"
-            disabled={submitting}
+            <div>
+              <label className="block font-semibold mb-2 text-gray-700" htmlFor="asset">
+                Asset (optional)
+              </label>
+              <select
+                id="asset"
+                name="asset"
+                className="w-full rounded-2xl border-2 border-gray-200 px-4 py-4 text-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-300 bg-white/80 backdrop-blur-sm"
+                value={selectedAssetId}
+                onChange={(e) => { setSelectedAssetId(e.target.value); }}
+              >
+                <option value="">-- Select asset (optional) --</option>
+                {assetsOptions.map(a => (
+                  <option key={a.id || a._id} value={a.id || a._id}>
+                    {a.name || a.serialNumber || (a.id || a._id)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </motion.div>
+      </motion.div>
+    ),
+    4: (
+      <motion.div
+        key="step4"
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        exit={{ opacity: 0, x: 20 }}
+        className="space-y-6"
+      >
+        <div className="text-center mb-8">
+          <motion.h2 
+            initial={{ scale: 0.9 }}
+            animate={{ scale: 1 }}
+            className="text-3xl font-bold bg-gradient-to-r from-yellow-600 to-orange-600 bg-clip-text text-transparent"
           >
-            {submitting ? "Submitting..." : "Submit Issue"}
-          </button>
-          <button
-            type="button"
-            className="w-full md:w-auto py-3 rounded-xl bg-gray-100 text-gray-700 text-base md:text-lg font-semibold shadow hover:bg-gray-200 transition"
-            onClick={() => navigate('/dashboard')}
-            disabled={submitting}
-          >
-            Cancel
-          </button>
+            Upload & Review
+          </motion.h2>
+          <p className="text-gray-600 mt-2">Add photos and review your submission</p>
         </div>
-      </form>
+
+        <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+          <label className="block font-semibold mb-4 text-gray-700">
+            Upload BEFORE Photo (Optional)
+          </label>
+          <motion.label
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="w-full flex flex-col items-center justify-center border-4 border-dashed border-gray-300 rounded-3xl h-64 cursor-pointer hover:border-purple-400 transition-all duration-300 bg-gradient-to-br from-white/60 to-white/30 backdrop-blur-sm"
+          >
+            <input
+              type="file"
+              name="beforePhoto"
+              accept="image/*"
+              className="hidden"
+              onChange={handleChange}
+            />
+            {preview ? (
+              <motion.div
+                initial={{ scale: 0.8 }}
+                animate={{ scale: 1 }}
+                className="relative"
+              >
+                <img 
+                  src={preview} 
+                  alt="Preview" 
+                  className="h-48 object-contain rounded-xl shadow-lg" 
+                />
+                <motion.div
+                  whileHover={{ scale: 1.1 }}
+                  className="absolute top-2 right-2 bg-white/80 rounded-full p-2"
+                >
+                  <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </motion.div>
+              </motion.div>
+            ) : (
+              <motion.div
+                initial={{ opacity: 0.5 }}
+                animate={{ opacity: 1 }}
+                className="text-center p-8"
+              >
+                <svg className="w-20 h-20 text-gray-400 mb-4 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <p className="text-gray-600 text-lg font-medium">Drag & drop or click to upload</p>
+                <p className="text-gray-400 text-sm mt-2">PNG, JPG, GIF up to 10MB</p>
+              </motion.div>
+            )}
+          </motion.label>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="p-6 rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100"
+        >
+          <h3 className="text-xl font-bold text-gray-800 mb-4">Issue Summary</h3>
+          <div className="space-y-3">
+            <div className="flex justify-between">
+              <span className="text-gray-600">Title:</span>
+              <span className="font-semibold">{form.title}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Category:</span>
+              <span className="font-semibold">{form.category}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Location:</span>
+              <span className="font-semibold">Block {form.building} - Floor {form.floor} - Unit {form.unit}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Contact:</span>
+              <span className="font-semibold">{form.name}</span>
+            </div>
+          </div>
+        </motion.div>
+      </motion.div>
+    )
+  };
+
+  return (
+    <div 
+      className={`min-h-screen ${asModal ? 'bg-transparent' : ''}`}
+      style={asModal ? {} : { background: backgroundGradient }}
+    >
+      {/* Floating particles */}
+      {!asModal && particles.map(particle => (
+        <motion.div
+          key={particle.id}
+          className="absolute rounded-full"
+          style={{
+            left: `${particle.x}%`,
+            top: `${particle.y}%`,
+            width: particle.size,
+            height: particle.size,
+            background: particle.color,
+            filter: 'blur(1px)'
+          }}
+          animate={{
+            y: [0, -100, 0],
+            x: [0, Math.sin(particle.id) * 20, 0]
+          }}
+          transition={{
+            duration: 10 + particle.speed * 10,
+            repeat: Infinity,
+            ease: "linear"
+          }}
+        />
+      ))}
+
+      {/* Animated Navbar */}
+      {!asModal && (
+        <motion.nav 
+          initial={{ y: -100 }}
+          animate={{ y: 0 }}
+          transition={{ type: "spring", stiffness: 100 }}
+          className="flex items-center justify-between bg-gradient-to-r from-purple-900/90 to-pink-900/90 shadow-2xl px-4 md:px-8 h-16 backdrop-blur-md"
+        >
+          <motion.div 
+            className="flex items-center gap-3"
+            whileHover={{ scale: 1.05 }}
+          >
+            <motion.span 
+              className="bg-white rounded-2xl p-2 flex items-center justify-center shadow-lg"
+              whileHover={{ rotate: 360 }}
+              transition={{ duration: 0.5 }}
+            >
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+                <rect x="2" y="2" width="20" height="20" rx="6" fill="#8b5cf6" />
+                <rect x="6" y="6" width="12" height="6" rx="2" fill="#c4b5fd" />
+              </svg>
+            </motion.span>
+            <div className="flex flex-col">
+              <span className="text-lg font-bold text-white">Fixnest</span>
+              <motion.span 
+                className="text-sm text-purple-200"
+                animate={{ opacity: [1, 0.5, 1] }}
+                transition={{ duration: 2, repeat: Infinity }}
+              >
+                Welcome, {JSON.parse(localStorage.getItem('user') || '{}').name || ''}
+              </motion.span>
+            </div>
+          </motion.div>
+
+          <div className="flex items-center gap-3">
+            {[
+              { path: '/dashboard', label: 'Dashboard', icon: 'dashboard', color: 'from-blue-500 to-cyan-500' },
+              { path: '/issues', label: 'All Issues', icon: 'issues', color: 'from-green-500 to-emerald-500' },
+              { path: '#', label: 'New Issue', icon: 'new', color: 'from-yellow-500 to-orange-500', active: true },
+              { path: '/feedback', label: 'Feedback', icon: 'feedback', color: 'from-teal-500 to-green-500' }
+            ].map((item) => (
+              <motion.button
+                key={item.path}
+                whileHover={{ y: -2 }}
+                whileTap={{ scale: 0.95 }}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-white font-semibold transition-all ${
+                  item.active 
+                    ? 'bg-gradient-to-r from-yellow-500 to-orange-500 shadow-lg' 
+                    : `bg-gradient-to-r ${item.color} hover:shadow-lg`
+                }`}
+                onClick={() => !item.active && navigate(item.path)}
+              >
+                {item.label}
+              </motion.button>
+            ))}
+
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={handleLogout}
+              className="px-4 py-2 bg-gradient-to-r from-red-600 to-pink-600 text-white rounded-xl hover:shadow-lg transition-all font-semibold"
+            >
+              Logout
+            </motion.button>
+          </div>
+        </motion.nav>
+      )}
+
+      {/* Main Form Container */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.5 }}
+        className="max-w-5xl mx-auto mt-10 p-4"
+      >
+        <motion.form
+          ref={formRef}
+          {...floatingAnimation}
+          className="bg-gradient-to-br from-white/90 to-white/70 rounded-3xl shadow-2xl p-8 backdrop-blur-sm"
+          onSubmit={handleSubmit}
+        >
+          {/* Progress Steps */}
+          <div className="mb-12">
+            <div className="flex justify-between items-center mb-6">
+              {[1, 2, 3, 4].map((step) => (
+                <React.Fragment key={step}>
+                  <motion.div
+                    whileHover={{ scale: 1.1 }}
+                    className={`flex flex-col items-center cursor-pointer ${formStep >= step ? 'text-purple-600' : 'text-gray-400'}`}
+                    onClick={() => setFormStep(step)}
+                  >
+                    <div className={`
+                      w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold
+                      ${formStep >= step 
+                        ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg' 
+                        : 'bg-gray-200'
+                      }
+                    `}>
+                      {formStep > step ? '✓' : step}
+                    </div>
+                    <span className="mt-2 text-sm font-medium">
+                      {['Details', 'Contact', 'Location', 'Upload'][step-1]}
+                    </span>
+                  </motion.div>
+                  {step < 4 && (
+                    <div className="flex-1 h-1 mx-4 relative">
+                      <div className="absolute inset-0 bg-gray-200 rounded-full"></div>
+                      <motion.div
+                        className="absolute inset-0 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full"
+                        initial={{ scaleX: 0 }}
+                        animate={{ scaleX: formStep > step ? 1 : 0 }}
+                        transition={{ duration: 0.3 }}
+                        style={{ originX: 0 }}
+                      />
+                    </div>
+                  )}
+                </React.Fragment>
+              ))}
+            </div>
+          </div>
+
+          <AnimatePresence mode="wait">
+            {formSteps[formStep]}
+          </AnimatePresence>
+
+          {/* Navigation Buttons */}
+          <motion.div 
+            className="flex justify-between mt-12 pt-8 border-t border-gray-200"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.3 }}
+          >
+            <motion.button
+              type="button"
+              whileHover={{ x: -5 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={prevStep}
+              className={`px-8 py-4 rounded-2xl text-lg font-semibold transition-all ${
+                formStep === 1 
+                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                  : 'bg-gradient-to-r from-gray-400 to-gray-600 text-white hover:shadow-lg'
+              }`}
+              disabled={formStep === 1}
+            >
+              ← Previous
+            </motion.button>
+
+            {formStep < 4 ? (
+              <motion.button
+                type="button"
+                whileHover={{ x: 5 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={nextStep}
+                className="px-8 py-4 rounded-2xl bg-gradient-to-r from-blue-500 to-purple-600 text-white text-lg font-semibold hover:shadow-lg transition-all"
+              >
+                Next →
+              </motion.button>
+            ) : (
+              <div className="flex gap-4">
+                <motion.button
+                  type="button"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => onClose ? onClose(false) : navigate('/dashboard')}
+                  className="px-8 py-4 rounded-2xl bg-gradient-to-r from-gray-400 to-gray-600 text-white text-lg font-semibold hover:shadow-lg transition-all"
+                  disabled={submitting}
+                >
+                  Cancel
+                </motion.button>
+                <motion.button
+                  type="submit"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  disabled={submitting}
+                  className="px-8 py-4 rounded-2xl bg-gradient-to-r from-green-500 to-emerald-600 text-white text-lg font-semibold hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed relative overflow-hidden"
+                >
+                  {submitting ? (
+                    <span className="flex items-center gap-2">
+                      <motion.span
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                      >
+                        ⏳
+                      </motion.span>
+                      Submitting...
+                    </span>
+                  ) : showSuccess ? (
+                    <span className="flex items-center gap-2">
+                      <motion.span
+                        animate={{ scale: [1, 1.5, 1] }}
+                        transition={{ duration: 0.5 }}
+                      >
+                        ✅
+                      </motion.span>
+                      Success!
+                    </span>
+                  ) : (
+                    'Submit Issue'
+                  )}
+                  
+                  {/* Progress Bar */}
+                  {submitting && (
+                    <motion.div
+                      className="absolute bottom-0 left-0 h-1 bg-gradient-to-r from-yellow-400 to-orange-500"
+                      initial={{ width: "0%" }}
+                      animate={{ width: `${uploadProgress}%` }}
+                      transition={{ duration: 0.3 }}
+                    />
+                  )}
+                </motion.button>
+              </div>
+            )}
+          </motion.div>
+
+          {/* Success Animation Overlay */}
+          <AnimatePresence>
+            {showSuccess && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 1.2 }}
+                className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-50"
+              >
+                <motion.div
+                  initial={{ y: 50 }}
+                  animate={{ y: 0 }}
+                  className="bg-white rounded-3xl p-12 text-center shadow-2xl"
+                >
+                  <motion.div
+                    animate={{
+                      scale: [1, 1.2, 1],
+                      rotate: [0, 360, 0]
+                    }}
+                    transition={{ duration: 1 }}
+                    className="text-6xl mb-6"
+                  >
+                    🎉
+                  </motion.div>
+                  <h3 className="text-3xl font-bold text-gray-800 mb-4">Issue Submitted!</h3>
+                  <p className="text-gray-600 text-lg">Your issue has been successfully submitted.</p>
+                  <motion.div
+                    animate={{
+                      scale: [1, 1.1, 1],
+                      transition: { repeat: Infinity, duration: 2 }
+                    }}
+                    className="mt-8 text-sm text-gray-500"
+                  >
+                    Redirecting...
+                  </motion.div>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.form>
+      </motion.div>
+
+      {/* Decorative Elements */}
+      {!asModal && (
+        <>
+          <motion.div
+            animate={{
+              y: [0, -20, 0],
+              x: [0, 10, 0]
+            }}
+            transition={{ duration: 5, repeat: Infinity }}
+            className="fixed top-20 left-10 w-16 h-16 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full opacity-20 blur-xl"
+          />
+          <motion.div
+            animate={{
+              y: [0, 20, 0],
+              x: [0, -10, 0]
+            }}
+            transition={{ duration: 6, repeat: Infinity, delay: 0.5 }}
+            className="fixed bottom-20 right-10 w-24 h-24 bg-gradient-to-r from-purple-400 to-pink-500 rounded-full opacity-20 blur-xl"
+          />
+          <motion.div
+            animate={{
+              y: [0, -30, 0],
+              rotate: [0, 180, 360]
+            }}
+            transition={{ duration: 8, repeat: Infinity }}
+            className="fixed top-1/2 left-1/4 w-12 h-12 bg-gradient-to-r from-blue-400 to-cyan-500 rounded-full opacity-20 blur-lg"
+          />
+        </>
+      )}
     </div>
   );
 }

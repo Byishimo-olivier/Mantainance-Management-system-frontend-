@@ -2,320 +2,451 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
-// Issues will be fetched from backend
+// Updated IssueCard to handle missing properties
+const IssueCard = ({ issue, userRole, actions }) => {
+  // Handle missing or undefined properties
+  const title = issue?.title || 'No Title';
+  const description = issue?.description || 'No description';
+  const time = issue?.createdAt ? new Date(issue.createdAt).toLocaleDateString() : issue?.time || 'No date';
+  const overdue = issue?.overdue || false;
+  const status = issue?.status || 'UNKNOWN';
 
-const technicians = [
-  { name: "Patrick Niyonsenga", email: "patrick.n@propcare.rw" },
-  { name: "Eric Habimana", email: "eric.h@propcare.rw" },
-  { name: "Jean Baptiste", email: "jean.b@propcare.rw" },
-];
+  return (
+    <div className="flex flex-col md:flex-row items-start justify-between border-2 border-red-200 bg-white rounded-2xl shadow p-4 md:p-8 mb-4">
+      <div className="flex-1">
+        <div className="text-base md:text-xl font-bold mb-1">{title}</div>
+        <div className="text-gray-600 mb-2">{description}</div>
+        <div className="text-sm text-gray-500 mb-2">
+          Status: <span className={`font-semibold ${getStatusColor(status)}`}>{status}</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-1">{actions}</div>
+      </div>
+      <div className="flex flex-col items-end min-w-[70px] md:min-w-[110px] gap-1 md:gap-2 mt-2 md:mt-0">
+        <span className="flex items-center gap-1 text-yellow-700 text-xs md:text-lg font-medium">{time}</span>
+        {overdue && <span className="text-red-600 text-xs md:text-base font-semibold">overdue</span>}
+      </div>
+    </div>
+  );
+};
+
+// Helper function for status colors
+const getStatusColor = (status) => {
+  switch (status?.toUpperCase()) {
+    case 'PENDING': return 'text-yellow-600';
+    case 'APPROVED': return 'text-green-600';
+    case 'IN PROGRESS': return 'text-blue-600';
+    case 'COMPLETED': return 'text-green-700';
+    case 'REJECTED': return 'text-red-600';
+    case 'OVERDUE': return 'text-red-700';
+    default: return 'text-gray-600';
+  }
+};
+
+const StatusFilter = ({ value, onChange, includeAll }) => (
+  <select 
+    value={value} 
+    onChange={(e) => onChange(e.target.value)} 
+    className="bg-white border border-gray-200 rounded-lg px-4 py-2 text-base font-medium text-gray-700 outline-none"
+  >
+    {includeAll && <option value="ALL">All</option>}
+    <option value="PENDING">Pending</option>
+    <option value="APPROVED">Approved</option>
+    <option value="IN PROGRESS">In Progress</option>
+    <option value="COMPLETED">Completed</option>
+    <option value="REJECTED">Rejected</option>
+    <option value="OVERDUE">Overdue</option>
+  </select>
+);
+
+const LoadingSpinner = ({ size = 'md', text }) => (
+  <div className="flex flex-col items-center">
+    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+    {text && <p className="mt-2 text-gray-600">{text}</p>}
+  </div>
+);
+
+const ErrorMessage = ({ message, onDismiss, className }) => (
+  <div className={`bg-red-50 text-red-700 p-4 rounded-lg mb-4 border border-red-200 ${className || ''}`}>
+    <div className="flex justify-between items-start">
+      <div>{message}</div>
+      {onDismiss && <button onClick={onDismiss} className="text-red-600">×</button>}
+    </div>
+  </div>
+);
+
+const API_BASE_URL = 'http://localhost:5000';
+
+// Minimal auth hook fallback (reads localStorage)
+const useAuth = () => {
+  const stored = localStorage.getItem('user');
+  const token = localStorage.getItem('token');
+  const user = stored ? JSON.parse(stored) : null;
+  const logout = () => { 
+    localStorage.removeItem('user'); 
+    localStorage.removeItem('token'); 
+    window.location.href = '/login'; 
+  };
+  return { user, logout, token };
+};
+
+// Simple issue service
+const issueService = {
+  fetchIssuesByRole: async (user) => {
+    const token = localStorage.getItem('token');
+    const cfg = { headers: { Authorization: `Bearer ${token}` } };
+    
+    if (!user) return [];
+    
+    try {
+      if (user.role === 'technician') {
+        const res = await axios.get(`${API_BASE_URL}/api/issues/assigned/${user._id || user.id}`, cfg);
+        return res.data || [];
+      }
+      
+      if (user.role === 'client') {
+        // For clients, fetch all issues from /api/issues endpoint
+        // The backend will filter by the user's role
+        const res = await axios.get(`${API_BASE_URL}/api/issues`, cfg);
+        console.log('CLIENT: Fetched issues from /api/issues:', res.data?.length || 0);
+        const sorted = (res.data || []).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        return sorted;
+      }
+      
+      // admin/manager: fetch all
+      const res = await axios.get(`${API_BASE_URL}/api/issues`, cfg);
+      const sorted = (res.data || []).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      return sorted;
+    } catch (error) {
+      console.error('Error fetching issues:', error);
+      return [];
+    }
+  },
+  
+  updateIssueStatus: async (issueId, status, token) => {
+    return axios.put(
+      `${API_BASE_URL}/api/issues/${issueId}`, 
+      { status }, 
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+  }
+};
 
 function AllIssues() {
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const userName = user?.name || user?.username || '';
+  
   const [issues, setIssues] = useState([]);
-  const [user, setUser] = useState(null);
+  const [filteredIssues, setFilteredIssues] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [refreshing, setRefreshing] = useState(false);
+  const [dataFetched, setDataFetched] = useState(false);
+
+  // Check authentication on mount
   useEffect(() => {
-    // Get user and token from localStorage
-    const storedUser = localStorage.getItem('user');
-    const token = localStorage.getItem('token');
-    if (!storedUser || !token) {
+    if (!user) {
       navigate('/login');
       return;
     }
-    // Note: Authorization header will be set per request to avoid conflicts
-    const userObj = JSON.parse(storedUser);
-    console.log('userObj from localStorage:', userObj);
-    setUser(userObj);
-    async function fetchIssues() {
-      try {
-        let url = 'http://localhost:5000/api/issues';
-        // For technician: assigned, for client: own, for admin: all
-        if (userObj.role === 'technician') {
-          url = `http://localhost:5000/api/issues/assigned/${userObj._id}`;
-        } else if (userObj.role === 'client') {
-          url = `http://localhost:5000/api/issues/user/${userObj._id}`; // Uses correct userId
-        }
-        console.log('Fetching issues from:', url);
-        const res = await axios.get(url);
-        console.log('Fetched issues:', res.data);
-        setIssues(res.data);
-      } catch (err) {
-        console.error('Error fetching issues:', err);
-        setIssues([]);
-      }
+    
+    // Only fetch data once
+    if (!dataFetched) {
+      fetchData();
     }
-    fetchIssues();
-  }, [navigate]);
-  const [assigning, setAssigning] = useState(null); // index of issue being assigned
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    navigate('/login', { replace: true });
-    window.location.reload();
+  }, [user, navigate, dataFetched]);
+
+  // Filter issues when statusFilter or issues change
+  useEffect(() => {
+    console.log('Filtering issues with filter:', statusFilter, 'total issues:', issues.length);
+    
+    if (statusFilter === "ALL") {
+      setFilteredIssues(issues);
+    } else {
+      const filtered = issues.filter(issue => {
+        const issueStatus = issue?.status || 'UNKNOWN';
+        return issueStatus === statusFilter;
+      });
+      console.log(`Filtered to ${filtered.length} issues with status ${statusFilter}`);
+      setFilteredIssues(filtered);
+    }
+  }, [issues, statusFilter]);
+
+  const fetchData = async () => {
+    console.log('FETCHDATA CALLED - user:', user, 'dataFetched:', dataFetched);
+    if (!user || dataFetched) {
+      console.log('FETCHDATA SKIPPED - no user or already fetched');
+      return;
+    }
+    
+    setLoading(true);
+    setError(null);
+
+    try {
+      console.log('FETCHDATA: Calling issueService.fetchIssuesByRole for client role');
+      const issuesData = await issueService.fetchIssuesByRole(user);
+      console.log('FETCHDATA: Fetched issues:', issuesData?.length || 0, issuesData);
+      
+      // Transform data to ensure it has expected properties
+      const transformedIssues = issuesData.map(issue => ({
+        ...issue,
+        time: issue.createdAt ? new Date(issue.createdAt).toLocaleDateString() : 'No date',
+        overdue: issue.status === 'OVERDUE' || (issue.dueDate && new Date(issue.dueDate) < new Date())
+      }));
+      
+      console.log('FETCHDATA: Transformed issues:', transformedIssues?.length || 0);
+      setIssues(transformedIssues);
+      setDataFetched(true);
+    } catch (err) {
+      console.error("Error fetching data:", err);
+      setError(err.message || "Failed to load issues");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleAssignClick = idx => {
-    setAssigning(idx);
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    setDataFetched(false);
+    await fetchData();
+    setRefreshing(false);
   };
 
-  const handleAssignTech = (idx, techName) => {
-    setIssues(prev => prev.map((issue, i) => i === idx ? { ...issue, assignee: techName } : issue));
-    setAssigning(null);
-  };
-
-  const fetchIssues = async () => {
+  const handleStatusUpdate = async (issueId, newStatus) => {
     try {
       const token = localStorage.getItem('token');
-      const userObj = JSON.parse(localStorage.getItem('user'));
-      let url = 'http://localhost:5000/api/issues';
-      // For technician: assigned, for client: own, for admin: all
-      if (userObj.role === 'technician') {
-        url = `http://localhost:5000/api/issues/assigned/${userObj._id}`;
-      } else if (userObj.role === 'client') {
-        url = `http://localhost:5000/api/issues/user/${userObj._id}`;
-      }
-      const config = { headers: { Authorization: `Bearer ${token}` } };
-      const res = await axios.get(url, config);
-      setIssues(res.data);
+      await issueService.updateIssueStatus(issueId, newStatus, token);
+      await handleRefresh(); // Refresh the data
     } catch (err) {
-      console.error('Error fetching issues:', err);
-      setIssues([]);
+      console.error(`Error updating status to ${newStatus}:`, err);
+      setError(`Failed to update issue status: ${err.message}`);
     }
   };
 
-  const handleAccept = async (issue) => {
+  const handleResubmit = async (issueId) => {
     try {
       const token = localStorage.getItem('token');
-      const config = { headers: { Authorization: `Bearer ${token}` } };
-
-      // Ensure we're using the correct ID format with proper null checks
-      let issueId;
-      if (typeof issue === 'string') {
-        issueId = issue;
-      } else if (issue && typeof issue === 'object') {
-        issueId = issue._id || issue.id;
-      } else {
-        throw new Error('Invalid issue format');
-      }
-
-      if (!issueId) {
-        throw new Error('No valid issue ID found');
-      }
-
-      console.log('Accepting issue:', issueId);
-
-      // Try different endpoint structures like ManagerDashboard
-      let response;
-      try {
-        // First try: PUT with status update
-        response = await axios.put(`http://localhost:5000/api/issues/${issueId}`, {
-          status: 'APPROVED'
-        }, config);
-        console.log('Accept successful (method 1):', response.data);
-      } catch (err1) {
-        console.log('Method 1 failed:', err1.response?.data);
-        throw err1;
-      }
-
-      // Refresh issues from backend
-      await fetchIssues();
+      await axios.post(`${API_BASE_URL}/issues/${issueId}/resubmit`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      console.log('Issue resubmitted successfully');
+      await handleRefresh(); // Refresh the data
     } catch (err) {
-      console.error('Error accepting issue:', err.response?.data || err.message);
+      console.error('Error resubmitting issue:', err);
+      setError(`Failed to resubmit issue: ${err.message}`);
     }
   };
 
-  const handleReject = async (issue) => {
-    try {
-      const token = localStorage.getItem('token');
-      const config = { headers: { Authorization: `Bearer ${token}` } };
-
-      // Ensure we're using the correct ID format with proper null checks
-      let issueId;
-      if (typeof issue === 'string') {
-        issueId = issue;
-      } else if (issue && typeof issue === 'object') {
-        issueId = issue._id || issue.id;
-      } else {
-        throw new Error('Invalid issue format');
-      }
-
-      if (!issueId) {
-        throw new Error('No valid issue ID found');
-      }
-
-      console.log('Rejecting issue:', issueId);
-
-      // Try different endpoint structures like ManagerDashboard
-      let response;
-      try {
-        // First try: PUT with status update
-        response = await axios.put(`http://localhost:5000/api/issues/${issueId}`, {
-          status: 'REJECTED'
-        }, config);
-        console.log('Reject successful (method 1):', response.data);
-      } catch (err1) {
-        console.log('Method 1 failed:', err1.response?.data);
-        throw err1;
-      }
-
-      // Refresh issues from backend
-      await fetchIssues();
-    } catch (err) {
-      console.error('Error rejecting issue:', err.response?.data || err.message);
-    }
+  const handleLogout = () => { 
+    logout(); 
   };
+
+  // Render navigation (moved to a separate function for clarity)
+  const renderNavigation = () => (
+    <nav className="flex items-center justify-between bg-blue-900 shadow-lg px-4 md:px-8 h-16">
+      <div className="flex items-center gap-3">
+        <span className="bg-white rounded-xl p-2 flex items-center justify-center">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+            <rect x="2" y="2" width="20" height="20" rx="6" fill="#1e40af" />
+            <rect x="6" y="6" width="12" height="6" rx="2" fill="#60a5fa" />
+          </svg>
+        </span>
+        <div className="flex flex-col">
+          <span className="text-lg font-bold text-white">Fixnest</span>
+          <span className="text-sm text-blue-200">Welcome, {userName}</span>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-4">
+        <button
+          className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-blue-800 text-white font-semibold transition"
+          onClick={() => navigate('/dashboard')}
+        >
+          Dashboard
+        </button>
+        
+        <button
+          className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-blue-800 text-white font-semibold transition bg-blue-800"
+          onClick={() => navigate("/issues")}
+        >
+          All Issues
+        </button>
+        
+        <button
+          onClick={() => navigate("/new-issue")}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-blue-800 text-white font-semibold transition"
+        >
+          New Issue
+        </button>
+        
+        <button
+          onClick={handleLogout}
+          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-semibold"
+        >
+          Logout
+        </button>
+      </div>
+    </nav>
+  );
+
+  if (loading && !refreshing) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        {renderNavigation()}
+        <div className="flex items-center justify-center h-96">
+          <LoadingSpinner size="lg" text="Loading issues..." />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 pb-8">
-        <nav className="flex items-center justify-between bg-white shadow px-4 md:px-8 h-16">
-        <div className="flex items-center gap-3">
-          <span className="bg-indigo-600 rounded-xl p-1 flex items-center justify-center">
-            <svg width="36" height="36" viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="6" fill="#6366f1"/><rect x="6" y="6" width="12" height="6" rx="2" fill="#a5b4fc"/></svg>
-          </span>
-          <div className="flex flex-col ml-1">
-            <span className="text-lg font-bold text-gray-900">Fixnest</span>
-            <span className="text-sm text-gray-500">Jean Mukaba</span>
+      {renderNavigation()}
+      
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header */}
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">All Issues</h1>
+            <p className="mt-2 text-gray-600">
+              {filteredIssues.length} issue{filteredIssues.length !== 1 ? 's' : ''} found
+              {statusFilter !== "ALL" && ` (filtered by ${statusFilter})`}
+            </p>
+          </div>
+          
+          <div className="flex flex-wrap items-center gap-4 mt-4 lg:mt-0">
+            <StatusFilter 
+              value={statusFilter}
+              onChange={setStatusFilter}
+              includeAll={true}
+            />
+            
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              <svg 
+                className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              {refreshing ? 'Refreshing...' : 'Refresh'}
+            </button>
           </div>
         </div>
-        <div className="flex gap-3">
-          <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-100 text-indigo-700 font-semibold" onClick={() => navigate('/dashboard')}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="4" fill="#ede9fe"/><rect x="7" y="7" width="4" height="4" rx="1" fill="#8b5cf6"/><rect x="13" y="7" width="4" height="4" rx="1" fill="#8b5cf6"/><rect x="7" y="13" width="4" height="4" rx="1" fill="#8b5cf6"/><rect x="13" y="13" width="4" height="4" rx="1" fill="#8b5cf6"/></svg> Dashboard
-          </button>
-          <button className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-gray-100 font-semibold" onClick={() => navigate('/issues')}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="4" fill="#f3f4f6"/><rect x="7" y="7" width="10" height="10" rx="2" fill="#6366f1"/></svg> All Issues
-          </button>
-          <button className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-gray-100 font-semibold" onClick={() => navigate('/new-issue')}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" fill="#fef9c3"/><path d="M12 8v4l3 3" stroke="#b45309" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg> New Issue
-          </button>
+
+        {/* Error Display */}
+        {error && (
+          <ErrorMessage 
+            message={error}
+            onDismiss={() => setError(null)}
+            className="mb-6"
+          />
+        )}
+
+        {/* Debug info - remove in production */}
+        <div className="mb-4 p-2 bg-gray-100 rounded text-sm text-gray-600">
+          <p>Debug: Showing {filteredIssues.length} issues. User role: {user?.role}</p>
+          <p>Issues have: {issues.length > 0 ? Object.keys(issues[0]).join(', ') : 'No issues'}</p>
         </div>
-        <div className="flex items-center gap-2">
-          <button className="bg-gray-100 rounded-lg px-2 py-1 flex items-center justify-center">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" fill="#f3f4f6"/><path d="M8 12h8" stroke="#222" strokeWidth="2" strokeLinecap="round"/></svg>
-          </button>
-          <button className="px-4 py-2 rounded-lg bg-gray-100 font-semibold" onClick={handleLogout}>Logout</button>
-        </div>
-      </nav>
-      <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between px-2 md:px-4 pt-6 md:pt-8 w-full">
-        <h1 className="text-2xl md:text-4xl font-extrabold mb-2 md:mb-0">All Issues</h1>
-        <div className="flex items-center gap-2 md:gap-3">
-          <button className="bg-white border border-gray-200 rounded-lg p-2 flex items-center justify-center hover:bg-gray-100">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M6 12h12M9 18h6" stroke="#222" strokeWidth="2" strokeLinecap="round"/></svg>
-          </button>
-          <select className="bg-white border border-gray-200 rounded-lg px-4 py-2 text-base font-medium text-gray-700 outline-none">
-            <option>All</option>
-            <option>Pending</option>
-            <option>In Progress</option>
-            <option>Completed</option>
-            <option>Overdue</option>
-          </select>
-        </div>
-      </div>
-      <div className="max-w-6xl mx-auto px-2 md:px-4 pt-4 md:pt-6 w-full">
-        {issues.map((issue, idx) => (
-          <div className="flex flex-col md:flex-row items-start justify-between border-2 border-red-200 bg-white rounded-2xl shadow p-4 md:p-8 mb-6 md:mb-8 transition hover:shadow-lg hover:border-red-400" key={idx}>
-            <div className="flex-1">
-              <div className="text-base md:text-xl font-bold mb-1">{issue.title}</div>
-              <div className="text-gray-600 mb-2">{issue.description}</div>
-              {(issue.photo || issue.image) && (
-                <div className="mb-2">
-                  <p className="text-sm font-semibold text-gray-700 mb-1">Original Issue Photo:</p>
-                  <img src={`http://localhost:5000${issue.photo || issue.image}`} alt="Issue" className="h-32 w-auto rounded mb-2" />
-                </div>
-              )}
-              
-              {/* Evidence Section - Show for admins and clients when issue is completed */}
-              {(issue.status === 'COMPLETE' || issue.status === 'COMPLETED') && issue.evidence && (
-                <div className="mb-2 p-3 bg-gray-50 rounded-lg">
-                  <p className="text-sm font-semibold text-gray-700 mb-2">Maintenance Evidence:</p>
-                  
-                  {issue.evidence.address && (
-                    <div className="mb-2">
-                      <p className="text-xs text-gray-600">Resolution Details:</p>
-                      <p className="text-sm text-gray-800">{issue.evidence.address}</p>
-                    </div>
-                  )}
-                  
-                  <div className="flex flex-wrap gap-2">
-                    {issue.evidence.beforeImage && (
-                      <div>
-                        <p className="text-xs text-gray-600 mb-1">BEFORE:</p>
-                        <img 
-                          src={`http://localhost:5000${issue.evidence.beforeImage}`} 
-                          alt="Before" 
-                          className="h-24 w-auto rounded border border-gray-300" 
-                        />
-                      </div>
+
+        {/* Issues List */}
+        {filteredIssues.length === 0 ? (
+          <div className="text-center py-16 bg-white rounded-xl shadow-sm">
+            <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <h3 className="mt-4 text-lg font-medium text-gray-900">No issues found</h3>
+            <p className="mt-2 text-gray-500">
+              {statusFilter === "ALL" 
+                ? "There are no issues to display."
+                : `No issues with status "${statusFilter}" found.`
+              }
+            </p>
+            {statusFilter !== "ALL" && (
+              <button
+                onClick={() => setStatusFilter("ALL")}
+                className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200"
+              >
+                View all issues
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {filteredIssues.map((issue) => (
+              <IssueCard
+                key={issue.id || issue._id || Math.random()}
+                issue={issue}
+                userRole={user?.role}
+                actions={
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    {/* Basic actions for all users */}
+                    <button
+                      onClick={() => console.log('View details:', issue)}
+                      className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+                    >
+                      View Details
+                    </button>
+                    
+                    {/* Client actions for PENDING issues */}
+                    {user?.role === 'client' && issue.status === 'PENDING' && (
+                      <>
+                        <button
+                          onClick={() => handleStatusUpdate(issue._id || issue.id, 'APPROVED')}
+                          className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
+                        >
+                          Accept
+                        </button>
+                        <button
+                          onClick={() => handleStatusUpdate(issue._id || issue.id, 'REJECTED')}
+                          className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
+                        >
+                          Reject
+                        </button>
+                        <button
+                          onClick={() => handleResubmit(issue._id || issue.id)}
+                          className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+                        >
+                          Resubmit
+                        </button>
+                      </>
                     )}
                     
-                    {issue.evidence.afterImage && (
-                      <div>
-                        <p className="text-xs text-gray-600 mb-1">AFTER:</p>
-                        <img 
-                          src={`http://localhost:5000${issue.evidence.afterImage}`} 
-                          alt="After" 
-                          className="h-24 w-auto rounded border border-green-300" 
-                        />
-                      </div>
+                    {/* Manager/Admin actions */}
+                    {(user?.role === 'manager' || user?.role === 'admin') && issue.status === 'APPROVED' && (
+                      <button
+                        onClick={() => handleStatusUpdate(issue._id || issue.id, 'IN PROGRESS')}
+                        className="px-3 py-1.5 bg-yellow-600 text-white rounded-lg text-sm font-medium hover:bg-yellow-700 transition-colors"
+                      >
+                        Start Work
+                      </button>
+                    )}
+                    
+                    {/* Technician actions */}
+                    {user?.role === 'technician' && issue.status === 'IN PROGRESS' && (
+                      <button
+                        onClick={() => handleStatusUpdate(issue._id || issue.id, 'COMPLETED')}
+                        className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
+                      >
+                        Mark Complete
+                      </button>
                     )}
                   </div>
-                </div>
-              )}
-              <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-1">
-                <span className="flex items-center gap-1 text-gray-800 text-xs md:text-base">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5A2.5 2.5 0 1 1 12 6a2.5 2.5 0 0 1 0 5.5z" fill="#222"/></svg>
-                  {issue.location}
-                </span>
-                {Array.isArray(issue.tags) ? issue.tags.filter(tag => tag !== 'PENDING' && tag !== 'IN PROGRESS' && tag !== 'COMPLETE' && tag !== 'OVERDUE').map((tag, i) => {
-                  let label = tag.label || tag;
-                  let colorClass = '';
-                  if (label === 'URGENT') colorClass = 'bg-red-100 text-red-700';
-                  else colorClass = 'bg-gray-100 text-gray-700';
-                  return (
-                    <span className={`rounded-xl px-2 md:px-4 py-1 text-xs md:text-sm font-semibold ${colorClass}`} key={i}>{label}</span>
-                  );
-                }) : null}
-                {issue.status && (
-                  <span className={`rounded-xl px-2 md:px-4 py-1 text-xs md:text-sm font-semibold mt-1 ${
-                    issue.status === 'IN PROGRESS' ? 'bg-blue-100 text-blue-700' :
-                    issue.status === 'PENDING' ? 'bg-yellow-100 text-yellow-700' :
-                    (issue.status === 'COMPLETE' || issue.status === 'COMPLETED') ? 'bg-green-100 text-green-700' :
-                    issue.status === 'OVERDUE' ? 'bg-red-100 text-red-700' :
-                    'bg-gray-100 text-gray-700'
-                  }`}>
-                    {(issue.status === 'COMPLETE' || issue.status === 'COMPLETED') ? 'Complete' : issue.status.replace('_', ' ')}
-                  </span>
-                )}
-                {/* Accept and Reject buttons for clients on PENDING issues */}
-                {issue.status === 'PENDING' && user?.role === 'client' && (
-                  <div className="flex gap-2 mt-2">
-                    <button
-                      className="bg-green-500 text-white px-3 py-1 rounded text-sm font-semibold hover:bg-green-600"
-                      onClick={() => handleAccept(issue)}
-                    >
-                      Accept
-                    </button>
-                    <button
-                      className="bg-red-500 text-white px-3 py-1 rounded text-sm font-semibold hover:bg-red-600"
-                      onClick={() => handleReject(issue)}
-                    >
-                      Reject
-                    </button>
-                  </div>
-                )}
-                {/* Assignment UI for manager */}
-                {/* ...existing code for assignment... */}
-              </div>
-            </div>
-            <div className="flex flex-col items-end min-w-[70px] md:min-w-[110px] gap-1 md:gap-2 mt-2 md:mt-0">
-              <span className="flex items-center gap-1 text-yellow-700 text-xs md:text-lg font-medium"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 8v4l3 3" stroke="#b45309" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><circle cx="12" cy="12" r="9" stroke="#fbbf24" strokeWidth="2"/></svg> {issue.time}</span>
-              {issue.overdue && <span className="text-red-600 text-xs md:text-base font-semibold">overdue</span>}
-            </div>
+                }
+              />
+            ))}
           </div>
-        ))}
-      </div>
+        )}
+      </main>
     </div>
   );
 }
 
 export default AllIssues;
-

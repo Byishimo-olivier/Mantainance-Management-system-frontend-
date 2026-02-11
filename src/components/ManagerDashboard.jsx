@@ -1,80 +1,427 @@
-// ...existing code...
-
-import Header from "./Header";
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import {
+  Shield,
+  BarChart3,
+  Clock,
+  Wrench,
+  CheckCircle,
+  LogOut,
+  Calendar,
+  Search,
+  Bell,
+  Upload,
+  TrendingUp,
+  Users,
+  ChevronRight,
+  MapPin,
+  AlertCircle,
+  Eye,
+  Edit,
+  FileText,
+  Filter,
+  Download,
+  Trash2,
+  MessageSquare,
+  Award,
+  Star
+} from 'lucide-react';
 
-// Populate feedbacks when switching to feedback tab or issues change
-// (This must be inside the component, not at the top level)
+// Enhanced Status badge with icons and gradients
+const StatusBadge = ({ status }) => {
+  const getStatusConfig = (status) => {
+    const statusMap = {
+      'PENDING': { 
+        bg: 'bg-gradient-to-r from-amber-50 to-orange-50',
+        text: 'text-amber-700',
+        border: 'border-amber-200',
+        icon: '⏳',
+        label: 'Pending'
+      },
+      'APPROVED': { 
+        bg: 'bg-gradient-to-r from-blue-50 to-indigo-50',
+        text: 'text-blue-700',
+        border: 'border-blue-200',
+        icon: '✅',
+        label: 'Approved'
+      },
+      'ASSIGNED': { 
+        bg: 'bg-gradient-to-r from-purple-50 to-violet-50',
+        text: 'text-purple-700',
+        border: 'border-purple-200',
+        icon: '👤',
+        label: 'Assigned'
+      },
+      'IN PROGRESS': { 
+        bg: 'bg-gradient-to-r from-orange-50 to-red-50',
+        text: 'text-orange-700',
+        border: 'border-orange-200',
+        icon: '🚧',
+        label: 'In Progress'
+      },
+      'COMPLETE': { 
+        bg: 'bg-gradient-to-r from-emerald-50 to-green-50',
+        text: 'text-emerald-700',
+        border: 'border-emerald-200',
+        icon: '🎯',
+        label: 'Complete'
+      },
+      'COMPLETED': { 
+        bg: 'bg-gradient-to-r from-emerald-50 to-green-50',
+        text: 'text-emerald-700',
+        border: 'border-emerald-200',
+        icon: '🎯',
+        label: 'Complete'
+      },
+      'DECLINED': { 
+        bg: 'bg-gradient-to-r from-rose-50 to-pink-50',
+        text: 'text-rose-700',
+        border: 'border-rose-200',
+        icon: '❌',
+        label: 'Declined'
+      },
+      'OVERDUE': { 
+        bg: 'bg-gradient-to-r from-red-50 to-rose-50',
+        text: 'text-red-700',
+        border: 'border-red-200',
+        icon: '⏰',
+        label: 'Overdue'
+      },
+    };
+    return statusMap[status] || { 
+      bg: 'bg-gradient-to-r from-gray-50 to-slate-50',
+      text: 'text-gray-700',
+      border: 'border-gray-200',
+      icon: '📌',
+      label: status
+    };
+  };
 
-const statusCards = [
-  {
-    label: "ASSIGNED",
-    count: 1,
-  },
-  // Add other status cards as needed
-];
+  const config = getStatusConfig(status);
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium ${config.bg} ${config.text} ${config.border} border shadow-sm`}>
+      <span className="text-sm">{config.icon}</span>
+      {config.label}
+    </span>
+  );
+};
+
+// Enhanced Priority badge
+const PriorityBadge = ({ priority }) => {
+  const getPriorityConfig = (priority) => {
+    const priorityMap = {
+      'LOW': { 
+        bg: 'bg-gradient-to-r from-emerald-100 to-teal-100',
+        text: 'text-emerald-800',
+        icon: '⬇️',
+        glow: 'shadow-emerald-200'
+      },
+      'MEDIUM': { 
+        bg: 'bg-gradient-to-r from-amber-100 to-yellow-100',
+        text: 'text-amber-800',
+        icon: '⚠️',
+        glow: 'shadow-amber-200'
+      },
+      'HIGH': { 
+        bg: 'bg-gradient-to-r from-orange-100 to-red-100',
+        text: 'text-orange-800',
+        icon: '🔥',
+        glow: 'shadow-orange-200'
+      },
+      'URGENT': { 
+        bg: 'bg-gradient-to-r from-rose-100 to-pink-100',
+        text: 'text-rose-800',
+        icon: '🚨',
+        glow: 'shadow-rose-200'
+      },
+    };
+    return priorityMap[priority] || { 
+      bg: 'bg-gradient-to-r from-gray-100 to-slate-100',
+      text: 'text-gray-800',
+      icon: '📌',
+      glow: 'shadow-gray-200'
+    };
+  };
+
+  const config = getPriorityConfig(priority);
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium ${config.bg} ${config.text} ${config.glow} shadow-md`}>
+      <span className="text-sm">{config.icon}</span>
+      {priority}
+    </span>
+  );
+};
+
+// Enhanced Stat Card with animations
+const StatCard = ({ title, value, change, icon, color, trend = "up" }) => {
+  const colorMap = {
+    blue: { bg: 'from-blue-500 to-cyan-500', text: 'text-blue-100', iconBg: 'bg-blue-500/20' },
+    orange: { bg: 'from-orange-500 to-amber-500', text: 'text-orange-100', iconBg: 'bg-orange-500/20' },
+    green: { bg: 'from-emerald-500 to-green-500', text: 'text-emerald-100', iconBg: 'bg-emerald-500/20' },
+    purple: { bg: 'from-purple-500 to-violet-500', text: 'text-purple-100', iconBg: 'bg-purple-500/20' },
+    red: { bg: 'from-rose-500 to-pink-500', text: 'text-rose-100', iconBg: 'bg-rose-500/20' },
+  };
+
+  const config = colorMap[color] || colorMap.blue;
+
+  return (
+    <div className="relative group">
+      <div className="absolute inset-0 bg-gradient-to-r opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-2xl blur-xl" />
+      <div className="relative bg-gradient-to-br from-white to-gray-50 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-gray-600 mb-2">{title}</p>
+            <p className="text-3xl font-bold bg-gradient-to-r bg-clip-text text-transparent from-gray-900 to-gray-700">
+              {value}
+            </p>
+            {change && (
+              <div className="flex items-center gap-1 mt-2">
+                <span className={`text-sm ${trend === 'up' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                  {change}
+                </span>
+                <span className="text-xs text-gray-500">from last week</span>
+              </div>
+            )}
+          </div>
+          <div className={`p-3 rounded-xl ${config.iconBg}`}>
+            {icon}
+          </div>
+        </div>
+        <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-b-2xl" />
+      </div>
+    </div>
+  );
+};
+
+// Enhanced Overview Cards
+const OverviewCards = ({ summary, pendingRequests }) => (
+  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    <StatCard
+      title="Total Issues"
+      value={summary.pending + summary.inProgress + summary.completed + summary.overdue}
+      icon={<BarChart3 className="w-6 h-6 text-blue-600" />}
+      color="blue"
+      trend="up"
+      change="+12%"
+    />
+    <StatCard
+      title="Pending Approval"
+      value={pendingRequests.length}
+      icon={<Clock className="w-6 h-6 text-orange-600" />}
+      color="orange"
+      trend={pendingRequests.length > 0 ? "up" : "down"}
+      change={pendingRequests.length > 0 ? "+2" : "0"}
+    />
+    <StatCard
+      title="In Progress"
+      value={summary.inProgress}
+      icon={<Wrench className="w-6 h-6 text-purple-600" />}
+      color="purple"
+      trend="up"
+      change="+5"
+    />
+    <StatCard
+      title="Completed"
+      value={summary.completed}
+      icon={<CheckCircle className="w-6 h-6 text-emerald-600" />}
+      color="green"
+      trend="up"
+      change={`+${Math.round((summary.completed / (summary.pending + summary.inProgress + summary.completed + summary.overdue)) * 100)}%`}
+    />
+  </div>
+);
+
+// Gradient Button Component
+const GradientButton = ({ children, onClick, color = "blue", className = "" }) => {
+  const colorMap = {
+    blue: "from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600",
+    green: "from-emerald-500 to-green-500 hover:from-emerald-600 hover:to-green-600",
+    orange: "from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600",
+    purple: "from-purple-500 to-violet-500 hover:from-purple-600 hover:to-violet-600",
+    red: "from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600",
+  };
+
+  return (
+    <button
+      onClick={onClick}
+      className={`relative overflow-hidden px-6 py-3 rounded-xl font-semibold text-white shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5 bg-gradient-to-r ${colorMap[color]} ${className}`}
+    >
+      <span className="relative z-10">{children}</span>
+      <div className="absolute inset-0 bg-white/10 opacity-0 hover:opacity-100 transition-opacity duration-300" />
+    </button>
+  );
+};
+
+// Glass Card Component
+const GlassCard = ({ children, className = "" }) => (
+  <div className={`bg-white/80 backdrop-blur-lg rounded-2xl border border-white/20 shadow-lg hover:shadow-xl transition-all duration-300 ${className}`}>
+    {children}
+  </div>
+);
 
 function ManagerDashboard() {
-  // Debug: confirm component mount
-  console.log('[ManagerDashboard] Component mounted');
   const [activeTab, setActiveTab] = useState('overview');
   const [issues, setIssues] = useState([]);
-  const [allIssues, setAllIssues] = useState([]); // Store all issues for feedbacks
+  const [allIssues, setAllIssues] = useState([]);
   const [pendingRequests, setPendingRequests] = useState([]);
   const [technicians, setTechnicians] = useState([]);
-  const [summary, setSummary] = useState({ pending: 0, inProgress: 0, completed: 0, overdue: 0 });
+  const [summary, setSummary] = useState({ 
+    pending: 0, 
+    inProgress: 0, 
+    completed: 0, 
+    overdue: 0 
+  });
   const [assigning, setAssigning] = useState(null);
-  const [assignmentData, setAssignmentData] = useState({ technicianId: "", priority: "MEDIUM", dueDate: "" });
+  const [assignmentData, setAssignmentData] = useState({ 
+    technicianId: "", 
+    priority: "MEDIUM", 
+    dueDate: "" 
+  });
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [declineReason, setDeclineReason] = useState('');
-  const [filters, setFilters] = useState({ status: 'all', priority: 'all', assignedTo: 'all' });
+  const [filters, setFilters] = useState({ 
+    status: 'all', 
+    priority: 'all', 
+    assignedTo: 'all' 
+  });
   const [feedbacks, setFeedbacks] = useState([]);
-
-  // Debug: log feedbacks whenever they change
-  useEffect(() => {
-    console.log('[ManagerDashboard] feedbacks state changed:', feedbacks);
-  }, [feedbacks]);
   const [loadingFeedbacks, setLoadingFeedbacks] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    const config = { headers: { Authorization: `Bearer ${token}` } };
+  // Load logged-in user from localStorage for sidebar display
+  let loggedUser = null;
+  try {
+    const rawUser = localStorage.getItem('user');
+    loggedUser = rawUser ? JSON.parse(rawUser) : null;
+  } catch (e) {
+    loggedUser = null;
+  }
 
-    // Fetch all data
-    Promise.all([
-      axios.get("http://localhost:5000/api/issues", config),
-      axios.get("http://localhost:5000/api/technicians", config),
-      axios.get("http://localhost:5000/api/managers/dashboard/summary", config)
-    ]).then(([issuesRes, techRes, summaryRes]) => {
-      console.log('Data loaded successfully');
-      // Filter issues using consistent logic
+  const userName = loggedUser?.name || loggedUser?.username || 'Manager';
+  const initials = (userName.split(' ').map(n => n?.[0] || '').slice(0, 2).join('') || 'M').toUpperCase();
+  const userRole = loggedUser?.role || (loggedUser?.isManager ? 'Manager' : 'User');
+
+  // Fetch all dashboard data
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('token');
+      
+      // Check if token exists
+      if (!token) {
+        console.warn('No authentication token found');
+        navigate('/login');
+        return;
+      }
+      
+      console.log('Token exists:', !!token, 'First 20 chars:', token?.substring(0, 20));
+      const config = { headers: { Authorization: `Bearer ${token}` } };
+
+      const [issuesRes, techRes, summaryRes] = await Promise.all([
+        axios.get("http://localhost:5000/api/issues", config),
+        axios.get("http://localhost:5000/api/technicians", config),
+        axios.get("http://localhost:5000/api/managers/dashboard/summary", config)
+      ]);
+
       const allIssuesData = issuesRes.data;
-      setAllIssues(allIssuesData); // Store all issues for feedbacks
+      setAllIssues(allIssuesData);
+      
       const approvedIssues = allIssuesData.filter(issue => 
         issue.approved === true || issue.assignedTo || (issue.status !== 'PENDING' && issue.status !== 'REJECTED')
       );
       const pendingRequests = allIssuesData.filter(issue => 
         issue.status === 'PENDING' && !issue.assignedTo && !issue.approved
       );
-      console.log('Initial load - Approved issues:', approvedIssues.length);
-      console.log('Initial load - Pending requests:', pendingRequests.length);
+      
       setIssues(approvedIssues);
       setPendingRequests(pendingRequests);
-      setTechnicians(techRes.data);
+      setTechnicians(techRes.data || []);
       setSummary(summaryRes.data);
-    }).catch(err => {
+    } catch (err) {
       console.error('Failed to load data:', err);
+      console.error('Error response:', err.response?.data);
+      console.error('Error status:', err.response?.status);
+      
+      // Check if it's a 401 error
+      if (err.response?.status === 401) {
+        console.warn('Unauthorized - token may have expired');
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        navigate('/login');
+        return;
+      }
+      
       setIssues([]);
       setAllIssues([]);
       setPendingRequests([]);
       setTechnicians([]);
       setSummary({ pending: 0, inProgress: 0, completed: 0, overdue: 0 });
-    });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch feedbacks when switching to feedback tab
+  const fetchFeedbacks = async () => {
+    if (activeTab !== 'feedback') return;
+    
+    try {
+      setLoadingFeedbacks(true);
+      const token = localStorage.getItem('token');
+      
+      // Check if token exists
+      if (!token) {
+        console.warn('No authentication token found');
+        navigate('/login');
+        return;
+      }
+      
+      const config = { headers: { Authorization: `Bearer ${token}` } };
+      
+      const response = await axios.get("http://localhost:5000/api/issues", config);
+      const issuesWithEvidence = response.data.filter(issue => 
+        issue.evidence?.afterImage || issue.evidence?.address
+      );
+      
+      const formattedFeedbacks = issuesWithEvidence.map(issue => ({
+        ...issue,
+        technicianName: getAssignedTechName(issue),
+        completedAt: issue.updatedAt,
+        evidence: issue.evidence || {}
+      }));
+      
+      setFeedbacks(formattedFeedbacks);
+    } catch (err) {
+      console.error('Failed to load feedbacks:', err);
+      
+      // Check if it's a 401 error
+      if (err.response?.status === 401) {
+        console.warn('Unauthorized - token may have expired');
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        navigate('/login');
+        return;
+      }
+      
+      setFeedbacks([]);
+    } finally {
+      setLoadingFeedbacks(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDashboardData();
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'feedback') {
+      fetchFeedbacks();
+    }
+  }, [activeTab]);
 
   // Approval functions
   const handleApproveRequest = async (requestId) => {
@@ -82,137 +429,25 @@ function ManagerDashboard() {
       const token = localStorage.getItem('token');
       const config = { headers: { Authorization: `Bearer ${token}` } };
       
-      console.log('=== APPROVAL DEBUG ===');
-      console.log('Raw requestId:', requestId);
-      console.log('requestId type:', typeof requestId);
-      console.log('requestId keys:', requestId ? Object.keys(requestId) : 'undefined/null');
-      console.log('requestId._id:', requestId?._id);
-      console.log('requestId.id:', requestId?.id);
-      
-      // Ensure we're using the correct ID format with proper null checks
-      let issueId;
-      if (typeof requestId === 'string') {
-        issueId = requestId;
-        console.log('Using string ID:', issueId);
-      } else if (requestId && typeof requestId === 'object') {
-        issueId = requestId._id || requestId.id;
-        console.log('Using object ID:', issueId);
-      } else {
-        console.error('Invalid requestId format:', requestId);
-        throw new Error(`Invalid request ID format. Received: ${JSON.stringify(requestId)}`);
-      }
-      
+      const issueId = selectedRequest?._id || selectedRequest?.id || requestId;
       if (!issueId) {
-        console.error('No issueId found in:', requestId);
-        throw new Error(`No valid issue ID found. Object: ${JSON.stringify(requestId)}`);
+        alert('No issue ID found');
+        return;
       }
-      
-      console.log('Final issue ID:', issueId, 'type:', typeof issueId, 'length:', issueId?.length);
-      
-      // Try different endpoint structures
-      let response;
-      try {
-        // First try: PUT with approval fields
-        response = await axios.put(`http://localhost:5000/api/issues/${issueId}`, {
-          status: 'APPROVED',
-          approved: true,
-          approvedBy: JSON.parse(localStorage.getItem('user')).id,
-          approvedAt: new Date().toISOString()
-        }, config);
-        console.log('Approval successful (method 1):', response.data);
-      } catch (err1) {
-        console.log('Method 1 failed, trying method 2:', err1.response?.data);
-        try {
-          // Second try: POST to approve endpoint
-          response = await axios.post(`http://localhost:5000/api/issues/${issueId}/approve`, {
-            approved: true,
-            approvedBy: JSON.parse(localStorage.getItem('user')).id
-          }, config);
-          console.log('Approval successful (method 2):', response.data);
-        } catch (err2) {
-          console.log('Method 2 failed, trying method 3:', err2.response?.data);
-          try {
-            // Third try: Just update status to something other than PENDING
-            response = await axios.put(`http://localhost:5000/api/issues/${issueId}`, {
-              status: 'APPROVED'
-            }, config);
-            console.log('Approval successful (method 3):', response.data);
-          } catch (err3) {
-            console.log('Method 3 failed, trying method 4:', err3.response?.data);
-            try {
-              // Fourth try: Update with a different field that might trigger approval
-              response = await axios.put(`http://localhost:5000/api/issues/${issueId}`, {
-                status: 'ASSIGNED',
-                assignedTo: null // Keep unassigned but change status
-              }, config);
-              console.log('Approval successful (method 4):', response.data);
-            } catch (err4) {
-              console.error('All approval methods failed:', err4.response?.data);
-              throw err4;
-            }
-          }
-        }
-      }
-      
-      // Check if the response actually contains updated data
-      if (response.data) {
-        console.log('Updated issue from backend:', response.data);
-        console.log('Updated status:', response.data.status);
-        console.log('Updated approved:', response.data.approved);
-      } else {
-        console.log('No data returned from backend');
-      }
-      
-      // Refresh data after approval
-      const issuesResponse = await axios.get("http://localhost:5000/api/issues", config);
-      
-      // Re-filter issues after approval
-      const allIssues = issuesResponse.data;
-      console.log('All issues from backend after approval:', allIssues.length);
-      console.log('Sample issue:', allIssues[0]);
-      
-      // More flexible filtering for approved issues
-      const approvedIssues = allIssues.filter(issue => {
-        // Check various ways an issue might be considered "approved"
-        const isApproved = issue.approved === true || 
-                           issue.approved === 'true' ||
-                           issue.status === 'APPROVED' ||
-                           issue.status === 'ASSIGNED' ||
-                           (issue.assignedTo && issue.assignedTo !== null) ||
-                           (issue.status !== 'PENDING' && issue.status !== 'REJECTED');
-        
-        if (isApproved) {
-          console.log('Issue approved:', issue.title, 'status:', issue.status, 'approved:', issue.approved);
-        }
-        
-        return isApproved;
-      });
-      
-      // More flexible filtering for pending requests
-      const pendingRequests = allIssues.filter(issue => {
-        // Check various ways an issue might be considered "pending approval"
-        const isPending = (issue.status === 'PENDING' || issue.status === 'pending') &&
-                          !issue.assignedTo && 
-                          issue.approved !== true && 
-                          issue.approved !== 'true';
-        
-        if (isPending) {
-          console.log('Issue pending:', issue.title, 'status:', issue.status, 'approved:', issue.approved);
-        }
-        
-        return isPending;
-      });
-      
-      console.log('After approval - Approved issues:', approvedIssues.length);
-      console.log('After approval - Pending requests:', pendingRequests.length);
-      
-      setIssues(approvedIssues);
-      setPendingRequests(pendingRequests);
+
+      await axios.put(`http://localhost:5000/api/issues/${issueId}`, {
+        status: 'APPROVED',
+        approved: true,
+        approvedBy: JSON.parse(localStorage.getItem('user')).id,
+        approvedAt: new Date().toISOString()
+      }, config);
+
+      await fetchDashboardData();
       setShowApprovalModal(false);
       setSelectedRequest(null);
       alert('Request approved! It has been moved to Issue Management for assignment.');
     } catch (error) {
-      console.error('Approval error:', error.response?.data || error.message);
+      console.error('Approval error:', error);
       alert(`Failed to approve request: ${error.response?.data?.error || error.message}`);
     }
   };
@@ -222,86 +457,27 @@ function ManagerDashboard() {
       const token = localStorage.getItem('token');
       const config = { headers: { Authorization: `Bearer ${token}` } };
       
-      // Ensure we're using the correct ID format with proper null checks
-      let issueId;
-      if (selectedRequest && typeof selectedRequest._id === 'string') {
-        issueId = selectedRequest._id;
-      } else if (selectedRequest && typeof selectedRequest.id === 'string') {
-        issueId = selectedRequest.id;
-      } else if (selectedRequest && typeof selectedRequest === 'object') {
-        issueId = selectedRequest._id || selectedRequest.id;
-      } else {
-        throw new Error('Invalid selected request ID format');
-      }
-      
+      const issueId = selectedRequest?._id || selectedRequest?.id;
       if (!issueId) {
-        throw new Error('No valid issue ID found in selected request');
+        alert('No issue ID found');
+        return;
       }
-      
-      console.log('Declining request:', issueId);
-      console.log('Request ID type:', typeof issueId, 'length:', issueId?.length);
-      
-      // Try different endpoint structures
-      let response;
-      try {
-        // First try: PUT with rejection fields
-        response = await axios.put(`http://localhost:5000/api/issues/${issueId}`, {
-          status: 'DECLINED',
-          rejected: true,
-          rejectedBy: JSON.parse(localStorage.getItem('user')).id,
-          rejectedAt: new Date().toISOString(),
-          rejectionReason: declineReason
-        }, config);
-        console.log('Rejection successful (method 1):', response.data);
-      } catch (err1) {
-        console.log('Method 1 failed, trying method 2:', err1.response?.data);
-        try {
-          // Second try: POST to reject endpoint
-          response = await axios.post(`http://localhost:5000/api/issues/${issueId}/reject`, {
-            rejected: true,
-            rejectedBy: JSON.parse(localStorage.getItem('user')).id,
-            rejectionReason: declineReason
-          }, config);
-          console.log('Rejection successful (method 2):', response.data);
-        } catch (err2) {
-          console.log('Method 2 failed, trying method 3:', err2.response?.data);
-          try {
-            // Third try: Just update status and add reason to description
-            response = await axios.put(`http://localhost:5000/api/issues/${issueId}`, {
-              status: 'DECLINED',
-              description: `${selectedRequest.description}\n\nREJECTED: ${declineReason}`
-            }, config);
-            console.log('Rejection successful (method 3):', response.data);
-          } catch (err3) {
-            console.error('All rejection methods failed:', err3.response?.data);
-            throw err3;
-          }
-        }
-      }
-      
-      // Refresh data after decline
-      const issuesResponse = await axios.get("http://localhost:5000/api/issues", config);
-      
-      // Re-filter issues after decline
-      const allIssues = issuesResponse.data;
-      const approvedIssues = allIssues.filter(issue => 
-        issue.approved === true || issue.assignedTo || (issue.status !== 'PENDING' && issue.status !== 'REJECTED')
-      );
-      const pendingRequests = allIssues.filter(issue => 
-        issue.status === 'PENDING' && !issue.assignedTo && !issue.approved
-      );
-      
-      console.log('After decline - Approved issues:', approvedIssues.length);
-      console.log('After decline - Pending requests:', pendingRequests.length);
-      
-      setIssues(approvedIssues);
-      setPendingRequests(pendingRequests);
+
+      await axios.put(`http://localhost:5000/api/issues/${issueId}`, {
+        status: 'DECLINED',
+        rejected: true,
+        rejectedBy: JSON.parse(localStorage.getItem('user')).id,
+        rejectedAt: new Date().toISOString(),
+        rejectionReason: declineReason
+      }, config);
+
+      await fetchDashboardData();
       setShowApprovalModal(false);
       setSelectedRequest(null);
       setDeclineReason('');
       alert('Request declined! It has been removed from the pending list.');
     } catch (error) {
-      console.error('Decline error:', error.response?.data || error.message);
+      console.error('Decline error:', error);
       alert(`Failed to decline request: ${error.response?.data?.error || error.message}`);
     }
   };
@@ -316,7 +492,6 @@ function ManagerDashboard() {
       return;
     }
     
-    // Validate assignment data
     if (!assignmentData.dueDate) {
       alert('Please select a due date for this assignment');
       return;
@@ -326,71 +501,29 @@ function ManagerDashboard() {
       const token = localStorage.getItem('token');
       const config = { headers: { Authorization: `Bearer ${token}` } };
       
-      // Ensure we're using the correct ID format with proper null checks
-      let issueId;
-      if (issue && typeof issue.id === 'string') {
-        issueId = issue.id;
-      } else if (issue && typeof issue._id === 'string') {
-        issueId = issue._id;
-      } else if (issue && typeof issue === 'object') {
-        issueId = issue._id || issue.id;
-      } else {
-        throw new Error('Invalid issue ID format');
-      }
-      
+      const issueId = issue?._id || issue?.id;
       if (!issueId) {
-        throw new Error('No valid issue ID found');
+        alert('No issue ID found');
+        return;
       }
+
+      // Use the dedicated assign endpoint (consistent with ManagementIssues)
+      const response = await axios.post(`http://localhost:5000/api/issues/${issueId}/assign`, {
+        techId: tech._id || tech.id,
+        priority: assignmentData.priority,
+        dueDate: assignmentData.dueDate,
+        status: 'ASSIGNED'
+      }, config);
+
+      // Update issues list with the response from backend
+      const updatedIssues = issues.map((iss, i) => i === idx ? response.data : iss);
+      setIssues(updatedIssues);
       
-      console.log('Assigning issue:', issueId);
-      console.log('Issue ID type:', typeof issueId, 'length:', issueId?.length);
-      console.log('Assignment data:', assignmentData);
-      
-      let response;
-      try {
-        // First try: POST to assign endpoint
-        response = await axios.post(`http://localhost:5000/api/issues/${issueId}/assign`, { 
-          techId: tech._id || tech.id,
-          priority: assignmentData.priority,
-          dueDate: assignmentData.dueDate,
-          status: 'ASSIGNED'
-        }, config);
-        console.log('Assignment successful (method 1):', response.data);
-      } catch (err1) {
-        console.log('Assignment method 1 failed, trying method 2:', err1.response?.data);
-        try {
-          // Second try: PUT with assignment fields
-          response = await axios.put(`http://localhost:5000/api/issues/${issueId}`, {
-            assignedTo: tech._id || tech.id,
-            priority: assignmentData.priority,
-            dueDate: assignmentData.dueDate,
-            status: 'ASSIGNED'
-          }, config);
-          console.log('Assignment successful (method 2):', response.data);
-        } catch (err2) {
-          console.log('Assignment method 2 failed, trying method 3:', err2.response?.data);
-          try {
-            // Third try: Different assign endpoint
-            response = await axios.put(`http://localhost:5000/api/issues/${issueId}/assign`, { 
-              technicianId: tech._id || tech.id,
-              priority: assignmentData.priority,
-              dueDate: assignmentData.dueDate,
-              status: 'ASSIGNED'
-            }, config);
-            console.log('Assignment successful (method 3):', response.data);
-          } catch (err3) {
-            console.error('All assignment methods failed:', err3.response?.data);
-            throw err3;
-          }
-        }
-      }
-      
-      setIssues(prev => prev.map((iss, i) => i === idx ? response.data : iss));
       setAssigning(null);
       setAssignmentData({ technicianId: "", priority: "MEDIUM", dueDate: "" });
       alert('Issue assigned successfully!');
     } catch (err) {
-      console.error('Assignment error:', err.response?.data || err.message);
+      console.error('Assignment error:', err);
       alert(`Failed to assign issue: ${err.response?.data?.error || err.message}`);
     }
   };
@@ -405,9 +538,17 @@ function ManagerDashboard() {
     });
   };
 
-  // Filter function for All Issues tab
+  // Filter function
   const getFilteredIssues = () => {
-    const allIssues = [...pendingRequests, ...issues];
+    let allIssues = [...pendingRequests, ...issues];
+    
+    if (searchQuery) {
+      allIssues = allIssues.filter(issue =>
+        issue.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        issue.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        issue.location.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
     
     return allIssues.filter(issue => {
       // Status filter
@@ -438,430 +579,1112 @@ function ManagerDashboard() {
     window.location.reload();
   };
 
+  const getAssignedTechName = (issue) => {
+    if (!issue) return 'Unassigned';
+    const assignedId = issue.assignedTo || (issue.assignees?.[0]?.id || issue.assignees?.[0]?._id);
+    if (!assignedId) return 'Unassigned';
+    
+    const tech = technicians.find(t => {
+      const idsToCheck = [t._id, t.id, t.userId].filter(Boolean).map(String);
+      return idsToCheck.includes(String(assignedId));
+    });
+    
+    return tech?.name || 'Technician';
+  };
 
-
-  const totalIssues = summary.pending + summary.inProgress + summary.completed + summary.overdue;
-  const completed = summary.completed;
-  const overdue = summary.overdue;
-  const inProgress = summary.inProgress;
-  const completionRate = totalIssues ? Math.round((completed / totalIssues) * 100) : 0;
+  // Enhanced TabButton with animations
+  const TabButton = ({ active, onClick, icon, label, badge, badgeColor }) => (
+    <button
+      onClick={onClick}
+      className={`relative flex items-center gap-3 px-4 py-3.5 rounded-xl text-left font-medium transition-all duration-300 group ${
+        active 
+          ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-lg shadow-indigo-200' 
+          : 'text-gray-700 hover:bg-gradient-to-r hover:from-indigo-50 hover:to-purple-50'
+      }`}
+    >
+      <span className={`text-lg transition-transform duration-300 ${active ? 'scale-110' : 'group-hover:scale-110'}`}>
+        {icon}
+      </span>
+      <span className="flex-1">{label}</span>
+      {badge && (
+        <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+          active ? 'bg-white/20 text-white' : `${badgeColor} text-white`
+        }`}>
+          {badge}
+        </span>
+      )}
+      {active && (
+        <div className="absolute right-3 w-2 h-2 bg-white rounded-full animate-pulse" />
+      )}
+    </button>
+  );
 
   return (
-    <div className="min-h-screen flex bg-gray-50">
-      {/* Sidebar */}
-      <aside className="w-72 bg-white shadow-lg flex flex-col justify-between">
+    <div className="min-h-screen flex bg-gradient-to-br from-gray-50 via-white to-blue-50">
+      {/* Enhanced Sidebar with gradient */}
+      <aside className="w-72 bg-gradient-to-b from-white to-gray-50 shadow-2xl flex flex-col justify-between border-r border-gray-200/50">
         <div>
-          {/* User Info */}
-          <div className="flex flex-col items-center py-8 border-b border-gray-100">
-            <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mb-2">
-              <span className="text-2xl text-indigo-600 font-bold">AK</span>
-            </div>
-            <div className="text-center">
-              <div className="font-semibold text-gray-900 text-lg">Alice Kayitesi</div>
-              <div className="text-sm text-blue-600 font-medium">Manager</div>
+          {/* User Info with gradient */}
+          <div className="relative py-8 px-6 border-b border-gray-200/50">
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-purple-500/5 rounded-b-3xl" />
+            <div className="relative flex flex-col items-center">
+              <div className="relative w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center mb-3 shadow-lg">
+                <span className="text-3xl font-bold text-white">{initials}</span>
+                <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-emerald-500 rounded-full border-4 border-white flex items-center justify-center">
+                  <Shield className="w-3 h-3 text-white" />
+                </div>
+              </div>
+              <div className="text-center">
+                <div className="font-bold text-gray-900 text-xl">{userName}</div>
+                <div className="flex items-center justify-center gap-2 mt-1">
+                  <span className="px-3 py-1 bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-700 rounded-full text-sm font-semibold">
+                    {userRole}
+                  </span>
+                  <span className="text-xs text-gray-500">⭐ 4.8</span>
+                </div>
+              </div>
             </div>
           </div>
+          
           {/* Navigation */}
-          <nav className="flex flex-col gap-1 mt-8 px-4">
-            <button onClick={() => setActiveTab('overview')} className={`flex items-center gap-3 px-4 py-3 rounded-lg text-left font-medium transition ${activeTab === 'overview' ? 'bg-indigo-100 text-indigo-700' : 'text-gray-700 hover:bg-gray-100'}`}>
-              Overview
-            </button>
-            <button onClick={() => setActiveTab('requests')} className={`flex items-center gap-3 px-4 py-3 rounded-lg text-left font-medium transition ${activeTab === 'requests' ? 'bg-orange-100 text-orange-700' : 'text-gray-700 hover:bg-gray-100'}`}>
-              Pending Requests
-              {pendingRequests.length > 0 && (
-                <span className="ml-auto bg-orange-500 text-white text-xs px-2 py-1 rounded-full">
-                  {pendingRequests.length}
-                </span>
-              )}
-            </button>
-            <button onClick={() => setActiveTab('issues')} className={`flex items-center gap-3 px-4 py-3 rounded-lg text-left font-medium transition ${activeTab === 'issues' ? 'bg-blue-100 text-blue-700' : 'text-gray-700 hover:bg-gray-100'}`}>
-              Issue Management
-            </button>
-            <button onClick={() => setActiveTab('all-issues')} className={`flex items-center gap-3 px-4 py-3 rounded-lg text-left font-medium transition ${activeTab === 'all-issues' ? 'bg-green-100 text-green-700' : 'text-gray-700 hover:bg-gray-100'}`}>
-              All Issues
-            </button>
-            <button onClick={() => setActiveTab('feedback')} className={`flex items-center gap-3 px-4 py-3 rounded-lg text-left font-medium transition ${activeTab === 'feedback' ? 'bg-green-100 text-green-700' : 'text-gray-700 hover:bg-gray-100'}`}>
-              Technician Feedback
-            </button>
+          <nav className="flex flex-col gap-2 mt-8 px-4">
+            <TabButton 
+              active={activeTab === 'overview'}
+              onClick={() => setActiveTab('overview')}
+              icon="📊"
+              label="Dashboard"
+            />
+            <TabButton 
+              active={activeTab === 'requests'}
+              onClick={() => setActiveTab('requests')}
+              icon="⏳"
+              label="Pending Requests"
+              badge={pendingRequests.length}
+              badgeColor="bg-gradient-to-r from-orange-500 to-amber-500"
+            />
+            <TabButton 
+              active={activeTab === 'issues'}
+              onClick={() => setActiveTab('issues')}
+              icon="🔧"
+              label="Issue Management"
+            />
+            <TabButton 
+              active={activeTab === 'all-issues'}
+              onClick={() => setActiveTab('all-issues')}
+              icon="📋"
+              label="All Issues"
+            />
+            <TabButton 
+              active={activeTab === 'feedback'}
+              onClick={() => setActiveTab('feedback')}
+              icon="💬"
+              label="Technician Feedback"
+            />
           </nav>
         </div>
-        {/* Logout */}
-        <div className="p-6 border-t">
-          <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left font-medium transition text-red-600 hover:bg-red-50">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5M21 12l-5 5M21 12h-9" stroke="#dc2626" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            Logout
+        
+        {/* Enhanced Logout */}
+        <div className="p-6 border-t border-gray-200/50">
+          <button 
+            onClick={handleLogout}
+            className="group w-full flex items-center justify-center gap-3 px-4 py-3.5 rounded-xl font-medium transition-all duration-300 bg-gradient-to-r from-gray-100 to-gray-50 hover:from-rose-50 hover:to-pink-50 text-gray-700 hover:text-rose-700 border border-gray-200 hover:border-rose-200"
+          >
+            <LogOut className="w-5 h-5 transition-transform group-hover:rotate-180 duration-500" />
+            <span>Logout</span>
           </button>
         </div>
       </aside>
 
-      {/* Main Content */}
-      <main className="flex-1 p-10 overflow-y-auto bg-gray-50">
-
-        {/* Requests Tab */}
-        {activeTab === 'requests' && (
-          <div>
-            {pendingRequests.length === 0 ? (
-              <div className="bg-white rounded-xl shadow p-12 text-center">
-                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#9ca3af" strokeWidth="2"/></svg>
-                </div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">No Pending Requests</h3>
-                <p className="text-gray-600">All client requests have been reviewed</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {pendingRequests.map(request => (
-                  <div key={request._id || request.id || request.title || request.createdAt} className="bg-white rounded-xl shadow p-6 flex flex-col justify-between">
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900 mb-2">{request.title}</h3>
-                      <p className="text-gray-600 mb-3">{request.description}</p>
-                      <div className="flex flex-wrap gap-2 mb-2">
-                        <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs">📍 {request.location}</span>
-                        <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs">{request.priority || 'MEDIUM'}</span>
-                        <span className="px-2 py-1 bg-gray-100 text-gray-500 rounded text-xs">{new Date(request.createdAt).toLocaleDateString()}</span>
-                      </div>
-                      {(request.beforePhoto || request.photo) && (
-                        <img src={`http://localhost:5000${request.beforePhoto || request.photo}`} alt="Issue" className="w-24 h-24 object-cover rounded-lg mb-2" />
-                      )}
-                    </div>
-                    <div className="flex gap-2 mt-4">
-                      <button onClick={() => { setSelectedRequest(request); setShowApprovalModal(true); }} className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium">✅ Approve</button>
-                      <button onClick={() => { setSelectedRequest(request); setDeclineReason(''); setShowApprovalModal(true); }} className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium">❌ Decline</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Issues Tab */}
-        {activeTab === 'issues' && (
-          <div>
-            {issues.length === 0 ? (
-              <div className="bg-white rounded-xl shadow p-12 text-center">
-                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="4" stroke="#9ca3af" strokeWidth="2"/></svg>
-                </div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">No Approved Issues</h3>
-                <p className="text-gray-600">No issues have been approved for assignment yet</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {issues.map((issue, idx) => (
-                  <div key={issue._id || issue.id || issue.title || idx} className="bg-white rounded-xl shadow-lg hover:shadow-2xl transition-shadow p-6 flex flex-col justify-between">
-                    <div>
-                      <div className="flex items-center gap-2 mb-3">
-                        <span className="inline-block w-3 h-3 rounded-full" style={{ background: issue.status === 'COMPLETE' || issue.status === 'COMPLETED' ? '#22c55e' : issue.status === 'IN PROGRESS' ? '#2563eb' : '#6366f1' }}></span>
-                        <span className="text-lg font-semibold text-gray-900 flex-1">{issue.title}</span>
-                        <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium">{issue.status || 'PENDING'}</span>
-                      </div>
-                      <div className="text-gray-500 text-sm mb-2">{issue.location}</div>
-                      {(issue.photo || issue.image) && (
-                        <img src={`http://localhost:5000${issue.photo || issue.image}`} alt="Issue" className="w-full h-32 object-cover rounded mb-3" />
-                      )}
-                      <div className="text-gray-700 text-sm mb-3">{issue.description}</div>
-                    </div>
-                    <div className="flex items-center justify-between mt-2">
-                      <span className="text-xs text-gray-400">Assigned to: {issue.assignedTo ? (() => { const tech = technicians.find(t => (t._id || t.id) === issue.assignedTo); return tech ? tech.name : 'Unknown'; })() : 'Unassigned'}</span>
-                      <button onClick={() => handleOpenAssignment(idx)} className="px-3 py-1 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700">Assign</button>
-                    </div>
-                    {assigning === idx && (
-                      <div className="mt-3 p-4 bg-gray-50 rounded-lg border">
-                        <h4 className="font-semibold text-gray-900 mb-3">Assign Issue to Technician</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Technician</label>
-                            <select className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" value={assignmentData.technicianId} onChange={(e) => setAssignmentData({...assignmentData, technicianId: e.target.value})}>
-                              <option value="">Select technician...</option>
-                              {technicians.map(tech => (<option key={tech._id || tech.id} value={tech._id || tech.id}>{tech.name}</option>))}
-                            </select>
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
-                            <select className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" value={assignmentData.priority} onChange={(e) => setAssignmentData({...assignmentData, priority: e.target.value})}>
-                              <option value="LOW">Low</option>
-                              <option value="MEDIUM">Medium</option>
-                              <option value="HIGH">High</option>
-                              <option value="URGENT">Urgent</option>
-                            </select>
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
-                            <input type="date" className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" value={assignmentData.dueDate} onChange={(e) => setAssignmentData({...assignmentData, dueDate: e.target.value})} min={new Date().toISOString().split('T')[0]} />
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <button onClick={() => { const tech = technicians.find(t => (t._id || t.id) === assignmentData.technicianId); if (tech && assignmentData.dueDate) { handleAssignTech(idx, tech.name); } else { alert('Please select a technician and due date'); } }} disabled={!assignmentData.technicianId || !assignmentData.dueDate} className="px-3 py-2 bg-green-600 text-white text-sm rounded hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed">Assign Issue</button>
-                          <button className="px-3 py-2 bg-red-100 text-red-700 text-sm rounded hover:bg-red-200" onClick={() => { setAssigning(null); setAssignmentData({ technicianId: '', priority: 'MEDIUM', dueDate: '' }); }}>Cancel</button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* All Issues Tab */}
-        {activeTab === 'all-issues' && (
-          <div>
-            {/* Filters */}
-            <div className="bg-white rounded-xl shadow p-4 mb-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Filters</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                  <select className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" value={filters.status} onChange={(e) => setFilters({...filters, status: e.target.value})}>
-                    <option value="all">All Status</option>
-                    <option value="pending-approval">Pending Approval</option>
-                    <option value="in-progress">In Progress</option>
-                    <option value="completed">Completed</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
-                  <select className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" value={filters.priority} onChange={(e) => setFilters({...filters, priority: e.target.value})}>
-                    <option value="all">All Priorities</option>
-                    <option value="LOW">Low</option>
-                    <option value="MEDIUM">Medium</option>
-                    <option value="HIGH">High</option>
-                    <option value="URGENT">Urgent</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Assignment</label>
-                  <select className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" value={filters.assignedTo} onChange={(e) => setFilters({...filters, assignedTo: e.target.value})}>
-                    <option value="all">All Issues</option>
-                    <option value="unassigned">Unassigned</option>
-                    <option value="assigned">Assigned</option>
-                  </select>
-                </div>
-              </div>
+      {/* Main Content Area */}
+      <main className="flex-1 p-8 overflow-y-auto">
+        {/* Enhanced Header */}
+        <div className="mb-8">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
+            <div>
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 via-blue-900 to-purple-900 bg-clip-text text-transparent">
+                Manager Dashboard
+              </h1>
+              <p className="text-gray-600 mt-2 flex items-center gap-2">
+                <Calendar className="w-4 h-4" />
+                Last updated: {new Date().toLocaleDateString('en-US', { 
+                  weekday: 'long',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric'
+                })}
+              </p>
             </div>
-
-            {/* Issues List */}
-            <div className="bg-white rounded-xl shadow">
-              <div className="p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                  All Issues ({getFilteredIssues().length})
-                </h3>
-                <div className="space-y-4">
-                  {getFilteredIssues().length === 0 ? (
-                    <div className="text-center py-8">
-                      <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#9ca3af" strokeWidth="2"/></svg>
-                      </div>
-                      <h4 className="text-lg font-semibold text-gray-900 mb-2">No Issues Found</h4>
-                      <p className="text-gray-600">Try adjusting your filters</p>
-                    </div>
-                  ) : (
-                    getFilteredIssues().map((issue, idx) => (
-                      <div key={issue._id || issue.id || issue.title || idx} className="border-b pb-4 last:border-b-0">
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2">
-                              <h4 className="font-semibold text-gray-900">{issue.title}</h4>
-                              <span className={`px-2 py-1 rounded text-xs font-medium ${
-                                issue.status === 'COMPLETE' || issue.status === 'COMPLETED' ? 'bg-green-100 text-green-700' :
-                                issue.status === 'IN PROGRESS' ? 'bg-blue-100 text-blue-700' :
-                                issue.status === 'PENDING' && !issue.assignedTo ? 'bg-orange-100 text-orange-700' :
-                                'bg-gray-100 text-gray-700'
-                              }`}>
-                                {issue.status === 'COMPLETE' || issue.status === 'COMPLETED' ? 'Complete' :
-                                 issue.status === 'IN PROGRESS' ? 'In Progress' :
-                                 issue.status === 'PENDING' && !issue.assignedTo ? 'Pending Approval' :
-                                 issue.status || 'PENDING'}
-                              </span>
-                              {issue.priority && (
-                                <span className={`px-2 py-1 rounded text-xs font-medium ${
-                                  issue.priority === 'HIGH' ? 'bg-red-100 text-red-700' :
-                                  issue.priority === 'MEDIUM' ? 'bg-yellow-100 text-yellow-700' :
-                                  issue.priority === 'LOW' ? 'bg-gray-100 text-gray-700' :
-                                  'bg-purple-100 text-purple-700'
-                                }`}>
-                                  {issue.priority}
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-sm text-gray-600 mb-2">{issue.description}</p>
-                            <div className="flex gap-4 text-sm text-gray-500">
-                              <span>📍 {issue.location}</span>
-                              <span>📅 {new Date(issue.createdAt).toLocaleDateString()}</span>
-                              {issue.dueDate && (
-                                <span className={new Date(issue.dueDate) < new Date() ? 'text-red-600 font-semibold' : ''}>
-                                  ⏰ Due: {new Date(issue.dueDate).toLocaleDateString()}
-                                </span>
-                              )}
-                              {issue.assignedTo && (
-                                <span>👤 Assigned to: {
-                                  (() => {
-                                    const tech = technicians.find(t => (t._id || t.id) === issue.assignedTo);
-                                    return tech ? tech.name : 'Unknown';
-                                  })()
-                                }</span>
-                              )}
-                            </div>
-                          </div>
-                          <div className="text-right ml-4">
-                            {(issue.photo || issue.image) && (
-                              <img
-                                src={`http://localhost:5000${issue.photo || issue.image}`}
-                                alt="Issue"
-                                className="w-16 h-16 object-cover rounded cursor-pointer hover:opacity-80 mb-2"
-                                onClick={() => window.open(`http://localhost:5000${issue.photo || issue.image}`, '_blank')}
-                              />
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
+            
+            <div className="flex items-center gap-4">
+              {/* Search Bar */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  type="text"
+                  placeholder="Search issues..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 pr-4 py-2.5 bg-white/80 backdrop-blur-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent w-64"
+                />
+              </div>
+              
+              {/* Notification Bell */}
+              <button className="relative p-2.5 bg-gradient-to-br from-white to-gray-50 rounded-xl border border-gray-200 hover:border-blue-200 transition-colors">
+                <Bell className="w-5 h-5 text-gray-600" />
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-r from-rose-500 to-pink-500 text-white text-xs rounded-full flex items-center justify-center">
+                  3
+                </span>
+              </button>
+              
+              {/* Quick Actions */}
+              <div className="flex items-center gap-2">
+                <GradientButton color="blue" className="px-4 py-2.5 text-sm">
+                  <span className="flex items-center gap-2">
+                    <Upload className="w-4 h-4" />
+                    Export Report
+                  </span>
+                </GradientButton>
               </div>
             </div>
           </div>
-        )}
-
-        {/* Feedback Tab */}
-        {activeTab === 'feedback' && (
-          <div>
-            {console.log('[ManagerDashboard] Feedback tab render. feedbacks:', feedbacks, 'loadingFeedbacks:', loadingFeedbacks)}
-            {loadingFeedbacks ? (
-              <div className="text-gray-400 text-center py-8">Loading feedback...</div>
-            ) : feedbacks.length === 0 ? (
-              <div className="text-gray-400 text-center py-8">No feedback from technicians yet.</div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {feedbacks.map((fb, idx) => (
-                  <div key={fb._id || fb.id || fb.title || idx} className="bg-gradient-to-r from-green-50 via-white to-gray-50 rounded-2xl p-6 shadow border border-green-100 flex flex-col">
-                    <div className="flex items-center gap-3 mb-2">
-                      <span className="text-lg font-semibold text-green-700">{fb.assignees && fb.assignees.length > 0 ? (fb.assignees[0].name || 'Technician') : 'Technician'}</span>
-                      <span className="text-xs bg-green-100 text-green-700 rounded px-2 py-1 font-medium">{fb.updatedAt ? new Date(fb.updatedAt).toLocaleDateString() : ''}</span>
-                    </div>
-                    {fb.afterImage && (
-                      <img
-                        src={fb.afterImage.startsWith('/uploads/') ? `http://localhost:5000${fb.afterImage}` : fb.afterImage}
-                        alt="After evidence"
-                        className="w-32 h-32 object-cover rounded mb-2 border"
-                      />
-                    )}
-                    <div className="text-gray-700 text-base">
-                      {fb.address ? fb.address : <span className="italic text-gray-400">No completion details provided.</span>}
-                    </div>
-                    <div className="text-xs text-gray-400 mt-2">Related Issue: {fb.title || fb._id || fb.id}</div>
-                  </div>
-                ))}
-              </div>
-            )}
+          
+          {/* Quick Stats Bar */}
+          <div className="flex flex-wrap gap-4 mb-6">
+            <div className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-50 to-green-50 rounded-full border border-emerald-200">
+              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+              <span className="text-sm font-medium text-emerald-700">
+                {summary.completed} tasks completed this week
+              </span>
+            </div>
+            <div className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-full border border-blue-200">
+              <TrendingUp className="w-4 h-4 text-blue-600" />
+              <span className="text-sm font-medium text-blue-700">
+                Efficiency: {Math.round((summary.completed / (summary.pending + summary.inProgress + summary.completed)) * 100)}%
+              </span>
+            </div>
           </div>
+        </div>
+
+        {/* Tab Content */}
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-20">
+            <div className="relative">
+              <div className="w-16 h-16 border-4 border-blue-200 rounded-full"></div>
+              <div className="absolute top-0 left-0 w-16 h-16 border-4 border-transparent border-t-blue-500 rounded-full animate-spin"></div>
+            </div>
+            <p className="mt-4 text-gray-600 animate-pulse">Loading dashboard...</p>
+          </div>
+        ) : activeTab === 'overview' ? (
+          <OverviewTab 
+            summary={summary}
+            pendingRequests={pendingRequests}
+            issues={issues}
+            technicians={technicians}
+            setActiveTab={setActiveTab}
+            getAssignedTechName={getAssignedTechName}
+          />
+        ) : activeTab === 'requests' ? (
+          <RequestsTab 
+            pendingRequests={pendingRequests}
+            setSelectedRequest={setSelectedRequest}
+            setShowApprovalModal={setShowApprovalModal}
+          />
+        ) : activeTab === 'issues' ? (
+          <IssuesTab 
+            issues={issues}
+            technicians={technicians}
+            assigning={assigning}
+            assignmentData={assignmentData}
+            setAssignmentData={setAssignmentData}
+            handleOpenAssignment={handleOpenAssignment}
+            handleAssignTech={handleAssignTech}
+            getAssignedTechName={getAssignedTechName}
+          />
+        ) : activeTab === 'all-issues' ? (
+          <AllIssuesTab 
+            filters={filters}
+            setFilters={setFilters}
+            getFilteredIssues={getFilteredIssues}
+            getAssignedTechName={getAssignedTechName}
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+          />
+        ) : (
+          <FeedbackTab 
+            feedbacks={feedbacks}
+            loadingFeedbacks={loadingFeedbacks}
+          />
         )}
 
-        {/* Approval Modal */}
+        {/* Enhanced Approval Modal */}
         {showApprovalModal && selectedRequest && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-              <div className="p-6">
-                <div className="flex justify-between items-start mb-4">
-                  <h2 className="text-xl font-bold">Review Client Request</h2>
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
+            <GlassCard className="max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-8">
+                <div className="flex justify-between items-center mb-8">
+                  <div>
+                    <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                      Review Request
+                    </h2>
+                    <p className="text-gray-600 mt-1">Approve or decline this maintenance request</p>
+                  </div>
                   <button
                     onClick={() => {
                       setShowApprovalModal(false);
                       setSelectedRequest(null);
                       setDeclineReason('');
                     }}
-                    className="text-gray-500 hover:text-gray-700"
+                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
                   >
-                    ✕
+                    <span className="text-2xl text-gray-500 hover:text-gray-700">×</span>
                   </button>
                 </div>
                 
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="font-semibold text-gray-700">Title</h3>
-                    <p className="text-gray-900">{selectedRequest.title}</p>
+                {/* Request Details */}
+                <div className="space-y-6">
+                  {/* Header with image */}
+                  <div className="flex flex-col md:flex-row gap-6">
+                    {(selectedRequest.beforePhoto || selectedRequest.photo) && (
+                      <div className="md:w-1/3">
+                        <div className="rounded-2xl overflow-hidden shadow-lg">
+                          <img 
+                            src={`http://localhost:5000${selectedRequest.beforePhoto || selectedRequest.photo}`}
+                            alt="Issue"
+                            className="w-full h-64 object-cover hover:scale-105 transition-transform duration-300"
+                          />
+                        </div>
+                      </div>
+                    )}
+                    <div className="flex-1">
+                      <h3 className="text-2xl font-bold text-gray-900 mb-3">{selectedRequest.title}</h3>
+                      <div className="flex items-center gap-4 mb-4">
+                        <PriorityBadge priority={selectedRequest.priority || 'MEDIUM'} />
+                        <div className="flex items-center gap-2 text-gray-600">
+                          <MapPin className="w-4 h-4" />
+                          {selectedRequest.location}
+                        </div>
+                      </div>
+                      <p className="text-gray-700 leading-relaxed">{selectedRequest.description}</p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-700">Description</h3>
-                    <p className="text-gray-900">{selectedRequest.description}</p>
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-700">Location</h3>
-                    <p className="text-gray-900">{selectedRequest.location}</p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  
+                  {/* Meta Info */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl">
                     <div>
-                      <h3 className="font-semibold text-gray-700">Priority</h3>
-                      <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${
-                        selectedRequest.priority === 'HIGH' ? 'bg-red-100 text-red-700' :
-                        selectedRequest.priority === 'MEDIUM' ? 'bg-yellow-100 text-yellow-700' :
-                        'bg-gray-100 text-gray-700'
-                      }`}>
-                        {selectedRequest.priority || 'MEDIUM'}
+                      <p className="text-sm text-gray-600 mb-1">Submitted</p>
+                      <p className="font-semibold text-gray-900">
+                        {new Date(selectedRequest.createdAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600 mb-1">Client</p>
+                      <p className="font-semibold text-gray-900">Anonymous</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600 mb-1">Category</p>
+                      <p className="font-semibold text-gray-900">Maintenance</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600 mb-1">Urgency</p>
+                      <div className="w-24">
+                        <PriorityBadge priority={selectedRequest.priority || 'MEDIUM'} />
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Decline Reason */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-3">
+                      <span className="flex items-center gap-2">
+                        <AlertCircle className="w-5 h-5 text-amber-600" />
+                        Decline Reason (Optional)
                       </span>
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-gray-700">Submitted</h3>
-                      <p className="text-gray-900">{new Date(selectedRequest.createdAt).toLocaleDateString()}</p>
-                    </div>
-                  </div>
-                  
-                  {(selectedRequest.beforePhoto || selectedRequest.photo) && (
-                    <div>
-                      <h3 className="font-semibold text-gray-700 mb-2">Client Photo</h3>
-                      <img 
-                        src={`http://localhost:5000${selectedRequest.beforePhoto || selectedRequest.photo}`}
-                        alt="Issue"
-                        className="w-32 h-32 object-cover rounded border"
-                      />
-                    </div>
-                  )}
-                  
-                  <div>
-                    <h3 className="font-semibold text-gray-700 mb-2">Decline Reason (if declining)</h3>
+                    </label>
                     <textarea
-                      className="w-full border rounded px-3 py-2"
+                      className="w-full px-4 py-3 bg-white/50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                       rows="3"
                       value={declineReason}
                       onChange={(e) => setDeclineReason(e.target.value)}
-                      placeholder="Please provide a reason for declining this request..."
+                      placeholder="Provide a reason for declining this request..."
                     />
                   </div>
                   
-                  <div className="flex gap-2 pt-4">
-                    <button
-                      onClick={() => handleApproveRequest(selectedRequest)}
-                      className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                  {/* Action Buttons */}
+                  <div className="flex gap-4 pt-6 border-t border-gray-200">
+                    <GradientButton
+                      onClick={() => handleApproveRequest(selectedRequest._id)}
+                      color="green"
+                      className="flex-1 py-4"
                     >
-                      Approve Request
-                    </button>
-                    <button
+                      <span className="flex items-center justify-center gap-3">
+                        <CheckCircle className="w-5 h-5" />
+                        Approve Request
+                      </span>
+                    </GradientButton>
+                    <GradientButton
                       onClick={handleDeclineRequest}
+                      color="red"
+                      className="flex-1 py-4"
                       disabled={!declineReason.trim()}
-                      className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
                     >
-                      Decline Request
-                    </button>
+                      <span className="flex items-center justify-center gap-3">
+                        <AlertCircle className="w-5 h-5" />
+                        Decline Request
+                      </span>
+                    </GradientButton>
                     <button
                       onClick={() => {
                         setShowApprovalModal(false);
                         setSelectedRequest(null);
                         setDeclineReason('');
                       }}
-                      className="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+                      className="flex-1 px-6 py-4 bg-gradient-to-b from-gray-100 to-gray-200 text-gray-700 rounded-xl font-semibold hover:from-gray-200 hover:to-gray-300 transition-all duration-300 border border-gray-300"
                     >
                       Cancel
                     </button>
                   </div>
                 </div>
               </div>
-            </div>
+            </GlassCard>
           </div>
         )}
       </main>
     </div>
   );
 }
+
+// Enhanced Overview Tab
+const OverviewTab = ({ summary, pendingRequests, issues, technicians, setActiveTab, getAssignedTechName }) => (
+  <div className="space-y-8">
+    {/* Overview Cards */}
+    <OverviewCards summary={summary} pendingRequests={pendingRequests} />
+    
+    {/* Grid Layout */}
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Pending Requests */}
+      <GlassCard className="lg:col-span-2 p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Pending Approval Requests</h3>
+            <p className="text-gray-600">Requests awaiting your review</p>
+          </div>
+          <GradientButton 
+            onClick={() => setActiveTab('requests')}
+            color="orange"
+            className="px-4 py-2 text-sm"
+          >
+            View All
+          </GradientButton>
+        </div>
+        <div className="space-y-4">
+          {pendingRequests.slice(0, 4).map((request, i) => (
+            <div key={request._id || request.id || `pending-${i}`} className="group p-4 bg-gradient-to-r from-white to-orange-50 rounded-xl border border-orange-100 hover:border-orange-200 transition-all duration-300">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-gradient-to-br from-orange-100 to-amber-100 rounded-lg flex items-center justify-center">
+                    <span className="text-2xl">📝</span>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-gray-900 group-hover:text-orange-700 transition-colors">
+                      {request.title}
+                    </h4>
+                    <p className="text-sm text-gray-600">{request.location}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <PriorityBadge priority={request.priority || 'MEDIUM'} />
+                  <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-orange-500 transition-colors" />
+                </div>
+              </div>
+            </div>
+          ))}
+          {pendingRequests.length === 0 && (
+            <div className="text-center py-8">
+              <div className="w-16 h-16 bg-gradient-to-br from-green-100 to-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <CheckCircle className="w-8 h-8 text-emerald-600" />
+              </div>
+              <h4 className="text-lg font-semibold text-gray-900 mb-2">All Clear!</h4>
+              <p className="text-gray-600">No pending requests to review</p>
+            </div>
+          )}
+        </div>
+      </GlassCard>
+
+      {/* Technician Stats */}
+      <GlassCard className="p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Top Technicians</h3>
+            <p className="text-gray-600">Based on completion rate</p>
+          </div>
+          <Users className="w-6 h-6 text-purple-600" />
+        </div>
+        <div className="space-y-4">
+          {technicians.slice(0, 3).map((tech, i) => (
+            <div key={tech._id || tech.id || `tech-${i}`} className="flex items-center justify-between p-3 bg-gradient-to-r from-purple-50 to-violet-50 rounded-lg">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-violet-500 rounded-full flex items-center justify-center text-white font-bold">
+                  {tech.name?.charAt(0) || 'T'}
+                </div>
+                <div>
+                  <h4 className="font-medium text-gray-900">{tech.name}</h4>
+                  <p className="text-xs text-gray-600">Available</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-lg font-bold text-purple-700">95%</div>
+                <div className="text-xs text-gray-500">Success Rate</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </GlassCard>
+
+      {/* Recent Activity */}
+      <GlassCard className="lg:col-span-3 p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Recent Activity</h3>
+            <p className="text-gray-600">Latest updates across all issues</p>
+          </div>
+          <Filter className="w-6 h-6 text-blue-600" />
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-gray-200">
+                <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Issue</th>
+                <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Status</th>
+                <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Technician</th>
+                <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Due Date</th>
+                <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Priority</th>
+                <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {issues.slice(0, 5).map((issue, i) => (
+                <tr key={issue._id || issue.id || `issue-${i}`} className="border-b border-gray-100 hover:bg-gradient-to-r hover:from-blue-50/50 hover:to-indigo-50/50 transition-colors">
+                  <td className="py-4 px-4">
+                    <div className="font-medium text-gray-900">{issue.title}</div>
+                    <div className="text-sm text-gray-600 truncate max-w-xs">{issue.description}</div>
+                  </td>
+                  <td className="py-4 px-4">
+                    <StatusBadge status={issue.status} />
+                  </td>
+                  <td className="py-4 px-4">
+                    <div className="text-sm font-medium text-gray-900">{getAssignedTechName(issue)}</div>
+                  </td>
+                  <td className="py-4 px-4">
+                    <div className={`text-sm font-medium ${issue.dueDate && new Date(issue.dueDate) < new Date() ? 'text-rose-600' : 'text-gray-900'}`}>
+                      {issue.dueDate ? new Date(issue.dueDate).toLocaleDateString() : 'Not set'}
+                    </div>
+                  </td>
+                  <td className="py-4 px-4">
+                    <PriorityBadge priority={issue.priority || 'MEDIUM'} />
+                  </td>
+                  <td className="py-4 px-4">
+                    <div className="flex items-center gap-2">
+                      <button className="p-2 hover:bg-blue-100 rounded-lg transition-colors">
+                        <Eye className="w-4 h-4 text-blue-600" />
+                      </button>
+                      <button className="p-2 hover:bg-green-100 rounded-lg transition-colors">
+                        <Edit className="w-4 h-4 text-green-600" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </GlassCard>
+    </div>
+  </div>
+);
+
+// Enhanced Requests Tab
+const RequestsTab = ({ pendingRequests, setSelectedRequest, setShowApprovalModal }) => (
+  <div>
+    <div className="mb-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Pending Approval Requests</h2>
+          <p className="text-gray-600">Review and approve client maintenance requests</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="px-4 py-2 bg-gradient-to-r from-orange-50 to-amber-50 rounded-lg border border-orange-200">
+            <span className="text-orange-700 font-semibold">{pendingRequests.length} pending</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {pendingRequests.length === 0 ? (
+      <GlassCard className="p-12 text-center">
+        <div className="w-24 h-24 bg-gradient-to-br from-emerald-100 to-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+          <CheckCircle className="w-12 h-12 text-emerald-600" />
+        </div>
+        <h3 className="text-2xl font-bold text-gray-900 mb-3">All Clear!</h3>
+        <p className="text-gray-600 mb-6">No pending requests to review</p>
+        <GradientButton color="green" className="px-8">
+          View Completed Requests
+        </GradientButton>
+      </GlassCard>
+    ) : (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {pendingRequests.map((request, i) => (
+          <div key={request._id || request.id || `pending-full-${i}`} className="group relative">
+            <div className="absolute inset-0 bg-gradient-to-r from-orange-500 to-amber-500 rounded-2xl blur opacity-0 group-hover:opacity-20 transition-opacity duration-300" />
+            <GlassCard className="relative p-6 hover:scale-[1.02] transition-all duration-300">
+              {/* Request Header */}
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex-1">
+                  <h3 className="text-lg font-bold text-gray-900 mb-2">{request.title}</h3>
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="px-2 py-1 bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 rounded-lg text-xs font-medium">
+                      📍 {request.location}
+                    </span>
+                    <PriorityBadge priority={request.priority || 'MEDIUM'} />
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-xs text-gray-500 mb-1">Submitted</div>
+                  <div className="text-sm font-medium text-gray-900">
+                    {new Date(request.createdAt).toLocaleDateString()}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Request Description */}
+              <p className="text-gray-600 text-sm mb-4 line-clamp-3">{request.description}</p>
+              
+              {/* Request Image */}
+              {(request.beforePhoto || request.photo) && (
+                <div className="mb-4">
+                  <img 
+                    src={`http://localhost:5000${request.beforePhoto || request.photo}`}
+                    alt="Issue"
+                    className="w-full h-48 object-cover rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300"
+                  />
+                </div>
+              )}
+              
+              {/* Action Buttons */}
+              <div className="flex gap-3">
+                <GradientButton
+                  onClick={() => { setSelectedRequest(request); setShowApprovalModal(true); }}
+                  color="green"
+                  className="flex-1 py-2.5 text-sm"
+                >
+                  <span className="flex items-center justify-center gap-2">
+                    <CheckCircle className="w-4 h-4" />
+                    Review
+                  </span>
+                </GradientButton>
+              </div>
+            </GlassCard>
+          </div>
+        ))}
+      </div>
+    )}
+  </div>
+);
+
+// Enhanced Issues Tab
+const IssuesTab = ({ 
+  issues, 
+  technicians, 
+  assigning, 
+  assignmentData, 
+  setAssignmentData, 
+  handleOpenAssignment, 
+  handleAssignTech,
+  getAssignedTechName 
+}) => (
+  <div>
+    <div className="mb-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Issue Management</h2>
+          <p className="text-gray-600">Assign and manage approved issues</p>
+        </div>
+        <GradientButton color="purple" className="px-6">
+          <span className="flex items-center gap-2">
+            <Wrench className="w-5 h-5" />
+            Manage Issues
+          </span>
+        </GradientButton>
+      </div>
+    </div>
+
+    {issues.length === 0 ? (
+      <GlassCard className="p-12 text-center">
+        <div className="w-24 h-24 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full flex items-center justify-center mx-auto mb-6">
+          <FileText className="w-12 h-12 text-blue-600" />
+        </div>
+        <h3 className="text-2xl font-bold text-gray-900 mb-3">No Issues Available</h3>
+        <p className="text-gray-600 mb-6">Approve requests to see them here for assignment</p>
+        <GradientButton color="blue" className="px-8">
+          View Pending Requests
+        </GradientButton>
+      </GlassCard>
+    ) : (
+      <div className="space-y-6">
+        {issues.map((issue, idx) => (
+          <div key={issue._id || issue.id || `issue-full-${idx}`} className="group relative">
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 rounded-2xl blur opacity-0 group-hover:opacity-10 transition-opacity duration-300" />
+            <GlassCard className="relative p-6 hover:shadow-2xl transition-all duration-300">
+              <div className="flex flex-col lg:flex-row gap-6">
+                {/* Issue Image */}
+                {(issue.photo || issue.image) && (
+                  <div className="lg:w-56 flex-shrink-0">
+                    <div className="relative rounded-xl overflow-hidden shadow-lg">
+                      <img 
+                        src={`http://localhost:5000${issue.photo || issue.image}`}
+                        alt="Issue"
+                        className="w-full h-56 object-cover hover:scale-105 transition-transform duration-300"
+                      />
+                      <div className="absolute top-3 left-3">
+                        <StatusBadge status={issue.status} />
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Issue Details */}
+                <div className="flex-1">
+                  <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-6">
+                    <div className="flex-1">
+                      <h3 className="text-xl font-bold text-gray-900 mb-3">{issue.title}</h3>
+                      <p className="text-gray-600 leading-relaxed mb-4">{issue.description}</p>
+                    </div>
+                    <div className="flex flex-col items-start lg:items-end gap-3">
+                      <PriorityBadge priority={issue.priority || 'MEDIUM'} />
+                      <div className="text-right">
+                        <div className="text-sm text-gray-600">Assigned to</div>
+                        <div className="font-semibold text-gray-900">{getAssignedTechName(issue)}</div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Meta Grid */}
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                    <div className="p-3 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-xl">
+                      <div className="text-xs text-gray-600 mb-1">Location</div>
+                      <div className="font-medium text-gray-900 flex items-center gap-2">
+                        <MapPin className="w-4 h-4 text-blue-600" />
+                        {issue.location}
+                      </div>
+                    </div>
+                    <div className="p-3 bg-gradient-to-r from-purple-50 to-violet-50 rounded-xl">
+                      <div className="text-xs text-gray-600 mb-1">Created</div>
+                      <div className="font-medium text-gray-900">{new Date(issue.createdAt).toLocaleDateString()}</div>
+                    </div>
+                    <div className="p-3 bg-gradient-to-r from-orange-50 to-amber-50 rounded-xl">
+                      <div className="text-xs text-gray-600 mb-1">Due Date</div>
+                      <div className={`font-medium ${issue.dueDate && new Date(issue.dueDate) < new Date() ? 'text-rose-600' : 'text-gray-900'}`}>
+                        {issue.dueDate ? new Date(issue.dueDate).toLocaleDateString() : 'Not set'}
+                      </div>
+                    </div>
+                    <div className="p-3 bg-gradient-to-r from-emerald-50 to-green-50 rounded-xl">
+                      <div className="text-xs text-gray-600 mb-1">Progress</div>
+                      <div className="font-medium text-gray-900">Pending Assignment</div>
+                    </div>
+                  </div>
+                  
+                  {/* Assignment Form or Button */}
+                  {assigning === idx ? (
+                    <AssignmentForm 
+                      assignmentData={assignmentData}
+                      setAssignmentData={setAssignmentData}
+                      technicians={technicians}
+                      onAssign={() => handleAssignTech(idx, technicians.find(t => t._id === assignmentData.technicianId)?.name)}
+                      onCancel={() => {
+                        setAssigning(null);
+                        setAssignmentData({ technicianId: "", priority: "MEDIUM", dueDate: "" });
+                      }}
+                    />
+                  ) : (
+                    <div className="flex justify-end">
+                      <GradientButton
+                        onClick={() => handleOpenAssignment(idx)}
+                        color="purple"
+                        className="px-6"
+                      >
+                        <span className="flex items-center gap-2">
+                          <Users className="w-5 h-5" />
+                          Assign Technician
+                        </span>
+                      </GradientButton>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </GlassCard>
+          </div>
+        ))}
+      </div>
+    )}
+  </div>
+);
+
+// Enhanced Assignment Form
+const AssignmentForm = ({ assignmentData, setAssignmentData, technicians, onAssign, onCancel }) => (
+  <div className="mt-4 p-6 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 rounded-2xl border border-blue-200">
+    <h4 className="text-lg font-bold text-gray-900 mb-4">Assign Issue to Technician</h4>
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Technician</label>
+        <select 
+          className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+          value={assignmentData.technicianId}
+          onChange={(e) => setAssignmentData({...assignmentData, technicianId: e.target.value})}
+        >
+          <option value="">Select technician...</option>
+          {technicians.map((tech, i) => (
+            <option key={tech._id || tech.id || `opt-${i}`} value={tech._id || tech.id || ''}>
+              {`🧑‍🔧 ${tech.name}`}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Priority</label>
+        <select 
+          className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+          value={assignmentData.priority}
+          onChange={(e) => setAssignmentData({...assignmentData, priority: e.target.value})}
+        >
+          <option value="LOW">Low</option>
+          <option value="MEDIUM">Medium</option>
+          <option value="HIGH">High</option>
+          <option value="URGENT">Urgent</option>
+        </select>
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Due Date</label>
+        <input 
+          type="date"
+          className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+          value={assignmentData.dueDate}
+          onChange={(e) => setAssignmentData({...assignmentData, dueDate: e.target.value})}
+          min={new Date().toISOString().split('T')[0]}
+        />
+      </div>
+    </div>
+    <div className="flex gap-3">
+      <GradientButton
+        onClick={onAssign}
+        disabled={!assignmentData.technicianId || !assignmentData.dueDate}
+        color="green"
+        className="px-6 py-2.5"
+      >
+        Assign Issue
+      </GradientButton>
+      <button
+        onClick={onCancel}
+        className="px-6 py-2.5 bg-gradient-to-b from-gray-100 to-gray-200 text-gray-700 rounded-xl font-semibold hover:from-gray-200 hover:to-gray-300 transition-all duration-300 border border-gray-300"
+      >
+        Cancel
+      </button>
+    </div>
+  </div>
+);
+
+// Enhanced All Issues Tab
+const AllIssuesTab = ({ 
+  filters, 
+  setFilters, 
+  getFilteredIssues, 
+  getAssignedTechName,
+  searchQuery,
+  setSearchQuery 
+}) => {
+  const filteredIssues = getFilteredIssues();
+  
+  return (
+    <div>
+      <div className="mb-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">All Issues</h2>
+            <p className="text-gray-600">View and manage all maintenance requests</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <GradientButton color="blue" className="px-4 py-2.5 text-sm">
+              <span className="flex items-center gap-2">
+                <Download className="w-4 h-4" />
+                Export
+              </span>
+            </GradientButton>
+          </div>
+        </div>
+      </div>
+
+      {/* Enhanced Filters */}
+      <GlassCard className="p-6 mb-6">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-lg font-semibold text-gray-900">Filters</h3>
+          <Filter className="w-5 h-5 text-blue-600" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+            <select 
+              className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+              value={filters.status}
+              onChange={(e) => setFilters({...filters, status: e.target.value})}
+            >
+              <option value="all">All Status</option>
+              <option value="pending-approval">Pending Approval</option>
+              <option value="in-progress">In Progress</option>
+              <option value="completed">Completed</option>
+              <option value="overdue">Overdue</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Priority</label>
+            <select 
+              className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+              value={filters.priority}
+              onChange={(e) => setFilters({...filters, priority: e.target.value})}
+            >
+              <option value="all">All Priorities</option>
+              <option value="LOW">Low</option>
+              <option value="MEDIUM">Medium</option>
+              <option value="HIGH">High</option>
+              <option value="URGENT">Urgent</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Assignment</label>
+            <select 
+              className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+              value={filters.assignedTo}
+              onChange={(e) => setFilters({...filters, assignedTo: e.target.value})}
+            >
+              <option value="all">All Issues</option>
+              <option value="unassigned">Unassigned</option>
+              <option value="assigned">Assigned</option>
+            </select>
+          </div>
+        </div>
+      </GlassCard>
+
+      {/* Enhanced Issues Table */}
+      <GlassCard>
+        <div className="p-6">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">
+                Issues ({filteredIssues.length})
+              </h3>
+              <p className="text-sm text-gray-600 mt-1">
+                Showing {filteredIssues.length} issues matching your filters
+              </p>
+            </div>
+            <div className="text-sm">
+              <span className="px-3 py-1.5 bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 rounded-lg font-medium">
+                Updated just now
+              </span>
+            </div>
+          </div>
+          
+          {filteredIssues.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="w-20 h-20 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Search className="w-10 h-10 text-gray-400" />
+              </div>
+              <h4 className="text-xl font-bold text-gray-900 mb-3">No Issues Found</h4>
+              <p className="text-gray-600 mb-6">Try adjusting your filters or search query</p>
+              <GradientButton 
+                onClick={() => {
+                  setFilters({ status: 'all', priority: 'all', assignedTo: 'all' });
+                  setSearchQuery('');
+                }}
+                color="blue"
+                className="px-8"
+              >
+                Clear All Filters
+              </GradientButton>
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-2xl border border-gray-200">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-gradient-to-r from-gray-50 to-gray-100">
+                    <th className="text-left py-4 px-6 text-sm font-semibold text-gray-700">Issue</th>
+                    <th className="text-left py-4 px-6 text-sm font-semibold text-gray-700">Status</th>
+                    <th className="text-left py-4 px-6 text-sm font-semibold text-gray-700">Priority</th>
+                    <th className="text-left py-4 px-6 text-sm font-semibold text-gray-700">Technician</th>
+                    <th className="text-left py-4 px-6 text-sm font-semibold text-gray-700">Due Date</th>
+                    <th className="text-left py-4 px-6 text-sm font-semibold text-gray-700">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredIssues.map((issue, idx) => (
+                    <tr 
+                      key={issue._id || issue.id || `filtered-${idx}`} 
+                      className={`border-b border-gray-100 hover:bg-gradient-to-r hover:from-blue-50/30 hover:to-indigo-50/30 transition-all duration-300 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}
+                    >
+                      <td className="py-4 px-6">
+                        <div>
+                          <div className="font-semibold text-gray-900 mb-1">{issue.title}</div>
+                          <div className="text-sm text-gray-600 flex items-center gap-2">
+                            <MapPin className="w-3 h-3" />
+                            {issue.location}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-4 px-6">
+                        <StatusBadge status={issue.status} />
+                      </td>
+                      <td className="py-4 px-6">
+                        <PriorityBadge priority={issue.priority || 'MEDIUM'} />
+                      </td>
+                      <td className="py-4 px-6">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full flex items-center justify-center text-blue-700 font-bold text-sm">
+                            {getAssignedTechName(issue).charAt(0)}
+                          </div>
+                          <span className="font-medium text-gray-900">{getAssignedTechName(issue)}</span>
+                        </div>
+                      </td>
+                      <td className="py-4 px-6">
+                        <div className={`text-sm font-medium ${issue.dueDate && new Date(issue.dueDate) < new Date() ? 'text-rose-600' : 'text-gray-900'}`}>
+                          {issue.dueDate ? new Date(issue.dueDate).toLocaleDateString() : 'Not set'}
+                        </div>
+                      </td>
+                      <td className="py-4 px-6">
+                        <div className="flex items-center gap-2">
+                          <button className="p-2 hover:bg-blue-100 rounded-lg transition-colors group">
+                            <Eye className="w-4 h-4 text-blue-600 group-hover:scale-110 transition-transform" />
+                          </button>
+                          <button className="p-2 hover:bg-green-100 rounded-lg transition-colors group">
+                            <Edit className="w-4 h-4 text-green-600 group-hover:scale-110 transition-transform" />
+                          </button>
+                          <button className="p-2 hover:bg-rose-100 rounded-lg transition-colors group">
+                            <Trash2 className="w-4 h-4 text-rose-600 group-hover:scale-110 transition-transform" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </GlassCard>
+    </div>
+  );
+};
+
+// Enhanced Feedback Tab
+const FeedbackTab = ({ feedbacks, loadingFeedbacks }) => (
+  <div>
+    <div className="mb-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Technician Feedback</h2>
+          <p className="text-gray-600">Review completion reports and feedback from technicians</p>
+        </div>
+        <GradientButton color="green" className="px-6">
+          <span className="flex items-center gap-2">
+            <MessageSquare className="w-5 h-5" />
+            Feedback Overview
+          </span>
+        </GradientButton>
+      </div>
+    </div>
+
+    {loadingFeedbacks ? (
+      <div className="flex flex-col items-center justify-center py-20">
+        <div className="relative">
+          <div className="w-16 h-16 border-4 border-green-200 rounded-full"></div>
+          <div className="absolute top-0 left-0 w-16 h-16 border-4 border-transparent border-t-green-500 rounded-full animate-spin"></div>
+        </div>
+        <p className="mt-4 text-gray-600 animate-pulse">Loading feedback...</p>
+      </div>
+    ) : feedbacks.length === 0 ? (
+      <GlassCard className="p-12 text-center">
+        <div className="w-24 h-24 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full flex items-center justify-center mx-auto mb-6">
+          <MessageSquare className="w-12 h-12 text-gray-400" />
+        </div>
+        <h3 className="text-2xl font-bold text-gray-900 mb-3">No Feedback Yet</h3>
+        <p className="text-gray-600 mb-6">Wait for technicians to complete jobs and submit feedback</p>
+        <GradientButton color="blue" className="px-8">
+          Check Progress
+        </GradientButton>
+      </GlassCard>
+    ) : (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {feedbacks.map((fb, idx) => (
+          <div key={fb._id || idx} className="group relative">
+            <div className="absolute inset-0 bg-gradient-to-r from-emerald-500 to-green-500 rounded-2xl blur opacity-0 group-hover:opacity-10 transition-opacity duration-300" />
+            <GlassCard className="relative p-6 hover:scale-[1.02] transition-all duration-300">
+              {/* Technician Header */}
+              <div className="flex items-center gap-4 mb-4">
+                <div className="relative">
+                  <div className="w-14 h-14 bg-gradient-to-br from-emerald-500 to-green-500 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                    {(fb.technicianName || 'T').charAt(0)}
+                  </div>
+                  <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-gradient-to-r from-amber-500 to-yellow-500 rounded-full border-2 border-white flex items-center justify-center">
+                    <Award className="w-3 h-3 text-white" />
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <h4 className="font-bold text-gray-900">{fb.technicianName || 'Technician'}</h4>
+                  <p className="text-sm text-gray-600 flex items-center gap-2">
+                    <Calendar className="w-3 h-3" />
+                    Completed: {new Date(fb.completedAt || fb.updatedAt).toLocaleDateString()}
+                  </p>
+                </div>
+                <StatusBadge status="COMPLETED" />
+              </div>
+              
+              {/* Issue Info */}
+              <div className="mb-4">
+                <h5 className="font-semibold text-gray-900 mb-2">Issue: {fb.title}</h5>
+                <p className="text-gray-600 text-sm bg-gradient-to-r from-emerald-50 to-green-50 p-3 rounded-xl border border-emerald-100">
+                  {fb.evidence.address || 'No completion details provided.'}
+                </p>
+              </div>
+              
+              {/* After Image */}
+              {fb.evidence.afterImage && (
+                <div className="mb-4">
+                  <div className="relative rounded-xl overflow-hidden shadow-lg group">
+                    <img
+                      src={fb.evidence.afterImage.startsWith('/uploads/') ? `http://localhost:5000${fb.evidence.afterImage}` : fb.evidence.afterImage}
+                      alt="After evidence"
+                      className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                    <div className="absolute bottom-3 left-3 text-white text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                      Click to view
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Footer */}
+              <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <MapPin className="w-4 h-4" />
+                  {fb.location}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
+                  <span className="text-sm font-semibold text-gray-900">5.0</span>
+                </div>
+              </div>
+            </GlassCard>
+          </div>
+        ))}
+      </div>
+    )}
+  </div>
+);
 
 export default ManagerDashboard;
