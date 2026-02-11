@@ -2,6 +2,10 @@ import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import NewIssue from './NewIssue';
+import heroImg from '../assets/1.jpg';
+import heroVid1 from '../assets/135907-764370874_small.mp4';
+import heroVid2 from '../assets/136906-765457769_small.mp4';
+import heroVid3 from '../assets/136909-765457779_small.mp4';
 
 function PropertiesPage() {
   const [properties, setProperties] = useState([]);
@@ -30,6 +34,24 @@ function PropertiesPage() {
   const [detailsTab, setDetailsTab] = useState('issues');
   const [showNewIssueModal, setShowNewIssueModal] = useState(false);
   const [newIssueModel, setNewIssueModel] = useState(null);
+
+  // Hero slides (images/videos) - use local `src/assets` files
+  const heroSlides = [
+    heroImg,
+    heroVid1,
+    heroVid2,
+    heroVid3,
+  ];
+  const [slideIndex, setSlideIndex] = useState(0);
+  const [paused, setPaused] = useState(false);
+
+  useEffect(() => {
+    if (paused) return undefined;
+    const t = setInterval(() => {
+      setSlideIndex(i => (i + 1) % heroSlides.length);
+    }, 5000);
+    return () => clearInterval(t);
+  }, [heroSlides.length, paused]);
 
   // Lock background scrolling when new-issue modal is open
   useEffect(() => {
@@ -75,6 +97,9 @@ function PropertiesPage() {
     const token = localStorage.getItem('token');
     if (token) {
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    } else {
+      // Remove Authorization header for anonymous users
+      delete axios.defaults.headers.common['Authorization'];
     }
   }, []);
 
@@ -242,6 +267,27 @@ function PropertiesPage() {
     setError('');
     setSuccess('');
     try {
+      // Try to get the property owner's userId (clientId or userId)
+      let userId = selectedProperty.clientId || selectedProperty.userId || (selectedProperty.user && (selectedProperty.user.id || selectedProperty.user._id));
+      if (!userId && selectedProperty.owner) {
+        userId = selectedProperty.owner.id || selectedProperty.owner._id;
+      }
+
+      // Fetch all users and check if userId exists
+      let validUserId = undefined;
+      if (userId) {
+        try {
+          const usersRes = await axios.get(`${backendBase}/api/users`);
+          const users = Array.isArray(usersRes.data) ? usersRes.data : [];
+          if (users.some(u => u.id === userId || u._id === userId)) {
+            validUserId = userId;
+          }
+        } catch (e) {
+          // If user fetch fails, fallback to not including userId
+          validUserId = undefined;
+        }
+      }
+
       const payload = {
         title: newIssue.title,
         description: newIssue.description,
@@ -250,6 +296,7 @@ function PropertiesPage() {
         address: selectedProperty.address,
         assetId: newIssue.assetId || null,
         propertyId: selectedProperty.id || selectedProperty._id,
+        ...(validUserId ? { userId: validUserId } : {}),
       };
       await axios.post(`${backendBase}/api/issues`, payload);
       await fetchPropertyDetails(selectedProperty);
@@ -769,113 +816,132 @@ function PropertiesPage() {
 
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-          <div className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6 items-start">
+        <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+          <div className="p-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8 items-start">
               <div className="md:col-span-1">
                 <img
                   src={getImageUrl((Array.isArray(selectedProperty.photos) && selectedProperty.photos.length > 0) ? selectedProperty.photos[0] : (selectedProperty.image || selectedProperty.photo))}
                   alt={selectedProperty.name}
-                  className="w-full h-56 md:h-64 object-cover rounded-lg"
+                  className="w-full h-56 md:h-64 object-cover rounded-xl shadow-lg"
                 />
               </div>
               <div className="md:col-span-2">
-                <div className="flex items-start justify-between mb-3">
+                <div className="flex items-start justify-between mb-6">
                   <div>
-                    <h2 className="text-2xl font-bold text-gray-900">{selectedProperty.name}</h2>
-                    <p className="text-sm text-gray-600 mt-1">{selectedProperty.address}</p>
+                    <h2 className="text-3xl font-bold text-gray-900">{selectedProperty.name}</h2>
+                    <p className="text-sm text-gray-600 mt-2">{selectedProperty.address}</p>
+                    <div className="flex items-center mt-2">
+                      <div className="flex text-amber-500">
+                        {[...Array(5)].map((_, i) => (
+                          <svg key={i} className="w-4 h-4 fill-current" viewBox="0 0 20 20">
+                            <path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z"/>
+                          </svg>
+                        ))}
+                      </div>
+                      <span className="ml-2 text-sm text-gray-500">(12 reviews)</span>
+                    </div>
                   </div>
                   <button
                     onClick={() => setShowDetailsModal(false)}
-                    className="text-gray-500 hover:text-gray-700 ml-4"
+                    className="text-gray-400 hover:text-gray-700 ml-4 transition-colors"
                   >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   </button>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 mb-4">
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <p className="text-sm text-gray-500">Type</p>
-                    <p className="font-medium">{selectedProperty.type || 'Residential'}</p>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                  <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                    <p className="text-xs text-gray-500 uppercase tracking-wider">Type</p>
+                    <p className="font-semibold text-gray-900">{selectedProperty.type || 'Residential'}</p>
                   </div>
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <p className="text-sm text-gray-500">Price</p>
-                    <p className="font-medium">{selectedProperty.price || 'N/A'}</p>
+                  <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                    <p className="text-xs text-gray-500 uppercase tracking-wider">Price</p>
+                    <p className="font-semibold text-gray-900 text-lg">{selectedProperty.price || 'N/A'}</p>
                   </div>
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <p className="text-sm text-gray-500">Status</p>
-                    <p className="font-medium">
-                      {selectedProperty.forRent ? 'For Rent' : selectedProperty.forSale ? 'For Sale' : 'Available'}
+                  <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                    <p className="text-xs text-gray-500 uppercase tracking-wider">Status</p>
+                    <p className="font-semibold">
+                      <span className={`px-2 py-1 rounded-full text-xs ${selectedProperty.forRent ? 'bg-blue-100 text-blue-800' : selectedProperty.forSale ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                        {selectedProperty.forRent ? 'For Rent' : selectedProperty.forSale ? 'For Sale' : 'Available'}
+                      </span>
                     </p>
                   </div>
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <p className="text-sm text-gray-500">Area</p>
-                    <p className="font-medium">{selectedProperty.area ?? selectedProperty.sqft ?? '-'}</p>
+                  <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                    <p className="text-xs text-gray-500 uppercase tracking-wider">Area</p>
+                    <p className="font-semibold text-gray-900">{selectedProperty.area ?? selectedProperty.sqft ?? '-'}</p>
                   </div>
+                </div>
+
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold mb-3 text-gray-900">Description</h3>
+                  <p className="text-gray-600 text-sm leading-relaxed">
+                    {selectedProperty.description || 'A premium property offering luxury living with modern amenities and elegant design.'}
+                  </p>
                 </div>
               </div>
             </div>
 
             {/* Inspection Checklist */}
-            <div className="mb-6">
-              <h3 className="text-lg font-semibold mb-3">Inspection Checklist</h3>
-              <div className="mb-3 flex items-center justify-between">
+            <div className="mb-8 bg-gray-50 rounded-2xl p-6 border border-gray-100">
+              <h3 className="text-xl font-semibold mb-4 text-gray-900">Inspection Checklist</h3>
+              <div className="mb-6 flex items-center justify-between">
                 <label className="flex items-center gap-3">
                   <input
                     type="checkbox"
                     checked={!!(checklistSelections['building'] > 0)}
                     onChange={() => setChecklistSelections(s => ({ ...s, building: s.building > 0 ? 0 : 1 }))}
-                    className="h-4 w-4"
+                    className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
-                  <span className="text-sm font-medium">Building: {selectedProperty.name}</span>
+                  <span className="text-sm font-medium text-gray-900">Building: {selectedProperty.name}</span>
                 </label>
                 <button
                   type="button"
                   onClick={() => setShowFloorMap(s => !s)}
-                  className="text-sm px-3 py-1 bg-gray-100 rounded hover:bg-gray-200"
+                  className="text-sm px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors font-medium"
                 >
-                  {showFloorMap ? 'Close Map' : 'Open Map'}
+                  {showFloorMap ? 'Close Map' : 'View Floor Map'}
                 </button>
               </div>
 
               {!showFloorMap && (
-                <div className="mb-3">
-                  <p className="text-sm text-gray-600 mb-2">Assets</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div className="mb-4">
+                  <p className="text-sm text-gray-700 mb-3 font-medium">Select Assets for Inspection</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {assets && assets.length > 0 ? (
                       assets.map((a) => {
                         const aid = a.id || a._id;
                         return (
-                          <label key={aid} className="flex items-center gap-3 p-2 border rounded">
+                          <label key={aid} className="flex items-start gap-3 p-4 border border-gray-200 rounded-xl bg-white hover:bg-gray-50 transition-colors cursor-pointer">
                             <input
                               type="checkbox"
                               checked={!!(checklistSelections[aid] > 0)}
                               onChange={() => setChecklistSelections(s => ({ ...s, [aid]: s[aid] > 0 ? 0 : 1 }))}
-                              className="h-4 w-4"
+                              className="h-5 w-5 mt-1 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                             />
-                            <div className="text-sm">
-                              <div className="font-medium">{a.name || aid}</div>
-                              <div className="text-xs text-gray-500">{a.type || ''}</div>
-                              <div className="text-xs text-gray-400 mt-1">
+                            <div className="flex-1">
+                              <div className="font-medium text-gray-900">{a.name || aid}</div>
+                              <div className="text-xs text-gray-500 mt-1">{a.type || ''}</div>
+                              <div className="text-xs text-gray-400 mt-2">
                                 {(() => {
                                   const info = getAssetLocationInfo(a);
                                   const blocks = (info.blocks || []).filter(Boolean);
                                   return `${info.building ? info.building + ' · ' : ''}${blocks.length ? (blocks.length === 1 ? 'Block ' + blocks[0] : 'Blocks ' + blocks.join(', ')) : ''}`;
                                 })()}
                               </div>
-                              <div className="text-xs text-gray-400 mt-1">Available: {a.quantity ?? 1}{checklistSelections[aid] > 0 ? ` · Selected: ${checklistSelections[aid]}` : ''}</div>
-                              <div className="mt-2 flex items-center gap-2">
+                              <div className="text-xs text-gray-500 mt-2">Available: {a.quantity ?? 1}{checklistSelections[aid] > 0 ? ` · Selected: ${checklistSelections[aid]}` : ''}</div>
+                              <div className="mt-3 flex items-center gap-2">
                                 <button
                                   type="button"
                                   onClick={(e) => { e.stopPropagation(); setChecklistSelections(s => { const cur = s[aid] || 0; const max = a.quantity || 1; const next = cur >= max ? 0 : cur + 1; return { ...s, [aid]: next }; }); }}
-                                  className="px-2 py-1 bg-gray-100 rounded text-xs"
+                                  className={`px-3 py-1 rounded text-xs font-medium ${checklistSelections[aid] > 0 ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'}`}
                                 >
-                                  {checklistSelections[aid] > 0 ? (checklistSelections[aid] === (a.quantity || 1) ? 'Deselect' : '+') : 'Select'}
+                                  {checklistSelections[aid] > 0 ? (checklistSelections[aid] === (a.quantity || 1) ? 'Deselect All' : 'Select More') : 'Select'}
                                 </button>
                                 { (checklistSelections[aid] > 0) && (
-                                  <div className="text-xs text-gray-600">{checklistSelections[aid]} / {a.quantity ?? 1}</div>
+                                  <div className="text-xs text-gray-600 font-medium">{checklistSelections[aid]} / {a.quantity ?? 1}</div>
                                 ) }
                               </div>
                             </div>
@@ -883,7 +949,7 @@ function PropertiesPage() {
                         );
                       })
                     ) : (
-                      <p className="text-sm text-gray-500">No assets found for this property.</p>
+                      <p className="text-sm text-gray-500 col-span-2">No assets found for this property.</p>
                     )}
                   </div>
                 </div>
@@ -894,13 +960,16 @@ function PropertiesPage() {
                   {/* Step 1: Block Selection (if no block selected) */}
                   {!selectedBlock ? (
                     <>
-                      <div className="flex items-center justify-between mb-4">
-                        <h4 className="text-lg font-semibold">Select a Block</h4>
+                      <div className="flex items-center justify-between mb-6">
+                        <h4 className="text-lg font-semibold text-gray-900">Select a Block</h4>
                         <button
                           onClick={() => setShowFloorMap(false)}
-                          className="text-sm text-gray-600 hover:text-gray-900"
+                          className="text-sm text-gray-600 hover:text-gray-900 font-medium flex items-center gap-2"
                         >
-                          ← Back to Checklist
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                          </svg>
+                          Back to Checklist
                         </button>
                       </div>
                       
@@ -912,7 +981,7 @@ function PropertiesPage() {
                       {renderBlockMap()}
 
                       {/* Action Button */}
-                      <div className="flex justify-end mt-6">
+                      <div className="flex justify-end mt-8">
                         <button
                           onClick={() => {
                             if (!selectedBlock) {
@@ -920,7 +989,7 @@ function PropertiesPage() {
                               return;
                             }
                           }}
-                          className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+                          className="px-8 py-3 bg-gray-900 hover:bg-black text-white font-medium rounded-lg transition-colors shadow-lg"
                         >
                           View Assets for Selected Block
                         </button>
@@ -929,14 +998,14 @@ function PropertiesPage() {
                   ) : (
                     /* Step 2: Asset/Seat Selection (when block is selected) */
                     <>
-                      <div className="flex items-center justify-between mb-4">
-                        <h4 className="text-lg font-semibold">Select items in {selectedBlock}</h4>
+                      <div className="flex items-center justify-between mb-6">
+                        <h4 className="text-lg font-semibold text-gray-900">Select items in Block {selectedBlock}</h4>
                         <button
                           onClick={() => {
                             setSelectedBlock(null);
                             setSelectedSeats({});
                           }}
-                          className="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1"
+                          className="text-sm text-gray-600 hover:text-gray-900 font-medium flex items-center gap-2"
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -950,9 +1019,9 @@ function PropertiesPage() {
                       </div>
 
                       {/* Show assets assigned to this block as selectable items */}
-                      <div className="bg-gray-50 p-6 rounded-xl mb-6">
+                      <div className="bg-white p-6 rounded-xl mb-6 border border-gray-200">
                         <div className="mb-4">
-                          <h5 className="font-medium text-gray-800 mb-2">Assets in Block {selectedBlock}</h5>
+                          <h5 className="font-semibold text-gray-900 mb-2">Assets in Block {selectedBlock}</h5>
                           <div className="text-sm text-gray-600">
                             {getAssetsForSelectedBlock.length} asset{getAssetsForSelectedBlock.length !== 1 ? 's' : ''} assigned to this block
                           </div>
@@ -965,7 +1034,7 @@ function PropertiesPage() {
                         {getAssetsForSelectedBlock.length === 0 && (
                           <>
                             <div className="mt-4 pt-4 border-t border-gray-300">
-                              <h5 className="font-medium text-gray-800 mb-2">Default Seating Chart</h5>
+                              <h5 className="font-semibold text-gray-900 mb-2">Default Seating Chart</h5>
                               <div className="text-sm text-gray-600 mb-4">
                                 No assets found for this block. Using default seating arrangement.
                               </div>
@@ -981,16 +1050,16 @@ function PropertiesPage() {
 
                       {/* Selected Items Summary */}
                       {Object.keys(selectedSeats).length > 0 && (
-                        <div className="bg-blue-50 p-4 rounded-lg mb-6">
-                          <h5 className="font-medium mb-2">Selected Items in {selectedBlock}:</h5>
+                        <div className="bg-blue-50 p-4 rounded-xl mb-6 border border-blue-100">
+                          <h5 className="font-semibold mb-3 text-blue-900">Selected Items in Block {selectedBlock}:</h5>
                           <div className="flex flex-wrap gap-2">
                             {Object.entries(selectedSeats).map(([itemId, item]) => (
-                              <span key={itemId} className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
+                              <span key={itemId} className="px-3 py-1.5 bg-blue-100 text-blue-800 rounded-lg text-sm font-medium">
                                 {item.assetName || 'Item'} #{item.index + 1}
                               </span>
                             ))}
                           </div>
-                          <div className="mt-2 text-sm text-blue-700">
+                          <div className="mt-3 text-sm text-blue-700 font-medium">
                             Total selected: {Object.keys(selectedSeats).length} item{Object.keys(selectedSeats).length !== 1 ? 's' : ''}
                           </div>
                         </div>
@@ -1061,9 +1130,9 @@ function PropertiesPage() {
                               setNewIssueModel(modelToOpen);
                               setShowNewIssueModal(true);
                             }}
-                            className="px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white font-medium rounded-lg transition-colors flex items-center gap-2"
+                            className="px-6 py-3 bg-orange-600 hover:bg-orange-700 text-white font-medium rounded-lg transition-colors flex items-center gap-2 shadow-lg"
                           >
-                            <span>Proceed</span>
+                            <span>Proceed to Report</span>
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                             </svg>
@@ -1075,16 +1144,17 @@ function PropertiesPage() {
                 </div>
               )}
 
-              <div className="mt-4">
+              <div className="mt-6">
                 <textarea
-                  placeholder="Description for checklist items (optional)"
+                  placeholder="Add notes or description for the inspection (optional)"
                   value={checklistDescription}
                   onChange={(e) => setChecklistDescription(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  rows="3"
                 />
               </div>
 
-              <div className="mt-3">
+              <div className="mt-6">
                 <button
                   onClick={async () => {
                     const selections = Object.keys(checklistSelections).filter(k => (checklistSelections[k] || 0) > 0);
@@ -1178,9 +1248,9 @@ function PropertiesPage() {
                     }
                   }}
                   disabled={isChecklistSubmitting}
-                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                  className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 font-medium transition-colors shadow-md"
                 >
-                  {isChecklistSubmitting ? 'Submitting...' : 'Create Issues from Checklist'}
+                  {isChecklistSubmitting ? 'Creating Issues...' : 'Create Inspection Issues'}
                 </button>
               </div>
             </div>
@@ -1191,91 +1261,100 @@ function PropertiesPage() {
                 <button
                   type="button"
                   onClick={() => setDetailsTab('issues')}
-                  className={`py-2 px-1 border-b-2 text-sm font-medium ${detailsTab === 'issues' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+                  className={`py-3 px-1 border-b-2 font-medium ${detailsTab === 'issues' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
                   Issues ({issues.length})
                 </button>
                 <button
                   type="button"
                   onClick={() => setDetailsTab('assets')}
-                  className={`py-2 px-1 border-b-2 text-sm font-medium ${detailsTab === 'assets' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+                  className={`py-3 px-1 border-b-2 font-medium ${detailsTab === 'assets' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
                   Assets ({assets.length})
                 </button>
                 <button
                   type="button"
                   onClick={() => setDetailsTab('technicians')}
-                  className={`py-2 px-1 border-b-2 text-sm font-medium ${detailsTab === 'technicians' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+                  className={`py-3 px-1 border-b-2 font-medium ${detailsTab === 'technicians' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
                   Technicians ({technicians.length})
                 </button>
               </nav>
             </div>
 
             {/* Details Tab Content */}
-            {detailsTab === 'issues' && (
-              <div className="mb-8">
-                <h3 className="text-lg font-semibold mb-4">Issues</h3>
-                <p className="text-sm text-gray-600">To report an issue, select items from the block map and click <strong>Proceed</strong>. You'll be taken to the New Issue page with the selected asset prefilled.</p>
-              </div>
-            )}
 
             {detailsTab === 'assets' && (
               <div className="mb-8">
-                <h3 className="text-lg font-semibold mb-4">Assets Assigned</h3>
+                <h3 className="text-xl font-semibold mb-4 text-gray-900">Assets Assigned</h3>
                 <div>
                   {assets.length === 0 ? (
-                    <div className="text-xs text-gray-500">No assets assigned to this property.</div>
+                    <div className="text-center py-8 bg-gray-50 rounded-xl">
+                      <p className="text-gray-500">No assets assigned to this property.</p>
+                    </div>
                   ) : (
-                    assets.map((a) => {
-                      const aid = a.id || a._id;
-                      const qty = a.quantity ?? 1;
-                      const selectedCount = checklistSelections[aid] || 0;
-                      const info = getAssetLocationInfo(a);
-                      const blocks = (info.blocks || []).filter(Boolean);
-                      return (
-                        <div key={aid} className={`p-2 mb-2 rounded border ${selectedCount > 0 ? 'bg-blue-600 text-white border-blue-700' : 'bg-white text-gray-800'}`}>
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <div className="text-sm font-medium">{a.name || aid}</div>
-                              <div className="text-xs text-gray-500">{a.type || ''}</div>
-                              <div className="text-xs text-gray-400 mt-1">
-                                {info.building ? info.building + ' · ' : ''}
-                                {blocks.length ? (blocks.length === 1 ? 'Block ' + blocks[0] : 'Blocks ' + blocks.join(', ')) : ''}
+                    <div className="space-y-3">
+                      {assets.map((a) => {
+                        const aid = a.id || a._id;
+                        const qty = a.quantity ?? 1;
+                        const selectedCount = checklistSelections[aid] || 0;
+                        const info = getAssetLocationInfo(a);
+                        const blocks = (info.blocks || []).filter(Boolean);
+                        return (
+                          <div key={aid} className={`p-4 rounded-xl border ${selectedCount > 0 ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200'}`}>
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-3">
+                                  <div className={`p-2 rounded-lg ${selectedCount > 0 ? 'bg-blue-100' : 'bg-gray-100'}`}>
+                                    <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                    </svg>
+                                  </div>
+                                  <div>
+                                    <div className="font-semibold text-gray-900">{a.name || aid}</div>
+                                    <div className="text-xs text-gray-500 mt-1">{a.type || ''}</div>
+                                    <div className="text-xs text-gray-400 mt-1">
+                                      {info.building ? info.building + ' · ' : ''}
+                                      {blocks.length ? (blocks.length === 1 ? 'Block ' + blocks[0] : 'Blocks ' + blocks.join(', ')) : ''}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-1">
+                                  {Array.from({ length: qty }).map((_, idx) => {
+                                    const sel = idx < selectedCount;
+                                    return (
+                                      <button
+                                        key={idx}
+                                        type="button"
+                                        onClick={(e) => { e.stopPropagation(); setChecklistSelections(s => { const cur = s[aid] || 0; const next = (idx < cur) ? idx : (idx + 1); return { ...s, [aid]: next }; }); }}
+                                        className={`w-7 h-7 rounded flex items-center justify-center text-xs ${sel ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+                                        aria-pressed={sel}
+                                      >
+                                        {idx + 1}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => { setEditingAsset(a); setAssetForm({ name: a.name || '', type: a.type || '', description: a.description || '', quantity: a.quantity ?? 1, building: info.building || '', blocks: (blocks || []) }); setOriginalAssetBlocks(blocks || []); }}
+                                  className="px-3 py-1.5 bg-gray-100 rounded-lg text-sm font-medium hover:bg-gray-200"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteAsset(a)}
+                                  className="px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-sm font-medium hover:bg-red-100"
+                                >
+                                  Delete
+                                </button>
                               </div>
                             </div>
-                            <div className="flex items-center gap-1">
-                              {Array.from({ length: qty }).map((_, idx) => {
-                                const sel = idx < selectedCount;
-                                return (
-                                  <button
-                                    key={idx}
-                                    type="button"
-                                    onClick={(e) => { e.stopPropagation(); setChecklistSelections(s => { const cur = s[aid] || 0; const next = (idx < cur) ? idx : (idx + 1); return { ...s, [aid]: next }; }); }}
-                                    className={`w-6 h-6 rounded flex items-center justify-center text-xs ${sel ? 'bg-white text-blue-600' : 'bg-gray-200 text-gray-700'}`}
-                                    aria-pressed={sel}
-                                  >
-                                    {sel ? '●' : '○'}
-                                  </button>
-                                );
-                              })}
-                              <button
-                                type="button"
-                                onClick={() => { setEditingAsset(a); setAssetForm({ name: a.name || '', type: a.type || '', description: a.description || '', quantity: a.quantity ?? 1, building: info.building || '', blocks: (blocks || []) }); setOriginalAssetBlocks(blocks || []); }}
-                                className="px-3 py-1 bg-gray-100 rounded text-sm ml-2"
-                              >
-                                Edit
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteAsset(a)}
-                                className="px-3 py-1 bg-red-100 text-red-700 rounded text-sm ml-2"
-                              >
-                                Delete
-                              </button>
-                            </div>
+                            <div className="mt-3 text-xs text-gray-500 font-medium">Available: {qty}{selectedCount > 0 ? ` · Selected: ${selectedCount}` : ''}</div>
                           </div>
-                          <div className="text-xs text-gray-400 mt-2">Available: {qty}{selectedCount > 0 ? ` · Selected: ${selectedCount}` : ''}</div>
-                        </div>
-                      );
-                    })
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
               </div>
@@ -1283,13 +1362,25 @@ function PropertiesPage() {
 
             {detailsTab === 'technicians' && (
               <div className="mb-8">
-                <h3 className="text-lg font-semibold mb-4">Technicians</h3>
+                <h3 className="text-xl font-semibold mb-4 text-gray-900">Available Technicians</h3>
                 {technicians.length === 0 ? (
-                  <p className="text-gray-500 text-center py-4">No technicians available for assignment.</p>
+                  <div className="text-center py-8 bg-gray-50 rounded-xl">
+                    <p className="text-gray-500">No technicians available for assignment.</p>
+                  </div>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {technicians.map(t => (
-                      <div key={t.id || t._id} className="p-3 bg-white rounded border">{t.name} — {t.phone}</div>
+                      <div key={t.id || t._id} className="p-4 bg-white rounded-xl border border-gray-200 hover:shadow-md transition-shadow">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                            <span className="font-semibold text-blue-600">{t.name?.charAt(0) || 'T'}</span>
+                          </div>
+                          <div>
+                            <div className="font-semibold text-gray-900">{t.name}</div>
+                            <div className="text-sm text-gray-500">{t.phone}</div>
+                          </div>
+                        </div>
+                      </div>
                     ))}
                   </div>
                 )}
@@ -1302,208 +1393,502 @@ function PropertiesPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Hero / Page header */}
-      <div className="relative bg-gradient-to-b from-gray-800 to-transparent text-white">
-        <div className="absolute inset-0 opacity-30 bg-[url('/hero-property.jpg')] bg-cover bg-center"></div>
-        <div className="relative max-w-7xl mx-auto px-4 py-20 text-center">
-          <p className="uppercase tracking-widest text-sm text-gray-200">Our exclusive properties</p>
-          <h1 className="mt-4 text-4xl md:text-5xl font-extrabold drop-shadow">All Properties</h1>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-rose-50">
+      {/* Enhanced Hero Section with Luxury Feel */}
+      <div className="relative bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white overflow-hidden">
+        {/* Animated background pattern */}
+        <div className="absolute inset-0 opacity-5">
+          <div className="absolute inset-0" style={{
+            backgroundImage: `radial-gradient(circle at 1px 1px, rgba(255,255,255,0.1) 1px, transparent 0)`,
+            backgroundSize: '40px 40px'
+          }}></div>
         </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-4 py-12">
-        {/* Success/Error Messages */}
-        {success && (
-          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-            <div className="flex items-center">
-              <svg className="w-5 h-5 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-              </svg>
-              <span className="text-green-700">{success}</span>
+        
+        {/* Floating decorative elements */}
+        <div className="absolute top-0 left-0 w-72 h-72 bg-gradient-to-br from-rose-500/10 to-amber-500/10 rounded-full filter blur-3xl -translate-x-1/2 -translate-y-1/2"></div>
+        <div className="absolute bottom-0 right-0 w-96 h-96 bg-gradient-to-tr from-blue-500/10 to-purple-500/10 rounded-full filter blur-3xl translate-x-1/3 translate-y-1/3"></div>
+        
+        <div className="relative z-10">
+          {/* Top Navigation Bar */}
+          <div className="border-b border-white/10">
+            <div className="max-w-7xl mx-auto px-6 py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-10">
+                  <div className="text-2xl font-serif font-light tracking-widest">MMS</div>
+                  <div className="text-sm text-gray-300 font-light tracking-wider hidden md:block">Finest</div>
+                </div>
+                
+                <nav className="hidden md:flex items-center space-x-8 text-sm font-light tracking-wide">
+                  <a href="#" className="hover:text-amber-300 transition-colors">Home</a>
+                  <a href="#" className="text-amber-300 border-b-2 border-amber-300 pb-1">Properties</a>
+                </nav>
+                
+                <div className="flex items-center space-x-4">
+                  <button onClick={() => navigate('/register')} className="text-sm px-5 py-2.5 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full transition-all border border-white/20">
+                    Sign up
+                  </button>
+                  <button onClick={() => navigate('/login')} className="text-sm px-5 py-2.5 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full transition-all border border-white/20">
+                    Sign in
+                  </button>
+                </div>
+                
+              </div>
             </div>
           </div>
-        )}
-        {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <div className="flex items-center">
-              <svg className="w-5 h-5 text-red-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-              </svg>
-              <span className="text-red-700">{error}</span>
-            </div>
-          </div>
-        )}
-
-        {/* Search + actions */}
-        <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-8">
-          <div className="flex-1">
-            <div className="relative">
-              <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              <input
-                type="text"
-                placeholder="Search properties by name, address, or type..."
-                value={searchQuery}
-                onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white"
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigate('/login')}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors duration-200"
+          
+          {/* Hero Content with Carousel */}
+          <div className="relative">
+            <div
+              onMouseEnter={() => setPaused(true)}
+              onMouseLeave={() => setPaused(false)}
+              className="relative w-full h-[70vh] min-h-[600px] overflow-hidden"
             >
-              Business
-            </button>
-          </div>
-        </div>
-
-        {/* Results count */}
-        <div className="mb-6 text-gray-600">
-          Showing {paginatedProperties.length} of {filteredProperties.length} properties
-        </div>
-
-        {/* Grid of property cards */}
-        {isLoading && properties.length === 0 ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-          </div>
-        ) : (
-          <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
-              {paginatedProperties.map((property) => {
-                const key = property.id || property._id || property.name;
-                const img = getImageUrl((Array.isArray(property.photos) && property.photos.length > 0) ? property.photos[0] : (property.image || property.photo));
-                const tag = property.forRent || property.rent ? 'RENT' : (property.forSale || property.sale ? 'BUY' : (property.type || 'BUY'));
+              {heroSlides.map((s, idx) => {
+                const isActive = idx === slideIndex;
+                const key = `slide-${idx}`;
+                const isVideo = /\.(mp4|webm)(\?.*)?$/i.test(s);
+                if (isVideo) {
+                  return (
+                    <video
+                      key={key}
+                      src={s}
+                      autoPlay
+                      muted
+                      loop
+                      playsInline
+                      className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${isActive ? 'opacity-100' : 'opacity-0'}`}
+                    />
+                  );
+                }
                 return (
                   <div
                     key={key}
-                    onClick={() => fetchPropertyDetails(property)}
-                    className="bg-white rounded-xl shadow-md overflow-hidden cursor-pointer transition transform hover:-translate-y-1 hover:shadow-xl border border-gray-100"
-                  >
-                    <div className="relative h-44 bg-gray-200">
-                      <img src={img} alt={property.name} className="w-full h-full object-cover" onError={(e) => { e.target.src = '/default-property.png'; }} />
-                      <span className="absolute top-3 left-3 bg-red-600 text-white text-xs font-bold px-3 py-1 rounded">{tag}</span>
-                      <div className="absolute top-3 right-3">
-                        <button className="p-1 bg-white rounded-full shadow hover:bg-gray-100">
-                          <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-                    <div className="p-5">
-                      <h3 className="text-xl font-bold text-gray-900 truncate">{property.name || 'Unnamed Property'}</h3>
-                      <p className="text-sm text-gray-500 mt-1 truncate">{property.address}</p>
-                      {property.price && (
-                        <div className="mt-4 text-lg font-extrabold text-gray-900">{property.price}</div>
-                      )}
-
-                      <div className="mt-6 border-t pt-4 text-gray-600 text-xs">
-                        <div className="grid grid-cols-4 gap-2 text-center">
-                          <div>
-                            <div className="text-gray-400 mb-1">Beds</div>
-                            <div className="font-bold">{property.beds ?? 4}</div>
-                          </div>
-                          <div>
-                            <div className="text-gray-400 mb-1">Wash Room</div>
-                            <div className="font-bold">{property.baths ?? 2}</div>
-                          </div>
-                          <div>
-                            <div className="text-gray-400 mb-1">Levels</div>
-                            <div className="font-bold">{property.levels ?? property.floors ?? 2}</div>
-                          </div>
-                          <div>
-                            <div className="text-gray-400 mb-1">Area</div>
-                            <div className="font-bold">{property.area ?? property.sqft ?? '1234'}</div>
-                          </div>
-                        </div>
-
-                        <div className="mt-3 grid grid-cols-4 gap-2 items-center">
-                          <div>
-                            <div className="text-gray-400 mb-1">Floors</div>
-                            <div className="font-bold">{property.floors ?? '-'}</div>
-                          </div>
-                          <div>
-                            <div className="text-gray-400 mb-1">Blocks</div>
-                            <div className="font-bold">{property.blocks ?? '-'}</div>
-                          </div>
-                          <div>
-                            <div className="text-gray-400 mb-1">Rooms</div>
-                            <div className="font-bold">{property.rooms ?? '-'}</div>
-                          </div>
-                          <div className="flex items-center justify-center">
-                            {/* <button
-                              onClick={(e) => { e.stopPropagation(); fetchPropertyDetails(property); }}
-                              className="px-3 py-1 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700"
-                            >
-                              View Details
-                            </button> */}
-                          </div>
-                        </div>
-                      </div>
-
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          fetchPropertyDetails(property);
-                        }}
-                        className="mt-4 w-full bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium py-2 rounded-lg transition-colors"
-                      >
-                        View Details
+                    style={{ backgroundImage: `url(${s})` }}
+                    className={`absolute inset-0 bg-cover bg-center transition-opacity duration-1000 ${isActive ? 'opacity-100' : 'opacity-0'}`}
+                  />
+                );
+              })}
+              
+              {/* Gradient overlay */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/40 to-transparent"></div>
+              
+              {/* Hero text content */}
+              <div className="absolute inset-0 flex items-center">
+                <div className="max-w-7xl mx-auto px-6 w-full">
+                  <div className="max-w-2xl">
+                    <h1 className="text-5xl md:text-6xl lg:text-7xl font-serif font-light leading-tight mb-6">
+                      Live Where Elegance
+                      <span className="block font-medium text-amber-300">Feels Like Home</span>
+                    </h1>
+                    <p className="text-lg text-gray-300 mb-10 max-w-xl font-light leading-relaxed">
+                      Discover a curated collection of prestigious homes, villas, and residences designed for those who appreciate elegance, comfort, and timeless value.
+                    </p>
+                    <div className="flex flex-wrap gap-4">
+                      <button className="px-8 py-3 bg-amber-500 hover:bg-amber-600 text-white font-medium rounded-full transition-all transform hover:-translate-y-0.5 shadow-lg hover:shadow-xl">
+                        Explore Properties
+                      </button>
+                      <button className="px-8 py-3 bg-transparent border-2 border-white/30 hover:border-white text-white font-medium rounded-full transition-all">
+                        Request a Private Viewing
                       </button>
                     </div>
                   </div>
-                );
-              })}
-            </div>
-
-            {/* No results message */}
-            {filteredProperties.length === 0 && !isLoading && (
-              <div className="text-center py-20">
-                <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <h3 className="text-xl font-medium text-gray-900 mb-2">No properties found</h3>
-                <p className="text-gray-600">Try adjusting your search or filter to find what you're looking for.</p>
+                </div>
               </div>
-            )}
-          </>
-        )}
-
-        {/* Pagination */}
-        {filteredProperties.length > itemsPerPage && (
-          <div className="flex items-center justify-center mt-10">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+              
+              {/* Carousel controls */}
+              <button 
+                onClick={() => setSlideIndex((slideIndex - 1 + heroSlides.length) % heroSlides.length)}
+                className="absolute left-8 top-1/2 -translate-y-1/2 w-14 h-14 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center text-white hover:bg-white/20 transition-all"
               >
-                Previous
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
               </button>
-              <span className="text-sm text-gray-600">Page {currentPage} of {totalPages}</span>
-              <button
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+              <button 
+                onClick={() => setSlideIndex((slideIndex + 1) % heroSlides.length)}
+                className="absolute right-8 top-1/2 -translate-y-1/2 w-14 h-14 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center text-white hover:bg-white/20 transition-all"
               >
-                Next
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
               </button>
+              
+              {/* Slide indicators */}
+              <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex items-center gap-3">
+                {heroSlides.map((_, i) => (
+                  <button
+                    key={`dot-${i}`}
+                    onClick={() => setSlideIndex(i)}
+                    className={`transition-all ${i === slideIndex ? 'w-12 h-1.5 bg-amber-400' : 'w-8 h-1.5 bg-white/40 hover:bg-white/60'}`}
+                  />
+                ))}
+              </div>
             </div>
           </div>
-        )}
+        </div>
+      </div>
+      
+      {/* About Section with Elegant Design */}
+      <div className="relative -mt-16 z-20">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="bg-white rounded-3xl shadow-2xl overflow-hidden border border-gray-100">
+            <div className="p-12">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 items-center">
+                <div className="lg:col-span-2">
+                  <div className="inline-flex items-center px-4 py-2 bg-amber-50 rounded-full mb-6">
+                    <span className="text-sm font-medium text-amber-700">ABOUT US</span>
+                  </div>
+                  <h2 className="text-4xl font-serif font-light text-gray-900 mb-6">
+                    Where Your Next Chapter
+                    <span className="block font-medium">Begins</span>
+                  </h2>
+                  <div className="space-y-4 text-gray-600">
+                    <p className="text-lg leading-relaxed">
+                      We specialize in Mentainance of Properties  defined by quality, exclusivity, and attention to detail. Every property we present is carefully selected for its architecture, location, and lifestyle appeal, offering more than a home, but an experience.
+                    </p>
+                    <p className="leading-relaxed">
+                      From modern city residences to serene private estates, we connect discerning Technician with spaces that reflect their success and aspirations.
+                    </p>
+                  </div>
+                  
+                  <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-6">
+                    <div className="text-center">
+                      <div className="text-3xl font-serif font-light text-gray-900 mb-2">500+</div>
+                      <div className="text-sm text-gray-500">Properties</div>
+                    </div>
+                   
+                    <div className="text-center">
+                      <div className="text-3xl font-serif font-light text-gray-900 mb-2">98%</div>
+                      <div className="text-sm text-gray-500">Client Satisfaction</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-3xl font-serif font-light text-gray-900 mb-2">50+</div>
+                      <div className="text-sm text-gray-500">Awards</div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="relative">
+                  <div className="grid grid-cols-2 gap-4">
+                    {['/build/static/media/thumb1.jpg','/build/static/media/thumb2.jpg','/build/static/media/thumb3.jpg','/build/static/media/thumb4.jpg'].map((src, i) => (
+                      <div key={i} className="relative group overflow-hidden rounded-2xl">
+                        <div className="aspect-square bg-gradient-to-br from-gray-100 to-gray-200">
+                          <div className="w-full h-full bg-gradient-to-br from-gray-200 to-gray-300 animate-pulse"></div>
+                        </div>
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="absolute -bottom-6 -left-6 w-32 h-32 bg-gradient-to-br from-amber-400 to-rose-400 rounded-full opacity-10 blur-xl"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Properties Section */}
+      <div className="py-20">
+        <div className="max-w-7xl mx-auto px-6">
+          {/* Search and Filter Section */}
+          <div className="mb-12">
+            <div className="bg-white rounded-2xl shadow-lg p-8 border border-gray-100">
+              <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+                <div className="flex-1 w-full">
+                  <div className="relative">
+                    <svg className="absolute left-5 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    <input
+                      type="text"
+                      placeholder="Search properties by name, location, or type..."
+                      value={searchQuery}
+                      onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                      className="w-full pl-14 pr-5 py-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all bg-gray-50/50"
+                    />
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-4">
+                  <button className="px-6 py-3.5 bg-gray-900 hover:bg-black text-white font-medium rounded-xl transition-all hover:-translate-y-0.5 shadow-lg hover:shadow-xl">
+                    For Business
+                  </button>
+                  <button className="px-6 py-3.5 border-2 border-gray-900 text-gray-900 hover:bg-gray-900 hover:text-white font-medium rounded-xl transition-all">
+                    Request Viewing
+                  </button>
+                </div>
+              </div>
+              
+              {/* Results count */}
+              <div className="mt-6 pt-6 border-t border-gray-100 flex items-center justify-between">
+                <div>
+                  <h3 className="text-2xl font-serif font-light text-gray-900">Featured Properties</h3>
+                  <p className="text-gray-600 mt-1">
+                    Showing <span className="font-medium text-gray-900">{paginatedProperties.length}</span> of <span className="font-medium text-gray-900">{filteredProperties.length}</span> premium properties
+                  </p>
+                </div>
+                <div className="hidden md:flex items-center gap-2">
+                  <button className="p-2.5 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
+                    </svg>
+                  </button>
+                  <button className="p-2.5 rounded-lg bg-amber-500 text-white">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Success/Error Messages */}
+          {success && (
+            <div className="mb-8 p-5 bg-gradient-to-r from-emerald-50 to-emerald-100 border border-emerald-200 rounded-2xl shadow-lg">
+              <div className="flex items-center">
+                <div className="w-10 h-10 bg-emerald-500 rounded-full flex items-center justify-center mr-4">
+                  <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <span className="text-emerald-800 font-medium">{success}</span>
+              </div>
+            </div>
+          )}
+          {error && (
+            <div className="mb-8 p-5 bg-gradient-to-r from-red-50 to-rose-100 border border-red-200 rounded-2xl shadow-lg">
+              <div className="flex items-center">
+                <div className="w-10 h-10 bg-red-500 rounded-full flex items-center justify-center mr-4">
+                  <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <span className="text-red-800 font-medium">{error}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Loading State */}
+          {isLoading && properties.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-24">
+              <div className="relative">
+                <div className="w-24 h-24 border-4 border-gray-200 rounded-full"></div>
+                <div className="absolute top-0 left-0 w-24 h-24 border-4 border-amber-500 rounded-full border-t-transparent animate-spin"></div>
+              </div>
+              <p className="mt-6 text-gray-600 text-lg">Loading premium properties...</p>
+            </div>
+          ) : (
+            <>
+              {/* Properties Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+                {paginatedProperties.map((property) => {
+                  const key = property.id || property._id || property.name;
+                  const img = getImageUrl((Array.isArray(property.photos) && property.photos.length > 0) ? property.photos[0] : (property.image || property.photo));
+                  const tag = property.forRent || property.rent ? 'RENT' : (property.forSale || property.sale ? 'SALE' : 'PREMIUM');
+                  const isForRent = property.forRent || property.rent;
+                  const tagColor = isForRent ? 'from-blue-500 to-cyan-500' : 'from-emerald-500 to-green-500';
+                  
+                  return (
+                    <div
+                      key={key}
+                      onClick={() => fetchPropertyDetails(property)}
+                      className="group cursor-pointer"
+                    >
+                      <div className="bg-white rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 border border-gray-100">
+                        {/* Property Image */}
+                        <div className="relative h-64 overflow-hidden">
+                          <img 
+                            src={img} 
+                            alt={property.name} 
+                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" 
+                            onError={(e) => { e.target.src = '/default-property.png'; }} 
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent"></div>
+                          
+                          {/* Tag */}
+                          <div className="absolute top-4 left-4">
+                            <span className={`px-4 py-1.5 text-xs font-bold text-white rounded-full bg-gradient-to-r ${tagColor} shadow-lg`}>
+                              {tag}
+                            </span>
+                          </div>
+                          
+                          {/* Action buttons */}
+                          <div className="absolute top-4 right-4 flex flex-col gap-2">
+                            <button className="p-2.5 bg-white/20 backdrop-blur-sm rounded-full hover:bg-white/30 transition-colors">
+                              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                              </svg>
+                            </button>
+                            <button className="p-2.5 bg-white/20 backdrop-blur-sm rounded-full hover:bg-white/30 transition-colors">
+                              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                              </svg>
+                            </button>
+                          </div>
+                          
+                          {/* Price */}
+                          {property.price && (
+                            <div className="absolute bottom-4 left-4">
+                              <div className="text-2xl font-bold text-white">{property.price}</div>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {/* Property Details */}
+                        <div className="p-6">
+                          <div className="mb-5">
+                            <h3 className="text-xl font-serif font-semibold text-gray-900 group-hover:text-amber-700 transition-colors truncate">
+                              {property.name || 'Luxury Property'}
+                            </h3>
+                            <p className="text-gray-600 mt-2 flex items-center text-sm">
+                              <svg className="w-4 h-4 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                              </svg>
+                              <span className="truncate">{property.address || 'Prime Location'}</span>
+                            </p>
+                          </div>
+
+                          {/* Property Features */}
+                          <div className="grid grid-cols-4 gap-4 mb-6">
+                            <div className="text-center">
+                              <div className="text-xs text-gray-500 mb-1">Beds</div>
+                              <div className="font-bold text-gray-900 text-lg">{property.beds ?? 4}</div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-xs text-gray-500 mb-1">Baths</div>
+                              <div className="font-bold text-gray-900 text-lg">{property.baths ?? 3}</div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-xs text-gray-500 mb-1">Area</div>
+                              <div className="font-bold text-gray-900 text-lg">{property.area ?? property.sqft ?? '2,500'}</div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-xs text-gray-500 mb-1">Type</div>
+                              <div className="font-bold text-gray-900 text-lg">{property.type?.split(' ')[0] || 'Villa'}</div>
+                            </div>
+                          </div>
+
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              fetchPropertyDetails(property);
+                            }}
+                            className="w-full py-3.5 bg-gradient-to-r from-gray-900 to-black text-white font-medium rounded-xl hover:shadow-xl transition-all hover:-translate-y-0.5"
+                          >
+                            View Details
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* No Results Message */}
+              {filteredProperties.length === 0 && !isLoading && (
+                <div className="text-center py-20">
+                  <div className="w-32 h-32 mx-auto mb-8 text-gray-300">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-3xl font-serif font-light text-gray-900 mb-4">No properties found</h3>
+                  <p className="text-gray-600 max-w-md mx-auto mb-8">Try adjusting your search criteria or browse our featured collections.</p>
+                  <button 
+                    onClick={() => { setSearchQuery(''); setCurrentPage(1); }}
+                    className="px-8 py-3 bg-amber-500 hover:bg-amber-600 text-white font-medium rounded-xl transition-all"
+                  >
+                    View All Properties
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Enhanced Pagination */}
+          {filteredProperties.length > itemsPerPage && (
+            <div className="flex items-center justify-center mt-16">
+              <div className="flex items-center gap-2 bg-white p-3 rounded-2xl shadow-lg border border-gray-100">
+                <button
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className={`px-5 py-3 rounded-xl font-medium transition-all ${currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-gray-100 text-gray-700 hover:bg-gray-900 hover:text-white hover:-translate-x-0.5'}`}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+                
+                <div className="flex items-center gap-2 px-4">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum;
+                    if (totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i;
+                    } else {
+                      pageNum = currentPage - 2 + i;
+                    }
+                    
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={`w-12 h-12 rounded-xl font-medium transition-all ${currentPage === pageNum ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg' : 'text-gray-700 hover:bg-gray-100 hover:scale-105'}`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                </div>
+                
+                <button
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className={`px-5 py-3 rounded-xl font-medium transition-all ${currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-gray-100 text-gray-700 hover:bg-gray-900 hover:text-white hover:translate-x-0.5'}`}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Footer Section */}
+      <div className="bg-gray-900 text-white py-12">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="flex flex-col md:flex-row items-center justify-between">
+            <div className="mb-8 md:mb-0">
+              <div className="text-2xl font-serif font-light tracking-widest mb-4">MMS</div>
+              <p className="text-gray-400">Finest</p>
+            </div>
+            <div className="flex items-center gap-8">
+              <a href="#" className="text-gray-300 hover:text-amber-300 transition-colors">Privacy Policy</a>
+              <a href="#" className="text-gray-300 hover:text-amber-300 transition-colors">Terms of Service</a>
+              <a href="#" className="text-gray-300 hover:text-amber-300 transition-colors">Contact Us</a>
+            </div>
+          </div>
+          <div className="mt-8 pt-8 border-t border-gray-800 text-center text-gray-400 text-sm">
+            © {new Date().getFullYear()} MMS.Finest. All rights reserved.
+          </div>
+        </div>
       </div>
 
       {/* Property Details Modal */}
       <PropertyDetailsModal />
+      
+      {/* New Issue Modal */}
       {showNewIssueModal && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 p-4" style={{ zIndex: 9999 }} role="dialog" aria-modal="true">
-          <div className="w-full max-w-4xl h-[90vh] bg-white rounded-xl overflow-hidden shadow-lg">
+        <div className="fixed inset-0 flex items-center justify-center bg-black/70 p-4 z-50" role="dialog" aria-modal="true">
+          <div className="w-full max-w-4xl h-[90vh] bg-white rounded-3xl overflow-hidden shadow-2xl">
             <div className="h-full overflow-y-auto">
               <NewIssue asModal={true} model={newIssueModel} onClose={(refresh) => { setShowNewIssueModal(false); setNewIssueModel(null); if (refresh) fetchPropertyDetails(selectedProperty); }} />
             </div>

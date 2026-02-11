@@ -98,6 +98,7 @@ function ClientDashboard() {
   const [properties, setProperties] = useState([]);
   const [assets, setAssets] = useState([]);
   const [internalTechnicians, setInternalTechnicians] = useState([]);
+  const [technicians, setTechnicians] = useState([]);
   const [maintenanceTemplates, setMaintenanceTemplates] = useState([]);
   const [maintenanceSchedules, setMaintenanceSchedules] = useState([]);
   const [editingProperty, setEditingProperty] = useState(null);
@@ -108,7 +109,7 @@ function ClientDashboard() {
   const [assetForm, setAssetForm] = useState({ name: '', type: '', description: '', propertyId: '', quantity: 1, building: '', blocks: [] });
   const [originalAssetBlocks, setOriginalAssetBlocks] = useState([]);
   const [editingTech, setEditingTech] = useState(null);
-  const [techForm, setTechForm] = useState({ name: '', email: '', phone: '', specialty: [], rating: 0, completed: 0, propertyId: '' });
+  const [techForm, setTechForm] = useState({ name: '', email: '', phone: '', password: '', specialty: [], rating: 0, completed: 0, propertyId: '' });
   const [editingTemplate, setEditingTemplate] = useState(null);
   const [templateForm, setTemplateForm] = useState({ name: '', type: '', frequency: '' });
   const [editingSchedule, setEditingSchedule] = useState(null);
@@ -119,6 +120,9 @@ function ClientDashboard() {
   const [showSchedulesInTemplates, setShowSchedulesInTemplates] = useState(false);
   const [issues, setIssues] = useState([]);
   const [allIssues, setAllIssues] = useState([]);
+  const [issuesByProperty, setIssuesByProperty] = useState({});
+  const [selectedTechs, setSelectedTechs] = useState({});
+  const [assignLoading, setAssignLoading] = useState({});
   const [statusCounts, setStatusCounts] = useState({
     Pending: 0,
     "In Progress": 0,
@@ -144,7 +148,6 @@ function ClientDashboard() {
   const [feedbacks, setFeedbacks] = useState([]);
   const [userName, setUserName] = useState("");
   const [currentUser, setCurrentUser] = useState(null);
-  const [showApprovedOnly, setShowApprovedOnly] = useState(false);
   const [loading, setLoading] = useState({
     properties: false,
     assets: false,
@@ -159,177 +162,316 @@ function ClientDashboard() {
   });
   const navigate = useNavigate();
 
+  // Helper to extract id strings from different shapes returned by the API
+  const extractId = (val) => {
+    if (!val && val !== 0) return null;
+    if (typeof val === 'string') return val;
+    if (typeof val === 'number') return String(val);
+    if (typeof val === 'object') {
+      // common fields
+      if (val.id) return val.id;
+      if (val._id) return val._id;
+      if (val.$oid) return val.$oid;
+      if (val.$id) return val.$id;
+      // nested object like { property: { id: '...' } }
+      if (val.property && (val.property.id || val.property._id)) return val.property.id || val.property._id;
+      try {
+        // fallback: if it's an ObjectId-like from some serializers
+        if (typeof val.toString === 'function') {
+          const s = val.toString();
+          if (s && s !== '[object Object]') return s;
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+    return null;
+  };
+
   useEffect(() => {
-    const storedUser = localStorage.getItem("user");
-    const token = localStorage.getItem("token");
-    if (!storedUser || !token) {
-      navigate("/login");
-      return;
-    }
-    const userObj = JSON.parse(storedUser);
-    setUserName(userObj.name || "");
-    setCurrentUser(userObj);
-    axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-    
-    async function fetchIssues() {
-      try {
-        const res = await axios.get('http://localhost:5000/api/issues');
-        setIssues(res.data || []);
-        setAllIssues(res.data || []);
-        const counts = { Pending: 0, "In Progress": 0, Completed: 0, Overdue: 0 };
-        (res.data || []).forEach(issue => {
-          const status = issue.status.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase()).replace('Complete', 'Completed');
-          if (counts[status] !== undefined) counts[status]++;
-        });
-        setStatusCounts(counts);
-      } catch (err) {
-        setIssues([]);
-        setStatusCounts({
-          Pending: 0,
-          "In Progress": 0,
-          Completed: 0,
-          Overdue: 0,
-        });
+    (async () => {
+      const storedUser = localStorage.getItem("user");
+      const token = localStorage.getItem("token");
+      if (!storedUser || !token) {
+        navigate("/login");
+        return;
       }
-    }
+      const userObj = JSON.parse(storedUser);
+      setUserName(userObj.name || "");
+      setCurrentUser(userObj);
+      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
 
-    async function fetchEntities() {
-      setLoading(l => ({ ...l, properties: true, assets: true, internalTechnicians: true, maintenanceTemplates: true }));
-      setErrors(e => ({ ...e, properties: '', assets: '', internalTechnicians: '', maintenanceTemplates: '' }));
-      
-      try {
-        const propRes = await axios.get('http://localhost:5000/api/properties');
-        setProperties(propRes.data || []);
-      } catch (err) {
-        setProperties([]);
-        setErrors(e => ({ ...e, properties: err?.response?.data?.message || err.message || 'Failed to fetch properties' }));
-      } finally {
-        setLoading(l => ({ ...l, properties: false }));
-      }
-      
-      try {
-        const assetRes = await axios.get('http://localhost:5000/api/assets');
-        setAssets(assetRes.data || []);
-      } catch (err) {
-        setAssets([]);
-        setErrors(e => ({ ...e, assets: err?.response?.data?.message || err.message || 'Failed to fetch assets' }));
-      } finally {
-        setLoading(l => ({ ...l, assets: false }));
-      }
-      
-      try {
-        const techRes = await axios.get('http://localhost:5000/api/internal-technicians');
-        setInternalTechnicians(techRes.data || []);
-      } catch (err) {
-        setInternalTechnicians([]);
-        setErrors(e => ({ ...e, internalTechnicians: err?.response?.data?.message || err.message || 'Failed to fetch internal technicians' }));
-      } finally {
-        setLoading(l => ({ ...l, internalTechnicians: false }));
-      }
-      
-      try {
-        const tmplRes = await axios.get('http://localhost:5000/api/maintenance-templates');
-        setMaintenanceTemplates(tmplRes.data || []);
-      } catch (err) {
-        setMaintenanceTemplates([]);
-        setErrors(e => ({ ...e, maintenanceTemplates: err?.response?.data?.message || err.message || 'Failed to fetch maintenance templates' }));
-      } finally {
-        setLoading(l => ({ ...l, maintenanceTemplates: false }));
-      }
-      
-      try {
-        const schedRes = await axios.get('http://localhost:5000/api/maintenance-schedules');
-        setMaintenanceSchedules(schedRes.data || []);
-        
-        // Compute upcoming reminders within next 24 hours
-        const now = new Date();
-        const cutoff = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-        const upcoming = (schedRes.data || []).filter(s => 
-          s && s.routine && s.nextDate && 
-          new Date(s.nextDate) <= cutoff && 
-          (!s.lastReminder || new Date(s.lastReminder) < new Date(s.nextDate))
-        );
-        setReminders(upcoming);
-        
-        // Compute maintenance counts for dashboard
-        const counts = { Preventive: 0, Routine: 0, Pending: 0, 'In Progress': 0, Completed: 0, Overdue: 0 };
-        const nowC = new Date();
-        
-        // Routine counts come from schedules
-        (schedRes.data || []).forEach(s => {
-          if (!s) return;
-          if (s.routine) counts.Routine++;
-          const next = s.nextDate ? new Date(s.nextDate) : null;
-          
-          if (next && next < nowC && !(s.status && s.status.toLowerCase().includes('complete'))) {
-            counts.Overdue++;
-            return;
-          }
-          
-          const st = (s.status || '').toLowerCase();
-          if (st.includes('complete')) counts.Completed++;
-          else if (st.includes('in progress') || st.includes('in_progress')) counts['In Progress']++;
-          else counts.Pending++;
-        });
+      async function fetchEntities() {
+        setLoading(l => ({ ...l, properties: true, assets: true, internalTechnicians: true, maintenanceTemplates: true }));
+        setErrors(e => ({ ...e, properties: '', assets: '', internalTechnicians: '', maintenanceTemplates: '' }));
 
-        // Preventive counts come from issues
-        const matches = (schedRes.data || []).filter(issue => {
-          if (!issue) return false;
-          const title = (issue.title || '').toLowerCase();
-          const rawTags = Array.isArray(issue.tags) ? issue.tags : [];
-          const tags = rawTags.map(t => {
-            if (!t) return '';
-            if (typeof t === 'string') return String(t).toLowerCase();
-            if (typeof t === 'object' && t.label) return String(t.label).toLowerCase();
-            return String(t).toLowerCase();
-          });
-          const issueType = String(issue.issueType || issue.type || issue.category || '').toLowerCase();
-          
-          if (tags.includes('preventive')) return true;
-          if (issueType === 'preventive') return true;
-          if (title.includes('preventive')) return true;
-          return false;
-        });
-        
-        counts.Preventive = matches.length;
-        setPreventiveMatches(matches.slice(0, 20));
-        setMaintenanceCounts(counts);
-        
-        // Send email reminders for upcoming items
-        (async function sendEmails() {
-          for (const s of upcoming) {
-            const id = s._id || s.id;
-            if (!id) continue;
+        try {
+          const propRes = await axios.get('http://localhost:5000/api/properties');
+          const propertiesData = propRes.data || [];
+
+          setProperties(propertiesData);
+          // If client user, fetch internal technicians per-property (client should only see their property's staff)
+          if (userObj && userObj.role === 'client' && propertiesData.length) {
             try {
-              await axios.post(`http://localhost:5000/api/maintenance-schedules/${id}/emailReminder`);
+              const techPromises = propertiesData.map(p => {
+                const pid = p.id || p._id || p._oid || p.$oid;
+                return axios.get(`${backendBase}/api/internal-technicians/by-property/${pid}`);
+              });
+              const settled = await Promise.allSettled(techPromises);
+              let combined = [];
+              settled.forEach(r => {
+                if (r.status === 'fulfilled' && Array.isArray(r.value.data)) combined = combined.concat(r.value.data);
+              });
+              if (combined.length) {
+
+                setInternalTechnicians(combined);
+              }
+              // Also fetch assets for these properties so client only sees their assets
+              try {
+                const assetPromises = propertiesData.map(p => {
+                  const pid = p.id || p._id || p._oid || p.$oid;
+                  return axios.get(`${backendBase}/api/assets?propertyId=${pid}`);
+                });
+                const settledAssets = await Promise.allSettled(assetPromises);
+                let combinedAssets = [];
+                settledAssets.forEach(r => {
+                  if (r.status === 'fulfilled' && Array.isArray(r.value.data)) combinedAssets = combinedAssets.concat(r.value.data);
+                });
+                if (combinedAssets.length) {
+                  setAssets(combinedAssets);
+                }
+              } catch (assetErr) {
+                console.error('Failed to fetch assets per property for client', assetErr);
+              }
             } catch (e) {
-              console.error('Failed to send email for schedule', id, e?.message || e);
+              console.error('Failed to fetch internal technicians per property for client', e);
             }
           }
-          
-          // Refresh schedules after emails
-          try {
-            const refreshed = await axios.get('http://localhost:5000/api/maintenance-schedules');
-            setMaintenanceSchedules(refreshed.data || []);
-            const now2 = new Date();
-            const cutoff2 = new Date(now2.getTime() + 24 * 60 * 60 * 1000);
-            const upcoming2 = (refreshed.data || []).filter(s => 
-              s && s.routine && s.nextDate && 
-              new Date(s.nextDate) <= cutoff2 && 
-              (!s.lastReminder || new Date(s.lastReminder) < new Date(s.nextDate))
-            );
-            setReminders(upcoming2);
-          } catch (e) {
-            // ignore
+          return propertiesData;
+        } catch (err) {
+          setProperties([]);
+          setErrors(e => ({ ...e, properties: err?.response?.data?.message || err.message || 'Failed to fetch properties' }));
+          return [];
+        } finally {
+          setLoading(l => ({ ...l, properties: false }));
+        }
+
+        try {
+          // Do not overwrite per-property assets for client users — those were
+          // fetched per-property inside `fetchEntities` above. Only fetch the
+          // global assets list for non-client roles.
+          if (!(userObj && userObj.role === 'client')) {
+            const assetRes = await axios.get('http://localhost:5000/api/assets');
+            setAssets(assetRes.data || []);
           }
-        })();
-      } catch (err) {
-        setMaintenanceSchedules([]);
+        } catch (err) {
+          if (!(userObj && userObj.role === 'client')) {
+            setAssets([]);
+            setErrors(e => ({ ...e, assets: err?.response?.data?.message || err.message || 'Failed to fetch assets' }));
+          }
+        } finally {
+          setLoading(l => ({ ...l, assets: false }));
+        }
+
+        try {
+          // If client user we already attempted to fetch internal technicians per-property above.
+          if (!(userObj && userObj.role === 'client')) {
+            const techRes = await axios.get('http://localhost:5000/api/internal-technicians');
+
+            setInternalTechnicians(techRes.data || []);
+          }
+        } catch (err) {
+          setInternalTechnicians([]);
+          setErrors(e => ({ ...e, internalTechnicians: err?.response?.data?.message || err.message || 'Failed to fetch internal technicians' }));
+        } finally {
+          setLoading(l => ({ ...l, internalTechnicians: false }));
+        }
+        // fetch technicians: admin/manager get minimal assign list; clients get public list for their property
+        try {
+          if (userObj && (userObj.role === 'manager' || userObj.role === 'admin')) {
+            const assignRes = await axios.get(`${backendBase}/api/technicians/for-assignment`);
+            setTechnicians(assignRes.data || []);
+          } else {
+            // clients and other roles: fetch public list of technicians so clients can request assignment
+            const allTechRes = await axios.get(`${backendBase}/api/technicians`);
+            setTechnicians(allTechRes.data || []);
+          }
+        } catch (e) {
+          setTechnicians([]);
+        }
+
+        try {
+          const tmplRes = await axios.get('http://localhost:5000/api/maintenance-templates');
+          setMaintenanceTemplates(tmplRes.data || []);
+        } catch (err) {
+          setMaintenanceTemplates([]);
+          setErrors(e => ({ ...e, maintenanceTemplates: err?.response?.data?.message || err.message || 'Failed to fetch maintenance templates' }));
+        } finally {
+          setLoading(l => ({ ...l, maintenanceTemplates: false }));
+        }
+
+        try {
+          const schedRes = await axios.get('http://localhost:5000/api/maintenance-schedules');
+          setMaintenanceSchedules(schedRes.data || []);
+
+          // Compute upcoming reminders within next 24 hours
+          const now = new Date();
+          const cutoff = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+          const upcoming = (schedRes.data || []).filter(s =>
+            s && s.routine && s.nextDate &&
+            new Date(s.nextDate) <= cutoff &&
+            (!s.lastReminder || new Date(s.lastReminder) < new Date(s.nextDate))
+          );
+          setReminders(upcoming);
+
+          // Compute maintenance counts for dashboard
+          const counts = { Preventive: 0, Routine: 0, Pending: 0, 'In Progress': 0, Completed: 0, Overdue: 0 };
+          const nowC = new Date();
+
+          // Routine counts come from schedules
+          (schedRes.data || []).forEach(s => {
+            if (!s) return;
+            if (s.routine) counts.Routine++;
+            const next = s.nextDate ? new Date(s.nextDate) : null;
+
+            if (next && next < nowC && !(s.status && s.status.toLowerCase().includes('complete'))) {
+              counts.Overdue++;
+              return;
+            }
+
+            const st = (s.status || '').toLowerCase();
+            if (st.includes('complete')) counts.Completed++;
+            else if (st.includes('in progress') || st.includes('in_progress')) counts['In Progress']++;
+            else counts.Pending++;
+          });
+
+          // Preventive counts come from issues
+          const matches = (schedRes.data || []).filter(issue => {
+            if (!issue) return false;
+            const title = (issue.title || '').toLowerCase();
+            const rawTags = Array.isArray(issue.tags) ? issue.tags : [];
+            const tags = rawTags.map(t => {
+              if (!t) return '';
+              if (typeof t === 'string') return String(t).toLowerCase();
+              if (typeof t === 'object' && t.label) return String(t.label).toLowerCase();
+              return String(t).toLowerCase();
+            });
+            const issueType = String(issue.issueType || issue.type || issue.category || '').toLowerCase();
+
+            if (tags.includes('preventive')) return true;
+            if (issueType === 'preventive') return true;
+            if (title.includes('preventive')) return true;
+            return false;
+          });
+
+          counts.Preventive = matches.length;
+          setPreventiveMatches(matches.slice(0, 20));
+          setMaintenanceCounts(counts);
+
+          // Send email reminders for upcoming items
+          (async function sendEmails() {
+            for (const s of upcoming) {
+              const id = s._id || s.id;
+              if (!id) continue;
+              try {
+                await axios.post(`http://localhost:5000/api/maintenance-schedules/${id}/emailReminder`);
+              } catch (e) {
+                console.error('Failed to send email for schedule', id, e?.message || e);
+              }
+            }
+
+            // Refresh schedules after emails
+            try {
+              const refreshed = await axios.get('http://localhost:5000/api/maintenance-schedules');
+              setMaintenanceSchedules(refreshed.data || []);
+              const now2 = new Date();
+              const cutoff2 = new Date(now2.getTime() + 24 * 60 * 60 * 1000);
+              const upcoming2 = (refreshed.data || []).filter(s =>
+                s && s.routine && s.nextDate &&
+                new Date(s.nextDate) <= cutoff2 &&
+                (!s.lastReminder || new Date(s.lastReminder) < new Date(s.nextDate))
+              );
+              setReminders(upcoming2);
+            } catch (e) {
+              // ignore
+            }
+          })();
+        } catch (err) {
+          setMaintenanceSchedules([]);
+        }
       }
-    }
-    
-    fetchIssues();
-    fetchEntities();
+
+      // Fetch entities (properties, assets, etc.) first so property-scoped issue queries
+      // can be executed for client users (to surface anonymous property issues).
+      const fetchedProps = await fetchEntities();
+
+      let filteredProps = fetchedProps;
+      // If the logged-in user is a client, attempt to narrow the properties list
+      // to those owned/linked to this client when such ownership fields exist
+      // (ownerId, userId, clientId, client, owner or nested `user`). This helps
+      // ensure clients only see their own properties even when the API returns
+      // all properties.
+      try {
+        if (userObj && userObj.role === 'client') {
+          const uid = userObj.id || userObj._id || userObj.userId;
+          if (uid && Array.isArray(fetchedProps) && fetchedProps.length) {
+            filteredProps = (fetchedProps || []).filter(p => {
+              const owner = p.ownerId || p.userId || p.clientId || p.client || p.owner || (p.user && (p.user.id || p.user._id));
+              if (!owner) return false;
+              return String(owner) === String(uid);
+            });
+
+            if (filteredProps.length) setProperties(filteredProps);
+          }
+        }
+      } catch (e) {
+        // non-fatal: keep whatever properties were loaded
+      }
+
+      async function fetchIssues() {
+        try {
+          // Fetch issues (backend now handles filtering for clients)
+          const res = await axios.get(`${backendBase}/api/issues`, {
+            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+          });
+          const fetched = res.data || [];
+
+          // Group issues by propertyId for the UI
+          const issuesByProp = {};
+          fetched.forEach(issue => {
+            const pid = extractId(issue.propertyId);
+            if (pid) {
+              if (!issuesByProp[pid]) issuesByProp[pid] = [];
+              issuesByProp[pid].push(issue);
+            }
+          });
+
+          // Sort issues for each property by most recent first
+          Object.keys(issuesByProp).forEach(pid => {
+            issuesByProp[pid] = issuesByProp[pid].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+          });
+
+          setIssues(fetched);
+          setAllIssues(fetched);
+          setIssuesByProperty(issuesByProp);
+
+          // Count issues by status
+          const counts = { Pending: 0, "In Progress": 0, Completed: 0, Overdue: 0 };
+          fetched.forEach(issue => {
+            const status = (issue.status || '').replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase()).replace('Complete', 'Completed');
+            if (counts[status] !== undefined) counts[status]++;
+          });
+          setStatusCounts(counts);
+        } catch (err) {
+          console.error('Error fetching issues:', err);
+          setIssues([]);
+          setAllIssues([]);
+          setStatusCounts({ Pending: 0, "In Progress": 0, Completed: 0, Overdue: 0 });
+        }
+      }
+
+      await fetchIssues();
+    })();
   }, [navigate]);
 
   async function approveIssue(issueId) {
@@ -362,6 +504,53 @@ function ClientDashboard() {
     }
   }
 
+  async function resubmitIssue(issueId) {
+    try {
+      await axios.post(`http://localhost:5000/api/issues/${issueId}/resubmit`);
+      // refresh issues
+      const res = await axios.get('http://localhost:5000/api/issues');
+      setIssues(res.data || []);
+      setAllIssues(res.data || []);
+    } catch (e) {
+      console.error('Resubmit failed', e);
+      alert('Failed to resubmit issue');
+    }
+  }
+
+  async function assignInternal(issueId, internalTechId) {
+    try {
+      if (!internalTechId) return;
+      setAssignLoading(s => ({ ...s, [issueId]: true }));
+      await axios.post(`http://localhost:5000/api/issues/${issueId}/assign-internal`, { internalTechId });
+      // refresh issues
+      const res = await axios.get('http://localhost:5000/api/issues');
+      setIssues(res.data || []);
+      setAllIssues(res.data || []);
+      setAssignLoading(s => ({ ...s, [issueId]: false }));
+    } catch (e) {
+      setAssignLoading(s => ({ ...s, [issueId]: false }));
+      console.error('Assign internal failed', e);
+      alert('Failed to assign internal technician');
+    }
+  }
+
+  async function assignToTech(issueId, techId) {
+    try {
+      if (!techId) return;
+      setAssignLoading(s => ({ ...s, [issueId]: true }));
+      await axios.post(`http://localhost:5000/api/issues/${issueId}/assign`, { techId });
+      // refresh issues
+      const res = await axios.get('http://localhost:5000/api/issues');
+      setIssues(res.data || []);
+      setAllIssues(res.data || []);
+      setAssignLoading(s => ({ ...s, [issueId]: false }));
+    } catch (e) {
+      setAssignLoading(s => ({ ...s, [issueId]: false }));
+      console.error('Assign to technician failed', e);
+      alert('Failed to assign technician');
+    }
+  }
+
   useEffect(() => {
     // Combine issue counts and maintenance counts for shared status cards
     setCombinedCounts({
@@ -383,13 +572,13 @@ function ClientDashboard() {
       const stored = localStorage.getItem('user');
       let userId = null;
       try { userId = stored ? JSON.parse(stored).id || JSON.parse(stored)._id : null; } catch (e) { userId = null; }
-      
+
       for (const s of reminders) {
         const id = s._id || s.id;
         if (!id) continue;
         await axios.post(`http://localhost:5000/api/maintenance-schedules/${id}/dismiss`, { userId });
       }
-      
+
       const schedRes = await axios.get('http://localhost:5000/api/maintenance-schedules');
       setMaintenanceSchedules(schedRes.data || []);
       setReminders([]);
@@ -403,13 +592,13 @@ function ClientDashboard() {
       const stored = localStorage.getItem('user');
       let userId = null;
       try { userId = stored ? JSON.parse(stored).id || JSON.parse(stored)._id : null; } catch (e) { userId = null; }
-      
+
       for (const s of reminders) {
         const id = s._id || s.id;
         if (!id) continue;
         await axios.post(`http://localhost:5000/api/maintenance-schedules/${id}/snooze`, { minutes, userId });
       }
-      
+
       const schedRes = await axios.get('http://localhost:5000/api/maintenance-schedules');
       setMaintenanceSchedules(schedRes.data || []);
       setReminders([]);
@@ -423,10 +612,10 @@ function ClientDashboard() {
       const stored = localStorage.getItem('user');
       let userId = null;
       try { userId = stored ? JSON.parse(stored).id || JSON.parse(stored)._id : null; } catch (e) { userId = null; }
-      
+
       await axios.post(`http://localhost:5000/api/maintenance-schedules/${id}/dismiss`, { userId });
       setReminders(r => r.filter(x => (x._id || x.id) !== id));
-      axios.get('http://localhost:5000/api/maintenance-schedules').then(res => setMaintenanceSchedules(res.data || [])).catch(() => {});
+      axios.get('http://localhost:5000/api/maintenance-schedules').then(res => setMaintenanceSchedules(res.data || [])).catch(() => { });
     } catch (e) {
       console.error('Failed to dismiss reminder', e);
     }
@@ -437,10 +626,10 @@ function ClientDashboard() {
       const stored = localStorage.getItem('user');
       let userId = null;
       try { userId = stored ? JSON.parse(stored).id || JSON.parse(stored)._id : null; } catch (e) { userId = null; }
-      
+
       await axios.post(`http://localhost:5000/api/maintenance-schedules/${id}/snooze`, { minutes, userId });
       setReminders(r => r.filter(x => (x._id || x.id) !== id));
-      axios.get('http://localhost:5000/api/maintenance-schedules').then(res => setMaintenanceSchedules(res.data || [])).catch(() => {});
+      axios.get('http://localhost:5000/api/maintenance-schedules').then(res => setMaintenanceSchedules(res.data || [])).catch(() => { });
     } catch (e) {
       console.error('Failed to snooze reminder', e);
     }
@@ -477,7 +666,7 @@ function ClientDashboard() {
             </svg>
             Dashboard
           </button>
-          
+
           <button
             className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-blue-800 text-white font-semibold transition"
             onClick={() => navigate("/issues")}
@@ -488,28 +677,54 @@ function ClientDashboard() {
             </svg>
             All Issues
           </button>
-          
           <button
+            onClick={async () => {
+              try {
+                const { jsPDF } = await import('jspdf');
+                const doc = new jsPDF();
+                const left = 14;
+                let y = 20;
+                doc.setFontSize(16);
+                doc.text('Issues Report', left, 16);
+                doc.setFontSize(11);
+                if (!issues || issues.length === 0) {
+                  doc.text('No issues to export.', left, y);
+                } else {
+                  issues.forEach((issue, idx) => {
+                    const title = `${idx + 1}. ${issue.title || 'Untitled'}`;
+                    doc.text(title, left, y);
+                    y += 7;
+                    const meta = `Status: ${issue.status || 'N/A'}  |  Location: ${issue.location || issue.address || 'N/A'}`;
+                    doc.text(meta, left, y);
+                    y += 6;
+                    const desc = (issue.description || '').toString();
+                    const split = doc.splitTextToSize(desc, 180);
+                    doc.text(split, left, y);
+                    y += split.length * 6 + 8;
+                    if (y > 270) { doc.addPage(); y = 20; }
+                  });
+                }
+                doc.save('issues-report.pdf');
+              } catch (err) {
+                console.error('PDF export failed', err);
+                alert('Failed to export PDF: ' + (err?.message || err));
+              }
+            }}
             className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-blue-800 text-white font-semibold transition"
-            onClick={() => navigate("/new-issue")}
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="12" r="9" fill="#fbbf24" />
-              <path d="M12 8v4l3 3" stroke="#1e40af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            New Issue
+            Export PDF
           </button>
-          
+
           <button
             className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-green-700 text-white font-semibold border border-green-500 transition"
             onClick={() => navigate("/feedback")}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-              <path d="M2 12a10 10 0 1 0 20 0A10 10 0 0 0 2 12Zm6-1 2 2 4-4" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M2 12a10 10 0 1 0 20 0A10 10 0 0 0 2 12Zm6-1 2 2 4-4" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
             Feedback
           </button>
-          
+
           <button
             onClick={handleLogout}
             className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-semibold"
@@ -533,7 +748,7 @@ function ClientDashboard() {
               </button>
             </div>
             <p className="text-sm mb-3 text-blue-100">You have {reminders.length} routine maintenance items due within 24 hours.</p>
-            
+
             <div className="space-y-2 max-h-56 overflow-auto">
               {reminders.map((r) => {
                 const id = r._id || r.id;
@@ -563,7 +778,7 @@ function ClientDashboard() {
                 );
               })}
             </div>
-            
+
             <div className="mt-3 flex gap-2 items-center">
               <button
                 className="px-3 py-1 bg-blue-700 text-white text-sm rounded hover:bg-blue-600 transition"
@@ -584,7 +799,7 @@ function ClientDashboard() {
                 {showAdminPanel ? 'Close Alerts' : 'Alerts View'}
               </button>
             </div>
-            
+
             {showAdminPanel && (
               <div className="mt-3 bg-blue-900 p-3 rounded max-h-64 overflow-auto">
                 <p className="font-semibold mb-2 text-white">Alerts: Snoozed / Dismissed Schedules</p>
@@ -606,13 +821,13 @@ function ClientDashboard() {
                         <div className="flex flex-col gap-2">
                           <button
                             className="px-2 py-1 bg-blue-700 rounded text-sm hover:bg-blue-600 transition text-white"
-                            onClick={() => {/* Add clear snooze function */}}
+                            onClick={() => {/* Add clear snooze function */ }}
                           >
                             Clear Snooze
                           </button>
                           <button
                             className="px-2 py-1 bg-blue-700 rounded text-sm hover:bg-blue-600 transition text-white"
-                            onClick={() => {/* Add clear dismissals function */}}
+                            onClick={() => {/* Add clear dismissals function */ }}
                           >
                             Clear Dismissals
                           </button>
@@ -626,7 +841,6 @@ function ClientDashboard() {
           </div>
         </div>
       )}
-
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 py-6">
         {/* Welcome Banner - Dark Blue Gradient */}
@@ -650,55 +864,7 @@ function ClientDashboard() {
           </div>
         </div>
 
-        {/* Status Cards - Dark Blue Theme */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
-          {statusCards.map((card) => (
-            <div
-              className={`rounded-xl border shadow-sm flex flex-col p-5 ${card.bgClass} transition hover:shadow-md hover:scale-105 transform duration-200`}
-              key={card.label}
-            >
-              <div className="flex items-center justify-between mb-2">
-                <span className={`text-lg font-semibold ${card.colorClass}`}>
-                  {card.label}
-                </span>
-                {card.icon}
-              </div>
-              <span className={`text-3xl font-bold ${card.colorClass}`}>
-                {combinedCounts[card.label] !== undefined
-                  ? combinedCounts[card.label]
-                  : maintenanceCounts[card.label] !== undefined
-                  ? maintenanceCounts[card.label]
-                  : statusCounts[card.label] || 0}
-              </span>
-              
-              {card.label === 'Preventive' && (
-                <div className="mt-3">
-                  <button
-                    className="text-sm underline hover:no-underline text-blue-300"
-                    onClick={() => setShowPreventiveDetails(!showPreventiveDetails)}
-                  >
-                    {showPreventiveDetails ? 'Hide Details' : 'Show Details'}
-                  </button>
-                  {showPreventiveDetails && (
-                    <div className="mt-2 bg-blue-800 text-white p-2 rounded max-h-40 overflow-auto text-xs">
-                      {preventiveMatches.length === 0 ? (
-                        <div>No preventive issues found.</div>
-                      ) : (
-                        <ul className="space-y-1">
-                          {preventiveMatches.map(it => (
-                            <li key={it.id || it._id} className="truncate">
-                              {it.title || 'Untitled'}
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
+        {/* Property Issue Cards - Removed as per user request */}
 
         {/* Tabs Navigation - Dark Blue Theme */}
         <div className="bg-white rounded-xl shadow mb-6 border border-blue-100">
@@ -706,11 +872,10 @@ function ClientDashboard() {
             {['dashboard', 'properties', 'assets', 'internalTechnicians', 'maintenanceTemplates'].map((tab) => (
               <button
                 key={tab}
-                className={`px-6 py-3 font-medium whitespace-nowrap ${
-                  activeTab === tab
-                    ? 'border-b-2 border-blue-600 text-blue-600'
-                    : 'text-gray-600 hover:text-blue-600'
-                }`}
+                className={`px-6 py-3 font-medium whitespace-nowrap ${activeTab === tab
+                  ? 'border-b-2 border-blue-600 text-blue-600'
+                  : 'text-gray-600 hover:text-blue-600'
+                  }`}
                 onClick={() => setActiveTab(tab)}
               >
                 {tab.charAt(0).toUpperCase() + tab.slice(1)}
@@ -726,15 +891,7 @@ function ClientDashboard() {
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold text-gray-800">Recent Issues</h2>
                 <div className="flex items-center gap-3">
-                  <label className="text-sm text-gray-600 flex items-center gap-2">
-                    <input 
-                      type="checkbox" 
-                      checked={showApprovedOnly} 
-                      onChange={e => setShowApprovedOnly(e.target.checked)}
-                      className="rounded text-blue-600 focus:ring-blue-500"
-                    />
-                    <span>Show approved only</span>
-                  </label>
+
                   <button
                     onClick={() => navigate("/issues")}
                     className="text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1"
@@ -746,7 +903,7 @@ function ClientDashboard() {
                   </button>
                 </div>
               </div>
-              
+
               {issues.length === 0 ? (
                 <div className="text-center py-12 text-gray-500">
                   <svg className="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -756,11 +913,12 @@ function ClientDashboard() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {( (showApprovedOnly ? issues.filter(i => i && (i.approved || (i.status && String(i.status).toUpperCase() === 'APPROVED'))) : issues) ).slice(0, 5).map((issue) => (
+                  {issues.slice(0, 5).map((issue) => (
                     <div
                       key={issue.id || issue._id}
                       className="border rounded-lg p-4 hover:shadow-md transition-shadow border-blue-100"
                     >
+
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-2">
@@ -768,7 +926,7 @@ function ClientDashboard() {
                             <h3 className="font-semibold text-gray-900">{issue.title}</h3>
                           </div>
                           <p className="text-gray-600 text-sm mb-3">{issue.location}</p>
-                          
+
                           {issue.photo || issue.image ? (
                             <img
                               src={imageSrc(issue.photo || issue.image)}
@@ -780,15 +938,15 @@ function ClientDashboard() {
                               }}
                             />
                           ) : null}
-                          
+
                           <div className="flex flex-wrap gap-2 mb-2">
                             {Array.isArray(issue.tags) &&
                               issue.tags
                                 .filter(tag => !["PENDING", "IN PROGRESS", "COMPLETE", "OVERDUE"].includes(tag))
                                 .map((tag, i) => {
                                   const label = tag.label || tag;
-                                  const colorClass = label === "URGENT" 
-                                    ? "bg-red-100 text-red-700 border border-red-200" 
+                                  const colorClass = label === "URGENT"
+                                    ? "bg-red-100 text-red-700 border border-red-200"
                                     : "bg-blue-50 text-blue-700 border border-blue-100";
                                   return (
                                     <span
@@ -799,20 +957,19 @@ function ClientDashboard() {
                                     </span>
                                   );
                                 })}
-                            
+
                             {issue.status && (
                               <span
-                                className={`px-2 py-1 text-xs rounded font-medium border ${
-                                  issue.status === "IN PROGRESS"
-                                    ? "bg-blue-50 text-blue-700 border-blue-200"
-                                    : issue.status === "PENDING"
+                                className={`px-2 py-1 text-xs rounded font-medium border ${issue.status === "IN PROGRESS"
+                                  ? "bg-blue-50 text-blue-700 border-blue-200"
+                                  : issue.status === "PENDING"
                                     ? "bg-yellow-50 text-yellow-700 border-yellow-200"
                                     : issue.status === "COMPLETE"
-                                    ? "bg-green-50 text-green-700 border-green-200"
-                                    : issue.status === "OVERDUE"
-                                    ? "bg-red-50 text-red-700 border-red-200"
-                                    : "bg-gray-50 text-gray-700 border-gray-200"
-                                }`}
+                                      ? "bg-green-50 text-green-700 border-green-200"
+                                      : issue.status === "OVERDUE"
+                                        ? "bg-red-50 text-red-700 border-red-200"
+                                        : "bg-gray-50 text-gray-700 border-gray-200"
+                                  }`}
                               >
                                 {issue.status.replace("_", " ")}
                               </span>
@@ -834,10 +991,158 @@ function ClientDashboard() {
                               >
                                 Decline
                               </button>
+                              <button
+                                className="bg-blue-500 text-white px-3 py-1 rounded text-sm font-semibold hover:bg-blue-600"
+                                onClick={() => resubmitIssue(issue.id || issue._id)}
+                              >
+                                Resubmit
+                              </button>
                             </div>
                           )}
+                          {/* Manager/Admin: assign internal technician */}
+                          {(currentUser?.role === 'manager' || currentUser?.role === 'admin') && internalTechnicians && internalTechnicians.length > 0 && (
+                            <div className="mt-3 flex items-center gap-2">
+                              <select
+                                className="border rounded px-2 py-1 text-sm"
+                                value={(selectedTechs[issue.id || issue._id] && selectedTechs[issue.id || issue._id].internal) || ''}
+                                onChange={(e) => setSelectedTechs(s => ({ ...s, [issue.id || issue._id]: { ...(s[issue.id || issue._id] || {}), internal: e.target.value } }))}
+                              >
+                                <option value="">Assign internal technician...</option>
+                                {internalTechnicians.map(t => (
+                                  <option key={t.id || t._id} value={t.id || t._id}>{t.name}{t.email ? ` (${t.email})` : ''}</option>
+                                ))}
+                              </select>
+                              <button
+                                className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-500"
+                                disabled={!((selectedTechs[issue.id || issue._id] && selectedTechs[issue.id || issue._id].internal)) || assignLoading[issue.id || issue._id]}
+                                onClick={() => assignInternal(issue.id || issue._id, (selectedTechs[issue.id || issue._id] || {}).internal)}
+                              >
+                                {assignLoading[issue.id || issue._id] ? 'Assigning...' : 'Assign'}
+                              </button>
+                            </div>
+                          )}
+                          {(currentUser?.role === 'manager' || currentUser?.role === 'admin') && technicians && technicians.length > 0 && issue.status === 'APPROVED' && (
+                            <div className="mt-3 flex items-center gap-2">
+                              <select
+                                className="border rounded px-2 py-1 text-sm"
+                                value={(selectedTechs[issue.id || issue._id] && selectedTechs[issue.id || issue._id].external) || ''}
+                                onChange={(e) => setSelectedTechs(s => ({ ...s, [issue.id || issue._id]: { ...(s[issue.id || issue._id] || {}), external: e.target.value } }))}
+                              >
+                                <option value="">Assign technician...</option>
+                                {technicians.map(t => (
+                                  <option key={t.id} value={t.id}>{t.name}{t.email ? ` (${t.email})` : ''}</option>
+                                ))}
+                              </select>
+                              <button
+                                className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-500"
+                                disabled={!((selectedTechs[issue.id || issue._id] && selectedTechs[issue.id || issue._id].external)) || assignLoading[issue.id || issue._id]}
+                                onClick={() => assignToTech(issue.id || issue._id, (selectedTechs[issue.id || issue._id] || {}).external)}
+                              >
+                                {assignLoading[issue.id || issue._id] ? 'Assigning...' : 'Assign'}
+                              </button>
+                            </div>
+                          )}
+                          {/* Client: request internal technician for this property's staff */}
+                          {currentUser?.role === 'client' && (() => {
+                            const pidRaw = issue.propertyId || (issue.property && (issue.property.id || issue.property._id)) || (issue.assetId ? (assets.find(a => (a.id || a._id) === issue.assetId)?.propertyId) : null);
+                            const pid = extractId(pidRaw);
+                            const techs = (internalTechnicians || []).filter(t => {
+                              const tid = extractId(t.propertyId || t.property);
+                              return tid && pid && (String(tid) === String(pid));
+                            });
+
+                            const isApproved = (issue.approved === true) || String(issue.status || '').toUpperCase() === 'APPROVED';
+                            // If no staff specifically for this property, fall back to any internal technicians
+                            const availableInternal = techs.length ? techs : (internalTechnicians || []);
+                            if (!availableInternal.length) {
+                              return (
+                                <p className="text-sm text-gray-500 mt-2">No property staff available.</p>
+                              );
+                            }
+                            if (!isApproved) {
+                              return (
+                                <p className="text-sm text-gray-500 mt-2">Assignment available only for approved issues.</p>
+                              );
+                            }
+                            return (
+                              <div className="mt-3 flex items-center gap-2">
+                                <div className="flex-1">
+                                  <label className="text-sm text-gray-600 block mb-1">Request property staff</label>
+                                  <select
+                                    className="border rounded px-2 py-1 text-sm w-full"
+                                    value={(selectedTechs[issue.id || issue._id] && selectedTechs[issue.id || issue._id].internal) || ''}
+                                    onChange={(e) => setSelectedTechs(s => ({ ...s, [issue.id || issue._id]: { ...(s[issue.id || issue._id] || {}), internal: e.target.value } }))}
+                                  >
+                                    <option value="">Request internal tech...</option>
+                                    {availableInternal.map(t => (
+                                      <option key={t.id || t._id} value={t.id || t._id}>{t.name}{t.email ? ` (${t.email})` : ''}</option>
+                                    ))}
+                                  </select>
+
+                                </div>
+                                <div>
+                                  <button
+                                    className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-500"
+                                    disabled={!((selectedTechs[issue.id || issue._id] && selectedTechs[issue.id || issue._id].internal)) || assignLoading[issue.id || issue._id]}
+                                    onClick={() => assignInternal(issue.id || issue._id, (selectedTechs[issue.id || issue._id] || {}).internal)}
+                                  >
+                                    {assignLoading[issue.id || issue._id] ? 'Requesting...' : 'Request'}
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })()}
+                          {/* Client: show external technicians assigned to this property (how saved in DB shown) */}
+                          {currentUser?.role === 'client' && (() => {
+                            const pid = issue.propertyId || (issue.property && (issue.property.id || issue.property._id)) || (issue.assetId ? (assets.find(a => (a.id || a._id) === issue.assetId)?.propertyId) : null);
+                            const extTechs = (technicians || []).filter(t => {
+                              const tid = extractId(t.propertyId || t.property);
+                              return tid && pid && (String(tid) === String(pid));
+                            });
+
+                            const isApproved = (issue.approved === true) || String(issue.status || '').toUpperCase() === 'APPROVED';
+                            // If no external technicians tied to property, fall back to all technicians
+                            const availableExternal = extTechs.length ? extTechs : (technicians || []);
+                            if (!availableExternal.length) {
+                              return null;
+                            }
+                            if (!isApproved) {
+                              return (
+                                <p className="text-sm text-gray-500 mt-2">Assignment available only for approved issues.</p>
+                              );
+                            }
+                            return (
+                              <div className="mt-3 flex items-center gap-2">
+                                <div className="flex-1">
+                                  <label className="text-sm text-gray-600 block mb-1">Available technicians for this property</label>
+                                  <select
+                                    className="border rounded px-2 py-1 text-sm w-full"
+                                    value={(selectedTechs[issue.id || issue._id] && selectedTechs[issue.id || issue._id].external) || ''}
+                                    onChange={(e) => setSelectedTechs(s => ({ ...s, [issue.id || issue._id]: { ...(s[issue.id || issue._id] || {}), external: e.target.value } }))}
+                                  >
+                                    <option value="">Assign technician...</option>
+                                    {availableExternal.map(t => (
+                                      <option key={t.id || t._id} value={t.id || t._id}>
+                                        {t.name}{t.email ? ` (${t.email})` : ''}{t.specialty ? ` — ${Array.isArray(t.specialty) ? t.specialty.join(', ') : t.specialty}` : ''}{t.rating ? ` • ${t.rating}⭐` : ''}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  <p className="text-xs text-gray-500 mt-1">Technician record fields: propertyId, name, email, phone, specialty[], rating, completed, status, createdAt</p>
+                                </div>
+                                <div>
+                                  <button
+                                    className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-500"
+                                    disabled={!((selectedTechs[issue.id || issue._id] && selectedTechs[issue.id || issue._id].external)) || assignLoading[issue.id || issue._id]}
+                                    onClick={() => assignToTech(issue.id || issue._id, (selectedTechs[issue.id || issue._id] || {}).external)}
+                                  >
+                                    {assignLoading[issue.id || issue._id] ? 'Assigning...' : 'Assign'}
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })()}
                         </div>
-                        
+
                         <div className="flex flex-col items-end">
                           <span className="flex items-center gap-1 text-yellow-600 font-medium">
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -857,29 +1162,33 @@ function ClientDashboard() {
               )}
             </div>
           )}
-
           {activeTab === 'properties' && (
             <div>
-              <h2 className="text-2xl font-bold text-gray-800 mb-6">Properties</h2>
-              
               {loading.properties && (
                 <div className="text-center py-8">
                   <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                   <p className="mt-2 text-gray-600">Loading properties...</p>
                 </div>
               )}
-              
+
               {errors.properties && (
                 <div className="bg-red-50 text-red-700 p-4 rounded-lg mb-4 border border-red-200">
                   Error: {errors.properties}
                 </div>
               )}
-              
+
               <form
                 className="bg-blue-50 p-4 rounded-lg mb-6 border border-blue-100"
                 onSubmit={async (e) => {
                   e.preventDefault();
                   try {
+                    const storedUser = localStorage.getItem("user");
+                    let userId = null;
+                    try {
+                      userId = storedUser ? JSON.parse(storedUser).id || JSON.parse(storedUser)._id : null;
+                    } catch (e) {
+                      userId = null;
+                    }
                     const payload = {
                       name: propertyForm.name,
                       type: propertyForm.type,
@@ -891,6 +1200,7 @@ function ClientDashboard() {
                       floors: propertyForm.floors ? parseInt(propertyForm.floors) : undefined,
                       blocks: propertyForm.blocks ? parseInt(propertyForm.blocks) : undefined,
                       rooms: propertyForm.rooms ? parseInt(propertyForm.rooms) : undefined,
+                      clientId: userId,
                     };
 
                     if (editingProperty) {
@@ -1056,7 +1366,7 @@ function ClientDashboard() {
                       <button
                         className="bg-gray-200 text-gray-700 px-4 py-2 rounded hover:bg-gray-300 transition font-medium"
                         type="button"
-                          onClick={() => {
+                        onClick={() => {
                           setEditingProperty(null);
                           setPropertyForm({ name: '', type: '', address: '', beds: '', baths: '', levels: '', area: '', floors: '', blocks: '', rooms: '' });
                         }}
@@ -1067,14 +1377,14 @@ function ClientDashboard() {
                   </div>
                 </div>
               </form>
-              
+
               <div className="space-y-3">
                 {properties.length === 0 && !loading.properties && !errors.properties && (
                   <div className="text-center py-8 text-gray-500">
                     No properties found. Add your first property above.
                   </div>
                 )}
-                
+
                 {properties.map((property) => (
                   <div
                     key={property.id || property._id}
@@ -1129,32 +1439,32 @@ function ClientDashboard() {
                         </div>
                         {property.photos && property.photos.length > 0 && (
                           <div className="mt-3 flex gap-2 overflow-x-auto">
-                            {property.photos.slice(0,4).map((p, idx) => (
-                              <img key={idx} src={imageSrc(p)} alt={`${property.name}-photo-${idx}`} className="h-14 w-24 object-cover rounded border" onError={(e)=>{e.target.onerror=null;e.target.src='/default-property.png'}} />
+                            {property.photos.slice(0, 4).map((p, idx) => (
+                              <img key={idx} src={imageSrc(p)} alt={`${property.name}-photo-${idx}`} className="h-14 w-24 object-cover rounded border" onError={(e) => { e.target.onerror = null; e.target.src = '/default-property.png' }} />
                             ))}
                           </div>
                         )}
                       </div>
-                      
+
                       <div className="flex gap-2">
                         <button
                           className="text-blue-600 hover:text-blue-800 px-3 py-1 rounded hover:bg-blue-50 transition border border-blue-200"
                           onClick={() => {
-                              setEditingProperty(property);
-                              setPropertyForm({
-                                name: property.name,
-                                type: property.type,
-                                address: property.address,
-                                beds: property.beds ?? '',
-                                baths: property.baths ?? '',
-                                levels: property.levels ?? property.floors ?? '',
-                                area: property.area ?? property.sqft ?? '',
-                                floors: property.floors ?? '',
-                                blocks: property.blocks ?? '',
-                                rooms: property.rooms ?? '',
-                              });
-                              setPropertyFiles(null);
-                            }}
+                            setEditingProperty(property);
+                            setPropertyForm({
+                              name: property.name,
+                              type: property.type,
+                              address: property.address,
+                              beds: property.beds ?? '',
+                              baths: property.baths ?? '',
+                              levels: property.levels ?? property.floors ?? '',
+                              area: property.area ?? property.sqft ?? '',
+                              floors: property.floors ?? '',
+                              blocks: property.blocks ?? '',
+                              rooms: property.rooms ?? '',
+                            });
+                            setPropertyFiles(null);
+                          }}
                         >
                           Edit
                         </button>
@@ -1189,26 +1499,33 @@ function ClientDashboard() {
               <h2 className="text-2xl font-bold text-gray-800 mb-6">
                 Assets <span className="text-gray-500 text-lg">({assets.length})</span>
               </h2>
-              
+
               {loading.assets && (
                 <div className="text-center py-8">
                   <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                   <p className="mt-2 text-gray-600">Loading assets...</p>
                 </div>
               )}
-              
+
               {errors.assets && (
                 <div className="bg-red-50 text-red-700 p-4 rounded-lg mb-4 border border-red-200">
                   Error: {errors.assets}
                 </div>
               )}
-              
+
               <form
                 className="bg-blue-50 p-4 rounded-lg mb-6 border border-blue-100"
                 onSubmit={async (e) => {
                   e.preventDefault();
                   try {
+                    // Always include propertyId in payload
                     const payload = { ...assetForm };
+                    if (!payload.propertyId) {
+                      // Try to infer propertyId from selected property if available
+                      if (typeof selectedProperty === 'object' && (selectedProperty?.id || selectedProperty?._id)) {
+                        payload.propertyId = selectedProperty.id || selectedProperty._id;
+                      }
+                    }
                     if (editingAsset) {
                       // compute removed blocks
                       const prev = Array.isArray(originalAssetBlocks) ? originalAssetBlocks.map(String) : [];
@@ -1219,9 +1536,16 @@ function ClientDashboard() {
                       setEditingAsset(null);
                       setOriginalAssetBlocks([]);
                     } else {
-                      await axios.post('http://localhost:5000/api/assets', payload);
+                      const storedUser = localStorage.getItem("user");
+                      let userId = null;
+                      try {
+                        userId = storedUser ? JSON.parse(storedUser).id || JSON.parse(storedUser)._id : null;
+                      } catch (e) {
+                        userId = null;
+                      }
+                      // Only send propertyId and userId as flat fields
+                      await axios.post('http://localhost:5000/api/assets', { ...payload, userId, propertyId: payload.propertyId });
                     }
-                    
                     setAssetForm({ name: '', type: '', description: '', propertyId: '', quantity: 1, building: '', blocks: [] });
                     const res = await axios.get('http://localhost:5000/api/assets');
                     setAssets(res.data || []);
@@ -1265,7 +1589,7 @@ function ClientDashboard() {
                     />
                     <button type="button" className="px-2 py-1 bg-gray-100 rounded" onClick={() => setAssetForm(f => ({ ...f, quantity: (f.quantity || 1) + 1 }))}>+</button>
                   </div>
-                  
+
                   <select
                     className="border border-blue-200 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     value={assetForm.propertyId}
@@ -1284,44 +1608,44 @@ function ClientDashboard() {
                     ))}
                   </select>
 
-                    {(() => {
-                      const prop = properties.find(p => (p.id || p._id) === assetForm.propertyId);
-                      const blocksCount = parseInt(prop?.blocks) || 0;
-                      if (blocksCount > 0) {
-                        // render checkboxes to select multiple blocks
-                        return (
-                          <div className="col-span-6">
-                            <div className="text-sm text-gray-600 mb-1">Select Blocks (optional)</div>
-                            <div className="grid grid-cols-6 gap-2">
-                              {Array.from({ length: blocksCount }).map((_, idx) => {
-                                const val = String(idx + 1);
-                                const checked = (assetForm.blocks || []).includes(val);
-                                return (
-                                  <label key={val} className={`px-2 py-1 border rounded text-center ${checked ? 'bg-blue-600 text-white' : 'bg-white text-gray-700'}`}>
-                                    <input type="checkbox" className="mr-1" checked={checked} onChange={() => {
-                                      setAssetForm(f => {
-                                        const cur = f.blocks || [];
-                                        if (cur.includes(val)) return { ...f, blocks: cur.filter(x => x !== val) };
-                                        return { ...f, blocks: [...cur, val] };
-                                      });
-                                    }} />
-                                    {`Block ${val}`}
-                                  </label>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        );
-                      }
+                  {(() => {
+                    const prop = properties.find(p => (p.id || p._id) === assetForm.propertyId);
+                    const blocksCount = parseInt(prop?.blocks) || 0;
+                    if (blocksCount > 0) {
+                      // render checkboxes to select multiple blocks
                       return (
-                        <input
-                          className="border border-blue-200 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          placeholder="Block (optional)"
-                          value={(assetForm.blocks || []).join(', ')}
-                          onChange={(e) => setAssetForm(f => ({ ...f, blocks: e.target.value.split(/[;,|]/).map(s => s.trim()).filter(Boolean) }))}
-                        />
+                        <div className="col-span-6">
+                          <div className="text-sm text-gray-600 mb-1">Select Blocks (optional)</div>
+                          <div className="grid grid-cols-6 gap-2">
+                            {Array.from({ length: blocksCount }).map((_, idx) => {
+                              const val = String(idx + 1);
+                              const checked = (assetForm.blocks || []).includes(val);
+                              return (
+                                <label key={val} className={`px-2 py-1 border rounded text-center ${checked ? 'bg-blue-600 text-white' : 'bg-white text-gray-700'}`}>
+                                  <input type="checkbox" className="mr-1" checked={checked} onChange={() => {
+                                    setAssetForm(f => {
+                                      const cur = f.blocks || [];
+                                      if (cur.includes(val)) return { ...f, blocks: cur.filter(x => x !== val) };
+                                      return { ...f, blocks: [...cur, val] };
+                                    });
+                                  }} />
+                                  {`Block ${val}`}
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
                       );
-                    })()}
+                    }
+                    return (
+                      <input
+                        className="border border-blue-200 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="Block (optional)"
+                        value={(assetForm.blocks || []).join(', ')}
+                        onChange={(e) => setAssetForm(f => ({ ...f, blocks: e.target.value.split(/[;,|]/).map(s => s.trim()).filter(Boolean) }))}
+                      />
+                    );
+                  })()}
                   <div className="flex gap-2">
                     <button
                       className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition flex-1 font-medium"
@@ -1344,14 +1668,14 @@ function ClientDashboard() {
                   </div>
                 </div>
               </form>
-              
+
               <div className="space-y-3">
                 {assets.length === 0 && !loading.assets && !errors.assets && (
                   <div className="text-center py-8 text-gray-500">
                     No assets found. Add your first asset above.
                   </div>
                 )}
-                
+
                 {assets.map((asset) => (
                   <div
                     key={asset.id || asset._id}
@@ -1360,7 +1684,7 @@ function ClientDashboard() {
                     <div className="flex justify-between items-start">
                       <div>
                         <h3 className="font-semibold text-gray-900">{asset.name}</h3>
-                          <div className="text-sm text-gray-600 mt-1 space-y-1">
+                        <div className="text-sm text-gray-600 mt-1 space-y-1">
                           <div>
                             <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded mr-2 border border-blue-100">{asset.type}</span>
                             <span className="text-blue-600 font-medium">Qty: {asset.quantity || 1}</span>
@@ -1379,7 +1703,7 @@ function ClientDashboard() {
                           )}
                         </div>
                       </div>
-                      
+
                       <div className="flex gap-2">
                         <button
                           className="text-blue-600 hover:text-blue-800 px-3 py-1 rounded hover:bg-blue-50 transition border border-blue-200"
@@ -1393,9 +1717,9 @@ function ClientDashboard() {
                             } else if (asset.location) {
                               const loc = asset.location;
                               if (typeof loc === 'string') {
-                                try { const parsed = JSON.parse(loc); if (parsed && parsed.block) blocksArr = Array.isArray(parsed.block) ? parsed.block.map(String) : String(parsed.block).split(/[;,|]/).map(s=>s.trim()).filter(Boolean); } catch(e) {}
+                                try { const parsed = JSON.parse(loc); if (parsed && parsed.block) blocksArr = Array.isArray(parsed.block) ? parsed.block.map(String) : String(parsed.block).split(/[;,|]/).map(s => s.trim()).filter(Boolean); } catch (e) { }
                               } else if (typeof loc === 'object' && loc.block) {
-                                blocksArr = Array.isArray(loc.block) ? loc.block.map(String) : String(loc.block).split(/[;,|]/).map(s=>s.trim()).filter(Boolean);
+                                blocksArr = Array.isArray(loc.block) ? loc.block.map(String) : String(loc.block).split(/[;,|]/).map(s => s.trim()).filter(Boolean);
                               }
                             }
                             setEditingAsset(asset);
@@ -1442,30 +1766,38 @@ function ClientDashboard() {
           {activeTab === 'internalTechnicians' && (
             <div>
               <h2 className="text-2xl font-bold text-gray-800 mb-6">Internal Technicians</h2>
-              
+
               {loading.internalTechnicians && (
                 <div className="text-center py-8">
                   <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                   <p className="mt-2 text-gray-600">Loading technicians...</p>
                 </div>
               )}
-              
+
               {errors.internalTechnicians && (
                 <div className="bg-red-50 text-red-700 p-4 rounded-lg mb-4 border border-red-200">
                   Error: {errors.internalTechnicians}
                 </div>
               )}
-              
+
               <form
                 className="bg-blue-50 p-4 rounded-lg mb-6 border border-blue-100"
                 onSubmit={async (e) => {
                   e.preventDefault();
                   try {
+                    const storedUser = localStorage.getItem("user");
+                    let userId = null;
+                    try {
+                      userId = storedUser ? JSON.parse(storedUser).id || JSON.parse(storedUser)._id : null;
+                    } catch (e) {
+                      userId = null;
+                    }
                     const data = {
                       ...techForm,
                       specialty: techForm.specialty.filter(s => s.trim()),
+                      userId,
                     };
-                    
+
                     if (editingTech) {
                       await axios.put(
                         `http://localhost:5000/api/internal-technicians/${editingTech._id || editingTech.id}`,
@@ -1475,17 +1807,18 @@ function ClientDashboard() {
                     } else {
                       await axios.post('http://localhost:5000/api/internal-technicians', data);
                     }
-                    
+
                     setTechForm({
                       name: '',
                       email: '',
                       phone: '',
+                      password: '',
                       specialty: [],
                       rating: 0,
                       completed: 0,
                       propertyId: '',
                     });
-                    
+
                     const res = await axios.get('http://localhost:5000/api/internal-technicians');
                     setInternalTechnicians(res.data || []);
                   } catch (err) {
@@ -1563,7 +1896,16 @@ function ClientDashboard() {
                     ))}
                   </select>
                 </div>
-                
+                <div className="mt-3">
+                  <input
+                    className="border border-blue-200 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-full md:w-1/2"
+                    type="password"
+                    placeholder="Password (optional)"
+                    value={techForm.password}
+                    onChange={(e) => setTechForm(f => ({ ...f, password: e.target.value }))}
+                  />
+                </div>
+
                 <div className="flex gap-3 mt-4">
                   <button
                     className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition font-medium"
@@ -1593,7 +1935,7 @@ function ClientDashboard() {
                   )}
                 </div>
               </form>
-              
+
               <div className="space-y-3">
                 {internalTechnicians.length === 0 &&
                   !loading.internalTechnicians &&
@@ -1602,7 +1944,7 @@ function ClientDashboard() {
                       No technicians found. Add your first technician above.
                     </div>
                   )}
-                
+
                 {internalTechnicians.map((tech) => (
                   <div
                     key={tech.id || tech._id}
@@ -1634,7 +1976,7 @@ function ClientDashboard() {
                           </p>
                         </div>
                       </div>
-                      
+
                       <div className="flex gap-2">
                         <button
                           className="text-blue-600 hover:text-blue-800 px-3 py-1 rounded hover:bg-blue-50 transition border border-blue-200"
@@ -1684,7 +2026,7 @@ function ClientDashboard() {
           {activeTab === 'maintenanceTemplates' && (
             <div>
               <h2 className="text-2xl font-bold text-gray-800 mb-6">Maintenance</h2>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                 <div
                   className="bg-gradient-to-r from-blue-900 to-blue-800 border border-blue-700 rounded-xl p-6 cursor-pointer hover:shadow-md transition-shadow hover:scale-105 transform duration-200"
@@ -1702,7 +2044,7 @@ function ClientDashboard() {
                     Report issues for preventive maintenance. We'll assign professional technicians, notify you when assigned, and provide feedback with evidence upon completion.
                   </p>
                 </div>
-                
+
                 <div
                   className="bg-gradient-to-r from-teal-700 to-teal-600 border border-teal-600 rounded-xl p-6 cursor-pointer hover:shadow-md transition-shadow hover:scale-105 transform duration-200"
                   onClick={() => setShowScheduleForm(true)}
@@ -1720,7 +2062,7 @@ function ClientDashboard() {
                   </p>
                 </div>
               </div>
-              
+
               {showScheduleForm && (
                 <div className="mb-8">
                   <ScheduleMaintenanceForm
@@ -1740,26 +2082,26 @@ function ClientDashboard() {
                   />
                 </div>
               )}
-              
+
               <div className="mt-8">
                 <div className="flex justify-between items-center mb-6">
                   <h3 className="text-xl font-bold text-gray-800">Scheduled Maintenance</h3>
                   <span className="text-gray-500">{maintenanceSchedules.length} schedules</span>
                 </div>
-                
+
                 {loading.maintenanceTemplates && (
                   <div className="text-center py-8">
                     <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                     <p className="mt-2 text-gray-600">Loading schedules...</p>
                   </div>
                 )}
-                
+
                 {errors.maintenanceTemplates && (
                   <div className="bg-red-50 text-red-700 p-4 rounded-lg mb-4 border border-red-200">
                     Error: {errors.maintenanceTemplates}
                   </div>
                 )}
-                
+
                 {maintenanceSchedules.length === 0 ? (
                   <div className="text-center py-12 text-gray-500">
                     <svg className="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1780,27 +2122,25 @@ function ClientDashboard() {
                             <div className="flex items-center gap-3 mb-2">
                               <h4 className="font-semibold text-gray-900">{schedule.name || 'Unnamed Schedule'}</h4>
                               <span
-                                className={`px-2 py-1 text-xs rounded-full ${
-                                  schedule.routine
-                                    ? 'bg-teal-100 text-teal-800 border border-teal-200'
-                                    : 'bg-blue-100 text-blue-800 border border-blue-200'
-                                }`}
+                                className={`px-2 py-1 text-xs rounded-full ${schedule.routine
+                                  ? 'bg-teal-100 text-teal-800 border border-teal-200'
+                                  : 'bg-blue-100 text-blue-800 border border-blue-200'
+                                  }`}
                               >
                                 {schedule.routine ? 'Routine' : 'Preventive'}
                               </span>
                               <span
-                                className={`px-2 py-1 text-xs rounded-full ${
-                                  schedule.status && schedule.status.toLowerCase().includes('complete')
-                                    ? 'bg-green-100 text-green-800 border border-green-200'
-                                    : schedule.nextDate && new Date(schedule.nextDate) < new Date()
+                                className={`px-2 py-1 text-xs rounded-full ${schedule.status && schedule.status.toLowerCase().includes('complete')
+                                  ? 'bg-green-100 text-green-800 border border-green-200'
+                                  : schedule.nextDate && new Date(schedule.nextDate) < new Date()
                                     ? 'bg-red-100 text-red-800 border border-red-200'
                                     : 'bg-yellow-100 text-yellow-800 border border-yellow-200'
-                                }`}
+                                  }`}
                               >
                                 {schedule.status || (schedule.routine ? 'Routine' : 'Preventive')}
                               </span>
                             </div>
-                            
+
                             <div className="text-sm text-gray-600 space-y-1">
                               <div>
                                 <span className="font-medium">Next:</span>{' '}
@@ -1808,7 +2148,7 @@ function ClientDashboard() {
                                   ? new Date(schedule.nextDate).toLocaleString()
                                   : 'TBD'}
                               </div>
-                              
+
                               {schedule.routine && (
                                 <div>
                                   <span className="font-medium">Frequency:</span>{' '}
@@ -1816,22 +2156,22 @@ function ClientDashboard() {
                                   {schedule.interval && ` (every ${schedule.interval})`}
                                 </div>
                               )}
-                              
+
                               {schedule.description && (
                                 <p className="mt-1 text-gray-700">{schedule.description}</p>
                               )}
-                              
+
                               <div>
                                 <span className="font-medium">Assigned Assets:</span>{' '}
                                 {(() => {
                                   const assetIds = Array.isArray(schedule.assets)
                                     ? schedule.assets
                                     : typeof schedule.assets === 'string' && schedule.assets.length > 0
-                                    ? schedule.assets.split(',')
-                                    : [];
-                                  
+                                      ? schedule.assets.split(',')
+                                      : [];
+
                                   if (assetIds.length === 0) return 'Unassigned';
-                                  
+
                                   return assetIds
                                     .map(id => {
                                       const asset = assets.find(a => (a.id || a._id) === id);
@@ -1842,7 +2182,7 @@ function ClientDashboard() {
                               </div>
                             </div>
                           </div>
-                          
+
                           <div className="flex gap-2">
                             <button
                               className="text-blue-600 hover:text-blue-800 px-3 py-1 rounded hover:bg-blue-50 transition border border-blue-200"
