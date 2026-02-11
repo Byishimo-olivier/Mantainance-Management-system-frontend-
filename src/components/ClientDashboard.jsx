@@ -148,7 +148,6 @@ function ClientDashboard() {
   const [feedbacks, setFeedbacks] = useState([]);
   const [userName, setUserName] = useState("");
   const [currentUser, setCurrentUser] = useState(null);
-  const [currentUser, setCurrentUser] = useState(null);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [selectedTechForAssign, setSelectedTechForAssign] = useState(null);
   const [selectedIssueForAssign, setSelectedIssueForAssign] = useState("");
