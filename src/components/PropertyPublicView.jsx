@@ -22,10 +22,10 @@ export default function PropertyPublicView() {
   async function fetch() {
     setLoading(true);
     try {
-      const p = await axios.get(`http://localhost:5000/api/properties/${id}`);
+      const p = await axios.get(`${import.meta.env.VITE_API_URL}/api/properties/${id}`);
       setProperty(p.data || null);
       // fetch issues and filter by property name/address
-      const res = await axios.get('http://localhost:5000/api/issues');
+      const res = await axios.get(import.meta.env.VITE_API_URL + '/api/issues');
       const all = res.data || [];
       const filtered = all.filter(i => {
         if (!i) return false;

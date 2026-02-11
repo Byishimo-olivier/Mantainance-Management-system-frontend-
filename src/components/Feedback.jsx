@@ -19,7 +19,7 @@ export default function Feedback() {
     async function fetchFeedbacks() {
       try {
         // Fetch all issues for this client
-        const res = await axios.get(`http://localhost:5000/api/issues/user/${userObj._id}`);
+        const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/issues/user/${userObj._id}`);
         // Only show issues that have after evidence (completion details or afterImage)
         const feedbackIssues = (res.data || []).filter(issue => issue.status === 'COMPLETE' || issue.status === 'OVERDUE' || issue.afterImage || issue.address);
         setFeedbacks(feedbackIssues);
@@ -53,7 +53,7 @@ export default function Feedback() {
                 </div>
                 {fb.afterImage && (
                   <img
-                    src={fb.afterImage.startsWith('/uploads/') ? `http://localhost:5000${fb.afterImage}` : fb.afterImage}
+                    src={fb.afterImage.startsWith('/uploads/') ? `${import.meta.env.VITE_API_URL}${fb.afterImage}` : fb.afterImage}
                     alt="After evidence"
                     className="w-32 h-32 object-cover rounded mb-2 border"
                   />

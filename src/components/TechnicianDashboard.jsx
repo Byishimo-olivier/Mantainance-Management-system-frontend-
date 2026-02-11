@@ -23,7 +23,7 @@ function AfterEvidenceForm({ issueId, onSuccess }) {
     try {
       const token = localStorage.getItem("token");
       const response = await axios.post(
-        `http://localhost:5000/api/issues/${issueId}/evidence/after`,
+        `${import.meta.env.VITE_API_URL}/api/issues/${issueId}/evidence/after`,
         formData,
         { headers: { Authorization: `Bearer ${token}`, "Content-Type": "multipart/form-data" } }
       );
@@ -99,7 +99,7 @@ const TechnicianDashboard = () => {
       const token = localStorage.getItem("token");
       const config = { headers: { Authorization: `Bearer ${token}` } };
       
-      await axios.put(`http://localhost:5000/api/issues/${jobId}`, {
+      await axios.put(`${import.meta.env.VITE_API_URL}/api/issues/${jobId}`, {
         status: 'IN PROGRESS'
       }, config);
       
@@ -139,7 +139,7 @@ const TechnicianDashboard = () => {
         technicianName: user.name
       };
 
-      await axios.post('http://localhost:5000/api/material-requests', requestData, config);
+      await axios.post(import.meta.env.VITE_API_URL + '/api/material-requests', requestData, config);
       
       alert('Material request submitted successfully!');
       setMaterialRequestData({
@@ -178,7 +178,7 @@ const TechnicianDashboard = () => {
   };
 
   const handleImageClick = (imageSrc, title) => {
-    window.open(`http://localhost:5000${imageSrc}`, '_blank');
+    window.open(`${import.meta.env.VITE_API_URL}${imageSrc}`, '_blank');
   };
 
   const fetchAssignedIssues = () => {
@@ -187,7 +187,7 @@ const TechnicianDashboard = () => {
       const u = JSON.parse(userStr);
       const token = localStorage.getItem("token");
       const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
-      axios.get(`http://localhost:5000/api/issues/assigned/${u._id || u.id}`, config)
+      axios.get(`${import.meta.env.VITE_API_URL}/api/issues/assigned/${u._id || u.id}`, config)
         .then(res => setJobs(res.data))
         .catch(err => {
           console.warn('Failed to fetch assigned issues:', err?.response?.data || err.message);
@@ -202,7 +202,7 @@ const TechnicianDashboard = () => {
       const u = JSON.parse(userStr);
       const token = localStorage.getItem("token");
       const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
-      axios.get(`http://localhost:5000/api/material-requests/tech/${u._id || u.id}`, config)
+      axios.get(`${import.meta.env.VITE_API_URL}/api/material-requests/tech/${u._id || u.id}`, config)
         .then(res => setMaterialRequests(res.data))
         .catch(err => {
           console.warn('Material requests endpoint failed:', err?.response?.status || err.message);
@@ -380,7 +380,7 @@ const TechnicianDashboard = () => {
                     {(job.beforePhoto || job.photo || job.image) && (
                       <div className="flex-shrink-0">
                         <img
-                          src={`http://localhost:5000${job.beforePhoto || job.photo || job.image}`}
+                          src={`${import.meta.env.VITE_API_URL}${job.beforePhoto || job.photo || job.image}`}
                           alt="Issue"
                           className="w-20 h-20 object-cover rounded-lg shadow border cursor-pointer hover:opacity-80 transition"
                           onClick={() => handleImageClick(job.beforePhoto || job.photo || job.image, job.title)}
@@ -631,7 +631,7 @@ const TechnicianDashboard = () => {
                       <div>
                         <h4 className="text-sm font-medium text-gray-600">Before (Client Photo)</h4>
                         <img 
-                          src={`http://localhost:5000${selectedJob.beforePhoto || selectedJob.photo || selectedJob.image}`} 
+                          src={`${import.meta.env.VITE_API_URL}${selectedJob.beforePhoto || selectedJob.photo || selectedJob.image}`} 
                           alt="Before" 
                           className="w-32 h-32 object-cover rounded border cursor-pointer hover:opacity-80 transition"
                           onClick={() => handleImageClick(selectedJob.beforePhoto || selectedJob.photo || selectedJob.image, selectedJob.title)}
@@ -643,7 +643,7 @@ const TechnicianDashboard = () => {
                       <div>
                         <h4 className="text-sm font-medium text-gray-600">After</h4>
                         <img 
-                          src={`http://localhost:5000${selectedJob.evidence.afterImage}`} 
+                          src={`${import.meta.env.VITE_API_URL}${selectedJob.evidence.afterImage}`} 
                           alt="After" 
                           className="w-32 h-32 object-cover rounded border cursor-pointer hover:opacity-80 transition"
                           onClick={() => handleImageClick(selectedJob.evidence.afterImage, `${selectedJob.title} - After`)}

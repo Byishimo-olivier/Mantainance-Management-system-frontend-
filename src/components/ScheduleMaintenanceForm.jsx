@@ -71,13 +71,13 @@ export default function ScheduleMaintenanceForm({ onSuccess, technicians = [], a
     setError('');
     try {
       if (initialData && (initialData._id || initialData.id)) {
-        await axios.put(`http://localhost:5000/api/maintenance-schedules/${initialData._id || initialData.id}`, {
+        await axios.put(`${import.meta.env.VITE_API_URL}/api/maintenance-schedules/${initialData._id || initialData.id}`, {
           ...form,
           employees: form.employees.join(','),
           assets: form.assets.join(','),
         });
       } else {
-        await axios.post('http://localhost:5000/api/maintenance-schedules', {
+        await axios.post(import.meta.env.VITE_API_URL + '/api/maintenance-schedules', {
           ...form,
           employees: form.employees.join(','), // send as comma-separated string
           assets: form.assets.join(','),

@@ -82,7 +82,7 @@ const statusCards = [
 ];
 
 function ClientDashboard() {
-  const backendBase = 'http://localhost:5000';
+  const backendBase = import.meta.env.VITE_API_URL + '';
   const imageSrc = (path) => {
     if (!path) return null;
     try {
@@ -148,6 +148,11 @@ function ClientDashboard() {
   const [feedbacks, setFeedbacks] = useState([]);
   const [userName, setUserName] = useState("");
   const [currentUser, setCurrentUser] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [assignModalOpen, setAssignModalOpen] = useState(false);
+  const [selectedTechForAssign, setSelectedTechForAssign] = useState(null);
+  const [selectedIssueForAssign, setSelectedIssueForAssign] = useState("");
+  const [assignableIssues, setAssignableIssues] = useState([]);
   const [loading, setLoading] = useState({
     properties: false,
     assets: false,
@@ -206,7 +211,7 @@ function ClientDashboard() {
         setErrors(e => ({ ...e, properties: '', assets: '', internalTechnicians: '', maintenanceTemplates: '' }));
 
         try {
-          const propRes = await axios.get('http://localhost:5000/api/properties');
+          const propRes = await axios.get(import.meta.env.VITE_API_URL + '/api/properties');
           const propertiesData = propRes.data || [];
 
           setProperties(propertiesData);
@@ -261,7 +266,7 @@ function ClientDashboard() {
           // fetched per-property inside `fetchEntities` above. Only fetch the
           // global assets list for non-client roles.
           if (!(userObj && userObj.role === 'client')) {
-            const assetRes = await axios.get('http://localhost:5000/api/assets');
+            const assetRes = await axios.get(import.meta.env.VITE_API_URL + '/api/assets');
             setAssets(assetRes.data || []);
           }
         } catch (err) {
@@ -276,7 +281,7 @@ function ClientDashboard() {
         try {
           // If client user we already attempted to fetch internal technicians per-property above.
           if (!(userObj && userObj.role === 'client')) {
-            const techRes = await axios.get('http://localhost:5000/api/internal-technicians');
+            const techRes = await axios.get(import.meta.env.VITE_API_URL + '/api/internal-technicians');
 
             setInternalTechnicians(techRes.data || []);
           }
@@ -301,7 +306,7 @@ function ClientDashboard() {
         }
 
         try {
-          const tmplRes = await axios.get('http://localhost:5000/api/maintenance-templates');
+          const tmplRes = await axios.get(import.meta.env.VITE_API_URL + '/api/maintenance-templates');
           setMaintenanceTemplates(tmplRes.data || []);
         } catch (err) {
           setMaintenanceTemplates([]);
@@ -311,7 +316,7 @@ function ClientDashboard() {
         }
 
         try {
-          const schedRes = await axios.get('http://localhost:5000/api/maintenance-schedules');
+          const schedRes = await axios.get(import.meta.env.VITE_API_URL + '/api/maintenance-schedules');
           setMaintenanceSchedules(schedRes.data || []);
 
           // Compute upcoming reminders within next 24 hours
@@ -374,7 +379,7 @@ function ClientDashboard() {
               const id = s._id || s.id;
               if (!id) continue;
               try {
-                await axios.post(`http://localhost:5000/api/maintenance-schedules/${id}/emailReminder`);
+                await axios.post(`${import.meta.env.VITE_API_URL}/api/maintenance-schedules/${id}/emailReminder`);
               } catch (e) {
                 console.error('Failed to send email for schedule', id, e?.message || e);
               }
@@ -382,7 +387,7 @@ function ClientDashboard() {
 
             // Refresh schedules after emails
             try {
-              const refreshed = await axios.get('http://localhost:5000/api/maintenance-schedules');
+              const refreshed = await axios.get(import.meta.env.VITE_API_URL + '/api/maintenance-schedules');
               setMaintenanceSchedules(refreshed.data || []);
               const now2 = new Date();
               const cutoff2 = new Date(now2.getTime() + 24 * 60 * 60 * 1000);
@@ -476,11 +481,11 @@ function ClientDashboard() {
 
   async function approveIssue(issueId) {
     try {
-      await axios.put(`http://localhost:5000/api/issues/${issueId}`, {
+      await axios.put(`${import.meta.env.VITE_API_URL}/api/issues/${issueId}`, {
         status: 'APPROVED'
       });
       // refresh issues
-      const res = await axios.get('http://localhost:5000/api/issues');
+      const res = await axios.get(import.meta.env.VITE_API_URL + '/api/issues');
       setIssues(res.data || []);
       setAllIssues(res.data || []);
     } catch (e) {
@@ -491,11 +496,11 @@ function ClientDashboard() {
 
   async function declineIssue(issueId) {
     try {
-      await axios.put(`http://localhost:5000/api/issues/${issueId}`, {
+      await axios.put(`${import.meta.env.VITE_API_URL}/api/issues/${issueId}`, {
         status: 'REJECTED'
       });
       // refresh issues
-      const res = await axios.get('http://localhost:5000/api/issues');
+      const res = await axios.get(import.meta.env.VITE_API_URL + '/api/issues');
       setIssues(res.data || []);
       setAllIssues(res.data || []);
     } catch (e) {
@@ -506,9 +511,9 @@ function ClientDashboard() {
 
   async function resubmitIssue(issueId) {
     try {
-      await axios.post(`http://localhost:5000/api/issues/${issueId}/resubmit`);
+      await axios.post(`${import.meta.env.VITE_API_URL}/api/issues/${issueId}/resubmit`);
       // refresh issues
-      const res = await axios.get('http://localhost:5000/api/issues');
+      const res = await axios.get(import.meta.env.VITE_API_URL + '/api/issues');
       setIssues(res.data || []);
       setAllIssues(res.data || []);
     } catch (e) {
@@ -521,9 +526,9 @@ function ClientDashboard() {
     try {
       if (!internalTechId) return;
       setAssignLoading(s => ({ ...s, [issueId]: true }));
-      await axios.post(`http://localhost:5000/api/issues/${issueId}/assign-internal`, { internalTechId });
+      await axios.post(`${import.meta.env.VITE_API_URL}/api/issues/${issueId}/assign-internal`, { internalTechId });
       // refresh issues
-      const res = await axios.get('http://localhost:5000/api/issues');
+      const res = await axios.get(import.meta.env.VITE_API_URL + '/api/issues');
       setIssues(res.data || []);
       setAllIssues(res.data || []);
       setAssignLoading(s => ({ ...s, [issueId]: false }));
@@ -538,9 +543,9 @@ function ClientDashboard() {
     try {
       if (!techId) return;
       setAssignLoading(s => ({ ...s, [issueId]: true }));
-      await axios.post(`http://localhost:5000/api/issues/${issueId}/assign`, { techId });
+      await axios.post(`${import.meta.env.VITE_API_URL}/api/issues/${issueId}/assign`, { techId });
       // refresh issues
-      const res = await axios.get('http://localhost:5000/api/issues');
+      const res = await axios.get(import.meta.env.VITE_API_URL + '/api/issues');
       setIssues(res.data || []);
       setAllIssues(res.data || []);
       setAssignLoading(s => ({ ...s, [issueId]: false }));
@@ -576,10 +581,10 @@ function ClientDashboard() {
       for (const s of reminders) {
         const id = s._id || s.id;
         if (!id) continue;
-        await axios.post(`http://localhost:5000/api/maintenance-schedules/${id}/dismiss`, { userId });
+        await axios.post(`${import.meta.env.VITE_API_URL}/api/maintenance-schedules/${id}/dismiss`, { userId });
       }
 
-      const schedRes = await axios.get('http://localhost:5000/api/maintenance-schedules');
+      const schedRes = await axios.get(import.meta.env.VITE_API_URL + '/api/maintenance-schedules');
       setMaintenanceSchedules(schedRes.data || []);
       setReminders([]);
     } catch (e) {
@@ -596,10 +601,10 @@ function ClientDashboard() {
       for (const s of reminders) {
         const id = s._id || s.id;
         if (!id) continue;
-        await axios.post(`http://localhost:5000/api/maintenance-schedules/${id}/snooze`, { minutes, userId });
+        await axios.post(`${import.meta.env.VITE_API_URL}/api/maintenance-schedules/${id}/snooze`, { minutes, userId });
       }
 
-      const schedRes = await axios.get('http://localhost:5000/api/maintenance-schedules');
+      const schedRes = await axios.get(import.meta.env.VITE_API_URL + '/api/maintenance-schedules');
       setMaintenanceSchedules(schedRes.data || []);
       setReminders([]);
     } catch (e) {
@@ -613,9 +618,9 @@ function ClientDashboard() {
       let userId = null;
       try { userId = stored ? JSON.parse(stored).id || JSON.parse(stored)._id : null; } catch (e) { userId = null; }
 
-      await axios.post(`http://localhost:5000/api/maintenance-schedules/${id}/dismiss`, { userId });
+      await axios.post(`${import.meta.env.VITE_API_URL}/api/maintenance-schedules/${id}/dismiss`, { userId });
       setReminders(r => r.filter(x => (x._id || x.id) !== id));
-      axios.get('http://localhost:5000/api/maintenance-schedules').then(res => setMaintenanceSchedules(res.data || [])).catch(() => { });
+      axios.get(import.meta.env.VITE_API_URL + '/api/maintenance-schedules').then(res => setMaintenanceSchedules(res.data || [])).catch(() => { });
     } catch (e) {
       console.error('Failed to dismiss reminder', e);
     }
@@ -627,13 +632,56 @@ function ClientDashboard() {
       let userId = null;
       try { userId = stored ? JSON.parse(stored).id || JSON.parse(stored)._id : null; } catch (e) { userId = null; }
 
-      await axios.post(`http://localhost:5000/api/maintenance-schedules/${id}/snooze`, { minutes, userId });
+      await axios.post(`${import.meta.env.VITE_API_URL}/api/maintenance-schedules/${id}/snooze`, { minutes, userId });
       setReminders(r => r.filter(x => (x._id || x.id) !== id));
-      axios.get('http://localhost:5000/api/maintenance-schedules').then(res => setMaintenanceSchedules(res.data || [])).catch(() => { });
+      axios.get(import.meta.env.VITE_API_URL + '/api/maintenance-schedules').then(res => setMaintenanceSchedules(res.data || [])).catch(() => { });
     } catch (e) {
+      console.error('Failed to snooze reminder', e);
       console.error('Failed to snooze reminder', e);
     }
   }
+
+  const openAssignModal = (tech) => {
+    // Find pending issues for this technician's property
+    // tech may have propertyId directly or via property object
+    const techPropId = tech.propertyId || (tech.property && (tech.property.id || tech.property._id));
+
+    if (!techPropId) {
+      alert("This technician is not linked to a specific property.");
+      return;
+    }
+
+    // Filter issues: must be PENDING and match property
+    const pending = allIssues.filter(i => {
+      const issuePropId = extractId(i.propertyId) || (i.property && (i.property.id || i.property._id));
+      const status = (i.status || '').toUpperCase();
+      // check if unassigned? usually yes, but maybe we want to reassign.
+      // let's assume valid to assign if PENDING or IN PROGRESS but not verified/completed
+      // and ideally not already assigned to THIS tech.
+      return (String(issuePropId) === String(techPropId)) && (status === 'PENDING' || status === 'IN PROGRESS');
+    });
+
+    setAssignableIssues(pending);
+    setSelectedTechForAssign(tech);
+    setSelectedIssueForAssign("");
+    setAssignModalOpen(true);
+  };
+
+  const handleAssignSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedTechForAssign || !selectedIssueForAssign) return;
+
+    try {
+      await assignInternal(selectedIssueForAssign, selectedTechForAssign.id || selectedTechForAssign._id);
+      setAssignModalOpen(false);
+      setSelectedTechForAssign(null);
+      setSelectedIssueForAssign("");
+      alert("Issue assigned successfully!");
+    } catch (e) {
+      console.error("Assignment failed", e);
+      alert("Failed to assign issue.");
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -1205,7 +1253,7 @@ function ClientDashboard() {
 
                     if (editingProperty) {
                       await axios.put(
-                        `http://localhost:5000/api/properties/${editingProperty._id || editingProperty.id}`,
+                        `${import.meta.env.VITE_API_URL}/api/properties/${editingProperty._id || editingProperty.id}`,
                         payload
                       );
 
@@ -1215,7 +1263,7 @@ function ClientDashboard() {
                           const form = new FormData();
                           Array.from(propertyFiles).forEach(f => form.append('photos', f));
                           await axios.post(
-                            `http://localhost:5000/api/properties/${editingProperty._id || editingProperty.id}/photos`,
+                            `${import.meta.env.VITE_API_URL}/api/properties/${editingProperty._id || editingProperty.id}/photos`,
                             form,
                             { headers: { 'Content-Type': 'multipart/form-data' } }
                           );
@@ -1226,7 +1274,7 @@ function ClientDashboard() {
 
                       setEditingProperty(null);
                     } else {
-                      const createRes = await axios.post('http://localhost:5000/api/properties', payload);
+                      const createRes = await axios.post(import.meta.env.VITE_API_URL + '/api/properties', payload);
                       const created = createRes.data;
 
                       // upload files if any
@@ -1235,7 +1283,7 @@ function ClientDashboard() {
                           const form = new FormData();
                           Array.from(propertyFiles).forEach(f => form.append('photos', f));
                           await axios.post(
-                            `http://localhost:5000/api/properties/${created.id || created._id}/photos`,
+                            `${import.meta.env.VITE_API_URL}/api/properties/${created.id || created._id}/photos`,
                             form,
                             { headers: { 'Content-Type': 'multipart/form-data' } }
                           );
@@ -1247,7 +1295,7 @@ function ClientDashboard() {
 
                     setPropertyForm({ name: '', type: '', address: '', beds: '', baths: '', levels: '', area: '', floors: '', blocks: '', rooms: '' });
                     setPropertyFiles(null);
-                    const res = await axios.get('http://localhost:5000/api/properties');
+                    const res = await axios.get(import.meta.env.VITE_API_URL + '/api/properties');
                     setProperties(res.data || []);
                   } catch (err) {
                     console.error('Error saving property:', err);
@@ -1474,7 +1522,7 @@ function ClientDashboard() {
                             if (window.confirm('Are you sure you want to delete this property?')) {
                               try {
                                 await axios.delete(
-                                  `http://localhost:5000/api/properties/${property._id || property.id}`
+                                  `${import.meta.env.VITE_API_URL}/api/properties/${property._id || property.id}`
                                 );
                                 setProperties(properties.filter(p => (p._id || p.id) !== (property._id || property.id)));
                               } catch (err) {
@@ -1532,7 +1580,7 @@ function ClientDashboard() {
                       const now = Array.isArray(assetForm.blocks) ? assetForm.blocks.map(String) : [];
                       const remove = prev.filter(p => !now.includes(p));
                       if (remove.length > 0) payload.removeBlocks = remove;
-                      await axios.put(`http://localhost:5000/api/assets/${editingAsset._id || editingAsset.id}`, payload);
+                      await axios.put(`${import.meta.env.VITE_API_URL}/api/assets/${editingAsset._id || editingAsset.id}`, payload);
                       setEditingAsset(null);
                       setOriginalAssetBlocks([]);
                     } else {
@@ -1544,10 +1592,10 @@ function ClientDashboard() {
                         userId = null;
                       }
                       // Only send propertyId and userId as flat fields
-                      await axios.post('http://localhost:5000/api/assets', { ...payload, userId, propertyId: payload.propertyId });
+                      await axios.post(import.meta.env.VITE_API_URL + '/api/assets', { ...payload, userId, propertyId: payload.propertyId });
                     }
                     setAssetForm({ name: '', type: '', description: '', propertyId: '', quantity: 1, building: '', blocks: [] });
-                    const res = await axios.get('http://localhost:5000/api/assets');
+                    const res = await axios.get(import.meta.env.VITE_API_URL + '/api/assets');
                     setAssets(res.data || []);
                   } catch (err) {
                     console.error('Error saving asset:', err);
@@ -1743,7 +1791,7 @@ function ClientDashboard() {
                             if (window.confirm('Are you sure you want to delete this asset?')) {
                               try {
                                 await axios.delete(
-                                  `http://localhost:5000/api/assets/${asset._id || asset.id}`
+                                  `${import.meta.env.VITE_API_URL}/api/assets/${asset._id || asset.id}`
                                 );
                                 setAssets(assets.filter(a => (a._id || a.id) !== (asset._id || asset.id)));
                               } catch (err) {
@@ -1800,12 +1848,12 @@ function ClientDashboard() {
 
                     if (editingTech) {
                       await axios.put(
-                        `http://localhost:5000/api/internal-technicians/${editingTech._id || editingTech.id}`,
+                        `${import.meta.env.VITE_API_URL}/api/internal-technicians/${editingTech._id || editingTech.id}`,
                         data
                       );
                       setEditingTech(null);
                     } else {
-                      await axios.post('http://localhost:5000/api/internal-technicians', data);
+                      await axios.post(import.meta.env.VITE_API_URL + '/api/internal-technicians', data);
                     }
 
                     setTechForm({
@@ -1819,7 +1867,7 @@ function ClientDashboard() {
                       propertyId: '',
                     });
 
-                    const res = await axios.get('http://localhost:5000/api/internal-technicians');
+                    const res = await axios.get(import.meta.env.VITE_API_URL + '/api/internal-technicians');
                     setInternalTechnicians(res.data || []);
                   } catch (err) {
                     console.error('Error saving technician:', err);
@@ -1996,12 +2044,18 @@ function ClientDashboard() {
                           Edit
                         </button>
                         <button
+                          className="text-green-600 hover:text-green-800 px-3 py-1 rounded hover:bg-green-50 transition border border-green-200"
+                          onClick={() => openAssignModal(tech)}
+                        >
+                          Assign Issue
+                        </button>
+                        <button
                           className="text-red-600 hover:text-red-800 px-3 py-1 rounded hover:bg-red-50 transition border border-red-200"
                           onClick={async () => {
                             if (window.confirm('Are you sure you want to delete this technician?')) {
                               try {
                                 await axios.delete(
-                                  `http://localhost:5000/api/internal-technicians/${tech._id || tech.id}`
+                                  `${import.meta.env.VITE_API_URL}/api/internal-technicians/${tech._id || tech.id}`
                                 );
                                 setInternalTechnicians(
                                   internalTechnicians.filter(t => (t._id || t.id) !== (tech._id || tech.id))
@@ -2070,7 +2124,7 @@ function ClientDashboard() {
                     assets={assets}
                     initialData={editingSchedule}
                     onSuccess={async () => {
-                      const res = await axios.get('http://localhost:5000/api/maintenance-schedules');
+                      const res = await axios.get(import.meta.env.VITE_API_URL + '/api/maintenance-schedules');
                       setMaintenanceSchedules(res.data || []);
                       setShowScheduleForm(false);
                       setEditingSchedule(null);
@@ -2199,7 +2253,7 @@ function ClientDashboard() {
                                 if (window.confirm('Are you sure you want to delete this schedule?')) {
                                   try {
                                     await axios.delete(
-                                      `http://localhost:5000/api/maintenance-schedules/${schedule._id || schedule.id}`
+                                      `${import.meta.env.VITE_API_URL}/api/maintenance-schedules/${schedule._id || schedule.id}`
                                     );
                                     setMaintenanceSchedules(
                                       maintenanceSchedules.filter(s => (s._id || s.id) !== (schedule._id || schedule.id))
@@ -2224,6 +2278,72 @@ function ClientDashboard() {
           )}
         </div>
       </div>
+
+      {/* Assign Issue Modal */}
+      {assignModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 animate-fade-in-up">
+            <h3 className="text-2xl font-bold mb-4 text-gray-800">Assign Issue to {selectedTechForAssign?.name}</h3>
+
+            <p className="text-gray-600 mb-6">
+              Select a pending issue from <strong>{selectedTechForAssign?.property?.name || 'this property'}</strong> to assign.
+            </p>
+
+            {assignableIssues.length === 0 ? (
+              <div className="text-center py-8 bg-gray-50 rounded-lg border border-gray-100 mb-6">
+                <span className="text-4xl">🤷‍♂️</span>
+                <p className="text-gray-500 mt-2">No pending issues found for this property.</p>
+              </div>
+            ) : (
+              <div className="space-y-4 max-h-60 overflow-y-auto mb-6 pr-2">
+                {assignableIssues.map(issue => (
+                  <label
+                    key={issue.id || issue._id}
+                    className={`block p-3 rounded-lg border cursor-pointer transition-all ${selectedIssueForAssign === (issue.id || issue._id) ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200' : 'border-gray-200 hover:border-blue-300'}`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <input
+                        type="radio"
+                        name="issueAssign"
+                        value={issue.id || issue._id}
+                        checked={selectedIssueForAssign === (issue.id || issue._id)}
+                        onChange={(e) => setSelectedIssueForAssign(e.target.value)}
+                        className="mt-1"
+                      />
+                      <div>
+                        <div className="font-semibold text-gray-800">{issue.title}</div>
+                        <div className="text-sm text-gray-500 line-clamp-1">{issue.description}</div>
+                        <div className="text-xs text-blue-600 mt-1">
+                          {new Date(issue.createdAt).toLocaleDateString()}
+                        </div>
+                      </div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-gray-100">
+              <button
+                onClick={() => setAssignModalOpen(false)}
+                className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAssignSubmit}
+                disabled={!selectedIssueForAssign || assignableIssues.length === 0}
+                className={`px-4 py-2 rounded-lg text-white font-medium transition shadow-sm ${!selectedIssueForAssign || assignableIssues.length === 0
+                    ? 'bg-gray-300 cursor-not-allowed'
+                    : 'bg-blue-600 hover:bg-blue-700 hover:shadow-md'
+                  }`}
+              >
+                Confirm Assignment
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

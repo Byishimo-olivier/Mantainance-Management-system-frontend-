@@ -15,7 +15,7 @@ function RequestsPage() {
       const config = { headers: { Authorization: `Bearer ${token}` } };
       
       console.log('Fetching all issues for Requests page...');
-      const response = await axios.get("http://localhost:5000/api/issues", config);
+      const response = await axios.get(import.meta.env.VITE_API_URL + "/api/issues", config);
       console.log('All issues response:', response.data);
       
       // More flexible filtering - show issues that need approval
@@ -58,7 +58,7 @@ function RequestsPage() {
       
       // Try to update with approval fields first
       try {
-        await axios.put(`http://localhost:5000/api/issues/${requestId}`, {
+        await axios.put(`${import.meta.env.VITE_API_URL}/api/issues/${requestId}`, {
           status: 'PENDING',
           approved: true,
           approvedBy: JSON.parse(localStorage.getItem('user')).id,
@@ -67,7 +67,7 @@ function RequestsPage() {
       } catch (approvalError) {
         console.log('Approval fields not supported, trying basic update...');
         // Fallback: just update status to indicate it's ready for assignment
-        await axios.put(`http://localhost:5000/api/issues/${requestId}`, {
+        await axios.put(`${import.meta.env.VITE_API_URL}/api/issues/${requestId}`, {
           status: 'PENDING'
         }, config);
       }
@@ -92,7 +92,7 @@ function RequestsPage() {
       
       // Try to update with rejection fields first
       try {
-        await axios.put(`http://localhost:5000/api/issues/${selectedRequest._id}`, {
+        await axios.put(`${import.meta.env.VITE_API_URL}/api/issues/${selectedRequest._id}`, {
           status: 'REJECTED',
           rejected: true,
           rejectedBy: JSON.parse(localStorage.getItem('user')).id,
@@ -102,7 +102,7 @@ function RequestsPage() {
       } catch (rejectionError) {
         console.log('Rejection fields not supported, trying basic update...');
         // Fallback: just update status and store reason in description
-        await axios.put(`http://localhost:5000/api/issues/${selectedRequest._id}`, {
+        await axios.put(`${import.meta.env.VITE_API_URL}/api/issues/${selectedRequest._id}`, {
           status: 'REJECTED',
           description: `${selectedRequest.description}\n\nREJECTED: ${declineReason}`
         }, config);
@@ -189,10 +189,10 @@ function RequestsPage() {
                       <div className="flex items-start gap-4">
                         {(request.beforePhoto || request.photo) && (
                           <img 
-                            src={`http://localhost:5000${request.beforePhoto || request.photo}`}
+                            src={`${import.meta.env.VITE_API_URL}${request.beforePhoto || request.photo}`}
                             alt="Issue"
                             className="w-20 h-20 object-cover rounded-lg cursor-pointer hover:opacity-80"
-                            onClick={() => window.open(`http://localhost:5000${request.beforePhoto || request.photo}`, '_blank')}
+                            onClick={() => window.open(`${import.meta.env.VITE_API_URL}${request.beforePhoto || request.photo}`, '_blank')}
                           />
                         )}
                         <div className="flex-1">
@@ -304,10 +304,10 @@ function RequestsPage() {
                   <div>
                     <h3 className="font-semibold text-gray-700 mb-2">Client Photo</h3>
                     <img 
-                      src={`http://localhost:5000${selectedRequest.beforePhoto || selectedRequest.photo}`}
+                      src={`${import.meta.env.VITE_API_URL}${selectedRequest.beforePhoto || selectedRequest.photo}`}
                       alt="Issue"
                       className="w-32 h-32 object-cover rounded border cursor-pointer hover:opacity-80"
-                      onClick={() => window.open(`http://localhost:5000${selectedRequest.beforePhoto || selectedRequest.photo}`, '_blank')}
+                      onClick={() => window.open(`${import.meta.env.VITE_API_URL}${selectedRequest.beforePhoto || selectedRequest.photo}`, '_blank')}
                     />
                   </div>
                 )}

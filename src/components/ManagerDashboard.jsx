@@ -322,9 +322,9 @@ function ManagerDashboard() {
       const config = { headers: { Authorization: `Bearer ${token}` } };
 
       const [issuesRes, techRes, summaryRes] = await Promise.all([
-        axios.get("http://localhost:5000/api/issues", config),
-        axios.get("http://localhost:5000/api/technicians", config),
-        axios.get("http://localhost:5000/api/managers/dashboard/summary", config)
+        axios.get(import.meta.env.VITE_API_URL + "/api/issues", config),
+        axios.get(import.meta.env.VITE_API_URL + "/api/technicians", config),
+        axios.get(import.meta.env.VITE_API_URL + "/api/managers/dashboard/summary", config)
       ]);
 
       const allIssuesData = issuesRes.data;
@@ -382,7 +382,7 @@ function ManagerDashboard() {
       
       const config = { headers: { Authorization: `Bearer ${token}` } };
       
-      const response = await axios.get("http://localhost:5000/api/issues", config);
+      const response = await axios.get(import.meta.env.VITE_API_URL + "/api/issues", config);
       const issuesWithEvidence = response.data.filter(issue => 
         issue.evidence?.afterImage || issue.evidence?.address
       );
@@ -435,7 +435,7 @@ function ManagerDashboard() {
         return;
       }
 
-      await axios.put(`http://localhost:5000/api/issues/${issueId}`, {
+      await axios.put(`${import.meta.env.VITE_API_URL}/api/issues/${issueId}`, {
         status: 'APPROVED',
         approved: true,
         approvedBy: JSON.parse(localStorage.getItem('user')).id,
@@ -463,7 +463,7 @@ function ManagerDashboard() {
         return;
       }
 
-      await axios.put(`http://localhost:5000/api/issues/${issueId}`, {
+      await axios.put(`${import.meta.env.VITE_API_URL}/api/issues/${issueId}`, {
         status: 'DECLINED',
         rejected: true,
         rejectedBy: JSON.parse(localStorage.getItem('user')).id,
@@ -508,7 +508,7 @@ function ManagerDashboard() {
       }
 
       // Use the dedicated assign endpoint (consistent with ManagementIssues)
-      const response = await axios.post(`http://localhost:5000/api/issues/${issueId}/assign`, {
+      const response = await axios.post(`${import.meta.env.VITE_API_URL}/api/issues/${issueId}/assign`, {
         techId: tech._id || tech.id,
         priority: assignmentData.priority,
         dueDate: assignmentData.dueDate,
@@ -848,7 +848,7 @@ function ManagerDashboard() {
                       <div className="md:w-1/3">
                         <div className="rounded-2xl overflow-hidden shadow-lg">
                           <img 
-                            src={`http://localhost:5000${selectedRequest.beforePhoto || selectedRequest.photo}`}
+                            src={`${import.meta.env.VITE_API_URL}${selectedRequest.beforePhoto || selectedRequest.photo}`}
                             alt="Issue"
                             className="w-full h-64 object-cover hover:scale-105 transition-transform duration-300"
                           />
@@ -1162,7 +1162,7 @@ const RequestsTab = ({ pendingRequests, setSelectedRequest, setShowApprovalModal
               {(request.beforePhoto || request.photo) && (
                 <div className="mb-4">
                   <img 
-                    src={`http://localhost:5000${request.beforePhoto || request.photo}`}
+                    src={`${import.meta.env.VITE_API_URL}${request.beforePhoto || request.photo}`}
                     alt="Issue"
                     className="w-full h-48 object-cover rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300"
                   />
@@ -1240,7 +1240,7 @@ const IssuesTab = ({
                   <div className="lg:w-56 flex-shrink-0">
                     <div className="relative rounded-xl overflow-hidden shadow-lg">
                       <img 
-                        src={`http://localhost:5000${issue.photo || issue.image}`}
+                        src={`${import.meta.env.VITE_API_URL}${issue.photo || issue.image}`}
                         alt="Issue"
                         className="w-full h-56 object-cover hover:scale-105 transition-transform duration-300"
                       />
@@ -1656,7 +1656,7 @@ const FeedbackTab = ({ feedbacks, loadingFeedbacks }) => (
                 <div className="mb-4">
                   <div className="relative rounded-xl overflow-hidden shadow-lg group">
                     <img
-                      src={fb.evidence.afterImage.startsWith('/uploads/') ? `http://localhost:5000${fb.evidence.afterImage}` : fb.evidence.afterImage}
+                      src={fb.evidence.afterImage.startsWith('/uploads/') ? `${import.meta.env.VITE_API_URL}${fb.evidence.afterImage}` : fb.evidence.afterImage}
                       alt="After evidence"
                       className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
                     />

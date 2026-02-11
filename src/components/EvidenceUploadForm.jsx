@@ -23,7 +23,7 @@ const EvidenceUploadForm = ({ issueId, onSuccess }) => {
     try {
       const token = localStorage.getItem("token");
       await axios.post(
-        `http://localhost:5000/api/issues/${issueId}/evidence`,
+        `${import.meta.env.VITE_API_URL}/api/issues/${issueId}/evidence`,
         formData,
         { headers: { Authorization: `Bearer ${token}`, "Content-Type": "multipart/form-data" } }
       );

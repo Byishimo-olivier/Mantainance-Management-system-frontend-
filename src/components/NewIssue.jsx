@@ -7,14 +7,14 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
   const navigate = useNavigate();
   const location = useLocation();
   const formRef = useRef(null);
-  
+
   // Enhanced gradient background
   const backgroundGradient = "linear-gradient(135deg, #667eea 0%, #764ba2 25%, #f093fb 50%, #f5576c 75%, #ff7eb3 100%)";
-  
+
   const prefill = propModel || (location && location.state && location.state.model) ? (propModel || location.state.model) : {};
   const [prefilledAsset] = useState(prefill.asset || null);
   const [selectedItems] = useState(prefill.selectedItems || []);
-  
+
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -50,7 +50,7 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
     phone: "",
   });
 
-  const backendBase = 'http://localhost:5000';
+  const backendBase = import.meta.env.VITE_API_URL + '';
   const [submitting, setSubmitting] = useState(false);
   const [preview, setPreview] = useState(null);
   const [properties, setProperties] = useState([]);
@@ -83,7 +83,7 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
     // Load user data and check authentication
     const storedUser = localStorage.getItem('user');
     const storedToken = localStorage.getItem('token');
-    
+
     if (storedUser && storedToken) {
       const userObj = JSON.parse(storedUser);
       setIsAuthenticated(true);
@@ -113,14 +113,16 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
       const res = await axios.get(`${backendBase}/api/properties`, config);
       const list = Array.isArray(res.data) ? res.data : [];
       setProperties(list);
-      
+
       if (selectedPropertyId) {
         await loadAssetsForProperty(selectedPropertyId);
+        await loadInternalTechnicians(selectedPropertyId);
       } else if (prefilledAsset) {
         const pid = prefilledAsset.propertyId || (prefilledAsset.property && (prefilledAsset.property.id || prefilledAsset.property._id));
         if (pid) {
           setSelectedPropertyId(pid);
           await loadAssetsForProperty(pid);
+          await loadInternalTechnicians(pid);
         }
       }
     } catch (e) {
@@ -142,6 +144,18 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
     }
   }
 
+  async function loadInternalTechnicians(propertyId) {
+    try {
+      const token = localStorage.getItem('token');
+      const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+      const res = await axios.get(`${backendBase}/api/internal-technicians/by-property/${propertyId}`, config);
+      setInternalTechnicians(Array.isArray(res.data) ? res.data : []);
+    } catch (e) {
+      console.error("Failed to load internal technicians:", e);
+      setInternalTechnicians([]);
+    }
+  }
+
   const handleChange = (e) => {
     const { name, value, files } = e.target;
     if (files && files.length > 0) {
@@ -156,14 +170,14 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
     e.preventDefault();
     setSubmitting(true);
     setUploadProgress(0);
-    
+
     // For authenticated users, property is required
     if (isAuthenticated && !selectedPropertyId) {
       alert("Please select a property for your issue");
       setSubmitting(false);
       return;
     }
-    
+
     // Simulate upload progress
     const progressInterval = setInterval(() => {
       setUploadProgress(prev => {
@@ -179,7 +193,7 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
       const location = `Block ${form.building} - Floor ${form.floor} - Unit ${form.unit}`;
       const tags = [form.category.toUpperCase(), "PENDING"];
       const formData = new FormData();
-      
+
       formData.append("title", form.title);
       formData.append("description", form.description);
       formData.append("location", location);
@@ -195,16 +209,17 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
       if (prefill && prefill.assetId) formData.append('assetId', prefill.assetId);
       else if (prefilledAsset && (prefilledAsset.id || prefilledAsset._id)) formData.append('assetId', prefilledAsset.id || prefilledAsset._id);
       else if (selectedAssetId) formData.append('assetId', selectedAssetId);
-      
+
       if (prefill && prefill.selectedItems && Array.isArray(prefill.selectedItems) && prefill.selectedItems.length > 0) {
         const ids = prefill.selectedItems.map(si => si.assetId).filter(Boolean);
         if (ids.length > 0) formData.append('assetIds', JSON.stringify(ids));
       }
 
       if (selectedPropertyId) formData.append('propertyId', selectedPropertyId);
+      if (selectedTechnicianId) formData.append('internalTechnicianId', selectedTechnicianId);
 
       const token = localStorage.getItem('token');
-      
+
       // Submit with either authenticated userId or anonymous ID
       if (isAuthenticated && userId) {
         formData.append("userId", userId);
@@ -217,18 +232,18 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
       const headers = { "Content-Type": "multipart/form-data" };
       if (token) headers.Authorization = `Bearer ${token}`;
 
-      await axios.post("http://localhost:5000/api/issues", formData, { headers });
-      
+      await axios.post(import.meta.env.VITE_API_URL + "/api/issues", formData, { headers });
+
       clearInterval(progressInterval);
       setUploadProgress(100);
-      
+
       // Show success animation
       setShowSuccess(true);
-      
+
       setTimeout(() => {
         setSubmitting(false);
         setShowSuccess(false);
-        
+
         if (onClose && typeof onClose === 'function') {
           onClose(true);
         } else {
@@ -249,7 +264,7 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
   // Floating animation effect
   const floatingAnimation = {
     initial: { y: 0 },
-    animate: { 
+    animate: {
       y: [0, -10, 0],
       transition: {
         duration: 3,
@@ -270,7 +285,7 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
         className="space-y-6"
       >
         <div className="text-center mb-8">
-          <motion.h2 
+          <motion.h2
             initial={{ scale: 0.9 }}
             animate={{ scale: 1 }}
             className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent"
@@ -279,7 +294,7 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
           </motion.h2>
           <p className="text-gray-600 mt-2">Let's start with the basic information</p>
         </div>
-        
+
         <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
           <label className="block font-semibold mb-2 text-gray-700" htmlFor="title">
             Issue Title <span className="text-red-500">*</span>
@@ -341,7 +356,7 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
         className="space-y-6"
       >
         <div className="text-center mb-8">
-          <motion.h2 
+          <motion.h2
             initial={{ scale: 0.9 }}
             animate={{ scale: 1 }}
             className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent"
@@ -359,7 +374,7 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
             {isAuthenticated ? '✓ Authenticated Submission' : '◎ Anonymous Submission'}
           </div>
         </div>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {[
             { id: 'name', label: 'Name', type: 'text', placeholder: 'Your full name' },
@@ -402,7 +417,7 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
         className="space-y-6"
       >
         <div className="text-center mb-8">
-          <motion.h2 
+          <motion.h2
             initial={{ scale: 0.9 }}
             animate={{ scale: 1 }}
             className="text-3xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent"
@@ -411,7 +426,7 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
           </motion.h2>
           <p className="text-gray-600 mt-2">Where is the issue located?</p>
         </div>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {[
             { id: 'building', label: 'Building', placeholder: 'e.g., Block A' },
@@ -460,7 +475,9 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
                   setSelectedPropertyId(pid);
                   const prop = properties.find(p => (p.id || p._id) === pid);
                   if (prop) setForm(f => ({ ...f, building: prop.name || f.building }));
+                  if (prop) setForm(f => ({ ...f, building: prop.name || f.building }));
                   await loadAssetsForProperty(pid);
+                  await loadInternalTechnicians(pid);
                 }}
               >
                 <option value="">-- Select property {isAuthenticated ? "(required)" : "(optional)"} --</option>
@@ -503,7 +520,7 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
         className="space-y-6"
       >
         <div className="text-center mb-8">
-          <motion.h2 
+          <motion.h2
             initial={{ scale: 0.9 }}
             animate={{ scale: 1 }}
             className="text-3xl font-bold bg-gradient-to-r from-yellow-600 to-orange-600 bg-clip-text text-transparent"
@@ -535,10 +552,10 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
                 animate={{ scale: 1 }}
                 className="relative"
               >
-                <img 
-                  src={preview} 
-                  alt="Preview" 
-                  className="h-48 object-contain rounded-xl shadow-lg" 
+                <img
+                  src={preview}
+                  alt="Preview"
+                  className="h-48 object-contain rounded-xl shadow-lg"
                 />
                 <motion.div
                   whileHover={{ scale: 1.1 }}
@@ -595,7 +612,7 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
   };
 
   return (
-    <div 
+    <div
       className={`min-h-screen ${asModal ? 'bg-transparent' : ''}`}
       style={asModal ? {} : { background: backgroundGradient }}
     >
@@ -626,17 +643,17 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
 
       {/* Animated Navbar */}
       {!asModal && (
-        <motion.nav 
+        <motion.nav
           initial={{ y: -100 }}
           animate={{ y: 0 }}
           transition={{ type: "spring", stiffness: 100 }}
           className="flex items-center justify-between bg-gradient-to-r from-purple-900/90 to-pink-900/90 shadow-2xl px-4 md:px-8 h-16 backdrop-blur-md"
         >
-          <motion.div 
+          <motion.div
             className="flex items-center gap-3"
             whileHover={{ scale: 1.05 }}
           >
-            <motion.span 
+            <motion.span
               className="bg-white rounded-2xl p-2 flex items-center justify-center shadow-lg"
               whileHover={{ rotate: 360 }}
               transition={{ duration: 0.5 }}
@@ -648,7 +665,7 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
             </motion.span>
             <div className="flex flex-col">
               <span className="text-lg font-bold text-white">Fixnest</span>
-              <motion.span 
+              <motion.span
                 className="text-sm text-purple-200"
                 animate={{ opacity: [1, 0.5, 1] }}
                 transition={{ duration: 2, repeat: Infinity }}
@@ -669,11 +686,10 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
                 key={item.path}
                 whileHover={{ y: -2 }}
                 whileTap={{ scale: 0.95 }}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-white font-semibold transition-all ${
-                  item.active 
-                    ? 'bg-gradient-to-r from-yellow-500 to-orange-500 shadow-lg' 
-                    : `bg-gradient-to-r ${item.color} hover:shadow-lg`
-                }`}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-white font-semibold transition-all ${item.active
+                  ? 'bg-gradient-to-r from-yellow-500 to-orange-500 shadow-lg'
+                  : `bg-gradient-to-r ${item.color} hover:shadow-lg`
+                  }`}
                 onClick={() => !item.active && navigate(item.path)}
               >
                 {item.label}
@@ -717,15 +733,15 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
                   >
                     <div className={`
                       w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold
-                      ${formStep >= step 
-                        ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg' 
+                      ${formStep >= step
+                        ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg'
                         : 'bg-gray-200'
                       }
                     `}>
                       {formStep > step ? '✓' : step}
                     </div>
                     <span className="mt-2 text-sm font-medium">
-                      {['Details', 'Contact', 'Location', 'Upload'][step-1]}
+                      {['Details', 'Contact', 'Location', 'Upload'][step - 1]}
                     </span>
                   </motion.div>
                   {step < 4 && (
@@ -750,7 +766,7 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
           </AnimatePresence>
 
           {/* Navigation Buttons */}
-          <motion.div 
+          <motion.div
             className="flex justify-between mt-12 pt-8 border-t border-gray-200"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -761,11 +777,10 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
               whileHover={{ x: -5 }}
               whileTap={{ scale: 0.95 }}
               onClick={prevStep}
-              className={`px-8 py-4 rounded-2xl text-lg font-semibold transition-all ${
-                formStep === 1 
-                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
-                  : 'bg-gradient-to-r from-gray-400 to-gray-600 text-white hover:shadow-lg'
-              }`}
+              className={`px-8 py-4 rounded-2xl text-lg font-semibold transition-all ${formStep === 1
+                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                : 'bg-gradient-to-r from-gray-400 to-gray-600 text-white hover:shadow-lg'
+                }`}
               disabled={formStep === 1}
             >
               ← Previous
@@ -823,7 +838,7 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
                   ) : (
                     'Submit Issue'
                   )}
-                  
+
                   {/* Progress Bar */}
                   {submitting && (
                     <motion.div

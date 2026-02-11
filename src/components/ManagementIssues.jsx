@@ -27,10 +27,10 @@ const tagColors = {
       return;
     }
     axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    axios.get("http://localhost:5000/api/issues")
+    axios.get(import.meta.env.VITE_API_URL + "/api/issues")
       .then(res => setIssues(res.data))
       .catch(() => setIssues([]));
-    axios.get("http://localhost:5000/api/technicians")
+    axios.get(import.meta.env.VITE_API_URL + "/api/technicians")
       .then(res => setTechnicians(res.data))
       .catch(() => setTechnicians([]));
   }, []);
@@ -50,7 +50,7 @@ const tagColors = {
     }
     try {
       // Use the dedicated assign endpoint
-      const res = await axios.post(`http://localhost:5000/api/issues/${issue.id}/assign`, { techId: tech._id || tech.id });
+      const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/issues/${issue.id}/assign`, { techId: tech._id || tech.id });
       // Update UI with the new issue data from backend
       setIssues(prev => prev.map((iss, i) => i === idx ? res.data : iss));
     } catch (err) {
@@ -87,7 +87,7 @@ const tagColors = {
             <div className="text-gray-500 text-sm mb-1">{issue.location}</div>
             {(issue.photo || issue.image) && (
               <img
-                src={`http://localhost:5000${issue.photo || issue.image}`}
+                src={`${import.meta.env.VITE_API_URL}${issue.photo || issue.image}`}
                 alt="Issue"
                 className="w-full h-32 max-w-xs object-cover rounded mb-2 mx-auto"
                 style={{ aspectRatio: '4/3' }}

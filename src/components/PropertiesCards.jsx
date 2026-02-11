@@ -16,7 +16,7 @@ export default function PropertiesCards() {
   async function fetchProperties() {
     setLoading(true);
     try {
-      const res = await axios.get('http://localhost:5000/api/properties');
+      const res = await axios.get(import.meta.env.VITE_API_URL + '/api/properties');
       const data = res.data;
       if (Array.isArray(data)) setProperties(data);
       else if (data && Array.isArray(data.data)) setProperties(data.data);

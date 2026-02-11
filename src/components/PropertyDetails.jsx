@@ -25,10 +25,10 @@ export default function PropertyDetails() {
   async function fetchAll() {
     setLoading(true);
     try {
-      const p = await axios.get(`http://localhost:5000/api/properties/${id}`);
+      const p = await axios.get(`${import.meta.env.VITE_API_URL}/api/properties/${id}`);
       setProperty(p.data || null);
 
-      const res = await axios.get('http://localhost:5000/api/issues');
+      const res = await axios.get(import.meta.env.VITE_API_URL + '/api/issues');
       const all = res.data || [];
       const filtered = all.filter(i => {
         if (!i) return false;
@@ -40,16 +40,16 @@ export default function PropertyDetails() {
 
       // assets
       try {
-        const ares = await axios.get(`http://localhost:5000/api/assets?propertyId=${id}`);
+        const ares = await axios.get(`${import.meta.env.VITE_API_URL}/api/assets?propertyId=${id}`);
         setAssets(ares.data || []);
       } catch (e) {
-        const allA = await axios.get('http://localhost:5000/api/assets');
+        const allA = await axios.get(import.meta.env.VITE_API_URL + '/api/assets');
         setAssets((allA.data || []).filter(a => String(a.propertyId) === String(id) || String(a.property?._id) === String(id)));
       }
 
       // for assignment
       try {
-        const tr = await axios.get('http://localhost:5000/api/technicians/for-assignment');
+        const tr = await axios.get(import.meta.env.VITE_API_URL + '/api/technicians/for-assignment');
         setTechs(tr.data || []);
       } catch (e) {
         setTechs([]);
@@ -84,7 +84,7 @@ export default function PropertyDetails() {
       userId: userId || undefined,
     };
     try {
-      await axios.post('http://localhost:5000/api/issues', payload);
+      await axios.post(import.meta.env.VITE_API_URL + '/api/issues', payload);
       setNewIssue({ title: '', description: '', tags: '', assetId: '' });
       await fetchAll();
     } catch (e) {
@@ -95,7 +95,7 @@ export default function PropertyDetails() {
 
   async function approve(issueId) {
     try {
-      await axios.post(`http://localhost:5000/api/issues/${issueId}/approve`);
+      await axios.post(`${import.meta.env.VITE_API_URL}/api/issues/${issueId}/approve`);
       await fetchAll();
     } catch (e) { console.error(e); alert('Approve failed'); }
   }
@@ -103,7 +103,7 @@ export default function PropertyDetails() {
   async function decline(issueId) {
     try {
       const reason = prompt('Decline reason (optional)');
-      await axios.post(`http://localhost:5000/api/issues/${issueId}/decline`, { reason });
+      await axios.post(`${import.meta.env.VITE_API_URL}/api/issues/${issueId}/decline`, { reason });
       await fetchAll();
     } catch (e) { console.error(e); alert('Decline failed'); }
   }
@@ -111,7 +111,7 @@ export default function PropertyDetails() {
   async function assignInternal(issueId, techId) {
     try {
       if (!techId) return;
-      await axios.post(`http://localhost:5000/api/issues/${issueId}/assign`, { techId });
+      await axios.post(`${import.meta.env.VITE_API_URL}/api/issues/${issueId}/assign`, { techId });
       await fetchAll();
     } catch (e) { console.error(e); alert('Assign failed'); }
   }
@@ -120,7 +120,7 @@ export default function PropertyDetails() {
     const name = prompt('External technician name or contact:');
     if (!name) return;
     try {
-      await axios.put(`http://localhost:5000/api/issues/${issueId}`, { assignedTo: name, status: 'ASSIGNED' });
+      await axios.put(`${import.meta.env.VITE_API_URL}/api/issues/${issueId}`, { assignedTo: name, status: 'ASSIGNED' });
       await fetchAll();
     } catch (e) { console.error(e); alert('Assign failed'); }
   }

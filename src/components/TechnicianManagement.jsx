@@ -10,7 +10,7 @@ function TechnicianManagement() {
   const [technicians, setTechnicians] = useState([]);
     // Fetch technicians from backend
     useEffect(() => {
-      axios.get("http://localhost:5000/api/technicians")
+      axios.get(import.meta.env.VITE_API_URL + "/api/technicians")
         .then(res => setTechnicians(res.data))
         .catch(() => setTechnicians([]));
     }, []);
@@ -54,7 +54,7 @@ function TechnicianManagement() {
     e.preventDefault();
     setSaving(true);
     try {
-      const res = await axios.post("http://localhost:5000/api/technicians", {
+      const res = await axios.post(import.meta.env.VITE_API_URL + "/api/technicians", {
         ...form,
         rating: 4.0,
         completed: 0,
