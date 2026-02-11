@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import Select from 'react-select';
-import axios from 'axios';
+import api from '../api/axios';
 
 export default function ScheduleMaintenanceForm({ onSuccess, technicians = [], assets = [], onClose, initialData = null }) {
   const [form, setForm] = useState({
@@ -71,13 +71,13 @@ export default function ScheduleMaintenanceForm({ onSuccess, technicians = [], a
     setError('');
     try {
       if (initialData && (initialData._id || initialData.id)) {
-        await axios.put(`${import.meta.env.VITE_API_URL}/api/maintenance-schedules/${initialData._id || initialData.id}`, {
+        await api.put(`/api/maintenance-schedules/${initialData._id || initialData.id}`, {
           ...form,
           employees: form.employees.join(','),
           assets: form.assets.join(','),
         });
       } else {
-        await axios.post(import.meta.env.VITE_API_URL + '/api/maintenance-schedules', {
+        await api.post('/api/maintenance-schedules', {
           ...form,
           employees: form.employees.join(','), // send as comma-separated string
           assets: form.assets.join(','),
