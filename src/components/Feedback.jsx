@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../api/axios";
 import { useNavigate } from "react-router-dom";
 
 export default function Feedback() {
@@ -15,11 +15,11 @@ export default function Feedback() {
       return;
     }
     const userObj = JSON.parse(storedUser);
-    axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+    // Auth handled by interceptor
     async function fetchFeedbacks() {
       try {
         // Fetch all issues for this client
-        const res = await axios.get(`http://localhost:5000/api/issues/user/${userObj._id}`);
+        const res = await api.get(`/api/issues/user/${userObj._id}`);
         // Only show issues that have after evidence (completion details or afterImage)
         const feedbackIssues = (res.data || []).filter(issue => issue.status === 'COMPLETE' || issue.status === 'OVERDUE' || issue.afterImage || issue.address);
         setFeedbacks(feedbackIssues);
@@ -36,7 +36,7 @@ export default function Feedback() {
     <div className="min-h-screen bg-gray-50 py-8 px-4 md:px-8">
       <div className="max-w-3xl mx-auto bg-white rounded-3xl shadow-lg p-8 border border-gray-100">
         <h1 className="text-2xl md:text-3xl font-extrabold text-indigo-700 mb-6 flex items-center gap-2">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M2 12a10 10 0 1 0 20 0A10 10 0 0 0 2 12Zm6-1 2 2 4-4" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M2 12a10 10 0 1 0 20 0A10 10 0 0 0 2 12Zm6-1 2 2 4-4" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
           Technician Feedback
         </h1>
         {loading ? (
@@ -53,7 +53,7 @@ export default function Feedback() {
                 </div>
                 {fb.afterImage && (
                   <img
-                    src={fb.afterImage.startsWith('/uploads/') ? `http://localhost:5000${fb.afterImage}` : fb.afterImage}
+                    src={fb.afterImage.startsWith('/uploads/') ? `${api.defaults.baseURL || import.meta.env.VITE_API_URL || ''}${fb.afterImage}` : fb.afterImage}
                     alt="After evidence"
                     className="w-32 h-32 object-cover rounded mb-2 border"
                   />

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import api from '../api/axios';
 import { useParams, useNavigate } from 'react-router-dom';
 
 export default function PropertyPublicView() {
@@ -13,7 +13,7 @@ export default function PropertyPublicView() {
   useEffect(() => {
     const stored = localStorage.getItem('user');
     if (stored) {
-      try { setCurrentUser(JSON.parse(stored)); } catch(e) { setCurrentUser(null); }
+      try { setCurrentUser(JSON.parse(stored)); } catch (e) { setCurrentUser(null); }
     }
     fetch();
     // eslint-disable-next-line
@@ -22,16 +22,16 @@ export default function PropertyPublicView() {
   async function fetch() {
     setLoading(true);
     try {
-      const p = await axios.get(`http://localhost:5000/api/properties/${id}`);
+      const p = await api.get(`/api/properties/${id}`);
       setProperty(p.data || null);
       // fetch issues and filter by property name/address
-      const res = await axios.get('http://localhost:5000/api/issues');
+      const res = await api.get('/api/issues');
       const all = res.data || [];
       const filtered = all.filter(i => {
         if (!i) return false;
         const loc = (i.location || i.address || '').toString().toLowerCase();
         return (p.data && ((p.data.name || '').toString().toLowerCase() && loc.includes((p.data.name || '').toString().toLowerCase()))) ||
-               (p.data && ((p.data.address || '').toString().toLowerCase() && loc.includes((p.data.address || '').toString().toLowerCase())));
+          (p.data && ((p.data.address || '').toString().toLowerCase() && loc.includes((p.data.address || '').toString().toLowerCase())));
       });
       setIssues(filtered);
     } catch (err) {
@@ -44,7 +44,7 @@ export default function PropertyPublicView() {
 
   async function approve(issueId) {
     try {
-      await axios.post(`/api/issues/${issueId}/approve`);
+      await api.post(`/api/issues/${issueId}/approve`);
       await fetch();
     } catch (e) { console.error(e); alert('Approve failed'); }
   }
@@ -52,7 +52,7 @@ export default function PropertyPublicView() {
   async function decline(issueId) {
     try {
       const reason = prompt('Reason for decline (optional)');
-      await axios.post(`/api/issues/${issueId}/decline`, { reason });
+      await api.post(`/api/issues/${issueId}/decline`, { reason });
       await fetch();
     } catch (e) { console.error(e); alert('Decline failed'); }
   }
@@ -84,7 +84,7 @@ export default function PropertyPublicView() {
                   <div>
                     <div className="font-semibold">{it.title}</div>
                     <div className="text-sm text-gray-600">{it.description}</div>
-                    <div className="text-xs text-gray-500 mt-1">Tags: {(it.tags||[]).join(', ')}</div>
+                    <div className="text-xs text-gray-500 mt-1">Tags: {(it.tags || []).join(', ')}</div>
                   </div>
                   <div className="text-right">
                     <div className="text-sm">Status: {it.status || 'PENDING'}</div>
@@ -95,8 +95,8 @@ export default function PropertyPublicView() {
                 {/* Approve/Decline available to admins/managers or owner accounts */}
                 {(currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager' || currentUser.id === it.userId || currentUser._id === it.userId)) && (
                   <div className="mt-3 flex gap-2">
-                    {!it.approved && <button className="px-3 py-1 bg-green-100 text-green-700 rounded" onClick={() => approve(it.id||it._id)}>Approve</button>}
-                    {!it.rejected && <button className="px-3 py-1 bg-red-100 text-red-700 rounded" onClick={() => decline(it.id||it._id)}>Decline</button>}
+                    {!it.approved && <button className="px-3 py-1 bg-green-100 text-green-700 rounded" onClick={() => approve(it.id || it._id)}>Approve</button>}
+                    {!it.rejected && <button className="px-3 py-1 bg-red-100 text-red-700 rounded" onClick={() => decline(it.id || it._id)}>Decline</button>}
                   </div>
                 )}
               </div>

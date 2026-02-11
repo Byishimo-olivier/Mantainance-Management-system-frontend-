@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import api from '../../api/axios';
 
 
 export default function Login({ onLogin }) {
@@ -13,13 +14,9 @@ export default function Login({ onLogin }) {
     e.preventDefault();
     setError('');
     try {
-      const res = await fetch('http://localhost:5000/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
-      });
-      const data = await res.json();
-      if (res.ok) {
+      const res = await api.post('/api/auth/login', { email, password });
+      const data = res.data;
+      if (res.status === 200) {
         onLogin && onLogin(data.token, data.user);
         // Role-based redirect
         if (data.user && data.user.role === 'admin') {
@@ -37,7 +34,8 @@ export default function Login({ onLogin }) {
         setError(data.error || 'Login failed');
       }
     } catch (err) {
-      setError('Network error');
+      console.error(err);
+      setError(err.response?.data?.error || 'Login failed');
     }
   };
 

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import React, { useState, useEffect } from "react";
+import api from "../api/axios";
 import { useNavigate } from "react-router-dom";
 import {
   Shield,
@@ -32,56 +33,56 @@ import {
 const StatusBadge = ({ status }) => {
   const getStatusConfig = (status) => {
     const statusMap = {
-      'PENDING': { 
+      'PENDING': {
         bg: 'bg-gradient-to-r from-amber-50 to-orange-50',
         text: 'text-amber-700',
         border: 'border-amber-200',
         icon: '⏳',
         label: 'Pending'
       },
-      'APPROVED': { 
+      'APPROVED': {
         bg: 'bg-gradient-to-r from-blue-50 to-indigo-50',
         text: 'text-blue-700',
         border: 'border-blue-200',
         icon: '✅',
         label: 'Approved'
       },
-      'ASSIGNED': { 
+      'ASSIGNED': {
         bg: 'bg-gradient-to-r from-purple-50 to-violet-50',
         text: 'text-purple-700',
         border: 'border-purple-200',
         icon: '👤',
         label: 'Assigned'
       },
-      'IN PROGRESS': { 
+      'IN PROGRESS': {
         bg: 'bg-gradient-to-r from-orange-50 to-red-50',
         text: 'text-orange-700',
         border: 'border-orange-200',
         icon: '🚧',
         label: 'In Progress'
       },
-      'COMPLETE': { 
+      'COMPLETE': {
         bg: 'bg-gradient-to-r from-emerald-50 to-green-50',
         text: 'text-emerald-700',
         border: 'border-emerald-200',
         icon: '🎯',
         label: 'Complete'
       },
-      'COMPLETED': { 
+      'COMPLETED': {
         bg: 'bg-gradient-to-r from-emerald-50 to-green-50',
         text: 'text-emerald-700',
         border: 'border-emerald-200',
         icon: '🎯',
         label: 'Complete'
       },
-      'DECLINED': { 
+      'DECLINED': {
         bg: 'bg-gradient-to-r from-rose-50 to-pink-50',
         text: 'text-rose-700',
         border: 'border-rose-200',
         icon: '❌',
         label: 'Declined'
       },
-      'OVERDUE': { 
+      'OVERDUE': {
         bg: 'bg-gradient-to-r from-red-50 to-rose-50',
         text: 'text-red-700',
         border: 'border-red-200',
@@ -89,7 +90,7 @@ const StatusBadge = ({ status }) => {
         label: 'Overdue'
       },
     };
-    return statusMap[status] || { 
+    return statusMap[status] || {
       bg: 'bg-gradient-to-r from-gray-50 to-slate-50',
       text: 'text-gray-700',
       border: 'border-gray-200',
@@ -111,32 +112,32 @@ const StatusBadge = ({ status }) => {
 const PriorityBadge = ({ priority }) => {
   const getPriorityConfig = (priority) => {
     const priorityMap = {
-      'LOW': { 
+      'LOW': {
         bg: 'bg-gradient-to-r from-emerald-100 to-teal-100',
         text: 'text-emerald-800',
         icon: '⬇️',
         glow: 'shadow-emerald-200'
       },
-      'MEDIUM': { 
+      'MEDIUM': {
         bg: 'bg-gradient-to-r from-amber-100 to-yellow-100',
         text: 'text-amber-800',
         icon: '⚠️',
         glow: 'shadow-amber-200'
       },
-      'HIGH': { 
+      'HIGH': {
         bg: 'bg-gradient-to-r from-orange-100 to-red-100',
         text: 'text-orange-800',
         icon: '🔥',
         glow: 'shadow-orange-200'
       },
-      'URGENT': { 
+      'URGENT': {
         bg: 'bg-gradient-to-r from-rose-100 to-pink-100',
         text: 'text-rose-800',
         icon: '🚨',
         glow: 'shadow-rose-200'
       },
     };
-    return priorityMap[priority] || { 
+    return priorityMap[priority] || {
       bg: 'bg-gradient-to-r from-gray-100 to-slate-100',
       text: 'text-gray-800',
       icon: '📌',
@@ -266,25 +267,25 @@ function ManagerDashboard() {
   const [allIssues, setAllIssues] = useState([]);
   const [pendingRequests, setPendingRequests] = useState([]);
   const [technicians, setTechnicians] = useState([]);
-  const [summary, setSummary] = useState({ 
-    pending: 0, 
-    inProgress: 0, 
-    completed: 0, 
-    overdue: 0 
+  const [summary, setSummary] = useState({
+    pending: 0,
+    inProgress: 0,
+    completed: 0,
+    overdue: 0
   });
   const [assigning, setAssigning] = useState(null);
-  const [assignmentData, setAssignmentData] = useState({ 
-    technicianId: "", 
-    priority: "MEDIUM", 
-    dueDate: "" 
+  const [assignmentData, setAssignmentData] = useState({
+    technicianId: "",
+    priority: "MEDIUM",
+    dueDate: ""
   });
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [declineReason, setDeclineReason] = useState('');
-  const [filters, setFilters] = useState({ 
-    status: 'all', 
-    priority: 'all', 
-    assignedTo: 'all' 
+  const [filters, setFilters] = useState({
+    status: 'all',
+    priority: 'all',
+    assignedTo: 'all'
   });
   const [feedbacks, setFeedbacks] = useState([]);
   const [loadingFeedbacks, setLoadingFeedbacks] = useState(false);
@@ -310,33 +311,34 @@ function ManagerDashboard() {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      
+
       // Check if token exists
       if (!token) {
         console.warn('No authentication token found');
         navigate('/login');
         return;
       }
-      
+
       console.log('Token exists:', !!token, 'First 20 chars:', token?.substring(0, 20));
-      const config = { headers: { Authorization: `Bearer ${token}` } };
+      console.log('Token exists:', !!token, 'First 20 chars:', token?.substring(0, 20));
+      // const config = { headers: { Authorization: `Bearer ${token}` } }; // handled by interceptor
 
       const [issuesRes, techRes, summaryRes] = await Promise.all([
-        axios.get("http://localhost:5000/api/issues", config),
-        axios.get("http://localhost:5000/api/technicians", config),
-        axios.get("http://localhost:5000/api/managers/dashboard/summary", config)
+        api.get("/api/issues"),
+        api.get("/api/technicians"),
+        api.get("/api/managers/dashboard/summary")
       ]);
 
       const allIssuesData = issuesRes.data;
       setAllIssues(allIssuesData);
-      
-      const approvedIssues = allIssuesData.filter(issue => 
+
+      const approvedIssues = allIssuesData.filter(issue =>
         issue.approved === true || issue.assignedTo || (issue.status !== 'PENDING' && issue.status !== 'REJECTED')
       );
-      const pendingRequests = allIssuesData.filter(issue => 
+      const pendingRequests = allIssuesData.filter(issue =>
         issue.status === 'PENDING' && !issue.assignedTo && !issue.approved
       );
-      
+
       setIssues(approvedIssues);
       setPendingRequests(pendingRequests);
       setTechnicians(techRes.data || []);
@@ -345,7 +347,7 @@ function ManagerDashboard() {
       console.error('Failed to load data:', err);
       console.error('Error response:', err.response?.data);
       console.error('Error status:', err.response?.status);
-      
+
       // Check if it's a 401 error
       if (err.response?.status === 401) {
         console.warn('Unauthorized - token may have expired');
@@ -354,7 +356,7 @@ function ManagerDashboard() {
         navigate('/login');
         return;
       }
-      
+
       setIssues([]);
       setAllIssues([]);
       setPendingRequests([]);
@@ -368,36 +370,36 @@ function ManagerDashboard() {
   // Fetch feedbacks when switching to feedback tab
   const fetchFeedbacks = async () => {
     if (activeTab !== 'feedback') return;
-    
+
     try {
       setLoadingFeedbacks(true);
       const token = localStorage.getItem('token');
-      
+
       // Check if token exists
       if (!token) {
         console.warn('No authentication token found');
         navigate('/login');
         return;
       }
-      
-      const config = { headers: { Authorization: `Bearer ${token}` } };
-      
-      const response = await axios.get("http://localhost:5000/api/issues", config);
-      const issuesWithEvidence = response.data.filter(issue => 
+
+      // const config = { headers: { Authorization: `Bearer ${token}` } };
+
+      const response = await api.get("/api/issues");
+      const issuesWithEvidence = response.data.filter(issue =>
         issue.evidence?.afterImage || issue.evidence?.address
       );
-      
+
       const formattedFeedbacks = issuesWithEvidence.map(issue => ({
         ...issue,
         technicianName: getAssignedTechName(issue),
         completedAt: issue.updatedAt,
         evidence: issue.evidence || {}
       }));
-      
+
       setFeedbacks(formattedFeedbacks);
     } catch (err) {
       console.error('Failed to load feedbacks:', err);
-      
+
       // Check if it's a 401 error
       if (err.response?.status === 401) {
         console.warn('Unauthorized - token may have expired');
@@ -406,7 +408,7 @@ function ManagerDashboard() {
         navigate('/login');
         return;
       }
-      
+
       setFeedbacks([]);
     } finally {
       setLoadingFeedbacks(false);
@@ -427,20 +429,20 @@ function ManagerDashboard() {
   const handleApproveRequest = async (requestId) => {
     try {
       const token = localStorage.getItem('token');
-      const config = { headers: { Authorization: `Bearer ${token}` } };
-      
+      // const config = { headers: { Authorization: `Bearer ${token}` } };
+
       const issueId = selectedRequest?._id || selectedRequest?.id || requestId;
       if (!issueId) {
         alert('No issue ID found');
         return;
       }
 
-      await axios.put(`http://localhost:5000/api/issues/${issueId}`, {
+      await api.put(`/api/issues/${issueId}`, {
         status: 'APPROVED',
         approved: true,
         approvedBy: JSON.parse(localStorage.getItem('user')).id,
         approvedAt: new Date().toISOString()
-      }, config);
+      });
 
       await fetchDashboardData();
       setShowApprovalModal(false);
@@ -455,21 +457,21 @@ function ManagerDashboard() {
   const handleDeclineRequest = async () => {
     try {
       const token = localStorage.getItem('token');
-      const config = { headers: { Authorization: `Bearer ${token}` } };
-      
+      // const config = { headers: { Authorization: `Bearer ${token}` } };
+
       const issueId = selectedRequest?._id || selectedRequest?.id;
       if (!issueId) {
         alert('No issue ID found');
         return;
       }
 
-      await axios.put(`http://localhost:5000/api/issues/${issueId}`, {
+      await api.put(`/api/issues/${issueId}`, {
         status: 'DECLINED',
         rejected: true,
         rejectedBy: JSON.parse(localStorage.getItem('user')).id,
         rejectedAt: new Date().toISOString(),
         rejectionReason: declineReason
-      }, config);
+      });
 
       await fetchDashboardData();
       setShowApprovalModal(false);
@@ -491,16 +493,16 @@ function ManagerDashboard() {
       setAssigning(null);
       return;
     }
-    
+
     if (!assignmentData.dueDate) {
       alert('Please select a due date for this assignment');
       return;
     }
-    
+
     try {
       const token = localStorage.getItem('token');
-      const config = { headers: { Authorization: `Bearer ${token}` } };
-      
+      // const config = { headers: { Authorization: `Bearer ${token}` } };
+
       const issueId = issue?._id || issue?.id;
       if (!issueId) {
         alert('No issue ID found');
@@ -508,17 +510,17 @@ function ManagerDashboard() {
       }
 
       // Use the dedicated assign endpoint (consistent with ManagementIssues)
-      const response = await axios.post(`http://localhost:5000/api/issues/${issueId}/assign`, {
+      const response = await api.post(`/api/issues/${issueId}/assign`, {
         techId: tech._id || tech.id,
         priority: assignmentData.priority,
         dueDate: assignmentData.dueDate,
         status: 'ASSIGNED'
-      }, config);
+      });
 
       // Update issues list with the response from backend
       const updatedIssues = issues.map((iss, i) => i === idx ? response.data : iss);
       setIssues(updatedIssues);
-      
+
       setAssigning(null);
       setAssignmentData({ technicianId: "", priority: "MEDIUM", dueDate: "" });
       alert('Issue assigned successfully!');
@@ -541,7 +543,7 @@ function ManagerDashboard() {
   // Filter function
   const getFilteredIssues = () => {
     let allIssues = [...pendingRequests, ...issues];
-    
+
     if (searchQuery) {
       allIssues = allIssues.filter(issue =>
         issue.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -549,7 +551,7 @@ function ManagerDashboard() {
         issue.location.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
-    
+
     return allIssues.filter(issue => {
       // Status filter
       if (filters.status !== 'all') {
@@ -558,16 +560,16 @@ function ManagerDashboard() {
         if (filters.status === 'in-progress' && issue.status !== 'IN PROGRESS') return false;
         if (filters.status === 'completed' && issue.status !== 'COMPLETE' && issue.status !== 'COMPLETED') return false;
       }
-      
+
       // Priority filter
       if (filters.priority !== 'all' && issue.priority !== filters.priority) return false;
-      
+
       // Assigned filter
       if (filters.assignedTo !== 'all') {
         if (filters.assignedTo === 'unassigned' && issue.assignedTo) return false;
         if (filters.assignedTo === 'assigned' && !issue.assignedTo) return false;
       }
-      
+
       return true;
     });
   };
@@ -583,12 +585,12 @@ function ManagerDashboard() {
     if (!issue) return 'Unassigned';
     const assignedId = issue.assignedTo || (issue.assignees?.[0]?.id || issue.assignees?.[0]?._id);
     if (!assignedId) return 'Unassigned';
-    
+
     const tech = technicians.find(t => {
       const idsToCheck = [t._id, t.id, t.userId].filter(Boolean).map(String);
       return idsToCheck.includes(String(assignedId));
     });
-    
+
     return tech?.name || 'Technician';
   };
 
@@ -596,20 +598,18 @@ function ManagerDashboard() {
   const TabButton = ({ active, onClick, icon, label, badge, badgeColor }) => (
     <button
       onClick={onClick}
-      className={`relative flex items-center gap-3 px-4 py-3.5 rounded-xl text-left font-medium transition-all duration-300 group ${
-        active 
-          ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-lg shadow-indigo-200' 
+      className={`relative flex items-center gap-3 px-4 py-3.5 rounded-xl text-left font-medium transition-all duration-300 group ${active
+          ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-lg shadow-indigo-200'
           : 'text-gray-700 hover:bg-gradient-to-r hover:from-indigo-50 hover:to-purple-50'
-      }`}
+        }`}
     >
       <span className={`text-lg transition-transform duration-300 ${active ? 'scale-110' : 'group-hover:scale-110'}`}>
         {icon}
       </span>
       <span className="flex-1">{label}</span>
       {badge && (
-        <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
-          active ? 'bg-white/20 text-white' : `${badgeColor} text-white`
-        }`}>
+        <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${active ? 'bg-white/20 text-white' : `${badgeColor} text-white`
+          }`}>
           {badge}
         </span>
       )}
@@ -645,16 +645,16 @@ function ManagerDashboard() {
               </div>
             </div>
           </div>
-          
+
           {/* Navigation */}
           <nav className="flex flex-col gap-2 mt-8 px-4">
-            <TabButton 
+            <TabButton
               active={activeTab === 'overview'}
               onClick={() => setActiveTab('overview')}
               icon="📊"
               label="Dashboard"
             />
-            <TabButton 
+            <TabButton
               active={activeTab === 'requests'}
               onClick={() => setActiveTab('requests')}
               icon="⏳"
@@ -662,19 +662,19 @@ function ManagerDashboard() {
               badge={pendingRequests.length}
               badgeColor="bg-gradient-to-r from-orange-500 to-amber-500"
             />
-            <TabButton 
+            <TabButton
               active={activeTab === 'issues'}
               onClick={() => setActiveTab('issues')}
               icon="🔧"
               label="Issue Management"
             />
-            <TabButton 
+            <TabButton
               active={activeTab === 'all-issues'}
               onClick={() => setActiveTab('all-issues')}
               icon="📋"
               label="All Issues"
             />
-            <TabButton 
+            <TabButton
               active={activeTab === 'feedback'}
               onClick={() => setActiveTab('feedback')}
               icon="💬"
@@ -682,10 +682,10 @@ function ManagerDashboard() {
             />
           </nav>
         </div>
-        
+
         {/* Enhanced Logout */}
         <div className="p-6 border-t border-gray-200/50">
-          <button 
+          <button
             onClick={handleLogout}
             className="group w-full flex items-center justify-center gap-3 px-4 py-3.5 rounded-xl font-medium transition-all duration-300 bg-gradient-to-r from-gray-100 to-gray-50 hover:from-rose-50 hover:to-pink-50 text-gray-700 hover:text-rose-700 border border-gray-200 hover:border-rose-200"
           >
@@ -706,7 +706,7 @@ function ManagerDashboard() {
               </h1>
               <p className="text-gray-600 mt-2 flex items-center gap-2">
                 <Calendar className="w-4 h-4" />
-                Last updated: {new Date().toLocaleDateString('en-US', { 
+                Last updated: {new Date().toLocaleDateString('en-US', {
                   weekday: 'long',
                   year: 'numeric',
                   month: 'long',
@@ -714,7 +714,7 @@ function ManagerDashboard() {
                 })}
               </p>
             </div>
-            
+
             <div className="flex items-center gap-4">
               {/* Search Bar */}
               <div className="relative">
@@ -727,7 +727,7 @@ function ManagerDashboard() {
                   className="pl-10 pr-4 py-2.5 bg-white/80 backdrop-blur-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent w-64"
                 />
               </div>
-              
+
               {/* Notification Bell */}
               <button className="relative p-2.5 bg-gradient-to-br from-white to-gray-50 rounded-xl border border-gray-200 hover:border-blue-200 transition-colors">
                 <Bell className="w-5 h-5 text-gray-600" />
@@ -735,7 +735,7 @@ function ManagerDashboard() {
                   3
                 </span>
               </button>
-              
+
               {/* Quick Actions */}
               <div className="flex items-center gap-2">
                 <GradientButton color="blue" className="px-4 py-2.5 text-sm">
@@ -747,7 +747,7 @@ function ManagerDashboard() {
               </div>
             </div>
           </div>
-          
+
           {/* Quick Stats Bar */}
           <div className="flex flex-wrap gap-4 mb-6">
             <div className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-50 to-green-50 rounded-full border border-emerald-200">
@@ -775,7 +775,7 @@ function ManagerDashboard() {
             <p className="mt-4 text-gray-600 animate-pulse">Loading dashboard...</p>
           </div>
         ) : activeTab === 'overview' ? (
-          <OverviewTab 
+          <OverviewTab
             summary={summary}
             pendingRequests={pendingRequests}
             issues={issues}
@@ -784,13 +784,13 @@ function ManagerDashboard() {
             getAssignedTechName={getAssignedTechName}
           />
         ) : activeTab === 'requests' ? (
-          <RequestsTab 
+          <RequestsTab
             pendingRequests={pendingRequests}
             setSelectedRequest={setSelectedRequest}
             setShowApprovalModal={setShowApprovalModal}
           />
         ) : activeTab === 'issues' ? (
-          <IssuesTab 
+          <IssuesTab
             issues={issues}
             technicians={technicians}
             assigning={assigning}
@@ -801,7 +801,7 @@ function ManagerDashboard() {
             getAssignedTechName={getAssignedTechName}
           />
         ) : activeTab === 'all-issues' ? (
-          <AllIssuesTab 
+          <AllIssuesTab
             filters={filters}
             setFilters={setFilters}
             getFilteredIssues={getFilteredIssues}
@@ -810,7 +810,7 @@ function ManagerDashboard() {
             setSearchQuery={setSearchQuery}
           />
         ) : (
-          <FeedbackTab 
+          <FeedbackTab
             feedbacks={feedbacks}
             loadingFeedbacks={loadingFeedbacks}
           />
@@ -839,7 +839,7 @@ function ManagerDashboard() {
                     <span className="text-2xl text-gray-500 hover:text-gray-700">×</span>
                   </button>
                 </div>
-                
+
                 {/* Request Details */}
                 <div className="space-y-6">
                   {/* Header with image */}
@@ -847,8 +847,8 @@ function ManagerDashboard() {
                     {(selectedRequest.beforePhoto || selectedRequest.photo) && (
                       <div className="md:w-1/3">
                         <div className="rounded-2xl overflow-hidden shadow-lg">
-                          <img 
-                            src={`http://localhost:5000${selectedRequest.beforePhoto || selectedRequest.photo}`}
+                          <img
+                            src={`${import.meta.env.VITE_API_URL}${selectedRequest.beforePhoto || selectedRequest.photo}`}
                             alt="Issue"
                             className="w-full h-64 object-cover hover:scale-105 transition-transform duration-300"
                           />
@@ -867,7 +867,7 @@ function ManagerDashboard() {
                       <p className="text-gray-700 leading-relaxed">{selectedRequest.description}</p>
                     </div>
                   </div>
-                  
+
                   {/* Meta Info */}
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl">
                     <div>
@@ -891,7 +891,7 @@ function ManagerDashboard() {
                       </div>
                     </div>
                   </div>
-                  
+
                   {/* Decline Reason */}
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-3">
@@ -908,7 +908,7 @@ function ManagerDashboard() {
                       placeholder="Provide a reason for declining this request..."
                     />
                   </div>
-                  
+
                   {/* Action Buttons */}
                   <div className="flex gap-4 pt-6 border-t border-gray-200">
                     <GradientButton
@@ -958,7 +958,7 @@ const OverviewTab = ({ summary, pendingRequests, issues, technicians, setActiveT
   <div className="space-y-8">
     {/* Overview Cards */}
     <OverviewCards summary={summary} pendingRequests={pendingRequests} />
-    
+
     {/* Grid Layout */}
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       {/* Pending Requests */}
@@ -968,7 +968,7 @@ const OverviewTab = ({ summary, pendingRequests, issues, technicians, setActiveT
             <h3 className="text-xl font-bold text-gray-900 mb-2">Pending Approval Requests</h3>
             <p className="text-gray-600">Requests awaiting your review</p>
           </div>
-          <GradientButton 
+          <GradientButton
             onClick={() => setActiveTab('requests')}
             color="orange"
             className="px-4 py-2 text-sm"
@@ -1154,21 +1154,21 @@ const RequestsTab = ({ pendingRequests, setSelectedRequest, setShowApprovalModal
                   </div>
                 </div>
               </div>
-              
+
               {/* Request Description */}
               <p className="text-gray-600 text-sm mb-4 line-clamp-3">{request.description}</p>
-              
+
               {/* Request Image */}
               {(request.beforePhoto || request.photo) && (
                 <div className="mb-4">
-                  <img 
-                    src={`http://localhost:5000${request.beforePhoto || request.photo}`}
+                  <img
+                    src={`${import.meta.env.VITE_API_URL}${request.beforePhoto || request.photo}`}
                     alt="Issue"
                     className="w-full h-48 object-cover rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300"
                   />
                 </div>
               )}
-              
+
               {/* Action Buttons */}
               <div className="flex gap-3">
                 <GradientButton
@@ -1191,15 +1191,15 @@ const RequestsTab = ({ pendingRequests, setSelectedRequest, setShowApprovalModal
 );
 
 // Enhanced Issues Tab
-const IssuesTab = ({ 
-  issues, 
-  technicians, 
-  assigning, 
-  assignmentData, 
-  setAssignmentData, 
-  handleOpenAssignment, 
+const IssuesTab = ({
+  issues,
+  technicians,
+  assigning,
+  assignmentData,
+  setAssignmentData,
+  handleOpenAssignment,
   handleAssignTech,
-  getAssignedTechName 
+  getAssignedTechName
 }) => (
   <div>
     <div className="mb-6">
@@ -1239,8 +1239,8 @@ const IssuesTab = ({
                 {(issue.photo || issue.image) && (
                   <div className="lg:w-56 flex-shrink-0">
                     <div className="relative rounded-xl overflow-hidden shadow-lg">
-                      <img 
-                        src={`http://localhost:5000${issue.photo || issue.image}`}
+                      <img
+                        src={`${import.meta.env.VITE_API_URL}${issue.photo || issue.image}`}
                         alt="Issue"
                         className="w-full h-56 object-cover hover:scale-105 transition-transform duration-300"
                       />
@@ -1250,7 +1250,7 @@ const IssuesTab = ({
                     </div>
                   </div>
                 )}
-                
+
                 {/* Issue Details */}
                 <div className="flex-1">
                   <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-6">
@@ -1266,7 +1266,7 @@ const IssuesTab = ({
                       </div>
                     </div>
                   </div>
-                  
+
                   {/* Meta Grid */}
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                     <div className="p-3 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-xl">
@@ -1291,10 +1291,10 @@ const IssuesTab = ({
                       <div className="font-medium text-gray-900">Pending Assignment</div>
                     </div>
                   </div>
-                  
+
                   {/* Assignment Form or Button */}
                   {assigning === idx ? (
-                    <AssignmentForm 
+                    <AssignmentForm
                       assignmentData={assignmentData}
                       setAssignmentData={setAssignmentData}
                       technicians={technicians}
@@ -1335,10 +1335,10 @@ const AssignmentForm = ({ assignmentData, setAssignmentData, technicians, onAssi
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">Technician</label>
-        <select 
+        <select
           className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
           value={assignmentData.technicianId}
-          onChange={(e) => setAssignmentData({...assignmentData, technicianId: e.target.value})}
+          onChange={(e) => setAssignmentData({ ...assignmentData, technicianId: e.target.value })}
         >
           <option value="">Select technician...</option>
           {technicians.map((tech, i) => (
@@ -1350,10 +1350,10 @@ const AssignmentForm = ({ assignmentData, setAssignmentData, technicians, onAssi
       </div>
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">Priority</label>
-        <select 
+        <select
           className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
           value={assignmentData.priority}
-          onChange={(e) => setAssignmentData({...assignmentData, priority: e.target.value})}
+          onChange={(e) => setAssignmentData({ ...assignmentData, priority: e.target.value })}
         >
           <option value="LOW">Low</option>
           <option value="MEDIUM">Medium</option>
@@ -1363,11 +1363,11 @@ const AssignmentForm = ({ assignmentData, setAssignmentData, technicians, onAssi
       </div>
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">Due Date</label>
-        <input 
+        <input
           type="date"
           className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
           value={assignmentData.dueDate}
-          onChange={(e) => setAssignmentData({...assignmentData, dueDate: e.target.value})}
+          onChange={(e) => setAssignmentData({ ...assignmentData, dueDate: e.target.value })}
           min={new Date().toISOString().split('T')[0]}
         />
       </div>
@@ -1392,16 +1392,16 @@ const AssignmentForm = ({ assignmentData, setAssignmentData, technicians, onAssi
 );
 
 // Enhanced All Issues Tab
-const AllIssuesTab = ({ 
-  filters, 
-  setFilters, 
-  getFilteredIssues, 
+const AllIssuesTab = ({
+  filters,
+  setFilters,
+  getFilteredIssues,
   getAssignedTechName,
   searchQuery,
-  setSearchQuery 
+  setSearchQuery
 }) => {
   const filteredIssues = getFilteredIssues();
-  
+
   return (
     <div>
       <div className="mb-6">
@@ -1430,10 +1430,10 @@ const AllIssuesTab = ({
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-            <select 
+            <select
               className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
               value={filters.status}
-              onChange={(e) => setFilters({...filters, status: e.target.value})}
+              onChange={(e) => setFilters({ ...filters, status: e.target.value })}
             >
               <option value="all">All Status</option>
               <option value="pending-approval">Pending Approval</option>
@@ -1444,10 +1444,10 @@ const AllIssuesTab = ({
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Priority</label>
-            <select 
+            <select
               className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
               value={filters.priority}
-              onChange={(e) => setFilters({...filters, priority: e.target.value})}
+              onChange={(e) => setFilters({ ...filters, priority: e.target.value })}
             >
               <option value="all">All Priorities</option>
               <option value="LOW">Low</option>
@@ -1458,10 +1458,10 @@ const AllIssuesTab = ({
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Assignment</label>
-            <select 
+            <select
               className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
               value={filters.assignedTo}
-              onChange={(e) => setFilters({...filters, assignedTo: e.target.value})}
+              onChange={(e) => setFilters({ ...filters, assignedTo: e.target.value })}
             >
               <option value="all">All Issues</option>
               <option value="unassigned">Unassigned</option>
@@ -1489,7 +1489,7 @@ const AllIssuesTab = ({
               </span>
             </div>
           </div>
-          
+
           {filteredIssues.length === 0 ? (
             <div className="text-center py-12">
               <div className="w-20 h-20 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -1497,7 +1497,7 @@ const AllIssuesTab = ({
               </div>
               <h4 className="text-xl font-bold text-gray-900 mb-3">No Issues Found</h4>
               <p className="text-gray-600 mb-6">Try adjusting your filters or search query</p>
-              <GradientButton 
+              <GradientButton
                 onClick={() => {
                   setFilters({ status: 'all', priority: 'all', assignedTo: 'all' });
                   setSearchQuery('');
@@ -1523,8 +1523,8 @@ const AllIssuesTab = ({
                 </thead>
                 <tbody>
                   {filteredIssues.map((issue, idx) => (
-                    <tr 
-                      key={issue._id || issue.id || `filtered-${idx}`} 
+                    <tr
+                      key={issue._id || issue.id || `filtered-${idx}`}
                       className={`border-b border-gray-100 hover:bg-gradient-to-r hover:from-blue-50/30 hover:to-indigo-50/30 transition-all duration-300 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}
                     >
                       <td className="py-4 px-6">
@@ -1642,7 +1642,7 @@ const FeedbackTab = ({ feedbacks, loadingFeedbacks }) => (
                 </div>
                 <StatusBadge status="COMPLETED" />
               </div>
-              
+
               {/* Issue Info */}
               <div className="mb-4">
                 <h5 className="font-semibold text-gray-900 mb-2">Issue: {fb.title}</h5>
@@ -1650,13 +1650,13 @@ const FeedbackTab = ({ feedbacks, loadingFeedbacks }) => (
                   {fb.evidence.address || 'No completion details provided.'}
                 </p>
               </div>
-              
+
               {/* After Image */}
               {fb.evidence.afterImage && (
                 <div className="mb-4">
                   <div className="relative rounded-xl overflow-hidden shadow-lg group">
                     <img
-                      src={fb.evidence.afterImage.startsWith('/uploads/') ? `http://localhost:5000${fb.evidence.afterImage}` : fb.evidence.afterImage}
+                      src={fb.evidence.afterImage.startsWith('/uploads/') ? `${import.meta.env.VITE_API_URL}${fb.evidence.afterImage}` : fb.evidence.afterImage}
                       alt="After evidence"
                       className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
                     />
@@ -1667,7 +1667,7 @@ const FeedbackTab = ({ feedbacks, loadingFeedbacks }) => (
                   </div>
                 </div>
               )}
-              
+
               {/* Footer */}
               <div className="flex items-center justify-between pt-4 border-t border-gray-200">
                 <div className="flex items-center gap-2 text-sm text-gray-600">

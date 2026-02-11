@@ -13,11 +13,11 @@ export default function AssetDetail({ assetId, onClose, onUpdated }) {
     setLoading(true);
     (async () => {
       try {
-        const res = await axios.get(`http://localhost:5000/api/assets/${assetId}`);
+        const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/assets/${assetId}`);
         setAsset(res.data || null);
-        const m = await axios.get(`http://localhost:5000/api/assets/${assetId}/movements`);
+        const m = await axios.get(`${import.meta.env.VITE_API_URL}/api/assets/${assetId}/movements`);
         setMovements(m.data || []);
-        const p = await axios.get(`http://localhost:5000/api/assets/${assetId}/spare-parts`);
+        const p = await axios.get(`${import.meta.env.VITE_API_URL}/api/assets/${assetId}/spare-parts`);
         setParts(p.data || []);
       } catch (e) {
         console.error('Failed loading asset detail', e);

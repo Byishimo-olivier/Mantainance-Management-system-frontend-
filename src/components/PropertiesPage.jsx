@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import axios from 'axios';
+import api from '../api/axios';
 import { useNavigate } from 'react-router-dom';
 import NewIssue from './NewIssue';
 import heroImg from '../assets/1.jpg';
@@ -64,7 +64,7 @@ function PropertiesPage() {
   }, [showNewIssueModal]);
 
   const navigate = useNavigate();
-  const backendBase = 'http://localhost:5000';
+  const backendBase = import.meta.env.VITE_API_URL + '';
   const itemsPerPage = 12;
 
   // Block configuration
@@ -93,15 +93,7 @@ function PropertiesPage() {
     selectedSeats: []
   });
 
-  const setupAxiosAuth = useCallback(() => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    } else {
-      // Remove Authorization header for anonymous users
-      delete axios.defaults.headers.common['Authorization'];
-    }
-  }, []);
+  // setupAxiosAuth removed - handled by interceptor
 
   const getImageUrl = useCallback(
     (path) => {
@@ -125,8 +117,8 @@ function PropertiesPage() {
     setIsLoading(true);
     setError('');
     try {
-      setupAxiosAuth();
-      const response = await axios.get(`${backendBase}/api/properties`);
+      // setupAxiosAuth(); // Handled by interceptor
+      const response = await api.get('/api/properties');
       let propertiesData = [];
       if (Array.isArray(response.data)) {
         propertiesData = response.data;
@@ -144,19 +136,19 @@ function PropertiesPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [backendBase]);
+  }, []);
 
   const fetchPropertyDetails = useCallback(async (property) => {
     try {
       setSelectedProperty(property);
       setShowDetailsModal(true);
       setError('');
-      
+
       const propertyId = property.id || property._id;
 
       // Fetch issues
       try {
-        const issuesResponse = await axios.get(`${backendBase}/api/issues?propertyId=${propertyId}`);
+        const issuesResponse = await api.get(`/api/issues?propertyId=${propertyId}`);
         setIssues(Array.isArray(issuesResponse.data) ? issuesResponse.data : []);
       } catch (err) {
         console.error('Error loading issues:', err);
@@ -165,7 +157,7 @@ function PropertiesPage() {
 
       // Fetch assets and attach only those assigned to this property
       try {
-        const assetsResponse = await axios.get(`${backendBase}/api/assets?propertyId=${propertyId}`);
+        const assetsResponse = await api.get(`/api/assets?propertyId=${propertyId}`);
         const allAssets = Array.isArray(assetsResponse.data) ? assetsResponse.data : [];
         const filteredAssets = (allAssets || []).filter((a) => {
           const pid = a.propertyId || (a.property && (a.property.id || a.property._id));
@@ -192,17 +184,17 @@ function PropertiesPage() {
 
       // Fetch technicians (non-fatal)
       try {
-        const techResponse = await axios.get(`${backendBase}/api/technicians/for-assignment`);
+        const techResponse = await api.get('/api/technicians/for-assignment');
         setTechnicians(techResponse.data || []);
       } catch (err) {
         console.error('Error loading technicians:', err);
         setTechnicians([]);
-      } 
+      }
     } catch (err) {
       console.error('Error fetching property details:', err);
       setError('Failed to load property details.');
     }
-  }, [backendBase]);
+  }, []);
 
   const getAssetLocationInfo = useCallback((asset) => {
     let building = '';
@@ -298,7 +290,7 @@ function PropertiesPage() {
         propertyId: selectedProperty.id || selectedProperty._id,
         ...(validUserId ? { userId: validUserId } : {}),
       };
-      await axios.post(`${backendBase}/api/issues`, payload);
+      await api.post('/api/issues', payload);
       await fetchPropertyDetails(selectedProperty);
       setNewIssue({ title: '', description: '', tags: '', assetId: '' });
       setSuccess('Issue created successfully!');
@@ -313,7 +305,7 @@ function PropertiesPage() {
 
   const handleUpdateIssue = async (issueId, updates) => {
     try {
-      await axios.put(`${backendBase}/api/issues/${issueId}`, updates);
+      await api.put(`/api/issues/${issueId}`, updates);
       await fetchPropertyDetails(selectedProperty);
       setSuccess('Issue updated successfully!');
       setTimeout(() => setSuccess(''), 3000);
@@ -340,13 +332,13 @@ function PropertiesPage() {
       }
       if (editingAsset) {
         const assetId = editingAsset.id || editingAsset._id;
-        await axios.put(`${backendBase}/api/assets/${assetId}`, assetData);
+        await api.put(`/api/assets/${assetId}`, assetData);
         setSuccess('Asset updated successfully!');
       } else {
-        await axios.post(`${backendBase}/api/assets`, assetData);
+        await api.post('/api/assets', assetData);
         setSuccess('Asset added successfully!');
       }
-      const response = await axios.get(`${backendBase}/api/assets?propertyId=${propertyId}`);
+      const response = await api.get(`/api/assets?propertyId=${propertyId}`);
       const allAssets = response.data || [];
       const filteredAssets = (allAssets || []).filter((a) => {
         const pid = a.propertyId || (a.property && (a.property.id || a.property._id));
@@ -380,7 +372,7 @@ function PropertiesPage() {
     if (!window.confirm('Are you sure you want to delete this asset?')) return;
     try {
       const assetId = asset.id || asset._id;
-      await axios.delete(`${backendBase}/api/assets/${assetId}`);
+      await api.delete(`/api/assets/${assetId}`);
       setAssets((prev) => prev.filter((a) => (a.id || a._id) !== assetId));
       setSuccess('Asset deleted successfully!');
       setTimeout(() => setSuccess(''), 3000);
@@ -419,11 +411,11 @@ function PropertiesPage() {
   // Get assets for the selected block
   const getAssetsForSelectedBlock = useMemo(() => {
     if (!selectedBlock) return [];
-    
+
     return assets.filter((a) => {
       const info = getAssetLocationInfo(a);
       const blocks = info.blocks || [];
-      
+
       // Check if asset belongs to selected block
       return blocks.some(b => String(b) === String(selectedBlock));
     });
@@ -432,9 +424,9 @@ function PropertiesPage() {
   // Seat/Asset selection functions
   const handleAssetSelection = (assetId, index) => {
     if (!selectedBlock) return;
-    
+
     const assetKey = `${assetId}-${index}`;
-    
+
     setSelectedSeats(prev => {
       const newSelectedSeats = { ...prev };
       if (newSelectedSeats[assetKey]) {
@@ -457,13 +449,13 @@ function PropertiesPage() {
   // Handle selecting all assets of a type
   const handleSelectAllAssets = (assetId) => {
     if (!selectedBlock) return;
-    
+
     const asset = assets.find(a => (a.id || a._id) === assetId);
     if (!asset) return;
-    
+
     const qty = asset.quantity ?? 1;
     const newSelections = {};
-    
+
     for (let i = 0; i < qty; i++) {
       const assetKey = `${assetId}-${i}`;
       newSelections[assetKey] = {
@@ -475,7 +467,7 @@ function PropertiesPage() {
         isSelected: true
       };
     }
-    
+
     setSelectedSeats(prev => ({ ...prev, ...newSelections }));
   };
 
@@ -499,22 +491,22 @@ function PropertiesPage() {
   const areAllAssetsSelected = (assetId) => {
     const asset = assets.find(a => (a.id || a._id) === assetId);
     if (!asset) return false;
-    
+
     const qty = asset.quantity ?? 1;
     let selectedCount = 0;
-    
+
     for (let i = 0; i < qty; i++) {
       if (selectedSeats[`${assetId}-${i}`]) {
         selectedCount++;
       }
     }
-    
+
     return selectedCount === qty;
   };
 
   const renderAssetSeats = () => {
     const blockAssets = getAssetsForSelectedBlock;
-    
+
     if (blockAssets.length === 0) {
       return (
         <div className="text-center py-8">
@@ -530,7 +522,7 @@ function PropertiesPage() {
           const aid = asset.id || asset._id;
           const qty = asset.quantity ?? 1;
           const allSelected = areAllAssetsSelected(aid);
-          
+
           return (
             <div key={aid} className="bg-white p-4 rounded-lg border border-gray-200">
               <div className="flex items-center justify-between mb-3">
@@ -553,12 +545,12 @@ function PropertiesPage() {
                   </button>
                 </div>
               </div>
-              
+
               <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
                 {Array.from({ length: qty }).map((_, index) => {
                   const isSelected = isAssetInstanceSelected(aid, index);
                   const assetKey = `${aid}-${index}`;
-                  
+
                   return (
                     <button
                       key={assetKey}
@@ -572,7 +564,7 @@ function PropertiesPage() {
                   );
                 })}
               </div>
-              
+
               <div className="mt-3 text-xs text-gray-500 flex justify-between">
                 <span>Click on individual items to select/deselect</span>
                 <span className={`font-medium ${allSelected ? 'text-green-600' : 'text-gray-600'}`}>
@@ -590,7 +582,7 @@ function PropertiesPage() {
   const renderFallbackSeatingChart = () => {
     const rows = [];
     const block = blockConfiguration.blocks.find(b => b.id === selectedBlock);
-    
+
     for (let row = 0; row < seatConfiguration.rows; row++) {
       const seats = [];
       for (let seat = 0; seat < seatConfiguration.seatsPerRow; seat++) {
@@ -600,9 +592,9 @@ function PropertiesPage() {
         const isVIP = seatConfiguration.vipRows.includes(row);
         const isUnavailable = seatConfiguration.unavailableSeats.includes(seatKey);
         const isSoldOut = seatConfiguration.soldOutSeats.includes(seatKey);
-        
+
         let seatClass = "w-8 h-8 rounded flex items-center justify-center text-xs font-medium cursor-pointer transition-all ";
-        
+
         if (isSelected) {
           seatClass += "bg-blue-600 text-white border-2 border-blue-700 hover:bg-blue-700";
         } else if (isUnavailable) {
@@ -614,7 +606,7 @@ function PropertiesPage() {
         } else {
           seatClass += "bg-green-500 text-white border-2 border-green-600 hover:bg-green-600";
         }
-        
+
         seats.push(
           <button
             key={seatKey}
@@ -645,7 +637,7 @@ function PropertiesPage() {
           </button>
         );
       }
-      
+
       rows.push(
         <div key={row} className="flex items-center gap-2 mb-2">
           <div className="w-12 text-sm font-medium text-gray-600">Row {row + 1}</div>
@@ -655,7 +647,7 @@ function PropertiesPage() {
         </div>
       );
     }
-    
+
     return rows;
   };
 
@@ -689,13 +681,13 @@ function PropertiesPage() {
               <div className="text-xl font-bold text-white">{selectedProperty?.name || 'MAIN COURT'}</div>
             </div>
           </div>
-          
+
           {/* Blocks around the court */}
           <div className="absolute inset-0">
             {/* Top blocks */}
             <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 flex gap-4">
               {blocksToShow.slice(0, 3).map(block => (
-                <BlockButton 
+                <BlockButton
                   key={block.id}
                   block={block}
                   onClick={() => handleBlockClick(block.id)}
@@ -704,11 +696,11 @@ function PropertiesPage() {
                 />
               ))}
             </div>
-            
+
             {/* Right blocks */}
             <div className="absolute top-1/2 right-4 transform -translate-y-1/2 flex flex-col gap-4">
               {blocksToShow.slice(3, 5).map(block => (
-                <BlockButton 
+                <BlockButton
                   key={block.id}
                   block={block}
                   onClick={() => handleBlockClick(block.id)}
@@ -718,11 +710,11 @@ function PropertiesPage() {
                 />
               ))}
             </div>
-            
+
             {/* Left blocks */}
             <div className="absolute top-1/2 left-4 transform -translate-y-1/2 flex flex-col gap-4">
               {blocksToShow.slice(5, 7).map(block => (
-                <BlockButton 
+                <BlockButton
                   key={block.id}
                   block={block}
                   onClick={() => handleBlockClick(block.id)}
@@ -732,11 +724,11 @@ function PropertiesPage() {
                 />
               ))}
             </div>
-            
+
             {/* Bottom blocks */}
             <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 flex gap-4">
               {blocksToShow.slice(7).map(block => (
-                <BlockButton 
+                <BlockButton
                   key={block.id}
                   block={block}
                   onClick={() => handleBlockClick(block.id)}
@@ -747,7 +739,7 @@ function PropertiesPage() {
             </div>
           </div>
         </div>
-        
+
         {/* Legend removed per request */}
       </div>
     );
@@ -755,7 +747,7 @@ function PropertiesPage() {
 
   const BlockButton = ({ block, onClick, isSelected, isHighlighted, orientation = 'horizontal' }) => {
     let blockClass = "flex items-center justify-center font-bold rounded-lg shadow-md transition-all hover:scale-105 ";
-    
+
     if (block.status === 'unavailable') {
       blockClass += "bg-gray-400 text-gray-600 border-2 border-gray-500 cursor-not-allowed";
     } else if (block.status === 'sold-out') {
@@ -769,13 +761,13 @@ function PropertiesPage() {
     } else {
       blockClass += "bg-green-500 text-white border-2 border-green-600";
     }
-    
+
     if (orientation === 'vertical') {
       blockClass += " w-16 h-24";
     } else {
       blockClass += " w-24 h-16";
     }
-    
+
     return (
       <button
         onClick={() => onClick(block.id)}
@@ -835,7 +827,7 @@ function PropertiesPage() {
                       <div className="flex text-amber-500">
                         {[...Array(5)].map((_, i) => (
                           <svg key={i} className="w-4 h-4 fill-current" viewBox="0 0 20 20">
-                            <path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z"/>
+                            <path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z" />
                           </svg>
                         ))}
                       </div>
@@ -940,9 +932,9 @@ function PropertiesPage() {
                                 >
                                   {checklistSelections[aid] > 0 ? (checklistSelections[aid] === (a.quantity || 1) ? 'Deselect All' : 'Select More') : 'Select'}
                                 </button>
-                                { (checklistSelections[aid] > 0) && (
+                                {(checklistSelections[aid] > 0) && (
                                   <div className="text-xs text-gray-600 font-medium">{checklistSelections[aid]} / {a.quantity ?? 1}</div>
-                                ) }
+                                )}
                               </div>
                             </div>
                           </label>
@@ -972,7 +964,7 @@ function PropertiesPage() {
                           Back to Checklist
                         </button>
                       </div>
-                      
+
                       <div className="text-sm text-gray-600 mb-6">
                         Please select any block you want to inspect seats in that section.
                       </div>
@@ -1013,7 +1005,7 @@ function PropertiesPage() {
                           Back to Blocks
                         </button>
                       </div>
-                      
+
                       <div className="text-sm text-gray-600 mb-6">
                         Please select any items (assets) you want to inspect in this block.
                       </div>
@@ -1026,10 +1018,10 @@ function PropertiesPage() {
                             {getAssetsForSelectedBlock.length} asset{getAssetsForSelectedBlock.length !== 1 ? 's' : ''} assigned to this block
                           </div>
                         </div>
-                        
+
                         {/* Render assets as seats/selectable items */}
                         {renderAssetSeats()}
-                        
+
                         {/* Fallback: Show regular seating chart if no assets */}
                         {getAssetsForSelectedBlock.length === 0 && (
                           <>
@@ -1068,7 +1060,7 @@ function PropertiesPage() {
                       {/* Action Buttons */}
                       <div className="flex justify-between items-center">
                         <div className="text-sm text-gray-500">
-                          {getAssetsForSelectedBlock.length > 0 
+                          {getAssetsForSelectedBlock.length > 0
                             ? `${getAssetsForSelectedBlock.length} asset${getAssetsForSelectedBlock.length !== 1 ? 's' : ''} available`
                             : 'No assets assigned to this block'}
                         </div>
@@ -1170,7 +1162,7 @@ function PropertiesPage() {
                         const count = checklistSelections[key] || 0;
                         const isBuilding = key === 'building';
                         const isItem = key.startsWith('item-');
-                        
+
                         if (isBuilding) {
                           const payload = {
                             title: `Inspection - ${selectedProperty.name}`,
@@ -1190,7 +1182,7 @@ function PropertiesPage() {
                             if (parts.length >= 2) {
                               const [first, second] = parts;
                               let title, description;
-                              
+
                               // Check if it's an asset item (assetId-index)
                               const asset = assets.find(a => (a.id || a._id) === first);
                               if (asset) {
@@ -1201,7 +1193,7 @@ function PropertiesPage() {
                                 title = `Seat Inspection - Block ${first}`;
                                 description = checklistDescription || `Inspection for seat in Block ${first}, Row ${parseInt(second) + 1}, Seat ${parts.length > 2 ? parseInt(parts[2]) + 1 : 'N/A'}`;
                               }
-                              
+
                               const payload = {
                                 title,
                                 description,
@@ -1403,11 +1395,11 @@ function PropertiesPage() {
             backgroundSize: '40px 40px'
           }}></div>
         </div>
-        
+
         {/* Floating decorative elements */}
         <div className="absolute top-0 left-0 w-72 h-72 bg-gradient-to-br from-rose-500/10 to-amber-500/10 rounded-full filter blur-3xl -translate-x-1/2 -translate-y-1/2"></div>
         <div className="absolute bottom-0 right-0 w-96 h-96 bg-gradient-to-tr from-blue-500/10 to-purple-500/10 rounded-full filter blur-3xl translate-x-1/3 translate-y-1/3"></div>
-        
+
         <div className="relative z-10">
           {/* Top Navigation Bar */}
           <div className="border-b border-white/10">
@@ -1417,12 +1409,12 @@ function PropertiesPage() {
                   <div className="text-2xl font-serif font-light tracking-widest">MMS</div>
                   <div className="text-sm text-gray-300 font-light tracking-wider hidden md:block">Finest</div>
                 </div>
-                
+
                 <nav className="hidden md:flex items-center space-x-8 text-sm font-light tracking-wide">
                   <a href="#" className="hover:text-amber-300 transition-colors">Home</a>
                   <a href="#" className="text-amber-300 border-b-2 border-amber-300 pb-1">Properties</a>
                 </nav>
-                
+
                 <div className="flex items-center space-x-4">
                   <button onClick={() => navigate('/register')} className="text-sm px-5 py-2.5 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full transition-all border border-white/20">
                     Sign up
@@ -1431,11 +1423,11 @@ function PropertiesPage() {
                     Sign in
                   </button>
                 </div>
-                
+
               </div>
             </div>
           </div>
-          
+
           {/* Hero Content with Carousel */}
           <div className="relative">
             <div
@@ -1468,10 +1460,10 @@ function PropertiesPage() {
                   />
                 );
               })}
-              
+
               {/* Gradient overlay */}
               <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/40 to-transparent"></div>
-              
+
               {/* Hero text content */}
               <div className="absolute inset-0 flex items-center">
                 <div className="max-w-7xl mx-auto px-6 w-full">
@@ -1494,9 +1486,9 @@ function PropertiesPage() {
                   </div>
                 </div>
               </div>
-              
+
               {/* Carousel controls */}
-              <button 
+              <button
                 onClick={() => setSlideIndex((slideIndex - 1 + heroSlides.length) % heroSlides.length)}
                 className="absolute left-8 top-1/2 -translate-y-1/2 w-14 h-14 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center text-white hover:bg-white/20 transition-all"
               >
@@ -1504,7 +1496,7 @@ function PropertiesPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
               </button>
-              <button 
+              <button
                 onClick={() => setSlideIndex((slideIndex + 1) % heroSlides.length)}
                 className="absolute right-8 top-1/2 -translate-y-1/2 w-14 h-14 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center text-white hover:bg-white/20 transition-all"
               >
@@ -1512,7 +1504,7 @@ function PropertiesPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
               </button>
-              
+
               {/* Slide indicators */}
               <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex items-center gap-3">
                 {heroSlides.map((_, i) => (
@@ -1527,7 +1519,7 @@ function PropertiesPage() {
           </div>
         </div>
       </div>
-      
+
       {/* About Section with Elegant Design */}
       <div className="relative -mt-16 z-20">
         <div className="max-w-7xl mx-auto px-6">
@@ -1550,13 +1542,13 @@ function PropertiesPage() {
                       From modern city residences to serene private estates, we connect discerning Technician with spaces that reflect their success and aspirations.
                     </p>
                   </div>
-                  
+
                   <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-6">
                     <div className="text-center">
                       <div className="text-3xl font-serif font-light text-gray-900 mb-2">500+</div>
                       <div className="text-sm text-gray-500">Properties</div>
                     </div>
-                   
+
                     <div className="text-center">
                       <div className="text-3xl font-serif font-light text-gray-900 mb-2">98%</div>
                       <div className="text-sm text-gray-500">Client Satisfaction</div>
@@ -1567,10 +1559,10 @@ function PropertiesPage() {
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="relative">
                   <div className="grid grid-cols-2 gap-4">
-                    {['/build/static/media/thumb1.jpg','/build/static/media/thumb2.jpg','/build/static/media/thumb3.jpg','/build/static/media/thumb4.jpg'].map((src, i) => (
+                    {['/build/static/media/thumb1.jpg', '/build/static/media/thumb2.jpg', '/build/static/media/thumb3.jpg', '/build/static/media/thumb4.jpg'].map((src, i) => (
                       <div key={i} className="relative group overflow-hidden rounded-2xl">
                         <div className="aspect-square bg-gradient-to-br from-gray-100 to-gray-200">
                           <div className="w-full h-full bg-gradient-to-br from-gray-200 to-gray-300 animate-pulse"></div>
@@ -1608,7 +1600,7 @@ function PropertiesPage() {
                     />
                   </div>
                 </div>
-                
+
                 <div className="flex items-center gap-4">
                   <button className="px-6 py-3.5 bg-gray-900 hover:bg-black text-white font-medium rounded-xl transition-all hover:-translate-y-0.5 shadow-lg hover:shadow-xl">
                     For Business
@@ -1618,7 +1610,7 @@ function PropertiesPage() {
                   </button>
                 </div>
               </div>
-              
+
               {/* Results count */}
               <div className="mt-6 pt-6 border-t border-gray-100 flex items-center justify-between">
                 <div>
@@ -1688,7 +1680,7 @@ function PropertiesPage() {
                   const tag = property.forRent || property.rent ? 'RENT' : (property.forSale || property.sale ? 'SALE' : 'PREMIUM');
                   const isForRent = property.forRent || property.rent;
                   const tagColor = isForRent ? 'from-blue-500 to-cyan-500' : 'from-emerald-500 to-green-500';
-                  
+
                   return (
                     <div
                       key={key}
@@ -1698,21 +1690,21 @@ function PropertiesPage() {
                       <div className="bg-white rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 border border-gray-100">
                         {/* Property Image */}
                         <div className="relative h-64 overflow-hidden">
-                          <img 
-                            src={img} 
-                            alt={property.name} 
-                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" 
-                            onError={(e) => { e.target.src = '/default-property.png'; }} 
+                          <img
+                            src={img}
+                            alt={property.name}
+                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                            onError={(e) => { e.target.src = '/default-property.png'; }}
                           />
                           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent"></div>
-                          
+
                           {/* Tag */}
                           <div className="absolute top-4 left-4">
                             <span className={`px-4 py-1.5 text-xs font-bold text-white rounded-full bg-gradient-to-r ${tagColor} shadow-lg`}>
                               {tag}
                             </span>
                           </div>
-                          
+
                           {/* Action buttons */}
                           <div className="absolute top-4 right-4 flex flex-col gap-2">
                             <button className="p-2.5 bg-white/20 backdrop-blur-sm rounded-full hover:bg-white/30 transition-colors">
@@ -1727,7 +1719,7 @@ function PropertiesPage() {
                               </svg>
                             </button>
                           </div>
-                          
+
                           {/* Price */}
                           {property.price && (
                             <div className="absolute bottom-4 left-4">
@@ -1735,7 +1727,7 @@ function PropertiesPage() {
                             </div>
                           )}
                         </div>
-                        
+
                         {/* Property Details */}
                         <div className="p-6">
                           <div className="mb-5">
@@ -1797,7 +1789,7 @@ function PropertiesPage() {
                   </div>
                   <h3 className="text-3xl font-serif font-light text-gray-900 mb-4">No properties found</h3>
                   <p className="text-gray-600 max-w-md mx-auto mb-8">Try adjusting your search criteria or browse our featured collections.</p>
-                  <button 
+                  <button
                     onClick={() => { setSearchQuery(''); setCurrentPage(1); }}
                     className="px-8 py-3 bg-amber-500 hover:bg-amber-600 text-white font-medium rounded-xl transition-all"
                   >
@@ -1821,7 +1813,7 @@ function PropertiesPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                   </svg>
                 </button>
-                
+
                 <div className="flex items-center gap-2 px-4">
                   {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                     let pageNum;
@@ -1834,7 +1826,7 @@ function PropertiesPage() {
                     } else {
                       pageNum = currentPage - 2 + i;
                     }
-                    
+
                     return (
                       <button
                         key={pageNum}
@@ -1846,7 +1838,7 @@ function PropertiesPage() {
                     );
                   })}
                 </div>
-                
+
                 <button
                   onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                   disabled={currentPage === totalPages}
@@ -1884,7 +1876,7 @@ function PropertiesPage() {
 
       {/* Property Details Modal */}
       <PropertyDetailsModal />
-      
+
       {/* New Issue Modal */}
       {showNewIssueModal && (
         <div className="fixed inset-0 flex items-center justify-center bg-black/70 p-4 z-50" role="dialog" aria-modal="true">

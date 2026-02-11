@@ -14,11 +14,11 @@ const AdminDashboard = () => {
     const token = localStorage.getItem("token");
     if (!token) return;
     axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-    axios.get("http://localhost:5000/api/issues").then(res => setJobs(res.data));
-    axios.get("http://localhost:5000/api/technicians").then(res => setTechnicians(res.data));
-    axios.get("http://localhost:5000/api/materials").then(res => setInventory(res.data));
-    axios.get("http://localhost:5000/api/finances/summary").then(res => setFinances(res.data));
-    axios.get("http://localhost:5000/api/subscriptions").then(res => setSubscriptions(res.data));
+    axios.get(import.meta.env.VITE_API_URL + "/api/issues").then(res => setJobs(res.data));
+    axios.get(import.meta.env.VITE_API_URL + "/api/technicians").then(res => setTechnicians(res.data));
+    axios.get(import.meta.env.VITE_API_URL + "/api/materials").then(res => setInventory(res.data));
+    axios.get(import.meta.env.VITE_API_URL + "/api/finances/summary").then(res => setFinances(res.data));
+    axios.get(import.meta.env.VITE_API_URL + "/api/subscriptions").then(res => setSubscriptions(res.data));
   }, []);
 
   return (

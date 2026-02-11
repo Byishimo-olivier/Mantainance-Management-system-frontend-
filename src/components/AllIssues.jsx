@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import api from "../api/axios";
 import { useNavigate } from "react-router-dom";
 
 // Updated IssueCard to handle missing properties
@@ -43,9 +43,9 @@ const getStatusColor = (status) => {
 };
 
 const StatusFilter = ({ value, onChange, includeAll }) => (
-  <select 
-    value={value} 
-    onChange={(e) => onChange(e.target.value)} 
+  <select
+    value={value}
+    onChange={(e) => onChange(e.target.value)}
     className="bg-white border border-gray-200 rounded-lg px-4 py-2 text-base font-medium text-gray-700 outline-none"
   >
     {includeAll && <option value="ALL">All</option>}
@@ -74,17 +74,17 @@ const ErrorMessage = ({ message, onDismiss, className }) => (
   </div>
 );
 
-const API_BASE_URL = 'http://localhost:5000';
+const API_BASE_URL = ''; // using api instance baseURL
 
 // Minimal auth hook fallback (reads localStorage)
 const useAuth = () => {
   const stored = localStorage.getItem('user');
   const token = localStorage.getItem('token');
   const user = stored ? JSON.parse(stored) : null;
-  const logout = () => { 
-    localStorage.removeItem('user'); 
-    localStorage.removeItem('token'); 
-    window.location.href = '/login'; 
+  const logout = () => {
+    localStorage.removeItem('user');
+    localStorage.removeItem('token');
+    window.location.href = '/login';
   };
   return { user, logout, token };
 };
@@ -92,28 +92,27 @@ const useAuth = () => {
 // Simple issue service
 const issueService = {
   fetchIssuesByRole: async (user) => {
-    const token = localStorage.getItem('token');
-    const cfg = { headers: { Authorization: `Bearer ${token}` } };
-    
+    // Auth handled by interceptor
+
     if (!user) return [];
-    
+
     try {
       if (user.role === 'technician') {
-        const res = await axios.get(`${API_BASE_URL}/api/issues/assigned/${user._id || user.id}`, cfg);
+        const res = await api.get(`/api/issues/assigned/${user._id || user.id}`);
         return res.data || [];
       }
-      
+
       if (user.role === 'client') {
         // For clients, fetch all issues from /api/issues endpoint
         // The backend will filter by the user's role
-        const res = await axios.get(`${API_BASE_URL}/api/issues`, cfg);
+        const res = await api.get('/api/issues');
         console.log('CLIENT: Fetched issues from /api/issues:', res.data?.length || 0);
         const sorted = (res.data || []).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
         return sorted;
       }
-      
+
       // admin/manager: fetch all
-      const res = await axios.get(`${API_BASE_URL}/api/issues`, cfg);
+      const res = await api.get('/api/issues');
       const sorted = (res.data || []).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
       return sorted;
     } catch (error) {
@@ -121,12 +120,11 @@ const issueService = {
       return [];
     }
   },
-  
+
   updateIssueStatus: async (issueId, status, token) => {
-    return axios.put(
-      `${API_BASE_URL}/api/issues/${issueId}`, 
-      { status }, 
-      { headers: { Authorization: `Bearer ${token}` } }
+    return api.put(
+      `/api/issues/${issueId}`,
+      { status }
     );
   }
 };
@@ -135,7 +133,7 @@ function AllIssues() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const userName = user?.name || user?.username || '';
-  
+
   const [issues, setIssues] = useState([]);
   const [filteredIssues, setFilteredIssues] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -150,7 +148,7 @@ function AllIssues() {
       navigate('/login');
       return;
     }
-    
+
     // Only fetch data once
     if (!dataFetched) {
       fetchData();
@@ -160,7 +158,7 @@ function AllIssues() {
   // Filter issues when statusFilter or issues change
   useEffect(() => {
     console.log('Filtering issues with filter:', statusFilter, 'total issues:', issues.length);
-    
+
     if (statusFilter === "ALL") {
       setFilteredIssues(issues);
     } else {
@@ -179,7 +177,7 @@ function AllIssues() {
       console.log('FETCHDATA SKIPPED - no user or already fetched');
       return;
     }
-    
+
     setLoading(true);
     setError(null);
 
@@ -187,14 +185,14 @@ function AllIssues() {
       console.log('FETCHDATA: Calling issueService.fetchIssuesByRole for client role');
       const issuesData = await issueService.fetchIssuesByRole(user);
       console.log('FETCHDATA: Fetched issues:', issuesData?.length || 0, issuesData);
-      
+
       // Transform data to ensure it has expected properties
       const transformedIssues = issuesData.map(issue => ({
         ...issue,
         time: issue.createdAt ? new Date(issue.createdAt).toLocaleDateString() : 'No date',
         overdue: issue.status === 'OVERDUE' || (issue.dueDate && new Date(issue.dueDate) < new Date())
       }));
-      
+
       console.log('FETCHDATA: Transformed issues:', transformedIssues?.length || 0);
       setIssues(transformedIssues);
       setDataFetched(true);
@@ -226,10 +224,7 @@ function AllIssues() {
 
   const handleResubmit = async (issueId) => {
     try {
-      const token = localStorage.getItem('token');
-      await axios.post(`${API_BASE_URL}/issues/${issueId}/resubmit`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.post(`/api/issues/${issueId}/resubmit`, {});
       console.log('Issue resubmitted successfully');
       await handleRefresh(); // Refresh the data
     } catch (err) {
@@ -238,8 +233,8 @@ function AllIssues() {
     }
   };
 
-  const handleLogout = () => { 
-    logout(); 
+  const handleLogout = () => {
+    logout();
   };
 
   // Render navigation (moved to a separate function for clarity)
@@ -265,21 +260,21 @@ function AllIssues() {
         >
           Dashboard
         </button>
-        
+
         <button
           className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-blue-800 text-white font-semibold transition bg-blue-800"
           onClick={() => navigate("/issues")}
         >
           All Issues
         </button>
-        
+
         <button
           onClick={() => navigate("/new-issue")}
           className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-blue-800 text-white font-semibold transition"
         >
           New Issue
         </button>
-        
+
         <button
           onClick={handleLogout}
           className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-semibold"
@@ -304,7 +299,7 @@ function AllIssues() {
   return (
     <div className="min-h-screen bg-gray-50 pb-8">
       {renderNavigation()}
-      
+
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between mb-8">
@@ -315,23 +310,23 @@ function AllIssues() {
               {statusFilter !== "ALL" && ` (filtered by ${statusFilter})`}
             </p>
           </div>
-          
+
           <div className="flex flex-wrap items-center gap-4 mt-4 lg:mt-0">
-            <StatusFilter 
+            <StatusFilter
               value={statusFilter}
               onChange={setStatusFilter}
               includeAll={true}
             />
-            
+
             <button
               onClick={handleRefresh}
               disabled={refreshing}
               className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
-              <svg 
-                className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} 
-                fill="none" 
-                stroke="currentColor" 
+              <svg
+                className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`}
+                fill="none"
+                stroke="currentColor"
                 viewBox="0 0 24 24"
               >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -343,7 +338,7 @@ function AllIssues() {
 
         {/* Error Display */}
         {error && (
-          <ErrorMessage 
+          <ErrorMessage
             message={error}
             onDismiss={() => setError(null)}
             className="mb-6"
@@ -364,7 +359,7 @@ function AllIssues() {
             </svg>
             <h3 className="mt-4 text-lg font-medium text-gray-900">No issues found</h3>
             <p className="mt-2 text-gray-500">
-              {statusFilter === "ALL" 
+              {statusFilter === "ALL"
                 ? "There are no issues to display."
                 : `No issues with status "${statusFilter}" found.`
               }
@@ -394,7 +389,7 @@ function AllIssues() {
                     >
                       View Details
                     </button>
-                    
+
                     {/* Client actions for PENDING issues */}
                     {user?.role === 'client' && issue.status === 'PENDING' && (
                       <>
@@ -418,7 +413,7 @@ function AllIssues() {
                         </button>
                       </>
                     )}
-                    
+
                     {/* Manager/Admin actions */}
                     {(user?.role === 'manager' || user?.role === 'admin') && issue.status === 'APPROVED' && (
                       <button
@@ -428,7 +423,7 @@ function AllIssues() {
                         Start Work
                       </button>
                     )}
-                    
+
                     {/* Technician actions */}
                     {user?.role === 'technician' && issue.status === 'IN PROGRESS' && (
                       <button

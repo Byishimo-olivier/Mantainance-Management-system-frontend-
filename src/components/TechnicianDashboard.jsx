@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../api/axios";
 import { useNavigate } from 'react-router-dom';
 
 // AFTER EVIDENCE FORM WITH COMPLETION DETAILS
@@ -21,11 +21,12 @@ function AfterEvidenceForm({ issueId, onSuccess }) {
     if (afterImage) formData.append("afterImage", afterImage);
     formData.append("address", completionDetails);
     try {
-      const token = localStorage.getItem("token");
-      const response = await axios.post(
-        `http://localhost:5000/api/issues/${issueId}/evidence/after`,
+      // Authorization handled by interceptor. 
+      // Important: Allow axios/browser to set Content-Type for FormData to include boundary
+      const response = await api.post(
+        `/api/issues/${issueId}/evidence/after`,
         formData,
-        { headers: { Authorization: `Bearer ${token}`, "Content-Type": "multipart/form-data" } }
+        { headers: { "Content-Type": "multipart/form-data" } }
       );
       setAfterImage(null);
       setCompletionDetails("");
@@ -96,13 +97,12 @@ const TechnicianDashboard = () => {
 
   const handleStartWork = async (jobId) => {
     try {
-      const token = localStorage.getItem("token");
-      const config = { headers: { Authorization: `Bearer ${token}` } };
-      
-      await axios.put(`http://localhost:5000/api/issues/${jobId}`, {
+      // Authorization handled by interceptor
+
+      await api.put(`/api/issues/${jobId}`, {
         status: 'IN PROGRESS'
-      }, config);
-      
+      });
+
       fetchAssignedIssues();
       alert('Work started! Status set to In Progress.');
     } catch (error) {
@@ -130,17 +130,16 @@ const TechnicianDashboard = () => {
   const handleMaterialRequestSubmit = async (e) => {
     e.preventDefault();
     try {
-      const token = localStorage.getItem("token");
-      const config = { headers: { Authorization: `Bearer ${token}` } };
-      
+      // Authorization handled by interceptor
+
       const requestData = {
         ...materialRequestData,
         technicianId: user._id || user.id,
         technicianName: user.name
       };
 
-      await axios.post('http://localhost:5000/api/material-requests', requestData, config);
-      
+      await api.post('/api/material-requests', requestData);
+
       alert('Material request submitted successfully!');
       setMaterialRequestData({
         title: "",
@@ -149,7 +148,7 @@ const TechnicianDashboard = () => {
         urgency: "MEDIUM"
       });
       setShowMaterialRequestForm(false);
-      
+
       // Refresh material requests
       fetchMaterialRequests();
     } catch (error) {
@@ -177,17 +176,21 @@ const TechnicianDashboard = () => {
     return job.status || 'PENDING';
   };
 
+  /* Helper for imageSrc using base URL if needed, but here we just open in new tab.
+     Since we are refactoring, we need to know the base URL. 
+     We can access it from api.defaults.baseURL or import.meta.env.VITE_API_URL 
+  */
   const handleImageClick = (imageSrc, title) => {
-    window.open(`http://localhost:5000${imageSrc}`, '_blank');
+    const baseUrl = api.defaults.baseURL || import.meta.env.VITE_API_URL || '';
+    window.open(`${baseUrl}${imageSrc}`, '_blank');
   };
 
   const fetchAssignedIssues = () => {
     const userStr = localStorage.getItem("user");
     if (userStr) {
       const u = JSON.parse(userStr);
-      const token = localStorage.getItem("token");
-      const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
-      axios.get(`http://localhost:5000/api/issues/assigned/${u._id || u.id}`, config)
+      // Authorization handled by interceptor
+      api.get(`/api/issues/assigned/${u._id || u.id}`)
         .then(res => setJobs(res.data))
         .catch(err => {
           console.warn('Failed to fetch assigned issues:', err?.response?.data || err.message);
@@ -200,9 +203,8 @@ const TechnicianDashboard = () => {
     const userStr = localStorage.getItem("user");
     if (userStr) {
       const u = JSON.parse(userStr);
-      const token = localStorage.getItem("token");
-      const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
-      axios.get(`http://localhost:5000/api/material-requests/tech/${u._id || u.id}`, config)
+      // Authorization handled by interceptor
+      api.get(`/api/material-requests/tech/${u._id || u.id}`)
         .then(res => setMaterialRequests(res.data))
         .catch(err => {
           console.warn('Material requests endpoint failed:', err?.response?.status || err.message);
@@ -342,7 +344,7 @@ const TechnicianDashboard = () => {
           <div className="text-3xl font-bold">{jobs.length}</div>
           <p className="text-sm text-gray-500 mt-2">Total jobs assigned to you</p>
         </div>
-        
+
         <div className="bg-white rounded-xl shadow p-6">
           <h2 className="font-semibold text-lg mb-2">In Progress</h2>
           <div className="text-3xl font-bold">
@@ -350,7 +352,7 @@ const TechnicianDashboard = () => {
           </div>
           <p className="text-sm text-gray-500 mt-2">Currently working on</p>
         </div>
-        
+
         <div className="bg-white rounded-xl shadow p-6">
           <h2 className="font-semibold text-lg mb-2">Material Requests</h2>
           <div className="text-3xl font-bold">{materialRequests.length}</div>
@@ -366,7 +368,7 @@ const TechnicianDashboard = () => {
             <h2 className="font-semibold text-xl">Assigned Issues</h2>
             <span className="text-sm text-gray-500">{jobs.length} total</span>
           </div>
-          
+
           {jobs.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
               No assigned issues found
@@ -380,7 +382,7 @@ const TechnicianDashboard = () => {
                     {(job.beforePhoto || job.photo || job.image) && (
                       <div className="flex-shrink-0">
                         <img
-                          src={`http://localhost:5000${job.beforePhoto || job.photo || job.image}`}
+                          src={`${api.defaults.baseURL || import.meta.env.VITE_API_URL || ''}${job.beforePhoto || job.photo || job.image}`}
                           alt="Issue"
                           className="w-20 h-20 object-cover rounded-lg shadow border cursor-pointer hover:opacity-80 transition"
                           onClick={() => handleImageClick(job.beforePhoto || job.photo || job.image, job.title)}
@@ -388,32 +390,30 @@ const TechnicianDashboard = () => {
                         />
                       </div>
                     )}
-                    
+
                     <div className="flex-1">
                       <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-2">
                         <div>
                           <h3 className="font-semibold text-gray-800">{job.title}</h3>
                           <div className="flex flex-wrap gap-2 mt-1">
-                            <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${
-                              getJobStatus(job) === 'IN PROGRESS' ? 'bg-blue-100 text-blue-700' :
+                            <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${getJobStatus(job) === 'IN PROGRESS' ? 'bg-blue-100 text-blue-700' :
                               getJobStatus(job) === 'PENDING' ? 'bg-yellow-100 text-yellow-700' :
-                              (getJobStatus(job) === 'COMPLETE' || getJobStatus(job) === 'COMPLETED') ? 'bg-green-100 text-green-700' :
-                              getJobStatus(job) === 'OVERDUE' ? 'bg-red-100 text-red-700' :
-                              'bg-gray-100 text-gray-700'
-                            }`}>
+                                (getJobStatus(job) === 'COMPLETE' || getJobStatus(job) === 'COMPLETED') ? 'bg-green-100 text-green-700' :
+                                  getJobStatus(job) === 'OVERDUE' ? 'bg-red-100 text-red-700' :
+                                    'bg-gray-100 text-gray-700'
+                              }`}>
                               {(getJobStatus(job) === 'COMPLETE' || getJobStatus(job) === 'COMPLETED') ? 'Complete' : getJobStatus(job)}
                             </span>
-                            <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${
-                              job.priority === 'HIGH' ? 'bg-red-100 text-red-700' :
+                            <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${job.priority === 'HIGH' ? 'bg-red-100 text-red-700' :
                               job.priority === 'MEDIUM' ? 'bg-yellow-100 text-yellow-700' :
-                              job.priority === 'LOW' ? 'bg-gray-100 text-gray-700' :
-                              'bg-purple-100 text-purple-700'
-                            }`}>
+                                job.priority === 'LOW' ? 'bg-gray-100 text-gray-700' :
+                                  'bg-purple-100 text-purple-700'
+                              }`}>
                               {job.priority || 'MEDIUM'} Priority
                             </span>
                           </div>
                         </div>
-                        
+
                         <div className="flex flex-col items-end">
                           {job.dueDate && (
                             <span className={`text-xs ${isOverdue(job.dueDate) ? 'text-red-600 font-semibold' : 'text-gray-500'}`}>
@@ -427,7 +427,7 @@ const TechnicianDashboard = () => {
                             >
                               View
                             </button>
-                            
+
                             {getJobStatus(job) === 'PENDING' && (
                               <button
                                 className="px-3 py-1 bg-orange-500 text-white text-xs rounded hover:bg-orange-600"
@@ -436,7 +436,7 @@ const TechnicianDashboard = () => {
                                 Start Work
                               </button>
                             )}
-                            
+
                             {getJobStatus(job) === 'IN PROGRESS' && (
                               <button
                                 className="px-3 py-1 bg-green-500 text-white text-xs rounded hover:bg-green-600"
@@ -448,7 +448,7 @@ const TechnicianDashboard = () => {
                           </div>
                         </div>
                       </div>
-                      
+
                       {/* AFTER FORM */}
                       {showAfterForm[job.id || job._id] && (
                         <div className="mt-4 pt-4 border-t">
@@ -479,7 +479,7 @@ const TechnicianDashboard = () => {
                 + New Request
               </button>
             </div>
-            
+
             {materialRequests.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
                 No material requests yet
@@ -496,12 +496,11 @@ const TechnicianDashboard = () => {
                           <span className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
                             Qty: {req.quantity || req.items?.[0]?.quantity || ''}
                           </span>
-                          <span className={`text-xs px-2 py-1 rounded ${
-                            req.urgency === 'URGENT' ? 'bg-red-100 text-red-700' :
+                          <span className={`text-xs px-2 py-1 rounded ${req.urgency === 'URGENT' ? 'bg-red-100 text-red-700' :
                             req.urgency === 'HIGH' ? 'bg-orange-100 text-orange-700' :
-                            req.urgency === 'MEDIUM' ? 'bg-yellow-100 text-yellow-700' :
-                            'bg-gray-100 text-gray-700'
-                          }`}>
+                              req.urgency === 'MEDIUM' ? 'bg-yellow-100 text-yellow-700' :
+                                'bg-gray-100 text-gray-700'
+                            }`}>
                             {req.urgency}
                           </span>
                         </div>
@@ -517,13 +516,12 @@ const TechnicianDashboard = () => {
                           </div>
                         )}
                       </div>
-                      <span className={`text-xs px-2 py-1 rounded ${
-                        req.status === 'APPROVED' ? 'bg-green-100 text-green-700' :
+                      <span className={`text-xs px-2 py-1 rounded ${req.status === 'APPROVED' ? 'bg-green-100 text-green-700' :
                         req.status === 'PENDING' ? 'bg-yellow-100 text-yellow-700' :
-                        req.status === 'REJECTED' ? 'bg-red-100 text-red-700' :
-                        req.status === 'FULFILLED' ? 'bg-blue-100 text-blue-700' :
-                        'bg-gray-100 text-gray-700'
-                      }`}>
+                          req.status === 'REJECTED' ? 'bg-red-100 text-red-700' :
+                            req.status === 'FULFILLED' ? 'bg-blue-100 text-blue-700' :
+                              'bg-gray-100 text-gray-700'
+                        }`}>
                         {req.status}
                       </span>
                     </div>
@@ -532,7 +530,7 @@ const TechnicianDashboard = () => {
                 {materialRequests.length > 5 && (
                   <div className="text-center pt-4">
                     <button
-                      onClick={() => {/* Implement view all */}}
+                      onClick={() => {/* Implement view all */ }}
                       className="text-sm text-purple-600 hover:text-purple-800"
                     >
                       View all {materialRequests.length} requests
@@ -583,7 +581,7 @@ const TechnicianDashboard = () => {
                   ✕
                 </button>
               </div>
-              
+
               <div className="space-y-4">
                 <div>
                   <h3 className="font-semibold text-gray-700">Title</h3>
@@ -600,29 +598,27 @@ const TechnicianDashboard = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <h3 className="font-semibold text-gray-700">Status</h3>
-                    <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${
-                      getJobStatus(selectedJob) === 'IN PROGRESS' ? 'bg-blue-100 text-blue-700' :
+                    <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${getJobStatus(selectedJob) === 'IN PROGRESS' ? 'bg-blue-100 text-blue-700' :
                       getJobStatus(selectedJob) === 'PENDING' ? 'bg-yellow-100 text-yellow-700' :
-                      (getJobStatus(selectedJob) === 'COMPLETE' || getJobStatus(selectedJob) === 'COMPLETED') ? 'bg-green-100 text-green-700' :
-                      getJobStatus(selectedJob) === 'OVERDUE' ? 'bg-red-100 text-red-700' :
-                      'bg-gray-100 text-gray-700'
-                    }`}>
+                        (getJobStatus(selectedJob) === 'COMPLETE' || getJobStatus(selectedJob) === 'COMPLETED') ? 'bg-green-100 text-green-700' :
+                          getJobStatus(selectedJob) === 'OVERDUE' ? 'bg-red-100 text-red-700' :
+                            'bg-gray-100 text-gray-700'
+                      }`}>
                       {(getJobStatus(selectedJob) === 'COMPLETE' || getJobStatus(selectedJob) === 'COMPLETED') ? 'Complete' : getJobStatus(selectedJob)?.replace('_', ' ') || 'Pending'}
                     </span>
                   </div>
                   <div>
                     <h3 className="font-semibold text-gray-700">Priority</h3>
-                    <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${
-                      selectedJob.priority === 'HIGH' ? 'bg-red-100 text-red-700' :
+                    <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${selectedJob.priority === 'HIGH' ? 'bg-red-100 text-red-700' :
                       selectedJob.priority === 'MEDIUM' ? 'bg-yellow-100 text-yellow-700' :
-                      selectedJob.priority === 'LOW' ? 'bg-gray-100 text-gray-700' :
-                      'bg-purple-100 text-purple-700'
-                    }`}>
+                        selectedJob.priority === 'LOW' ? 'bg-gray-100 text-gray-700' :
+                          'bg-purple-100 text-purple-700'
+                      }`}>
                       {selectedJob.priority || 'MEDIUM'}
                     </span>
                   </div>
                 </div>
-                
+
                 {/* Evidence Display */}
                 <div className="border-t pt-4">
                   <h3 className="font-semibold text-gray-700 mb-2">Evidence</h3>
@@ -630,9 +626,9 @@ const TechnicianDashboard = () => {
                     {(selectedJob.beforePhoto || selectedJob.photo || selectedJob.image) && (
                       <div>
                         <h4 className="text-sm font-medium text-gray-600">Before (Client Photo)</h4>
-                        <img 
-                          src={`http://localhost:5000${selectedJob.beforePhoto || selectedJob.photo || selectedJob.image}`} 
-                          alt="Before" 
+                        <img
+                          src={`${api.defaults.baseURL || import.meta.env.VITE_API_URL || ''}${selectedJob.beforePhoto || selectedJob.photo || selectedJob.image}`}
+                          alt="Before"
                           className="w-32 h-32 object-cover rounded border cursor-pointer hover:opacity-80 transition"
                           onClick={() => handleImageClick(selectedJob.beforePhoto || selectedJob.photo || selectedJob.image, selectedJob.title)}
                           title="Click to view larger image"
@@ -642,9 +638,9 @@ const TechnicianDashboard = () => {
                     {selectedJob.evidence?.afterImage && (
                       <div>
                         <h4 className="text-sm font-medium text-gray-600">After</h4>
-                        <img 
-                          src={`http://localhost:5000${selectedJob.evidence.afterImage}`} 
-                          alt="After" 
+                        <img
+                          src={`${api.defaults.baseURL || import.meta.env.VITE_API_URL || ''}${selectedJob.evidence.afterImage}`}
+                          alt="After"
                           className="w-32 h-32 object-cover rounded border cursor-pointer hover:opacity-80 transition"
                           onClick={() => handleImageClick(selectedJob.evidence.afterImage, `${selectedJob.title} - After`)}
                           title="Click to view larger image"
@@ -659,7 +655,7 @@ const TechnicianDashboard = () => {
                     )}
                   </div>
                 </div>
-                
+
                 <div className="flex gap-2 pt-4">
                   <button
                     onClick={() => setSelectedJob(null)}
