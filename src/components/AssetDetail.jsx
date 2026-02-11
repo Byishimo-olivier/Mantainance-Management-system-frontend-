@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api/axios';
 import AssetMapView from './AssetMapView';
 
 export default function AssetDetail({ assetId, onClose, onUpdated }) {
@@ -13,11 +13,11 @@ export default function AssetDetail({ assetId, onClose, onUpdated }) {
     setLoading(true);
     (async () => {
       try {
-        const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/assets/${assetId}`);
+        const res = await api.get(`/api/assets/${assetId}`);
         setAsset(res.data || null);
-        const m = await axios.get(`${import.meta.env.VITE_API_URL}/api/assets/${assetId}/movements`);
+        const m = await api.get(`/api/assets/${assetId}/movements`);
         setMovements(m.data || []);
-        const p = await axios.get(`${import.meta.env.VITE_API_URL}/api/assets/${assetId}/spare-parts`);
+        const p = await api.get(`/api/assets/${assetId}/spare-parts`);
         setParts(p.data || []);
       } catch (e) {
         console.error('Failed loading asset detail', e);

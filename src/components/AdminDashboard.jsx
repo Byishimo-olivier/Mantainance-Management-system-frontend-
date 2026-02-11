@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../api/axios";
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -11,14 +11,12 @@ const AdminDashboard = () => {
   const [subscriptions, setSubscriptions] = useState([]);
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) return;
-    axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-    axios.get(import.meta.env.VITE_API_URL + "/api/issues").then(res => setJobs(res.data));
-    axios.get(import.meta.env.VITE_API_URL + "/api/technicians").then(res => setTechnicians(res.data));
-    axios.get(import.meta.env.VITE_API_URL + "/api/materials").then(res => setInventory(res.data));
-    axios.get(import.meta.env.VITE_API_URL + "/api/finances/summary").then(res => setFinances(res.data));
-    axios.get(import.meta.env.VITE_API_URL + "/api/subscriptions").then(res => setSubscriptions(res.data));
+    // Auth token is handled by the api interceptor in ../api/axios.js
+    api.get("/api/issues").then(res => setJobs(res.data));
+    api.get("/api/technicians").then(res => setTechnicians(res.data));
+    api.get("/api/materials").then(res => setInventory(res.data));
+    api.get("/api/finances/summary").then(res => setFinances(res.data));
+    api.get("/api/subscriptions").then(res => setSubscriptions(res.data));
   }, []);
 
   return (

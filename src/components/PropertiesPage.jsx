@@ -269,7 +269,7 @@ function PropertiesPage() {
       let validUserId = undefined;
       if (userId) {
         try {
-          const usersRes = await axios.get(`${backendBase}/api/users`);
+          const usersRes = await api.get('/api/users');
           const users = Array.isArray(usersRes.data) ? usersRes.data : [];
           if (users.some(u => u.id === userId || u._id === userId)) {
             validUserId = userId;
@@ -1173,7 +1173,7 @@ function PropertiesPage() {
                             assetId: null,
                             propertyId,
                           };
-                          posts.push(axios.post(`${backendBase}/api/issues`, payload));
+                          posts.push(api.post('/api/issues', payload));
                         } else if (isItem) {
                           const itemId = key.replace('item-', '');
                           // itemId format: assetId-index or block-row-seat
@@ -1203,7 +1203,7 @@ function PropertiesPage() {
                                 assetId: asset ? asset.id || asset._id : null,
                                 propertyId,
                               };
-                              posts.push(axios.post(`${backendBase}/api/issues`, payload));
+                              posts.push(api.post('/api/issues', payload));
                             }
                           }
                         } else {
@@ -1219,7 +1219,7 @@ function PropertiesPage() {
                               assetId: key,
                               propertyId,
                             };
-                            posts.push(axios.post(`${backendBase}/api/issues`, payload));
+                            posts.push(api.post('/api/issues', payload));
                           }
                         }
                       }

@@ -1252,8 +1252,8 @@ function ClientDashboard() {
                     };
 
                     if (editingProperty) {
-                      await axios.put(
-                        `${import.meta.env.VITE_API_URL}/api/properties/${editingProperty._id || editingProperty.id}`,
+                      await api.put(
+                        `/api/properties/${editingProperty._id || editingProperty.id}`,
                         payload
                       );
 
@@ -1262,8 +1262,8 @@ function ClientDashboard() {
                         try {
                           const form = new FormData();
                           Array.from(propertyFiles).forEach(f => form.append('photos', f));
-                          await axios.post(
-                            `${import.meta.env.VITE_API_URL}/api/properties/${editingProperty._id || editingProperty.id}/photos`,
+                          await api.post(
+                            `/api/properties/${editingProperty._id || editingProperty.id}/photos`,
                             form,
                             { headers: { 'Content-Type': 'multipart/form-data' } }
                           );
@@ -1274,7 +1274,7 @@ function ClientDashboard() {
 
                       setEditingProperty(null);
                     } else {
-                      const createRes = await axios.post(import.meta.env.VITE_API_URL + '/api/properties', payload);
+                      const createRes = await api.post('/api/properties', payload);
                       const created = createRes.data;
 
                       // upload files if any
@@ -1282,8 +1282,8 @@ function ClientDashboard() {
                         try {
                           const form = new FormData();
                           Array.from(propertyFiles).forEach(f => form.append('photos', f));
-                          await axios.post(
-                            `${import.meta.env.VITE_API_URL}/api/properties/${created.id || created._id}/photos`,
+                          await api.post(
+                            `/api/properties/${created.id || created._id}/photos`,
                             form,
                             { headers: { 'Content-Type': 'multipart/form-data' } }
                           );
@@ -1295,7 +1295,7 @@ function ClientDashboard() {
 
                     setPropertyForm({ name: '', type: '', address: '', beds: '', baths: '', levels: '', area: '', floors: '', blocks: '', rooms: '' });
                     setPropertyFiles(null);
-                    const res = await axios.get(import.meta.env.VITE_API_URL + '/api/properties');
+                    const res = await api.get('/api/properties');
                     setProperties(res.data || []);
                   } catch (err) {
                     console.error('Error saving property:', err);
@@ -1521,8 +1521,8 @@ function ClientDashboard() {
                           onClick={async () => {
                             if (window.confirm('Are you sure you want to delete this property?')) {
                               try {
-                                await axios.delete(
-                                  `${import.meta.env.VITE_API_URL}/api/properties/${property._id || property.id}`
+                                await api.delete(
+                                  `/api/properties/${property._id || property.id}`
                                 );
                                 setProperties(properties.filter(p => (p._id || p.id) !== (property._id || property.id)));
                               } catch (err) {
@@ -1580,7 +1580,7 @@ function ClientDashboard() {
                       const now = Array.isArray(assetForm.blocks) ? assetForm.blocks.map(String) : [];
                       const remove = prev.filter(p => !now.includes(p));
                       if (remove.length > 0) payload.removeBlocks = remove;
-                      await axios.put(`${import.meta.env.VITE_API_URL}/api/assets/${editingAsset._id || editingAsset.id}`, payload);
+                      await api.put(`/api/assets/${editingAsset._id || editingAsset.id}`, payload);
                       setEditingAsset(null);
                       setOriginalAssetBlocks([]);
                     } else {
@@ -1592,10 +1592,10 @@ function ClientDashboard() {
                         userId = null;
                       }
                       // Only send propertyId and userId as flat fields
-                      await axios.post(import.meta.env.VITE_API_URL + '/api/assets', { ...payload, userId, propertyId: payload.propertyId });
+                      await api.post('/api/assets', { ...payload, userId, propertyId: payload.propertyId });
                     }
                     setAssetForm({ name: '', type: '', description: '', propertyId: '', quantity: 1, building: '', blocks: [] });
-                    const res = await axios.get(import.meta.env.VITE_API_URL + '/api/assets');
+                    const res = await api.get('/api/assets');
                     setAssets(res.data || []);
                   } catch (err) {
                     console.error('Error saving asset:', err);
@@ -1790,8 +1790,8 @@ function ClientDashboard() {
                           onClick={async () => {
                             if (window.confirm('Are you sure you want to delete this asset?')) {
                               try {
-                                await axios.delete(
-                                  `${import.meta.env.VITE_API_URL}/api/assets/${asset._id || asset.id}`
+                                await api.delete(
+                                  `/api/assets/${asset._id || asset.id}`
                                 );
                                 setAssets(assets.filter(a => (a._id || a.id) !== (asset._id || asset.id)));
                               } catch (err) {
@@ -1847,13 +1847,13 @@ function ClientDashboard() {
                     };
 
                     if (editingTech) {
-                      await axios.put(
-                        `${import.meta.env.VITE_API_URL}/api/internal-technicians/${editingTech._id || editingTech.id}`,
+                      await api.put(
+                        `/api/internal-technicians/${editingTech._id || editingTech.id}`,
                         data
                       );
                       setEditingTech(null);
                     } else {
-                      await axios.post(import.meta.env.VITE_API_URL + '/api/internal-technicians', data);
+                      await api.post('/api/internal-technicians', data);
                     }
 
                     setTechForm({
@@ -1867,7 +1867,7 @@ function ClientDashboard() {
                       propertyId: '',
                     });
 
-                    const res = await axios.get(import.meta.env.VITE_API_URL + '/api/internal-technicians');
+                    const res = await api.get('/api/internal-technicians');
                     setInternalTechnicians(res.data || []);
                   } catch (err) {
                     console.error('Error saving technician:', err);
@@ -2054,8 +2054,8 @@ function ClientDashboard() {
                           onClick={async () => {
                             if (window.confirm('Are you sure you want to delete this technician?')) {
                               try {
-                                await axios.delete(
-                                  `${import.meta.env.VITE_API_URL}/api/internal-technicians/${tech._id || tech.id}`
+                                await api.delete(
+                                  `/api/internal-technicians/${tech._id || tech.id}`
                                 );
                                 setInternalTechnicians(
                                   internalTechnicians.filter(t => (t._id || t.id) !== (tech._id || tech.id))
@@ -2124,7 +2124,7 @@ function ClientDashboard() {
                     assets={assets}
                     initialData={editingSchedule}
                     onSuccess={async () => {
-                      const res = await axios.get(import.meta.env.VITE_API_URL + '/api/maintenance-schedules');
+                      const res = await api.get('/api/maintenance-schedules');
                       setMaintenanceSchedules(res.data || []);
                       setShowScheduleForm(false);
                       setEditingSchedule(null);
@@ -2252,8 +2252,8 @@ function ClientDashboard() {
                               onClick={async () => {
                                 if (window.confirm('Are you sure you want to delete this schedule?')) {
                                   try {
-                                    await axios.delete(
-                                      `${import.meta.env.VITE_API_URL}/api/maintenance-schedules/${schedule._id || schedule.id}`
+                                    await api.delete(
+                                      `/api/maintenance-schedules/${schedule._id || schedule.id}`
                                     );
                                     setMaintenanceSchedules(
                                       maintenanceSchedules.filter(s => (s._id || s.id) !== (schedule._id || schedule.id))
