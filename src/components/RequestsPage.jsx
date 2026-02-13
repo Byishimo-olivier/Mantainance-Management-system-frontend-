@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import api from "../api/axios";
+import { getImageUrl } from '../utils/imageUrl';
 import { useNavigate } from "react-router-dom";
 
 function RequestsPage() {
@@ -176,12 +177,12 @@ function RequestsPage() {
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                     <div className="flex-1">
                       <div className="flex items-start gap-4">
-                        {(request.beforePhoto || request.photo) && (
+                        {getImageUrl(request.beforePhoto || request.photo) && (
                           <img
-                            src={`${api.defaults.baseURL || import.meta.env.VITE_API_URL || ''}${request.beforePhoto || request.photo}`}
+                            src={getImageUrl(request.beforePhoto || request.photo)}
                             alt="Issue"
                             className="w-20 h-20 object-cover rounded-lg cursor-pointer hover:opacity-80"
-                            onClick={() => window.open(`${api.defaults.baseURL || import.meta.env.VITE_API_URL || ''}${request.beforePhoto || request.photo}`, '_blank')}
+                            onClick={() => window.open(getImageUrl(request.beforePhoto || request.photo), '_blank')}
                           />
                         )}
                         <div className="flex-1">
@@ -287,14 +288,14 @@ function RequestsPage() {
                 </div>
 
                 {/* BEFORE Photo */}
-                {(selectedRequest.beforePhoto || selectedRequest.photo) && (
+                {getImageUrl(selectedRequest.beforePhoto || selectedRequest.photo) && (
                   <div>
                     <h3 className="font-semibold text-gray-700 mb-2">Client Photo</h3>
                     <img
-                      src={`${api.defaults.baseURL || import.meta.env.VITE_API_URL || ''}${selectedRequest.beforePhoto || selectedRequest.photo}`}
+                      src={getImageUrl(selectedRequest.beforePhoto || selectedRequest.photo)}
                       alt="Issue"
                       className="w-32 h-32 object-cover rounded border cursor-pointer hover:opacity-80"
-                      onClick={() => window.open(`${api.defaults.baseURL || import.meta.env.VITE_API_URL || ''}${selectedRequest.beforePhoto || selectedRequest.photo}`, '_blank')}
+                      onClick={() => window.open(getImageUrl(selectedRequest.beforePhoto || selectedRequest.photo), '_blank')}
                     />
                   </div>
                 )}
