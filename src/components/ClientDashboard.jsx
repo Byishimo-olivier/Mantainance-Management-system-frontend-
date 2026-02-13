@@ -85,7 +85,7 @@ const statusCards = [
 function ClientDashboard() {
   const backendBase = import.meta.env.VITE_API_URL + '';
   const imageSrc = (path) => {
-    if (!path) return null;
+    if (!path || path === 'null' || path === 'undefined') return null;
     try {
       if (String(path).startsWith('http') || String(path).startsWith('//')) return path;
       if (String(path).startsWith('/')) return `${backendBase}${path}`;
@@ -204,7 +204,6 @@ function ClientDashboard() {
       const userObj = JSON.parse(storedUser);
       setUserName(userObj.name || "");
       setCurrentUser(userObj);
-      setCurrentUser(userObj);
       // axios.defaults.headers.common["Authorization"] is handled in api/axios.js
 
       async function fetchEntities() {
@@ -253,6 +252,7 @@ function ClientDashboard() {
               console.error('Failed to fetch internal technicians per property for client', e);
             }
           }
+
           return propertiesData;
         } catch (err) {
           setProperties([]);
@@ -261,7 +261,9 @@ function ClientDashboard() {
         } finally {
           setLoading(l => ({ ...l, properties: false }));
         }
+      }
 
+      async function fetchRest() {
         try {
           // Do not overwrite per-property assets for client users — those were
           // fetched per-property inside `fetchEntities` above. Only fetch the
@@ -410,6 +412,8 @@ function ClientDashboard() {
       // Fetch entities (properties, assets, etc.) first so property-scoped issue queries
       // can be executed for client users (to surface anonymous property issues).
       const fetchedProps = await fetchEntities();
+      // Added call to fetchRest which was previously unreachable
+      await fetchRest();
 
       let filteredProps = fetchedProps;
       // If the logged-in user is a client, attempt to narrow the properties list
@@ -436,10 +440,32 @@ function ClientDashboard() {
 
       async function fetchIssues() {
         try {
-          // Fetch issues (backend now handles filtering for clients)
-          // Fetch issues (backend now handles filtering for clients)
+          console.log('[Dashboard] Fetching issues...');
           const res = await api.get(`/api/issues`);
-          const fetched = res.data || [];
+          const rawIssues = res.data || [];
+          console.log(`[Dashboard] Fetched ${rawIssues.length} issues`);
+
+          const fetched = rawIssues.map(issue => {
+            const createdAt = new Date(issue.createdAt);
+            const now = new Date();
+            const diff = now - createdAt;
+            const hours = Math.floor(diff / (1000 * 60 * 60));
+
+            let time = 'Recent';
+            if (hours > 24) time = `${Math.floor(hours / 24)}d ago`;
+            else if (hours > 0) time = `${hours}h ago`;
+            else time = 'Just now';
+
+            // Simple overdue logic: if status is PENDING or IN PROGRESS and older than 3 days
+            const statusUpper = (issue.status || '').toUpperCase();
+            const isOverdue = (statusUpper === 'PENDING' || statusUpper === 'IN PROGRESS' || statusUpper === 'IN_PROGRESS') && (hours > 72);
+
+            return {
+              ...issue,
+              time,
+              overdue: issue.overdue !== undefined ? issue.overdue : isOverdue
+            };
+          }).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
           // Group issues by propertyId for the UI
           const issuesByProp = {};
@@ -451,11 +477,6 @@ function ClientDashboard() {
             }
           });
 
-          // Sort issues for each property by most recent first
-          Object.keys(issuesByProp).forEach(pid => {
-            issuesByProp[pid] = issuesByProp[pid].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-          });
-
           setIssues(fetched);
           setAllIssues(fetched);
           setIssuesByProperty(issuesByProp);
@@ -463,8 +484,12 @@ function ClientDashboard() {
           // Count issues by status
           const counts = { Pending: 0, "In Progress": 0, Completed: 0, Overdue: 0 };
           fetched.forEach(issue => {
-            const status = (issue.status || '').replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase()).replace('Complete', 'Completed');
-            if (counts[status] !== undefined) counts[status]++;
+            const status = (issue.status || '').toLowerCase().replace(/_/g, ' ');
+            if (status.includes('pending')) counts.Pending++;
+            else if (status.includes('progress')) counts["In Progress"]++;
+            else if (status.includes('complete') || status.includes('verified') || status.includes('approved')) counts.Completed++;
+
+            if (issue.overdue) counts.Overdue++;
           });
           setStatusCounts(counts);
         } catch (err) {
@@ -486,8 +511,9 @@ function ClientDashboard() {
       });
       // refresh issues
       const res = await api.get('/api/issues');
-      setIssues(res.data || []);
-      setAllIssues(res.data || []);
+      const fetched = (res.data || []).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      setIssues(fetched);
+      setAllIssues(fetched);
     } catch (e) {
       console.error('Approve failed', e);
       alert('Failed to approve issue');
@@ -501,8 +527,9 @@ function ClientDashboard() {
       });
       // refresh issues
       const res = await api.get('/api/issues');
-      setIssues(res.data || []);
-      setAllIssues(res.data || []);
+      const fetched = (res.data || []).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      setIssues(fetched);
+      setAllIssues(fetched);
     } catch (e) {
       console.error('Decline failed', e);
       alert('Failed to decline issue');
@@ -514,8 +541,9 @@ function ClientDashboard() {
       await api.post(`/api/issues/${issueId}/resubmit`);
       // refresh issues
       const res = await api.get('/api/issues');
-      setIssues(res.data || []);
-      setAllIssues(res.data || []);
+      const fetched = (res.data || []).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      setIssues(fetched);
+      setAllIssues(fetched);
     } catch (e) {
       console.error('Resubmit failed', e);
       alert('Failed to resubmit issue');
@@ -529,8 +557,9 @@ function ClientDashboard() {
       await api.post(`/api/issues/${issueId}/assign-internal`, { internalTechId });
       // refresh issues
       const res = await api.get('/api/issues');
-      setIssues(res.data || []);
-      setAllIssues(res.data || []);
+      const fetched = (res.data || []).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      setIssues(fetched);
+      setAllIssues(fetched);
       setAssignLoading(s => ({ ...s, [issueId]: false }));
     } catch (e) {
       setAssignLoading(s => ({ ...s, [issueId]: false }));
@@ -546,8 +575,9 @@ function ClientDashboard() {
       await api.post(`/api/issues/${issueId}/assign`, { techId });
       // refresh issues
       const res = await api.get('/api/issues');
-      setIssues(res.data || []);
-      setAllIssues(res.data || []);
+      const fetched = (res.data || []).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      setIssues(fetched);
+      setAllIssues(fetched);
       setAssignLoading(s => ({ ...s, [issueId]: false }));
     } catch (e) {
       setAssignLoading(s => ({ ...s, [issueId]: false }));
@@ -1249,6 +1279,7 @@ function ClientDashboard() {
                       blocks: propertyForm.blocks ? parseInt(propertyForm.blocks) : undefined,
                       rooms: propertyForm.rooms ? parseInt(propertyForm.rooms) : undefined,
                       clientId: userId,
+                      userId: userId,
                     };
 
                     if (editingProperty) {

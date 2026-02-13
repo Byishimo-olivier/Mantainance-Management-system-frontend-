@@ -79,7 +79,7 @@ export default function Login({ onLogin }) {
         >Login</button>
         {error && <div className="text-red-500 text-center mt-2 font-medium">{error}</div>}
         <div className="text-center mt-4">
-          <a href="/register" className="text-indigo-500 font-medium hover:underline">If you don't have an account, Sign up</a>
+          <a href="/register" className="text-indigo-500 font-medium hover:underline text-sm italic">If you don't have an account, Sign up</a>
         </div>
       </form>
     </div>

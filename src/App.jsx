@@ -60,7 +60,7 @@ function App() {
   return (
     <Routes>
       <Route path="/" element={<PropertiesPage />} />
-      <Route path= "/Home" element={<LandingPage/>}/>
+      <Route path="/Home" element={<LandingPage />} />
       <Route path="/dashboard" element={<Dashboard user={auth?.user} />} />
       <Route path="/login" element={<Login onLogin={handleLogin} />} />
       <Route path="/register" element={<Register />} />
@@ -76,7 +76,7 @@ function App() {
       <Route path="/issues" element={auth ? <AllIssues /> : <Login onLogin={handleLogin} />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password/:token" element={<ResetPasswordWrapper />} />
-      <Route path="/new-issue" element={auth ? <NewIssue /> : <Login onLogin={handleLogin} />} />
+      <Route path="/new-issue" element={<NewIssue />} />
       <Route path="/requests" element={auth ? <RequestsPage /> : <Login onLogin={handleLogin} />} />
       <Route path="/admin-dashboard" element={auth ? <AdminDashboard /> : <Login onLogin={handleLogin} />} />
       <Route path="/manager-dashboard" element={auth ? <ManagerDashboard /> : <Login onLogin={handleLogin} />} />
@@ -84,9 +84,9 @@ function App() {
       <Route path="/technicians" element={auth ? <TechnicianManagement /> : <Login onLogin={handleLogin} />} />
       <Route path="/technician-dashboard" element={auth ? <TechnicianDashboard /> : <Login onLogin={handleLogin} />} />
       <Route path="/manager-issues" element={auth ? <ManagementIssues issues={issues} setIssues={setIssues} /> : <Login onLogin={handleLogin} />} />
-      <Route path="/properties" element={auth ? <PropertiesPage /> : <Login onLogin={handleLogin} />} />
+      <Route path="/properties" element={<PropertiesPage />} />
       <Route path="/properties-cards" element={<PropertiesCards />} />
-      <Route path="/property-details/:id" element={auth ? <PropertyDetails /> : <Login onLogin={handleLogin} />} />
+      <Route path="/property-details/:id" element={<PropertyDetails />} />
       <Route path="/property/:id" element={<PropertyPublicView />} />
       <Route path="/property/:id" element={<PropertyPublicView />} />
       <Route path="/feedback" element={auth ? <Feedback /> : <Login onLogin={handleLogin} />} />

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import Select from 'react-select';
 import api from "../api/axios";
+import { getImageUrl } from '../utils/imageUrl';
 
 const ManagementIssues = () => {
 
@@ -74,19 +75,19 @@ const ManagementIssues = () => {
             <span className="text-lg font-semibold text-gray-900 flex-1">{issue.title}</span>
             {issue.status && (
               <span className={`ml-2 px-2 py-0.5 rounded text-xs font-medium ${issue.status === 'IN PROGRESS' ? 'bg-blue-100 text-blue-700' :
-                  issue.status === 'PENDING' ? 'bg-gray-100 text-gray-600' :
-                    (issue.status === 'COMPLETE' || issue.status === 'COMPLETED') ? 'bg-green-100 text-green-700' :
-                      issue.status === 'OVERDUE' ? 'bg-red-100 text-red-700' :
-                        'bg-gray-100 text-gray-700'
+                issue.status === 'PENDING' ? 'bg-gray-100 text-gray-600' :
+                  (issue.status === 'COMPLETE' || issue.status === 'COMPLETED') ? 'bg-green-100 text-green-700' :
+                    issue.status === 'OVERDUE' ? 'bg-red-100 text-red-700' :
+                      'bg-gray-100 text-gray-700'
                 }`}>
                 {(issue.status === 'COMPLETE' || issue.status === 'COMPLETED') ? 'Complete' : issue.status.replace('_', ' ')}
               </span>
             )}
           </div>
           <div className="text-gray-500 text-sm mb-1">{issue.location}</div>
-          {(issue.photo || issue.image) && (
+          {getImageUrl(issue.photo || issue.image) && (
             <img
-              src={`${api.defaults.baseURL || import.meta.env.VITE_API_URL || ''}${issue.photo || issue.image}`}
+              src={getImageUrl(issue.photo || issue.image)}
               alt="Issue"
               className="w-full h-32 max-w-xs object-cover rounded mb-2 mx-auto"
               style={{ aspectRatio: '4/3' }}

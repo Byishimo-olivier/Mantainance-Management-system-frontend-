@@ -18,6 +18,16 @@ export default function PropertyDetails() {
     if (stored) {
       try { setCurrentUser(JSON.parse(stored)); } catch (e) { setCurrentUser(null); }
     }
+
+    // Check if we need to generate an anonId
+    if (!stored) {
+      const storedAnonId = localStorage.getItem('anonId');
+      if (!storedAnonId) {
+        const newAnonId = `ANON-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+        localStorage.setItem('anonId', newAnonId);
+      }
+    }
+
     fetchAll();
     // eslint-disable-next-line
   }, [id]);
@@ -28,15 +38,8 @@ export default function PropertyDetails() {
       const p = await api.get(`/api/properties/${id}`);
       setProperty(p.data || null);
 
-      const res = await api.get('/api/issues');
-      const all = res.data || [];
-      const filtered = all.filter(i => {
-        if (!i) return false;
-        const loc = (i.location || i.address || '').toString().toLowerCase();
-        return (p.data && (p.data.name || '').toString().toLowerCase() && loc.includes((p.data.name || '').toString().toLowerCase())) ||
-          (p.data && (p.data.address || '').toString().toLowerCase() && loc.includes((p.data.address || '').toString().toLowerCase()));
-      });
-      setIssues(filtered);
+      const res = await api.get(`/api/issues?propertyId=${id}`);
+      setIssues(Array.isArray(res.data) ? res.data : []);
 
       // assets
       try {
@@ -69,11 +72,10 @@ export default function PropertyDetails() {
   async function submitIssue(e) {
     e.preventDefault();
     if (!property) return;
-    // Try to get the property owner's userId (clientId or userId)
-    let userId = property.clientId || property.userId || (property.user && (property.user.id || property.user._id));
-    if (!userId && property.owner) {
-      userId = property.owner.id || property.owner._id;
-    }
+    const isAuth = !!localStorage.getItem('token');
+    const reporterId = currentUser?.id || currentUser?._id;
+    const anonId = localStorage.getItem('anonId');
+
     const payload = {
       title: newIssue.title,
       description: newIssue.description,
@@ -82,11 +84,14 @@ export default function PropertyDetails() {
       address: property.address,
       assetId: newIssue.assetId || undefined,
       propertyId: property.id || property._id,
-      userId: userId || undefined,
+      userId: reporterId || undefined,
+      submissionType: isAuth ? 'authenticated' : 'anonymous',
+      anonId: isAuth ? undefined : anonId
     };
     try {
       await api.post('/api/issues', payload);
       setNewIssue({ title: '', description: '', tags: '', assetId: '' });
+      alert('Issue reported successfully!');
       await fetchAll();
     } catch (e) {
       console.error('Failed to create issue', e);
