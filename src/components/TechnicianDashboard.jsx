@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import api from "../api/axios";
+import { getImageUrl } from '../utils/imageUrl';
 import { useNavigate } from 'react-router-dom';
 
 // AFTER EVIDENCE FORM WITH COMPLETION DETAILS
@@ -181,8 +182,8 @@ const TechnicianDashboard = () => {
      We can access it from api.defaults.baseURL or import.meta.env.VITE_API_URL 
   */
   const handleImageClick = (imageSrc, title) => {
-    const baseUrl = api.defaults.baseURL || import.meta.env.VITE_API_URL || '';
-    window.open(`${baseUrl}${imageSrc}`, '_blank');
+    const url = getImageUrl(imageSrc);
+    if (url) window.open(url, '_blank');
   };
 
   const fetchAssignedIssues = () => {
@@ -379,10 +380,10 @@ const TechnicianDashboard = () => {
                 <div key={job.id || job._id} className="border rounded-lg p-4 hover:shadow-md transition">
                   <div className="flex flex-col md:flex-row gap-4">
                     {/* BEFORE Photo */}
-                    {(job.beforePhoto || job.photo || job.image) && (
+                    {getImageUrl(job.beforePhoto || job.photo || job.image) && (
                       <div className="flex-shrink-0">
                         <img
-                          src={`${api.defaults.baseURL || import.meta.env.VITE_API_URL || ''}${job.beforePhoto || job.photo || job.image}`}
+                          src={getImageUrl(job.beforePhoto || job.photo || job.image)}
                           alt="Issue"
                           className="w-20 h-20 object-cover rounded-lg shadow border cursor-pointer hover:opacity-80 transition"
                           onClick={() => handleImageClick(job.beforePhoto || job.photo || job.image, job.title)}
@@ -623,11 +624,11 @@ const TechnicianDashboard = () => {
                 <div className="border-t pt-4">
                   <h3 className="font-semibold text-gray-700 mb-2">Evidence</h3>
                   <div className="space-y-3">
-                    {(selectedJob.beforePhoto || selectedJob.photo || selectedJob.image) && (
+                    {getImageUrl(selectedJob.beforePhoto || selectedJob.photo || selectedJob.image) && (
                       <div>
                         <h4 className="text-sm font-medium text-gray-600">Before (Client Photo)</h4>
                         <img
-                          src={`${api.defaults.baseURL || import.meta.env.VITE_API_URL || ''}${selectedJob.beforePhoto || selectedJob.photo || selectedJob.image}`}
+                          src={getImageUrl(selectedJob.beforePhoto || selectedJob.photo || selectedJob.image)}
                           alt="Before"
                           className="w-32 h-32 object-cover rounded border cursor-pointer hover:opacity-80 transition"
                           onClick={() => handleImageClick(selectedJob.beforePhoto || selectedJob.photo || selectedJob.image, selectedJob.title)}
@@ -635,11 +636,11 @@ const TechnicianDashboard = () => {
                         />
                       </div>
                     )}
-                    {selectedJob.evidence?.afterImage && (
+                    {getImageUrl(selectedJob.evidence?.afterImage) && (
                       <div>
                         <h4 className="text-sm font-medium text-gray-600">After</h4>
                         <img
-                          src={`${api.defaults.baseURL || import.meta.env.VITE_API_URL || ''}${selectedJob.evidence.afterImage}`}
+                          src={getImageUrl(selectedJob.evidence.afterImage)}
                           alt="After"
                           className="w-32 h-32 object-cover rounded border cursor-pointer hover:opacity-80 transition"
                           onClick={() => handleImageClick(selectedJob.evidence.afterImage, `${selectedJob.title} - After`)}

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import api from "../api/axios";
+import { getImageUrl } from '../utils/imageUrl';
 import { useNavigate } from "react-router-dom";
 
 export default function ManagerFeedback() {
@@ -56,9 +57,9 @@ export default function ManagerFeedback() {
                   <span className="text-lg font-semibold text-green-700">{fb.assignees && fb.assignees.length > 0 ? (fb.assignees[0].name || "Technician") : "Technician"}</span>
                   <span className="text-xs bg-green-100 text-green-700 rounded px-2 py-1 font-medium">{fb.updatedAt ? new Date(fb.updatedAt).toLocaleDateString() : ""}</span>
                 </div>
-                {fb.afterImage && (
+                {getImageUrl(fb.afterImage) && (
                   <img
-                    src={fb.afterImage.startsWith('/uploads/') ? `${api.defaults.baseURL || import.meta.env.VITE_API_URL || ''}${fb.afterImage}` : fb.afterImage}
+                    src={getImageUrl(fb.afterImage)}
                     alt="After evidence"
                     className="w-32 h-32 object-cover rounded mb-2 border"
                   />

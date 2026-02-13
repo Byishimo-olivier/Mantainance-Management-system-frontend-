@@ -345,12 +345,6 @@ function AllIssues() {
           />
         )}
 
-        {/* Debug info - remove in production */}
-        <div className="mb-4 p-2 bg-gray-100 rounded text-sm text-gray-600">
-          <p>Debug: Showing {filteredIssues.length} issues. User role: {user?.role}</p>
-          <p>Issues have: {issues.length > 0 ? Object.keys(issues[0]).join(', ') : 'No issues'}</p>
-        </div>
-
         {/* Issues List */}
         {filteredIssues.length === 0 ? (
           <div className="text-center py-16 bg-white rounded-xl shadow-sm">

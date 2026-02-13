@@ -26,4 +26,28 @@ api.interceptors.request.use(
     }
 );
 
+// Add a response interceptor to handle 401 Unauthorized errors
+api.interceptors.response.use(
+    (response) => {
+        return response;
+    },
+    (error) => {
+        if (error.response && error.response.status === 401) {
+            const token = localStorage.getItem('token');
+            if (token) {
+                console.warn('[API Auth] 401 Unauthorized detected with token. Clearing session.');
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                // Check if we're not already on the login page to avoid infinite loops
+                if (!window.location.pathname.includes('/login')) {
+                    window.location.href = '/login';
+                }
+            } else {
+                console.warn('[API Auth] 401 Unauthorized detected as guest. No redirect.');
+            }
+        }
+        return Promise.reject(error);
+    }
+);
+
 export default api;

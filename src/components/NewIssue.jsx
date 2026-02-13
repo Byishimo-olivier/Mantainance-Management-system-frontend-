@@ -64,6 +64,8 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userId, setUserId] = useState(null);
   const [anonId, setAnonId] = useState(null);
+  const [internalTechnicians, setInternalTechnicians] = useState([]);
+  const [selectedTechnicianId, setSelectedTechnicianId] = useState('');
 
   // Floating particles animation
   const [particles, setParticles] = useState([]);
@@ -505,6 +507,25 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
               </select>
             </div>
           </div>
+          <div className="mt-4">
+            <label className="block font-semibold mb-2 text-gray-700" htmlFor="technician">
+              Assigned Technician (optional)
+            </label>
+            <select
+              id="technician"
+              name="technician"
+              className="w-full rounded-2xl border-2 border-gray-200 px-4 py-4 text-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-300 bg-white/80 backdrop-blur-sm"
+              value={selectedTechnicianId}
+              onChange={(e) => setSelectedTechnicianId(e.target.value)}
+            >
+              <option value="">-- Select internal technician (optional) --</option>
+              {internalTechnicians.map(t => (
+                <option key={t.id || t._id} value={t.id || t._id}>
+                  {t.name} ({Array.isArray(t.specialty) ? t.specialty.join(', ') : (t.specialty || 'General')})
+                </option>
+              ))}
+            </select>
+          </div>
         </motion.div>
       </motion.div>
     ),
@@ -667,40 +688,56 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
                 animate={{ opacity: [1, 0.5, 1] }}
                 transition={{ duration: 2, repeat: Infinity }}
               >
-                Welcome, {JSON.parse(localStorage.getItem('user') || '{}').name || ''}
+                {isAuthenticated ? `Welcome, ${JSON.parse(localStorage.getItem('user') || '{}').name || ''}` : 'Guest User'}
               </motion.span>
             </div>
           </motion.div>
 
           <div className="flex items-center gap-3">
-            {[
+            {isAuthenticated && [
               { path: '/dashboard', label: 'Dashboard', icon: 'dashboard', color: 'from-blue-500 to-cyan-500' },
               { path: '/issues', label: 'All Issues', icon: 'issues', color: 'from-green-500 to-emerald-500' },
-              { path: '#', label: 'New Issue', icon: 'new', color: 'from-yellow-500 to-orange-500', active: true },
               { path: '/feedback', label: 'Feedback', icon: 'feedback', color: 'from-teal-500 to-green-500' }
             ].map((item) => (
               <motion.button
                 key={item.path}
                 whileHover={{ y: -2 }}
                 whileTap={{ scale: 0.95 }}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-white font-semibold transition-all ${item.active
-                  ? 'bg-gradient-to-r from-yellow-500 to-orange-500 shadow-lg'
-                  : `bg-gradient-to-r ${item.color} hover:shadow-lg`
-                  }`}
-                onClick={() => !item.active && navigate(item.path)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-white font-semibold transition-all bg-gradient-to-r ${item.color} hover:shadow-lg`}
+                onClick={() => navigate(item.path)}
               >
                 {item.label}
               </motion.button>
             ))}
 
             <motion.button
-              whileHover={{ scale: 1.05 }}
+              whileHover={{ y: -2 }}
               whileTap={{ scale: 0.95 }}
-              onClick={handleLogout}
-              className="px-4 py-2 bg-gradient-to-r from-red-600 to-pink-600 text-white rounded-xl hover:shadow-lg transition-all font-semibold"
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-white font-semibold transition-all bg-gradient-to-r from-yellow-500 to-orange-500 shadow-lg"
+              onClick={() => { }} // current page
             >
-              Logout
+              New Issue
             </motion.button>
+
+            {isAuthenticated ? (
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={handleLogout}
+                className="px-4 py-2 bg-gradient-to-r from-red-600 to-pink-600 text-white rounded-xl hover:shadow-lg transition-all font-semibold"
+              >
+                Logout
+              </motion.button>
+            ) : (
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => navigate('/login')}
+                className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-blue-600 text-white rounded-xl hover:shadow-lg transition-all font-semibold"
+              >
+                Login
+              </motion.button>
+            )}
           </div>
         </motion.nav>
       )}

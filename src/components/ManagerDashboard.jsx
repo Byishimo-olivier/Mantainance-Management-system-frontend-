@@ -27,6 +27,7 @@ import {
   Award,
   Star
 } from 'lucide-react';
+import { getImageUrl } from '../utils/imageUrl';
 
 // Enhanced Status badge with icons and gradients
 const StatusBadge = ({ status }) => {
@@ -436,11 +437,8 @@ function ManagerDashboard() {
         return;
       }
 
-      await api.put(`/api/issues/${issueId}`, {
-        status: 'APPROVED',
-        approved: true,
+      await api.post(`/api/issues/${issueId}/approve`, {
         approvedBy: JSON.parse(localStorage.getItem('user')).id,
-        approvedAt: new Date().toISOString()
       });
 
       await fetchDashboardData();
@@ -464,12 +462,9 @@ function ManagerDashboard() {
         return;
       }
 
-      await api.put(`/api/issues/${issueId}`, {
-        status: 'DECLINED',
-        rejected: true,
+      await api.post(`/api/issues/${issueId}/decline`, {
         rejectedBy: JSON.parse(localStorage.getItem('user')).id,
-        rejectedAt: new Date().toISOString(),
-        rejectionReason: declineReason
+        reason: declineReason
       });
 
       await fetchDashboardData();
@@ -843,11 +838,11 @@ function ManagerDashboard() {
                 <div className="space-y-6">
                   {/* Header with image */}
                   <div className="flex flex-col md:flex-row gap-6">
-                    {(selectedRequest.beforePhoto || selectedRequest.photo) && (
+                    {getImageUrl(selectedRequest.beforePhoto || selectedRequest.photo) && (
                       <div className="md:w-1/3">
                         <div className="rounded-2xl overflow-hidden shadow-lg">
                           <img
-                            src={`${import.meta.env.VITE_API_URL}${selectedRequest.beforePhoto || selectedRequest.photo}`}
+                            src={getImageUrl(selectedRequest.beforePhoto || selectedRequest.photo)}
                             alt="Issue"
                             className="w-full h-64 object-cover hover:scale-105 transition-transform duration-300"
                           />
@@ -1158,10 +1153,10 @@ const RequestsTab = ({ pendingRequests, setSelectedRequest, setShowApprovalModal
               <p className="text-gray-600 text-sm mb-4 line-clamp-3">{request.description}</p>
 
               {/* Request Image */}
-              {(request.beforePhoto || request.photo) && (
+              {getImageUrl(request.beforePhoto || request.photo) && (
                 <div className="mb-4">
                   <img
-                    src={`${import.meta.env.VITE_API_URL}${request.beforePhoto || request.photo}`}
+                    src={getImageUrl(request.beforePhoto || request.photo)}
                     alt="Issue"
                     className="w-full h-48 object-cover rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300"
                   />
@@ -1235,11 +1230,11 @@ const IssuesTab = ({
             <GlassCard className="relative p-6 hover:shadow-2xl transition-all duration-300">
               <div className="flex flex-col lg:flex-row gap-6">
                 {/* Issue Image */}
-                {(issue.photo || issue.image) && (
+                {getImageUrl(issue.photo || issue.image) && (
                   <div className="lg:w-56 flex-shrink-0">
                     <div className="relative rounded-xl overflow-hidden shadow-lg">
                       <img
-                        src={`${import.meta.env.VITE_API_URL}${issue.photo || issue.image}`}
+                        src={getImageUrl(issue.photo || issue.image)}
                         alt="Issue"
                         className="w-full h-56 object-cover hover:scale-105 transition-transform duration-300"
                       />
@@ -1651,11 +1646,11 @@ const FeedbackTab = ({ feedbacks, loadingFeedbacks }) => (
               </div>
 
               {/* After Image */}
-              {fb.evidence.afterImage && (
+              {getImageUrl(fb.evidence.afterImage) && (
                 <div className="mb-4">
                   <div className="relative rounded-xl overflow-hidden shadow-lg group">
                     <img
-                      src={fb.evidence.afterImage.startsWith('/uploads/') ? `${import.meta.env.VITE_API_URL}${fb.evidence.afterImage}` : fb.evidence.afterImage}
+                      src={getImageUrl(fb.evidence.afterImage)}
                       alt="After evidence"
                       className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
                     />
