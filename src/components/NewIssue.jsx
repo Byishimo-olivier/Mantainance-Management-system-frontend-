@@ -64,8 +64,9 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userId, setUserId] = useState(null);
   const [anonId, setAnonId] = useState(null);
-  const [internalTechnicians, setInternalTechnicians] = useState([]);
-  const [selectedTechnicianId, setSelectedTechnicianId] = useState('');
+
+  // Floating particles animation
+  const [particles, setParticles] = useState([]);
 
   useEffect(() => {
     // Load user data and check authentication
@@ -658,49 +659,45 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
             </span>
             <div className="flex flex-col">
               <span className="text-lg font-bold text-white">Fixnest</span>
-              <span className="text-sm text-indigo-200">
-                {isAuthenticated ? `Welcome, ${JSON.parse(localStorage.getItem('user') || '{}').name || ''}` : 'Guest User'}
-              </span>
+              <motion.span
+                className="text-sm text-purple-200"
+                animate={{ opacity: [1, 0.5, 1] }}
+                transition={{ duration: 2, repeat: Infinity }}
+              >
+                Welcome, {JSON.parse(localStorage.getItem('user') || '{}').name || ''}
+              </motion.span>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
-            {isAuthenticated && [
-              { path: '/dashboard', label: 'Dashboard' },
-              { path: '/issues', label: 'All Issues' },
-              { path: '/feedback', label: 'Feedback' }
+            {[
+              { path: '/dashboard', label: 'Dashboard', icon: 'dashboard', color: 'from-blue-500 to-cyan-500' },
+              { path: '/issues', label: 'All Issues', icon: 'issues', color: 'from-green-500 to-emerald-500' },
+              { path: '#', label: 'New Issue', icon: 'new', color: 'from-yellow-500 to-orange-500', active: true },
+              { path: '/feedback', label: 'Feedback', icon: 'feedback', color: 'from-teal-500 to-green-500' }
             ].map((item) => (
               <button
                 key={item.path}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl text-white font-semibold transition-all bg-indigo-700 hover:bg-indigo-600"
-                onClick={() => navigate(item.path)}
+                whileHover={{ y: -2 }}
+                whileTap={{ scale: 0.95 }}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-white font-semibold transition-all ${item.active
+                  ? 'bg-gradient-to-r from-yellow-500 to-orange-500 shadow-lg'
+                  : `bg-gradient-to-r ${item.color} hover:shadow-lg`
+                  }`}
+                onClick={() => !item.active && navigate(item.path)}
               >
                 {item.label}
               </button>
             ))}
 
-            <button
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-white font-semibold transition-all bg-indigo-600 shadow-lg"
-              onClick={() => { }} // current page
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={handleLogout}
+              className="px-4 py-2 bg-gradient-to-r from-red-600 to-pink-600 text-white rounded-xl hover:shadow-lg transition-all font-semibold"
             >
-              New Issue
-            </button>
-
-            {isAuthenticated ? (
-              <button
-                onClick={handleLogout}
-                className="px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-all font-semibold"
-              >
-                Logout
-              </button>
-            ) : (
-              <button
-                onClick={() => navigate('/login')}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all font-semibold"
-              >
-                Login
-              </button>
-            )}
+              Logout
+            </motion.button>
           </div>
         </nav>
       )}

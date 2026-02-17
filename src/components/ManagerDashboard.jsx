@@ -29,8 +29,6 @@ import {
   Award,
   Star
 } from 'lucide-react';
-import { getImageUrl } from '../utils/imageUrl';
-import Header from "./Header";
 
 // Enhanced Status badge with icons and gradients
 const StatusBadge = ({ status }) => {
@@ -938,11 +936,11 @@ function ManagerDashboard() {
                   <div className="space-y-6">
                     {/* Header with image */}
                     <div className="flex flex-col md:flex-row gap-6">
-                      {getImageUrl(selectedRequest.beforePhoto || selectedRequest.photo) && (
+                      {(selectedRequest.beforePhoto || selectedRequest.photo) && (
                         <div className="md:w-1/3">
                           <div className="rounded-2xl overflow-hidden shadow-lg">
                             <img
-                              src={getImageUrl(selectedRequest.beforePhoto || selectedRequest.photo)}
+                              src={`${import.meta.env.VITE_API_URL}${selectedRequest.beforePhoto || selectedRequest.photo}`}
                               alt="Issue"
                               className="w-full h-64 object-cover hover:scale-105 transition-transform duration-300"
                             />
@@ -1839,7 +1837,7 @@ const AIInsights = ({ aiSentiment, loadingAI, aiError, aiRecommendations, loadin
               </span>
             </div>
             <p className="text-sm text-gray-700 italic leading-relaxed">"{aiSentiment.summary}"</p>
-            
+
           </div>
         ) : aiError ? (
           <div className="flex items-center gap-2 p-3 bg-red-50 text-red-700 rounded-xl text-xs border border-red-100">

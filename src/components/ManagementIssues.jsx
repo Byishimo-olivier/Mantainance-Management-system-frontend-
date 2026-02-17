@@ -67,10 +67,10 @@ const ManagementIssues = () => {
             <span className="text-lg font-semibold text-gray-900 flex-1">{issue.title}</span>
             {issue.status && (
               <span className={`ml-2 px-2 py-0.5 rounded text-xs font-medium ${issue.status === 'IN PROGRESS' ? 'bg-blue-100 text-blue-700' :
-                  issue.status === 'PENDING' ? 'bg-gray-100 text-gray-600' :
-                    (issue.status === 'COMPLETE' || issue.status === 'COMPLETED') ? 'bg-green-100 text-green-700' :
-                      issue.status === 'OVERDUE' ? 'bg-red-100 text-red-700' :
-                        'bg-gray-100 text-gray-700'
+                issue.status === 'PENDING' ? 'bg-gray-100 text-gray-600' :
+                  (issue.status === 'COMPLETE' || issue.status === 'COMPLETED') ? 'bg-green-100 text-green-700' :
+                    issue.status === 'OVERDUE' ? 'bg-red-100 text-red-700' :
+                      'bg-gray-100 text-gray-700'
                 }`}>
                 {(issue.status === 'COMPLETE' || issue.status === 'COMPLETED') ? 'Complete' : issue.status.replace('_', ' ')}
               </span>
