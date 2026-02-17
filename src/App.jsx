@@ -25,6 +25,7 @@ import RequestsPage from './components/RequestsPage';
 
 import Feedback from './components/Feedback';
 import ManagerFeedback from './components/ManagerFeedback';
+import AIChatbot from './components/AIChatbot';
 
 function ResetPasswordWrapper() {
   const { token } = useParams();
@@ -58,40 +59,43 @@ function App() {
   };
 
   return (
-    <Routes>
-      <Route path="/" element={<PropertiesPage />} />
-      <Route path="/Home" element={<LandingPage />} />
-      <Route path="/dashboard" element={<Dashboard user={auth?.user} />} />
-      <Route path="/login" element={<Login onLogin={handleLogin} />} />
-      <Route path="/register" element={<Register />} />
-      <Route path="/dashboard" element={auth ? (
-        auth.user?.role === 'admin' ? (
-          <Navigate to="/admin-dashboard" replace />
-        ) : auth.user?.role === 'manager' ? (
-          <Navigate to="/manager-dashboard" replace />
-        ) : auth.user?.role === 'technician' ? (
-          <Navigate to="/technician-dashboard" replace />
-        ) : <Dashboard user={auth.user} />
-      ) : <Login onLogin={handleLogin} />} />
-      <Route path="/issues" element={auth ? <AllIssues /> : <Login onLogin={handleLogin} />} />
-      <Route path="/forgot-password" element={<ForgotPassword />} />
-      <Route path="/reset-password/:token" element={<ResetPasswordWrapper />} />
-      <Route path="/new-issue" element={<NewIssue />} />
-      <Route path="/requests" element={auth ? <RequestsPage /> : <Login onLogin={handleLogin} />} />
-      <Route path="/admin-dashboard" element={auth ? <AdminDashboard /> : <Login onLogin={handleLogin} />} />
-      <Route path="/manager-dashboard" element={auth ? <ManagerDashboard /> : <Login onLogin={handleLogin} />} />
-      <Route path="/analytics" element={auth ? <Analytics /> : <Login onLogin={handleLogin} />} />
-      <Route path="/technicians" element={auth ? <TechnicianManagement /> : <Login onLogin={handleLogin} />} />
-      <Route path="/technician-dashboard" element={auth ? <TechnicianDashboard /> : <Login onLogin={handleLogin} />} />
-      <Route path="/manager-issues" element={auth ? <ManagementIssues issues={issues} setIssues={setIssues} /> : <Login onLogin={handleLogin} />} />
-      <Route path="/properties" element={<PropertiesPage />} />
-      <Route path="/properties-cards" element={<PropertiesCards />} />
-      <Route path="/property-details/:id" element={<PropertyDetails />} />
-      <Route path="/property/:id" element={<PropertyPublicView />} />
-      <Route path="/property/:id" element={<PropertyPublicView />} />
-      <Route path="/feedback" element={auth ? <Feedback /> : <Login onLogin={handleLogin} />} />
-      <Route path="/manager-feedback" element={auth ? <ManagerFeedback /> : <Login onLogin={handleLogin} />} />
-    </Routes>
+    <>
+      <Routes>
+        <Route path="/" element={<PropertiesPage />} />
+        <Route path="/Home" element={<LandingPage />} />
+        <Route path="/dashboard" element={<Dashboard user={auth?.user} />} />
+        <Route path="/login" element={<Login onLogin={handleLogin} />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/dashboard" element={auth ? (
+          auth.user?.role === 'admin' ? (
+            <Navigate to="/admin-dashboard" replace />
+          ) : auth.user?.role === 'manager' ? (
+            <Navigate to="/manager-dashboard" replace />
+          ) : auth.user?.role === 'technician' ? (
+            <Navigate to="/technician-dashboard" replace />
+          ) : <Dashboard user={auth.user} />
+        ) : <Login onLogin={handleLogin} />} />
+        <Route path="/issues" element={auth ? <AllIssues /> : <Login onLogin={handleLogin} />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password/:token" element={<ResetPasswordWrapper />} />
+        <Route path="/new-issue" element={<NewIssue />} />
+        <Route path="/requests" element={auth ? <RequestsPage /> : <Login onLogin={handleLogin} />} />
+        <Route path="/admin-dashboard" element={auth ? <AdminDashboard /> : <Login onLogin={handleLogin} />} />
+        <Route path="/manager-dashboard" element={auth ? <ManagerDashboard /> : <Login onLogin={handleLogin} />} />
+        <Route path="/analytics" element={auth ? <Analytics /> : <Login onLogin={handleLogin} />} />
+        <Route path="/technicians" element={auth ? <TechnicianManagement /> : <Login onLogin={handleLogin} />} />
+        <Route path="/technician-dashboard" element={auth ? <TechnicianDashboard /> : <Login onLogin={handleLogin} />} />
+        <Route path="/manager-issues" element={auth ? <ManagementIssues issues={issues} setIssues={setIssues} /> : <Login onLogin={handleLogin} />} />
+        <Route path="/properties" element={<PropertiesPage />} />
+        <Route path="/properties-cards" element={<PropertiesCards />} />
+        <Route path="/property-details/:id" element={<PropertyDetails />} />
+        <Route path="/property/:id" element={<PropertyPublicView />} />
+        <Route path="/property/:id" element={<PropertyPublicView />} />
+        <Route path="/feedback" element={auth ? <Feedback /> : <Login onLogin={handleLogin} />} />
+        <Route path="/manager-feedback" element={auth ? <ManagerFeedback /> : <Login onLogin={handleLogin} />} />
+      </Routes>
+      <AIChatbot />
+    </>
   );
 }
 

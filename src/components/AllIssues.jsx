@@ -19,6 +19,21 @@ const IssueCard = ({ issue, userRole, actions }) => {
         <div className="text-sm text-gray-500 mb-2">
           Status: <span className={`font-semibold ${getStatusColor(status)}`}>{status}</span>
         </div>
+
+        {/* Show assigned technicians */}
+        {issue.assignees && Array.isArray(issue.assignees) && issue.assignees.length > 0 && (
+          <div className="mt-2 mb-2 p-2 bg-green-50 border border-green-200 rounded">
+            <p className="text-xs font-semibold text-green-800 mb-1">Assigned to:</p>
+            {issue.assignees.map((assignee, idx) => (
+              <div key={idx} className="text-xs text-green-700">
+                <span className="font-medium">{assignee.name || 'Unknown'}</span>
+                {assignee.email && <span className="text-green-600"> ({assignee.email})</span>}
+                {assignee.role && <span className="ml-1 px-1 py-0.5 bg-green-100 rounded text-green-800">({assignee.role})</span>}
+              </div>
+            ))}
+          </div>
+        )}
+
         <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-1">{actions}</div>
       </div>
       <div className="flex flex-col items-end min-w-[70px] md:min-w-[110px] gap-1 md:gap-2 mt-2 md:mt-0">
@@ -141,6 +156,9 @@ function AllIssues() {
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [refreshing, setRefreshing] = useState(false);
   const [dataFetched, setDataFetched] = useState(false);
+  const [internalTechnicians, setInternalTechnicians] = useState([]);
+  const [selectedTechs, setSelectedTechs] = useState({});
+  const [assignLoading, setAssignLoading] = useState({});
 
   // Check authentication on mount
   useEffect(() => {
@@ -152,6 +170,7 @@ function AllIssues() {
     // Only fetch data once
     if (!dataFetched) {
       fetchData();
+      fetchInternalTechnicians();
     }
   }, [user, navigate, dataFetched]);
 
@@ -230,6 +249,32 @@ function AllIssues() {
     } catch (err) {
       console.error('Error resubmitting issue:', err);
       setError(`Failed to resubmit issue: ${err.message}`);
+    }
+  };
+
+  const fetchInternalTechnicians = async () => {
+    try {
+      const res = await api.get('/api/internal-technicians');
+      setInternalTechnicians(res.data || []);
+    } catch (err) {
+      console.error('Error fetching internal technicians:', err);
+      // Don't show error to user, just log it
+    }
+  };
+
+  const assignInternal = async (issueId, internalTechId) => {
+    try {
+      if (!internalTechId) return;
+      setAssignLoading(s => ({ ...s, [issueId]: true }));
+      await api.post(`/api/issues/${issueId}/assign-internal`, { internalTechId });
+      await handleRefresh(); // Refresh the data
+      setAssignLoading(s => ({ ...s, [issueId]: false }));
+      // Clear selection after successful assignment
+      setSelectedTechs(s => ({ ...s, [issueId]: '' }));
+    } catch (err) {
+      setAssignLoading(s => ({ ...s, [issueId]: false }));
+      console.error('Assign internal failed', err);
+      setError(`Failed to assign internal technician: ${err.response?.data?.error || err.message}`);
     }
   };
 
@@ -416,6 +461,31 @@ function AllIssues() {
                       >
                         Start Work
                       </button>
+                    )}
+
+                    {/* Manager/Admin: assign internal technician */}
+                    {(user?.role === 'manager' || user?.role === 'admin') && internalTechnicians && internalTechnicians.length > 0 && (
+                      <div className="flex items-center gap-2 mt-2 w-full">
+                        <select
+                          className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm flex-1"
+                          value={selectedTechs[issue.id || issue._id] || ''}
+                          onChange={(e) => setSelectedTechs(s => ({ ...s, [issue.id || issue._id]: e.target.value }))}
+                        >
+                          <option value="">Assign internal technician...</option>
+                          {internalTechnicians.map((t) => (
+                            <option key={t.id || t._id} value={t.id || t._id}>
+                              {t.name}{t.email ? ` (${t.email})` : ''}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          disabled={!selectedTechs[issue.id || issue._id] || assignLoading[issue.id || issue._id]}
+                          onClick={() => assignInternal(issue.id || issue._id, selectedTechs[issue.id || issue._id])}
+                        >
+                          {assignLoading[issue.id || issue._id] ? 'Assigning...' : 'Assign'}
+                        </button>
+                      </div>
                     )}
 
                     {/* Technician actions */}

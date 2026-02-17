@@ -8,8 +8,8 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
   const location = useLocation();
   const formRef = useRef(null);
 
-  // Enhanced gradient background
-  const backgroundGradient = "linear-gradient(135deg, #667eea 0%, #764ba2 25%, #f093fb 50%, #f5576c 75%, #ff7eb3 100%)";
+  // Simplified gradient background
+  const backgroundGradient = "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)";
 
   const prefill = propModel || (location && location.state && location.state.model) ? (propModel || location.state.model) : {};
   const [prefilledAsset] = useState(prefill.asset || null);
@@ -67,21 +67,7 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
   const [internalTechnicians, setInternalTechnicians] = useState([]);
   const [selectedTechnicianId, setSelectedTechnicianId] = useState('');
 
-  // Floating particles animation
-  const [particles, setParticles] = useState([]);
-
   useEffect(() => {
-    // Initialize particles
-    const newParticles = Array.from({ length: 30 }).map((_, i) => ({
-      id: i,
-      x: Math.random() * 100,
-      y: Math.random() * 100,
-      size: Math.random() * 20 + 5,
-      speed: Math.random() * 0.5 + 0.1,
-      color: `rgba(255, 255, 255, ${Math.random() * 0.3 + 0.1})`,
-    }));
-    setParticles(newParticles);
-
     // Load user data and check authentication
     const storedUser = localStorage.getItem('user');
     const storedToken = localStorage.getItem('token');
@@ -260,18 +246,7 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
   const nextStep = () => setFormStep(prev => Math.min(prev + 1, 4));
   const prevStep = () => setFormStep(prev => Math.max(prev - 1, 1));
 
-  // Floating animation effect
-  const floatingAnimation = {
-    initial: { y: 0 },
-    animate: {
-      y: [0, -10, 0],
-      transition: {
-        duration: 3,
-        repeat: Infinity,
-        ease: "easeInOut"
-      }
-    }
-  };
+
 
   // Form steps with animations
   const formSteps = {
@@ -287,7 +262,7 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
           <motion.h2
             initial={{ scale: 0.9 }}
             animate={{ scale: 1 }}
-            className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent"
+            className="text-3xl font-bold text-indigo-600"
           >
             Issue Details
           </motion.h2>
@@ -310,19 +285,52 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
           />
         </motion.div>
 
-        <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+        <motion.div whileHover={{ scale: 1.02 }} className="relative">
           <label className="block font-semibold mb-2 text-gray-700" htmlFor="description">
             Detailed Description <span className="text-red-500">*</span>
           </label>
-          <textarea
-            id="description"
-            name="description"
-            className="w-full rounded-2xl border-2 border-gray-200 px-4 py-4 text-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 min-h-[150px] bg-white/80 backdrop-blur-sm"
-            placeholder="Please provide details about the issue..."
-            value={form.description}
-            onChange={handleChange}
-            required
-          />
+          <div className="relative">
+            <textarea
+              id="description"
+              name="description"
+              className="w-full rounded-2xl border-2 border-gray-200 px-4 py-4 pr-16 text-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 min-h-[150px] bg-white/80 backdrop-blur-sm"
+              placeholder="Please provide details about the issue..."
+              value={form.description}
+              onChange={handleChange}
+              required
+            />
+            {form.description.length > 20 && (
+              <motion.button
+                type="button"
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+                onClick={async () => {
+                  try {
+                    setIsLoading(true);
+                    const res = await api.post('/api/ai/triage-issue', { description: form.description });
+                    const { category, priority, suggestedTechnicianId } = res.data;
+
+                    if (category) setForm(prev => ({ ...prev, category }));
+                    if (suggestedTechnicianId) setSelectedTechnicianId(suggestedTechnicianId);
+
+                    alert(`AI Suggestions:\nCategory: ${category}\nPriority: ${priority}`);
+                  } catch (e) {
+                    console.error("AI Triage failed:", e);
+                    alert("AI suggestion currently unavailable.");
+                  } finally {
+                    setIsLoading(false);
+                  }
+                }}
+                className="absolute right-4 bottom-4 p-3 bg-gradient-to-br from-indigo-500 to-purple-600 text-white rounded-xl shadow-lg hover:shadow-indigo-200 transition-all"
+                title="AI Auto-Categorize"
+              >
+                <div className="flex items-center gap-2">
+                  <span>✨</span>
+                  <span className="text-sm font-bold">Magic</span>
+                </div>
+              </motion.button>
+            )}
+          </div>
         </motion.div>
 
         <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
@@ -358,7 +366,7 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
           <motion.h2
             initial={{ scale: 0.9 }}
             animate={{ scale: 1 }}
-            className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent"
+            className="text-3xl font-bold text-indigo-600"
           >
             Contact Information
           </motion.h2>
@@ -369,7 +377,7 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
 
         {/* Submission Type Badge */}
         <div className="flex justify-center mb-6">
-          <div className={`px-6 py-3 rounded-full font-semibold text-white ${isAuthenticated ? 'bg-gradient-to-r from-green-500 to-emerald-600' : 'bg-gradient-to-r from-orange-500 to-red-600'}`}>
+          <div className={`px-6 py-3 rounded-full font-semibold text-white ${isAuthenticated ? 'bg-indigo-600' : 'bg-gray-600'}`}>
             {isAuthenticated ? '✓ Authenticated Submission' : '◎ Anonymous Submission'}
           </div>
         </div>
@@ -419,7 +427,7 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
           <motion.h2
             initial={{ scale: 0.9 }}
             animate={{ scale: 1 }}
-            className="text-3xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent"
+            className="text-3xl font-bold text-indigo-600"
           >
             Location Details
           </motion.h2>
@@ -541,7 +549,7 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
           <motion.h2
             initial={{ scale: 0.9 }}
             animate={{ scale: 1 }}
-            className="text-3xl font-bold bg-gradient-to-r from-yellow-600 to-orange-600 bg-clip-text text-transparent"
+            className="text-3xl font-bold text-indigo-600"
           >
             Upload & Review
           </motion.h2>
@@ -634,125 +642,74 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
       className={`min-h-screen ${asModal ? 'bg-transparent' : ''}`}
       style={asModal ? {} : { background: backgroundGradient }}
     >
-      {/* Floating particles */}
-      {!asModal && particles.map(particle => (
-        <motion.div
-          key={particle.id}
-          className="absolute rounded-full"
-          style={{
-            left: `${particle.x}%`,
-            top: `${particle.y}%`,
-            width: particle.size,
-            height: particle.size,
-            background: particle.color,
-            filter: 'blur(1px)'
-          }}
-          animate={{
-            y: [0, -100, 0],
-            x: [0, Math.sin(particle.id) * 20, 0]
-          }}
-          transition={{
-            duration: 10 + particle.speed * 10,
-            repeat: Infinity,
-            ease: "linear"
-          }}
-        />
-      ))}
 
-      {/* Animated Navbar */}
+
+      {/* Navbar */}
       {!asModal && (
-        <motion.nav
-          initial={{ y: -100 }}
-          animate={{ y: 0 }}
-          transition={{ type: "spring", stiffness: 100 }}
-          className="flex items-center justify-between bg-gradient-to-r from-purple-900/90 to-pink-900/90 shadow-2xl px-4 md:px-8 h-16 backdrop-blur-md"
+        <nav
+          className="flex items-center justify-between bg-indigo-900 shadow-lg px-4 md:px-8 h-16"
         >
-          <motion.div
-            className="flex items-center gap-3"
-            whileHover={{ scale: 1.05 }}
-          >
-            <motion.span
-              className="bg-white rounded-2xl p-2 flex items-center justify-center shadow-lg"
-              whileHover={{ rotate: 360 }}
-              transition={{ duration: 0.5 }}
-            >
+          <div className="flex items-center gap-3">
+            <span className="bg-white rounded-2xl p-2 flex items-center justify-center shadow-lg">
               <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
                 <rect x="2" y="2" width="20" height="20" rx="6" fill="#8b5cf6" />
                 <rect x="6" y="6" width="12" height="6" rx="2" fill="#c4b5fd" />
               </svg>
-            </motion.span>
+            </span>
             <div className="flex flex-col">
               <span className="text-lg font-bold text-white">Fixnest</span>
-              <motion.span
-                className="text-sm text-purple-200"
-                animate={{ opacity: [1, 0.5, 1] }}
-                transition={{ duration: 2, repeat: Infinity }}
-              >
+              <span className="text-sm text-indigo-200">
                 {isAuthenticated ? `Welcome, ${JSON.parse(localStorage.getItem('user') || '{}').name || ''}` : 'Guest User'}
-              </motion.span>
+              </span>
             </div>
-          </motion.div>
+          </div>
 
           <div className="flex items-center gap-3">
             {isAuthenticated && [
-              { path: '/dashboard', label: 'Dashboard', icon: 'dashboard', color: 'from-blue-500 to-cyan-500' },
-              { path: '/issues', label: 'All Issues', icon: 'issues', color: 'from-green-500 to-emerald-500' },
-              { path: '/feedback', label: 'Feedback', icon: 'feedback', color: 'from-teal-500 to-green-500' }
+              { path: '/dashboard', label: 'Dashboard' },
+              { path: '/issues', label: 'All Issues' },
+              { path: '/feedback', label: 'Feedback' }
             ].map((item) => (
-              <motion.button
+              <button
                 key={item.path}
-                whileHover={{ y: -2 }}
-                whileTap={{ scale: 0.95 }}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-white font-semibold transition-all bg-gradient-to-r ${item.color} hover:shadow-lg`}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-white font-semibold transition-all bg-indigo-700 hover:bg-indigo-600"
                 onClick={() => navigate(item.path)}
               >
                 {item.label}
-              </motion.button>
+              </button>
             ))}
 
-            <motion.button
-              whileHover={{ y: -2 }}
-              whileTap={{ scale: 0.95 }}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-white font-semibold transition-all bg-gradient-to-r from-yellow-500 to-orange-500 shadow-lg"
+            <button
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-white font-semibold transition-all bg-indigo-600 shadow-lg"
               onClick={() => { }} // current page
             >
               New Issue
-            </motion.button>
+            </button>
 
             {isAuthenticated ? (
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
+              <button
                 onClick={handleLogout}
-                className="px-4 py-2 bg-gradient-to-r from-red-600 to-pink-600 text-white rounded-xl hover:shadow-lg transition-all font-semibold"
+                className="px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-all font-semibold"
               >
                 Logout
-              </motion.button>
+              </button>
             ) : (
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
+              <button
                 onClick={() => navigate('/login')}
-                className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-blue-600 text-white rounded-xl hover:shadow-lg transition-all font-semibold"
+                className="px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all font-semibold"
               >
                 Login
-              </motion.button>
+              </button>
             )}
           </div>
-        </motion.nav>
+        </nav>
       )}
 
       {/* Main Form Container */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.5 }}
-        className="max-w-5xl mx-auto mt-10 p-4"
-      >
-        <motion.form
+      <div className="max-w-5xl mx-auto mt-10 p-4">
+        <form
           ref={formRef}
-          {...floatingAnimation}
-          className="bg-gradient-to-br from-white/90 to-white/70 rounded-3xl shadow-2xl p-8 backdrop-blur-sm"
+          className="bg-white rounded-3xl shadow-lg p-8"
           onSubmit={handleSubmit}
         >
           {/* Progress Steps */}
@@ -760,15 +717,14 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
             <div className="flex justify-between items-center mb-6">
               {[1, 2, 3, 4].map((step) => (
                 <React.Fragment key={step}>
-                  <motion.div
-                    whileHover={{ scale: 1.1 }}
-                    className={`flex flex-col items-center cursor-pointer ${formStep >= step ? 'text-purple-600' : 'text-gray-400'}`}
+                  <div
+                    className={`flex flex-col items-center cursor-pointer ${formStep >= step ? 'text-indigo-600' : 'text-gray-400'}`}
                     onClick={() => setFormStep(step)}
                   >
                     <div className={`
                       w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold
                       ${formStep >= step
-                        ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg'
+                        ? 'bg-indigo-600 text-white shadow-lg'
                         : 'bg-gray-200'
                       }
                     `}>
@@ -777,16 +733,13 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
                     <span className="mt-2 text-sm font-medium">
                       {['Details', 'Contact', 'Location', 'Upload'][step - 1]}
                     </span>
-                  </motion.div>
+                  </div>
                   {step < 4 && (
                     <div className="flex-1 h-1 mx-4 relative">
                       <div className="absolute inset-0 bg-gray-200 rounded-full"></div>
-                      <motion.div
-                        className="absolute inset-0 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full"
-                        initial={{ scaleX: 0 }}
-                        animate={{ scaleX: formStep > step ? 1 : 0 }}
-                        transition={{ duration: 0.3 }}
-                        style={{ originX: 0 }}
+                      <div
+                        className="absolute inset-0 bg-indigo-600 rounded-full transition-all duration-300"
+                        style={{ transform: `scaleX(${formStep > step ? 1 : 0})`, transformOrigin: 'left' }}
                       />
                     </div>
                   )}
@@ -800,73 +753,50 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
           </AnimatePresence>
 
           {/* Navigation Buttons */}
-          <motion.div
-            className="flex justify-between mt-12 pt-8 border-t border-gray-200"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.3 }}
-          >
-            <motion.button
+          <div className="flex justify-between mt-12 pt-8 border-t border-gray-200">
+            <button
               type="button"
-              whileHover={{ x: -5 }}
-              whileTap={{ scale: 0.95 }}
               onClick={prevStep}
               className={`px-8 py-4 rounded-2xl text-lg font-semibold transition-all ${formStep === 1
                 ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                : 'bg-gradient-to-r from-gray-400 to-gray-600 text-white hover:shadow-lg'
+                : 'bg-gray-500 text-white hover:bg-gray-600'
                 }`}
               disabled={formStep === 1}
             >
               ← Previous
-            </motion.button>
+            </button>
 
             {formStep < 4 ? (
-              <motion.button
+              <button
                 type="button"
-                whileHover={{ x: 5 }}
-                whileTap={{ scale: 0.95 }}
                 onClick={nextStep}
-                className="px-8 py-4 rounded-2xl bg-gradient-to-r from-blue-500 to-purple-600 text-white text-lg font-semibold hover:shadow-lg transition-all"
+                className="px-8 py-4 rounded-2xl bg-indigo-600 text-white text-lg font-semibold hover:bg-indigo-700 transition-all"
               >
                 Next →
-              </motion.button>
+              </button>
             ) : (
               <div className="flex gap-4">
-                <motion.button
+                <button
                   type="button"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
                   onClick={() => onClose ? onClose(false) : navigate('/dashboard')}
-                  className="px-8 py-4 rounded-2xl bg-gradient-to-r from-gray-400 to-gray-600 text-white text-lg font-semibold hover:shadow-lg transition-all"
+                  className="px-8 py-4 rounded-2xl bg-gray-500 text-white text-lg font-semibold hover:bg-gray-600 transition-all"
                   disabled={submitting}
                 >
                   Cancel
-                </motion.button>
-                <motion.button
+                </button>
+                <button
                   type="submit"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
                   disabled={submitting}
-                  className="px-8 py-4 rounded-2xl bg-gradient-to-r from-green-500 to-emerald-600 text-white text-lg font-semibold hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed relative overflow-hidden"
+                  className="px-8 py-4 rounded-2xl bg-indigo-600 text-white text-lg font-semibold hover:bg-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed relative overflow-hidden"
                 >
                   {submitting ? (
                     <span className="flex items-center gap-2">
-                      <motion.span
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                      >
-                        ⏳
-                      </motion.span>
+                      <span>⏳</span>
                       Submitting...
                     </span>
                   ) : showSuccess ? (
                     <span className="flex items-center gap-2">
-                      <motion.span
-                        animate={{ scale: [1, 1.5, 1] }}
-                        transition={{ duration: 0.5 }}
-                      >
-                        ✅
-                      </motion.span>
+                      <span>✅</span>
                       Success!
                     </span>
                   ) : (
@@ -875,89 +805,31 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
 
                   {/* Progress Bar */}
                   {submitting && (
-                    <motion.div
-                      className="absolute bottom-0 left-0 h-1 bg-gradient-to-r from-yellow-400 to-orange-500"
-                      initial={{ width: "0%" }}
-                      animate={{ width: `${uploadProgress}%` }}
-                      transition={{ duration: 0.3 }}
+                    <div
+                      className="absolute bottom-0 left-0 h-1 bg-indigo-400 transition-all duration-300"
+                      style={{ width: `${uploadProgress}%` }}
                     />
                   )}
-                </motion.button>
+                </button>
               </div>
             )}
-          </motion.div>
+          </div>
 
-          {/* Success Animation Overlay */}
+          {/* Success Overlay */}
           <AnimatePresence>
             {showSuccess && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 1.2 }}
-                className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-50"
-              >
-                <motion.div
-                  initial={{ y: 50 }}
-                  animate={{ y: 0 }}
-                  className="bg-white rounded-3xl p-12 text-center shadow-2xl"
-                >
-                  <motion.div
-                    animate={{
-                      scale: [1, 1.2, 1],
-                      rotate: [0, 360, 0]
-                    }}
-                    transition={{ duration: 1 }}
-                    className="text-6xl mb-6"
-                  >
-                    🎉
-                  </motion.div>
+              <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
+                <div className="bg-white rounded-3xl p-12 text-center shadow-2xl">
+                  <div className="text-6xl mb-6">🎉</div>
                   <h3 className="text-3xl font-bold text-gray-800 mb-4">Issue Submitted!</h3>
                   <p className="text-gray-600 text-lg">Your issue has been successfully submitted.</p>
-                  <motion.div
-                    animate={{
-                      scale: [1, 1.1, 1],
-                      transition: { repeat: Infinity, duration: 2 }
-                    }}
-                    className="mt-8 text-sm text-gray-500"
-                  >
-                    Redirecting...
-                  </motion.div>
-                </motion.div>
-              </motion.div>
+                  <div className="mt-8 text-sm text-gray-500">Redirecting...</div>
+                </div>
+              </div>
             )}
           </AnimatePresence>
-        </motion.form>
-      </motion.div>
-
-      {/* Decorative Elements */}
-      {!asModal && (
-        <>
-          <motion.div
-            animate={{
-              y: [0, -20, 0],
-              x: [0, 10, 0]
-            }}
-            transition={{ duration: 5, repeat: Infinity }}
-            className="fixed top-20 left-10 w-16 h-16 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full opacity-20 blur-xl"
-          />
-          <motion.div
-            animate={{
-              y: [0, 20, 0],
-              x: [0, -10, 0]
-            }}
-            transition={{ duration: 6, repeat: Infinity, delay: 0.5 }}
-            className="fixed bottom-20 right-10 w-24 h-24 bg-gradient-to-r from-purple-400 to-pink-500 rounded-full opacity-20 blur-xl"
-          />
-          <motion.div
-            animate={{
-              y: [0, -30, 0],
-              rotate: [0, 180, 360]
-            }}
-            transition={{ duration: 8, repeat: Infinity }}
-            className="fixed top-1/2 left-1/4 w-12 h-12 bg-gradient-to-r from-blue-400 to-cyan-500 rounded-full opacity-20 blur-lg"
-          />
-        </>
-      )}
+        </form>
+      </div>
     </div>
   );
 }

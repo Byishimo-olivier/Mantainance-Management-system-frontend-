@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import Header from "./Header";
 import ScheduleMaintenanceForm from './ScheduleMaintenanceForm';
 import AssetDetail from './AssetDetail';
 import AssetMovementForm from './AssetMovementForm';
@@ -715,102 +716,71 @@ function ClientDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Navbar - Dark Blue Theme */}
-      <nav className="flex items-center justify-between bg-blue-900 shadow-lg px-4 md:px-8 h-16">
-        <div className="flex items-center gap-3">
-          <span className="bg-white rounded-xl p-2 flex items-center justify-center">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
-              <rect x="2" y="2" width="20" height="20" rx="6" fill="#1e40af" />
-              <rect x="6" y="6" width="12" height="6" rx="2" fill="#60a5fa" />
-            </svg>
-          </span>
-          <div className="flex flex-col">
-            <span className="text-lg font-bold text-white">Fixnest</span>
-            <span className="text-sm text-blue-200">Welcome, {userName}</span>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-4">
-          <button
-            className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-blue-800 text-white font-semibold transition"
-            onClick={() => setActiveTab('dashboard')}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-              <rect x="3" y="3" width="18" height="18" rx="4" fill="#60a5fa" />
-              <rect x="7" y="7" width="4" height="4" rx="1" fill="#ffffff" />
-              <rect x="13" y="7" width="4" height="4" rx="1" fill="#ffffff" />
-              <rect x="7" y="13" width="4" height="4" rx="1" fill="#ffffff" />
-              <rect x="13" y="13" width="4" height="4" rx="1" fill="#ffffff" />
-            </svg>
-            Dashboard
-          </button>
-
-          <button
-            className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-blue-800 text-white font-semibold transition"
-            onClick={() => navigate("/issues")}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-              <rect x="3" y="3" width="18" height="18" rx="4" fill="#93c5fd" />
-              <rect x="7" y="7" width="10" height="10" rx="2" fill="#ffffff" />
-            </svg>
-            All Issues
-          </button>
-          <button
-            onClick={async () => {
-              try {
-                const { jsPDF } = await import('jspdf');
-                const doc = new jsPDF();
-                const left = 14;
-                let y = 20;
-                doc.setFontSize(16);
-                doc.text('Issues Report', left, 16);
-                doc.setFontSize(11);
-                if (!issues || issues.length === 0) {
-                  doc.text('No issues to export.', left, y);
-                } else {
-                  issues.forEach((issue, idx) => {
-                    const title = `${idx + 1}. ${issue.title || 'Untitled'}`;
-                    doc.text(title, left, y);
-                    y += 7;
-                    const meta = `Status: ${issue.status || 'N/A'}  |  Location: ${issue.location || issue.address || 'N/A'}`;
-                    doc.text(meta, left, y);
-                    y += 6;
-                    const desc = (issue.description || '').toString();
-                    const split = doc.splitTextToSize(desc, 180);
-                    doc.text(split, left, y);
-                    y += split.length * 6 + 8;
-                    if (y > 270) { doc.addPage(); y = 20; }
-                  });
+      <Header
+        title="Client Dashboard"
+        subtitle={`Welcome, ${userName}`}
+        user={currentUser}
+        right={
+          <div className="flex items-center gap-4">
+            <button
+              className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-gray-100 text-gray-700 font-semibold transition border border-transparent hover:border-gray-200"
+              onClick={() => setActiveTab('dashboard')}
+            >
+              Dashboard
+            </button>
+            <button
+              className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-gray-100 text-gray-700 font-semibold transition border border-transparent hover:border-gray-200"
+              onClick={() => navigate("/issues")}
+            >
+              All Issues
+            </button>
+            <button
+              onClick={async () => {
+                // PDF Export Logic (kept as-is)
+                try {
+                  const { jsPDF } = await import('jspdf');
+                  const doc = new jsPDF();
+                  const left = 14;
+                  let y = 20;
+                  doc.setFontSize(16);
+                  doc.text('Issues Report', left, 16);
+                  doc.setFontSize(11);
+                  if (!issues || issues.length === 0) {
+                    doc.text('No issues to export.', left, y);
+                  } else {
+                    issues.forEach((issue, idx) => {
+                      const title = `${idx + 1}. ${issue.title || 'Untitled'}`;
+                      doc.text(title, left, y);
+                      y += 7;
+                      const meta = `Status: ${issue.status || 'N/A'}  |  Location: ${issue.location || issue.address || 'N/A'}`;
+                      doc.text(meta, left, y);
+                      y += 6;
+                      const desc = (issue.description || '').toString();
+                      const split = doc.splitTextToSize(desc, 180);
+                      doc.text(split, left, y);
+                      y += split.length * 6 + 8;
+                      if (y > 270) { doc.addPage(); y = 20; }
+                    });
+                  }
+                  doc.save('issues-report.pdf');
+                } catch (err) {
+                  console.error('PDF export failed', err);
+                  alert('Failed to export PDF: ' + (err?.message || err));
                 }
-                doc.save('issues-report.pdf');
-              } catch (err) {
-                console.error('PDF export failed', err);
-                alert('Failed to export PDF: ' + (err?.message || err));
-              }
-            }}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-blue-800 text-white font-semibold transition"
-          >
-            Export PDF
-          </button>
-
-          <button
-            className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-green-700 text-white font-semibold border border-green-500 transition"
-            onClick={() => navigate("/feedback")}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-              <path d="M2 12a10 10 0 1 0 20 0A10 10 0 0 0 2 12Zm6-1 2 2 4-4" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            Feedback
-          </button>
-
-          <button
-            onClick={handleLogout}
-            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-semibold"
-          >
-            Logout
-          </button>
-        </div>
-      </nav>
+              }}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-indigo-50 text-indigo-700 font-semibold border border-indigo-200 transition shadow-sm"
+            >
+              Export PDF
+            </button>
+            <button
+              onClick={handleLogout}
+              className="px-4 py-2 bg-red-100 text-red-700 border border-red-200 rounded-lg font-semibold hover:bg-red-200 transition"
+            >
+              Logout
+            </button>
+          </div>
+        }
+      />
 
       {/* Reminders Panel */}
       {reminders.length > 0 && (
@@ -1054,6 +1024,20 @@ function ClientDashboard() {
                             )}
                           </div>
 
+                          {/* Show assigned technicians */}
+                          {issue.assignees && Array.isArray(issue.assignees) && issue.assignees.length > 0 && (
+                            <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded">
+                              <p className="text-xs font-semibold text-green-800 mb-1">Assigned to:</p>
+                              {issue.assignees.map((assignee, idx) => (
+                                <div key={idx} className="text-xs text-green-700">
+                                  <span className="font-medium">{assignee.name || 'Unknown'}</span>
+                                  {assignee.email && <span className="text-green-600"> ({assignee.email})</span>}
+                                  {assignee.role && <span className="ml-1 px-1 py-0.5 bg-green-100 rounded text-green-800">({assignee.role})</span>}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
                           {/* Accept and Decline buttons for clients on PENDING issues */}
                           {issue.status === 'PENDING' && currentUser?.role === 'client' && (
                             <div className="mt-3 flex gap-2">
@@ -1085,9 +1069,9 @@ function ClientDashboard() {
                                 value={(selectedTechs[issue.id || issue._id] && selectedTechs[issue.id || issue._id].internal) || ''}
                                 onChange={(e) => setSelectedTechs(s => ({ ...s, [issue.id || issue._id]: { ...(s[issue.id || issue._id] || {}), internal: e.target.value } }))}
                               >
-                                <option value="">Assign internal technician...</option>
-                                {internalTechnicians.map(t => (
-                                  <option key={t.id || t._id} value={t.id || t._id}>{t.name}{t.email ? ` (${t.email})` : ''}</option>
+                                <option key="default-internal" value="">Assign internal technician...</option>
+                                {internalTechnicians.map((t, idx) => (
+                                  <option key={t.id || t._id || `internal-${idx}`} value={t.id || t._id}>{t.name}{t.email ? ` (${t.email})` : ''}</option>
                                 ))}
                               </select>
                               <button
@@ -1106,9 +1090,9 @@ function ClientDashboard() {
                                 value={(selectedTechs[issue.id || issue._id] && selectedTechs[issue.id || issue._id].external) || ''}
                                 onChange={(e) => setSelectedTechs(s => ({ ...s, [issue.id || issue._id]: { ...(s[issue.id || issue._id] || {}), external: e.target.value } }))}
                               >
-                                <option value="">Assign technician...</option>
-                                {technicians.map(t => (
-                                  <option key={t.id} value={t.id}>{t.name}{t.email ? ` (${t.email})` : ''}</option>
+                                <option key="default-external" value="">Assign technician...</option>
+                                {technicians.map((t, idx) => (
+                                  <option key={t.id || t._id || `external-${idx}`} value={t.id || t._id}>{t.name}{t.email ? ` (${t.email})` : ''}</option>
                                 ))}
                               </select>
                               <button
@@ -1120,56 +1104,6 @@ function ClientDashboard() {
                               </button>
                             </div>
                           )}
-                          {/* Client: request internal technician for this property's staff */}
-                          {currentUser?.role === 'client' && (() => {
-                            const pidRaw = issue.propertyId || (issue.property && (issue.property.id || issue.property._id)) || (issue.assetId ? (assets.find(a => (a.id || a._id) === issue.assetId)?.propertyId) : null);
-                            const pid = extractId(pidRaw);
-                            const techs = (internalTechnicians || []).filter(t => {
-                              const tid = extractId(t.propertyId || t.property);
-                              return tid && pid && (String(tid) === String(pid));
-                            });
-
-                            const isApproved = (issue.approved === true) || String(issue.status || '').toUpperCase() === 'APPROVED';
-                            // If no staff specifically for this property, fall back to any internal technicians
-                            const availableInternal = techs.length ? techs : (internalTechnicians || []);
-                            if (!availableInternal.length) {
-                              return (
-                                <p className="text-sm text-gray-500 mt-2">No property staff available.</p>
-                              );
-                            }
-                            if (!isApproved) {
-                              return (
-                                <p className="text-sm text-gray-500 mt-2">Assignment available only for approved issues.</p>
-                              );
-                            }
-                            return (
-                              <div className="mt-3 flex items-center gap-2">
-                                <div className="flex-1">
-                                  <label className="text-sm text-gray-600 block mb-1">Request property staff</label>
-                                  <select
-                                    className="border rounded px-2 py-1 text-sm w-full"
-                                    value={(selectedTechs[issue.id || issue._id] && selectedTechs[issue.id || issue._id].internal) || ''}
-                                    onChange={(e) => setSelectedTechs(s => ({ ...s, [issue.id || issue._id]: { ...(s[issue.id || issue._id] || {}), internal: e.target.value } }))}
-                                  >
-                                    <option value="">Request internal tech...</option>
-                                    {availableInternal.map(t => (
-                                      <option key={t.id || t._id} value={t.id || t._id}>{t.name}{t.email ? ` (${t.email})` : ''}</option>
-                                    ))}
-                                  </select>
-
-                                </div>
-                                <div>
-                                  <button
-                                    className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-500"
-                                    disabled={!((selectedTechs[issue.id || issue._id] && selectedTechs[issue.id || issue._id].internal)) || assignLoading[issue.id || issue._id]}
-                                    onClick={() => assignInternal(issue.id || issue._id, (selectedTechs[issue.id || issue._id] || {}).internal)}
-                                  >
-                                    {assignLoading[issue.id || issue._id] ? 'Requesting...' : 'Request'}
-                                  </button>
-                                </div>
-                              </div>
-                            );
-                          })()}
                           {/* Client: show external technicians assigned to this property (how saved in DB shown) */}
                           {currentUser?.role === 'client' && (() => {
                             const pid = issue.propertyId || (issue.property && (issue.property.id || issue.property._id)) || (issue.assetId ? (assets.find(a => (a.id || a._id) === issue.assetId)?.propertyId) : null);
@@ -1198,9 +1132,9 @@ function ClientDashboard() {
                                     value={(selectedTechs[issue.id || issue._id] && selectedTechs[issue.id || issue._id].external) || ''}
                                     onChange={(e) => setSelectedTechs(s => ({ ...s, [issue.id || issue._id]: { ...(s[issue.id || issue._id] || {}), external: e.target.value } }))}
                                   >
-                                    <option value="">Assign technician...</option>
-                                    {availableExternal.map(t => (
-                                      <option key={t.id || t._id} value={t.id || t._id}>
+                                    <option key="default-assign-ext" value="">Assign technician...</option>
+                                    {availableExternal.map((t, idx) => (
+                                      <option key={t.id || t._id || `assign-ext-${idx}`} value={t.id || t._id}>
                                         {t.name}{t.email ? ` (${t.email})` : ''}{t.specialty ? ` — ${Array.isArray(t.specialty) ? t.specialty.join(', ') : t.specialty}` : ''}{t.rating ? ` • ${t.rating}⭐` : ''}
                                       </option>
                                     ))}

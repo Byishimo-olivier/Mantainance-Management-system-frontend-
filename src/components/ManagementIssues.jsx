@@ -14,47 +14,39 @@ const ManagementIssues = () => {
     LOW: "bg-gray-100 text-gray-600",
   };
 
-
   const [issues, setIssues] = useState([]);
   const [technicians, setTechnicians] = useState([]);
   const [assigning, setAssigning] = useState(null); // index of issue being assigned
 
   // Fetch issues and technicians from backend
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      setIssues([]);
-      setTechnicians([]);
-      return;
-    }
-    // Auth handled by interceptor
-    api.get("/api/issues")
-      .then(res => setIssues(res.data))
-      .catch(() => setIssues([]));
-    api.get("/api/technicians")
-      .then(res => setTechnicians(res.data))
-      .catch(() => setTechnicians([]));
+    const fetchData = async () => {
+      try {
+        const issuesRes = await api.get("/api/issues");
+        setIssues(issuesRes.data || []);
+
+        const techRes = await api.get("/api/technicians");
+        setTechnicians(techRes.data || []);
+      } catch (err) {
+        console.error('[ManagementIssues] Error fetching data:', err);
+      }
+    };
+    fetchData();
   }, []);
 
   const handleAssignClick = idx => {
     setAssigning(idx);
   };
 
-  const handleAssignTech = async (idx, techName) => {
+  const handleAssignTech = async (idx, techId) => {
     const issue = issues[idx];
-    // Find the selected technician object
-    const tech = technicians.find(t => t.name === techName);
-    if (!tech) {
-      alert('Technician not found');
-      setAssigning(null);
-      return;
-    }
     try {
       // Use the dedicated assign endpoint
-      const res = await api.post(`/api/issues/${issue.id}/assign`, { techId: tech._id || tech.id });
+      const res = await api.post(`/api/issues/${issue.id}/assign`, { techId });
       // Update UI with the new issue data from backend
       setIssues(prev => prev.map((iss, i) => i === idx ? res.data : iss));
     } catch (err) {
+      console.error('[ManagementIssues] Assignment error:', err);
       alert('Failed to assign technician');
     }
     setAssigning(null);
@@ -64,7 +56,7 @@ const ManagementIssues = () => {
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       {issues.map((issue, idx) => (
         <div
-          key={idx}
+          key={issue.id || idx}
           className="bg-white rounded-xl shadow-lg hover:shadow-2xl transition-shadow p-6 flex flex-col gap-3 border border-gray-100 relative"
         >
           <div className="flex items-center gap-2 mb-2">
@@ -75,10 +67,10 @@ const ManagementIssues = () => {
             <span className="text-lg font-semibold text-gray-900 flex-1">{issue.title}</span>
             {issue.status && (
               <span className={`ml-2 px-2 py-0.5 rounded text-xs font-medium ${issue.status === 'IN PROGRESS' ? 'bg-blue-100 text-blue-700' :
-                issue.status === 'PENDING' ? 'bg-gray-100 text-gray-600' :
-                  (issue.status === 'COMPLETE' || issue.status === 'COMPLETED') ? 'bg-green-100 text-green-700' :
-                    issue.status === 'OVERDUE' ? 'bg-red-100 text-red-700' :
-                      'bg-gray-100 text-gray-700'
+                  issue.status === 'PENDING' ? 'bg-gray-100 text-gray-600' :
+                    (issue.status === 'COMPLETE' || issue.status === 'COMPLETED') ? 'bg-green-100 text-green-700' :
+                      issue.status === 'OVERDUE' ? 'bg-red-100 text-red-700' :
+                        'bg-gray-100 text-gray-700'
                 }`}>
                 {(issue.status === 'COMPLETE' || issue.status === 'COMPLETED') ? 'Complete' : issue.status.replace('_', ' ')}
               </span>
@@ -111,10 +103,9 @@ const ManagementIssues = () => {
             <span className="text-xs text-gray-400">Assigned to:</span>
             {issue.assignedTo ? (
               <span className="inline-flex items-center px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 text-xs font-medium mr-1">
-                {/* Find the technician's name from the technicians list */}
                 {(() => {
-                  const tech = technicians.find(t => (t._id || t.id) === issue.assignedTo);
-                  return tech ? tech.name : 'Unknown';
+                  const tech = technicians.find(t => (t.id || t._id) === issue.assignedTo);
+                  return tech ? (tech.name || tech.username || tech.email || 'Unknown') : 'Unknown';
                 })()}
               </span>
             ) : (
@@ -130,8 +121,11 @@ const ManagementIssues = () => {
           {assigning === idx && (
             <div className="mt-3 flex flex-col gap-2 max-w-xs">
               <Select
-                options={technicians.map(tech => ({ value: tech._id || tech.id, label: tech.name }))}
-                onChange={option => option && handleAssignTech(idx, option.label)}
+                options={technicians.map(tech => ({
+                  value: tech.id || tech._id,
+                  label: tech.name || tech.username || tech.email || 'Unknown Technician'
+                }))}
+                onChange={option => option && handleAssignTech(idx, option.value)}
                 placeholder="Select technician..."
                 isSearchable
                 autoFocus
@@ -143,5 +137,6 @@ const ManagementIssues = () => {
       ))}
     </div>
   );
-}
+};
+
 export default ManagementIssues;

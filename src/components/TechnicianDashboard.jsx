@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import api from "../api/axios";
 import { getImageUrl } from '../utils/imageUrl';
 import { useNavigate } from 'react-router-dom';
+import Header from "./Header";
 
 // AFTER EVIDENCE FORM WITH COMPLETION DETAILS
 function AfterEvidenceForm({ issueId, onSuccess }) {
@@ -214,6 +215,126 @@ const TechnicianDashboard = () => {
     }
   };
 
+  const [alerts, setAlerts] = useState([]);
+  const [reminders, setReminders] = useState([]); // Keep for backward compatibility or refactor to use alerts
+
+  const getTimeRemaining = (targetDate) => {
+    if (!targetDate) return null;
+    const now = new Date();
+    const target = new Date(targetDate);
+    const diff = target - now;
+
+    const isOverdue = diff < 0;
+    const absDiff = Math.abs(diff);
+
+    const hours = Math.floor(absDiff / (1000 * 60 * 60));
+    const minutes = Math.floor((absDiff % (1000 * 60 * 60)) / (1000 * 60));
+
+    if (hours > 24) return { text: `${Math.floor(hours / 24)}d ${hours % 24}h`, isOverdue };
+    return { text: `${hours}h ${minutes}m`, isOverdue };
+  };
+
+  const fetchReminders = async () => {
+    const userStr = localStorage.getItem("user");
+    if (!userStr) return;
+    try {
+      const u = JSON.parse(userStr);
+      const res = await api.get(`/api/maintenance-schedules/technician/${u._id || u.id}`);
+      const schedules = res.data || [];
+
+      const now = new Date();
+      const cutoff = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 hours
+
+      // Process Maintenance Reminders
+      const upcomingSchedules = schedules.filter(s =>
+        s && s.routine && s.nextDate &&
+        new Date(s.nextDate) <= cutoff &&
+        (!s.lastReminder || new Date(s.lastReminder) < new Date(s.nextDate)) &&
+        (!s.snoozedUntil || new Date(s.snoozedUntil) < now) &&
+        (!s.dismissedBy || !s.dismissedBy[u._id || u.id])
+      ).map(s => ({
+        ...s,
+        type: 'MAINTENANCE',
+        priority: 'MEDIUM',
+        deadline: s.nextDate
+      }));
+
+      // Process Issue Deadlines
+      const issueAlerts = jobs.filter(j => {
+        const deadline = j.fixDeadline || j.dueDate;
+        if (!deadline) return false;
+        const dDate = new Date(deadline);
+        const isComplete = (j.status || '').toLowerCase().includes('complete');
+        // Show if due within 24h or already overdue, and NOT complete
+        return !isComplete && (dDate <= cutoff);
+      }).map(j => ({
+        ...j,
+        type: 'ISSUE',
+        priority: j.priority || 'HIGH',
+        deadline: j.fixDeadline || j.dueDate,
+        name: j.title
+      }));
+
+      const unifiedAlerts = [...upcomingSchedules, ...issueAlerts].sort((a, b) =>
+        new Date(a.deadline) - new Date(b.deadline)
+      );
+
+      setAlerts(unifiedAlerts);
+      setReminders(upcomingSchedules); // Maintain for any components still using it
+    } catch (err) {
+      console.warn('Failed to fetch alerts:', err);
+    }
+  };
+
+  const dismissOne = async (id, type) => {
+    try {
+      if (type === 'MAINTENANCE') {
+        await api.post(`/api/maintenance-schedules/${id}/dismiss`, { userId: user._id || user.id });
+      }
+      // For issues, we just hide them locally for now or if we implement an ignore flag
+      setAlerts(prev => prev.filter(a => (a._id || a.id) !== id));
+    } catch (err) {
+      console.error('Failed to dismiss alert:', err);
+    }
+  };
+
+  const snoozeOne = async (id, type, minutes = 60) => {
+    try {
+      if (type === 'MAINTENANCE') {
+        await api.post(`/api/maintenance-schedules/${id}/snooze`, { minutes, userId: user._id || user.id });
+      }
+      setAlerts(prev => prev.filter(a => (a._id || a.id) !== id));
+    } catch (err) {
+      console.error('Failed to snooze alert:', err);
+    }
+  };
+
+  const dismissAll = async () => {
+    try {
+      for (const a of alerts) {
+        if (a.type === 'MAINTENANCE') {
+          await api.post(`/api/maintenance-schedules/${a._id || a.id}/dismiss`, { userId: user._id || user.id });
+        }
+      }
+      setAlerts([]);
+    } catch (err) {
+      console.error('Failed to dismiss all alerts:', err);
+    }
+  };
+
+  const snoozeAll = async (minutes = 60) => {
+    try {
+      for (const a of alerts) {
+        if (a.type === 'MAINTENANCE') {
+          await api.post(`/api/maintenance-schedules/${a._id || a.id}/snooze`, { minutes, userId: user._id || user.id });
+        }
+      }
+      setAlerts([]);
+    } catch (err) {
+      console.error('Failed to snooze all alerts:', err);
+    }
+  };
+
   useEffect(() => {
     const userStr = localStorage.getItem("user");
     if (userStr) {
@@ -224,29 +345,152 @@ const TechnicianDashboard = () => {
     }
   }, []);
 
+  // Sync reminders/alerts when jobs are loaded or periodically
+  useEffect(() => {
+    if (user.id || user._id) {
+      fetchReminders();
+    }
+  }, [jobs, user]);
+
+  // Real-time timer update
+  useEffect(() => {
+    const timer = setInterval(() => {
+      // Force re-render to update countdown strings
+      setAlerts(prev => [...prev]);
+    }, 60000); // Every minute
+    return () => clearInterval(timer);
+  }, []);
+
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-8">
+      {/* Reminders Panel */}
+      {alerts.length > 0 && (
+        <div className="fixed top-20 right-4 z-50 max-w-sm w-full">
+          <div className="bg-slate-900 border-l-4 border-purple-500 text-white p-4 shadow-2xl rounded-r-xl animate-in slide-in-from-right duration-300">
+            <div className="flex justify-between items-center mb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">⏰</span>
+                <p className="font-bold text-lg text-purple-200">Task Alerts</p>
+              </div>
+              <button
+                onClick={() => setAlerts([])}
+                className="text-gray-400 hover:text-white transition-colors"
+                title="Close"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <p className="text-sm mb-4 text-gray-300">You have {alerts.length} {alerts.length === 1 ? 'task' : 'tasks'} requiring attention.</p>
+
+            <div className="space-y-3 max-h-80 overflow-y-auto pr-1 select-none custom-scrollbar">
+              {alerts.map((a) => {
+                const id = a._id || a.id;
+                const remaining = getTimeRemaining(a.deadline);
+                const isOverdue = remaining?.isOverdue;
+
+                return (
+                  <div key={`${a.type}-${id}`} className={`p-3 rounded-lg border shadow-sm transition-all ${isOverdue ? 'bg-red-900/40 border-red-500/50' : 'bg-slate-800 border-slate-700'
+                    }`}>
+                    <div className="flex justify-between items-start gap-2 mb-2">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${a.type === 'MAINTENANCE' ? 'bg-purple-500/20 text-purple-300' : 'bg-blue-500/20 text-blue-300'
+                            }`}>
+                            {a.type}
+                          </span>
+                          {isOverdue && (
+                            <span className="text-[10px] px-1.5 py-0.5 bg-red-500 text-white rounded font-bold uppercase animate-pulse">
+                              OVERDUE
+                            </span>
+                          )}
+                        </div>
+                        <p className="font-semibold text-white leading-tight text-sm">{a.name}</p>
+                      </div>
+                      <div className={`text-right ${isOverdue ? 'text-red-400' : 'text-purple-300'}`}>
+                        <p className="text-xs font-bold whitespace-nowrap">
+                          {isOverdue ? 'LATE BY' : 'REMAINING'}
+                        </p>
+                        <p className="text-sm font-mono font-black tabular-nums">
+                          {remaining?.text || 'N/A'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2">
+                      {a.type === 'MAINTENANCE' ? (
+                        <>
+                          <button
+                            className="flex-1 px-3 py-1.5 bg-purple-600 text-white text-xs font-semibold rounded-md hover:bg-purple-500 transition-colors shadow-sm"
+                            onClick={() => dismissOne(id, a.type)}
+                          >
+                            Dismiss
+                          </button>
+                          <button
+                            className="flex-1 px-3 py-1.5 bg-amber-600 text-white text-xs font-semibold rounded-md hover:bg-amber-500 transition-colors shadow-sm"
+                            onClick={() => snoozeOne(id, a.type, 60)}
+                          >
+                            Snooze 1h
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          className="flex-1 px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-md hover:bg-blue-500 transition-colors shadow-sm"
+                          onClick={() => {
+                            setSelectedJob(a);
+                            // Scroll to the job or highlight it?
+                          }}
+                        >
+                          View Details
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-slate-700 flex gap-2">
+              <button
+                className="flex-1 px-3 py-2 bg-slate-800 text-gray-300 text-xs font-bold rounded-lg hover:bg-slate-700 transition-colors border border-slate-700"
+                onClick={dismissAll}
+              >
+                Dismiss All Maint.
+              </button>
+              <button
+                className="flex-1 px-3 py-2 bg-amber-700/50 text-amber-200 text-xs font-bold rounded-lg hover:bg-amber-700 transition-colors border border-amber-600/50"
+                onClick={() => snoozeAll(60)}
+              >
+                Snooze All Maint.
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Technician Dashboard</h1>
-          <p className="text-gray-600">Welcome back, {user.name}</p>
-        </div>
-        <div className="flex gap-4 mt-4 md:mt-0">
-          <button
-            onClick={toggleMaterialRequestForm}
-            className="px-6 py-2 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition"
-          >
-            Ask for Material
-          </button>
-          <button
-            onClick={handleLogout}
-            className="px-6 py-2 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition"
-          >
-            Logout
-          </button>
-        </div>
-      </div>
+      <Header
+        title="Technician Dashboard"
+        subtitle={`Welcome back, ${user.name}`}
+        user={user}
+        right={
+          <div className="flex gap-4">
+            <button
+              onClick={toggleMaterialRequestForm}
+              className="px-6 py-2 bg-purple-100 text-purple-700 rounded-lg font-semibold hover:bg-purple-200 transition border border-purple-200"
+            >
+              Ask for Material
+            </button>
+            <button
+              onClick={handleLogout}
+              className="px-6 py-2 bg-red-100 text-red-700 rounded-lg font-semibold hover:bg-red-200 transition border border-red-200"
+            >
+              Logout
+            </button>
+          </div>
+        }
+      />
 
       {/* Material Request Form Modal */}
       {showMaterialRequestForm && (

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import api from "../api/axios";
 import { useNavigate } from "react-router-dom";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
 import {
   Shield,
   BarChart3,
@@ -28,6 +30,7 @@ import {
   Star
 } from 'lucide-react';
 import { getImageUrl } from '../utils/imageUrl';
+import Header from "./Header";
 
 // Enhanced Status badge with icons and gradients
 const StatusBadge = ({ status }) => {
@@ -291,6 +294,12 @@ function ManagerDashboard() {
   const [loadingFeedbacks, setLoadingFeedbacks] = useState(false);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [aiSentiment, setAiSentiment] = useState(null);
+  const [aiRecommendations, setAiRecommendations] = useState([]);
+  const [loadingAI, setLoadingAI] = useState(false);
+  const [loadingRecs, setLoadingRecs] = useState(false);
+  const [aiError, setAiError] = useState(null);
+  const [recsError, setRecsError] = useState(null);
   const navigate = useNavigate();
 
   // Load logged-in user from localStorage for sidebar display
@@ -367,6 +376,90 @@ function ManagerDashboard() {
     }
   };
 
+  const fetchAISentiment = async () => {
+    try {
+      setLoadingAI(true);
+      setAiError(null);
+      const res = await api.get("/api/ai/sentiment-summary");
+      setAiSentiment(res.data);
+    } catch (err) {
+      console.error("Failed to fetch AI sentiment:", err);
+      setAiError(err.response?.data?.message || "Analysis service unavailable");
+    } finally {
+      setLoadingAI(false);
+    }
+  };
+
+  const exportToPDF = async () => {
+    const dashboardElement = document.getElementById('dashboard-content');
+    if (!dashboardElement) return;
+
+    try {
+      setLoading(true);
+      const canvas = await html2canvas(dashboardElement, {
+        scale: 2,
+        useCORS: true,
+        logging: false
+      });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgProps = pdf.getImageProperties(imgData);
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`MMS-Status-Report-${new Date().toISOString().split('T')[0]}.pdf`);
+    } catch (err) {
+      console.error("PDF Export failed:", err);
+      alert("Failed to generate PDF. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const exportToExcel = () => {
+    try {
+      // Create CSV content
+      const headers = ["Issue Title", "Description", "Location", "Priority", "Status", "Date Created"];
+      const rows = issues.map(issue => [
+        `"${issue.title}"`,
+        `"${issue.description}"`,
+        `"${issue.location}"`,
+        `"${issue.priority}"`,
+        `"${issue.status}"`,
+        new Date(issue.createdAt).toLocaleDateString()
+      ]);
+
+      const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement("a");
+      const url = URL.createObjectURL(blob);
+      link.setAttribute("href", url);
+      link.setAttribute("download", `mms_maintenance_data_${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error("Excel/CSV Export failed:", err);
+      alert("Failed to export data.");
+    }
+  };
+
+  const fetchAIRecommendations = async () => {
+    try {
+      setLoadingRecs(true);
+      setRecsError(null);
+      const res = await api.get("/api/ai/dashboard-recommendations");
+      setAiRecommendations(res.data.recommendations || []);
+    } catch (err) {
+      console.error("Failed to fetch AI recommendations:", err);
+      setRecsError(err.response?.data?.message || "Recommendation service unavailable");
+    } finally {
+      setLoadingRecs(false);
+    }
+  };
+
   // Fetch feedbacks when switching to feedback tab
   const fetchFeedbacks = async () => {
     if (activeTab !== 'feedback') return;
@@ -417,6 +510,8 @@ function ManagerDashboard() {
 
   useEffect(() => {
     fetchDashboardData();
+    fetchAISentiment();
+    fetchAIRecommendations();
   }, []);
 
   useEffect(() => {
@@ -585,7 +680,7 @@ function ManagerDashboard() {
       return idsToCheck.includes(String(assignedId));
     });
 
-    return tech?.name || 'Technician';
+    return tech?.name || tech?.username || 'Technician';
   };
 
   // Enhanced TabButton with animations
@@ -691,24 +786,17 @@ function ManagerDashboard() {
 
       {/* Main Content Area */}
       <main className="flex-1 p-8 overflow-y-auto">
-        {/* Enhanced Header */}
-        <div className="mb-8">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
-            <div>
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 via-blue-900 to-purple-900 bg-clip-text text-transparent">
-                Manager Dashboard
-              </h1>
-              <p className="text-gray-600 mt-2 flex items-center gap-2">
-                <Calendar className="w-4 h-4" />
-                Last updated: {new Date().toLocaleDateString('en-US', {
-                  weekday: 'long',
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric'
-                })}
-              </p>
-            </div>
-
+        {/* Standardized Header */}
+        <Header
+          title="Manager Dashboard"
+          subtitle={`Last updated: ${new Date().toLocaleDateString('en-US', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+          })}`}
+          user={loggedUser || { name: userName, role: 'manager' }}
+          right={
             <div className="flex items-center gap-4">
               {/* Search Bar */}
               <div className="relative">
@@ -718,29 +806,32 @@ function ManagerDashboard() {
                   placeholder="Search issues..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 pr-4 py-2.5 bg-white/80 backdrop-blur-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent w-64"
+                  className="pl-10 pr-4 py-2 bg-white/80 backdrop-blur-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent w-64 text-sm"
                 />
               </div>
 
-              {/* Notification Bell */}
-              <button className="relative p-2.5 bg-gradient-to-br from-white to-gray-50 rounded-xl border border-gray-200 hover:border-blue-200 transition-colors">
-                <Bell className="w-5 h-5 text-gray-600" />
-                <span className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-r from-rose-500 to-pink-500 text-white text-xs rounded-full flex items-center justify-center">
-                  3
-                </span>
-              </button>
-
-              {/* Quick Actions */}
+              {/* Quick Actions (Exports) */}
               <div className="flex items-center gap-2">
-                <GradientButton color="blue" className="px-4 py-2.5 text-sm">
-                  <span className="flex items-center gap-2">
-                    <Upload className="w-4 h-4" />
-                    Export Report
-                  </span>
-                </GradientButton>
+                <button
+                  onClick={exportToPDF}
+                  className="p-2 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all text-gray-600 shadow-sm"
+                  title="Export PDF"
+                >
+                  <Download className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={exportToExcel}
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 transition-all shadow-md shadow-indigo-100 flex items-center gap-2"
+                >
+                  <FileText className="w-4 h-4" />
+                  <span>Export</span>
+                </button>
               </div>
             </div>
-          </div>
+          }
+        />
+
+        <div className="mb-6">
 
           {/* Quick Stats Bar */}
           <div className="flex flex-wrap gap-4 mb-6">
@@ -760,198 +851,235 @@ function ManagerDashboard() {
         </div>
 
         {/* Tab Content */}
-        {loading ? (
-          <div className="flex flex-col items-center justify-center py-20">
-            <div className="relative">
-              <div className="w-16 h-16 border-4 border-blue-200 rounded-full"></div>
-              <div className="absolute top-0 left-0 w-16 h-16 border-4 border-transparent border-t-blue-500 rounded-full animate-spin"></div>
+        <div id="dashboard-content">
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-20">
+              <div className="relative">
+                <div className="w-16 h-16 border-4 border-blue-200 rounded-full"></div>
+                <div className="absolute top-0 left-0 w-16 h-16 border-4 border-transparent border-t-blue-500 rounded-full animate-spin"></div>
+              </div>
+              <p className="mt-4 text-gray-600 animate-pulse">Loading dashboard...</p>
             </div>
-            <p className="mt-4 text-gray-600 animate-pulse">Loading dashboard...</p>
-          </div>
-        ) : activeTab === 'overview' ? (
-          <OverviewTab
-            summary={summary}
-            pendingRequests={pendingRequests}
-            issues={issues}
-            technicians={technicians}
-            setActiveTab={setActiveTab}
-            getAssignedTechName={getAssignedTechName}
-          />
-        ) : activeTab === 'requests' ? (
-          <RequestsTab
-            pendingRequests={pendingRequests}
-            setSelectedRequest={setSelectedRequest}
-            setShowApprovalModal={setShowApprovalModal}
-          />
-        ) : activeTab === 'issues' ? (
-          <IssuesTab
-            issues={issues}
-            technicians={technicians}
-            assigning={assigning}
-            assignmentData={assignmentData}
-            setAssignmentData={setAssignmentData}
-            handleOpenAssignment={handleOpenAssignment}
-            handleAssignTech={handleAssignTech}
-            getAssignedTechName={getAssignedTechName}
-          />
-        ) : activeTab === 'all-issues' ? (
-          <AllIssuesTab
-            filters={filters}
-            setFilters={setFilters}
-            getFilteredIssues={getFilteredIssues}
-            getAssignedTechName={getAssignedTechName}
-            searchQuery={searchQuery}
-            setSearchQuery={setSearchQuery}
-          />
-        ) : (
-          <FeedbackTab
-            feedbacks={feedbacks}
-            loadingFeedbacks={loadingFeedbacks}
-          />
-        )}
+          ) : activeTab === 'overview' ? (
+            <OverviewTab
+              summary={summary}
+              pendingRequests={pendingRequests}
+              issues={issues}
+              technicians={technicians}
+              setActiveTab={setActiveTab}
+              getAssignedTechName={getAssignedTechName}
+              aiSentiment={aiSentiment}
+              loadingAI={loadingAI}
+              aiError={aiError}
+              aiRecommendations={aiRecommendations}
+              loadingRecs={loadingRecs}
+              recsError={recsError}
+              exportToPDF={exportToPDF}
+              exportToExcel={exportToExcel}
+            />
+          ) : activeTab === 'requests' ? (
+            <RequestsTab
+              pendingRequests={pendingRequests}
+              setSelectedRequest={setSelectedRequest}
+              setShowApprovalModal={setShowApprovalModal}
+            />
+          ) : activeTab === 'issues' ? (
+            <IssuesTab
+              issues={issues}
+              technicians={technicians}
+              assigning={assigning}
+              assignmentData={assignmentData}
+              setAssignmentData={setAssignmentData}
+              handleOpenAssignment={handleOpenAssignment}
+              handleAssignTech={handleAssignTech}
+              getAssignedTechName={getAssignedTechName}
+            />
+          ) : activeTab === 'all-issues' ? (
+            <AllIssuesTab
+              filters={filters}
+              setFilters={setFilters}
+              getFilteredIssues={getFilteredIssues}
+              getAssignedTechName={getAssignedTechName}
+              searchQuery={searchQuery}
+              setSearchQuery={setSearchQuery}
+            />
+          ) : (
+            <FeedbackTab
+              feedbacks={feedbacks}
+              loadingFeedbacks={loadingFeedbacks}
+            />
+          )}
 
-        {/* Enhanced Approval Modal */}
-        {showApprovalModal && selectedRequest && (
-          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
-            <GlassCard className="max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-              <div className="p-8">
-                <div className="flex justify-between items-center mb-8">
-                  <div>
-                    <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                      Review Request
-                    </h2>
-                    <p className="text-gray-600 mt-1">Approve or decline this maintenance request</p>
-                  </div>
-                  <button
-                    onClick={() => {
-                      setShowApprovalModal(false);
-                      setSelectedRequest(null);
-                      setDeclineReason('');
-                    }}
-                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                  >
-                    <span className="text-2xl text-gray-500 hover:text-gray-700">×</span>
-                  </button>
-                </div>
-
-                {/* Request Details */}
-                <div className="space-y-6">
-                  {/* Header with image */}
-                  <div className="flex flex-col md:flex-row gap-6">
-                    {getImageUrl(selectedRequest.beforePhoto || selectedRequest.photo) && (
-                      <div className="md:w-1/3">
-                        <div className="rounded-2xl overflow-hidden shadow-lg">
-                          <img
-                            src={getImageUrl(selectedRequest.beforePhoto || selectedRequest.photo)}
-                            alt="Issue"
-                            className="w-full h-64 object-cover hover:scale-105 transition-transform duration-300"
-                          />
-                        </div>
-                      </div>
-                    )}
-                    <div className="flex-1">
-                      <h3 className="text-2xl font-bold text-gray-900 mb-3">{selectedRequest.title}</h3>
-                      <div className="flex items-center gap-4 mb-4">
-                        <PriorityBadge priority={selectedRequest.priority || 'MEDIUM'} />
-                        <div className="flex items-center gap-2 text-gray-600">
-                          <MapPin className="w-4 h-4" />
-                          {selectedRequest.location}
-                        </div>
-                      </div>
-                      <p className="text-gray-700 leading-relaxed">{selectedRequest.description}</p>
-                    </div>
-                  </div>
-
-                  {/* Meta Info */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl">
+          {/* Enhanced Approval Modal */}
+          {showApprovalModal && selectedRequest && (
+            <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
+              <GlassCard className="max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+                <div className="p-8">
+                  <div className="flex justify-between items-center mb-8">
                     <div>
-                      <p className="text-sm text-gray-600 mb-1">Submitted</p>
-                      <p className="font-semibold text-gray-900">
-                        {new Date(selectedRequest.createdAt).toLocaleDateString()}
-                      </p>
+                      <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                        Review Request
+                      </h2>
+                      <p className="text-gray-600 mt-1">Approve or decline this maintenance request</p>
                     </div>
-                    <div>
-                      <p className="text-sm text-gray-600 mb-1">Client</p>
-                      <p className="font-semibold text-gray-900">Anonymous</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600 mb-1">Category</p>
-                      <p className="font-semibold text-gray-900">Maintenance</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600 mb-1">Urgency</p>
-                      <div className="w-24">
-                        <PriorityBadge priority={selectedRequest.priority || 'MEDIUM'} />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Decline Reason */}
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-3">
-                      <span className="flex items-center gap-2">
-                        <AlertCircle className="w-5 h-5 text-amber-600" />
-                        Decline Reason (Optional)
-                      </span>
-                    </label>
-                    <textarea
-                      className="w-full px-4 py-3 bg-white/50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                      rows="3"
-                      value={declineReason}
-                      onChange={(e) => setDeclineReason(e.target.value)}
-                      placeholder="Provide a reason for declining this request..."
-                    />
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="flex gap-4 pt-6 border-t border-gray-200">
-                    <GradientButton
-                      onClick={() => handleApproveRequest(selectedRequest._id)}
-                      color="green"
-                      className="flex-1 py-4"
-                    >
-                      <span className="flex items-center justify-center gap-3">
-                        <CheckCircle className="w-5 h-5" />
-                        Approve Request
-                      </span>
-                    </GradientButton>
-                    <GradientButton
-                      onClick={handleDeclineRequest}
-                      color="red"
-                      className="flex-1 py-4"
-                      disabled={!declineReason.trim()}
-                    >
-                      <span className="flex items-center justify-center gap-3">
-                        <AlertCircle className="w-5 h-5" />
-                        Decline Request
-                      </span>
-                    </GradientButton>
                     <button
                       onClick={() => {
                         setShowApprovalModal(false);
                         setSelectedRequest(null);
                         setDeclineReason('');
                       }}
-                      className="flex-1 px-6 py-4 bg-gradient-to-b from-gray-100 to-gray-200 text-gray-700 rounded-xl font-semibold hover:from-gray-200 hover:to-gray-300 transition-all duration-300 border border-gray-300"
+                      className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
                     >
-                      Cancel
+                      <span className="text-2xl text-gray-500 hover:text-gray-700">×</span>
                     </button>
                   </div>
+
+                  {/* Request Details */}
+                  <div className="space-y-6">
+                    {/* Header with image */}
+                    <div className="flex flex-col md:flex-row gap-6">
+                      {getImageUrl(selectedRequest.beforePhoto || selectedRequest.photo) && (
+                        <div className="md:w-1/3">
+                          <div className="rounded-2xl overflow-hidden shadow-lg">
+                            <img
+                              src={getImageUrl(selectedRequest.beforePhoto || selectedRequest.photo)}
+                              alt="Issue"
+                              className="w-full h-64 object-cover hover:scale-105 transition-transform duration-300"
+                            />
+                          </div>
+                        </div>
+                      )}
+                      <div className="flex-1">
+                        <h3 className="text-2xl font-bold text-gray-900 mb-3">{selectedRequest.title}</h3>
+                        <div className="flex items-center gap-4 mb-4">
+                          <PriorityBadge priority={selectedRequest.priority || 'MEDIUM'} />
+                          <div className="flex items-center gap-2 text-gray-600">
+                            <MapPin className="w-4 h-4" />
+                            {selectedRequest.location}
+                          </div>
+                        </div>
+                        <p className="text-gray-700 leading-relaxed">{selectedRequest.description}</p>
+                      </div>
+                    </div>
+
+                    {/* Meta Info */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl">
+                      <div>
+                        <p className="text-sm text-gray-600 mb-1">Submitted</p>
+                        <p className="font-semibold text-gray-900">
+                          {new Date(selectedRequest.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600 mb-1">Client</p>
+                        <p className="font-semibold text-gray-900">Anonymous</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600 mb-1">Category</p>
+                        <p className="font-semibold text-gray-900">Maintenance</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600 mb-1">Urgency</p>
+                        <div className="w-24">
+                          <PriorityBadge priority={selectedRequest.priority || 'MEDIUM'} />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Decline Reason */}
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-3">
+                        <span className="flex items-center gap-2">
+                          <AlertCircle className="w-5 h-5 text-amber-600" />
+                          Decline Reason (Optional)
+                        </span>
+                      </label>
+                      <textarea
+                        className="w-full px-4 py-3 bg-white/50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                        rows="3"
+                        value={declineReason}
+                        onChange={(e) => setDeclineReason(e.target.value)}
+                        placeholder="Provide a reason for declining this request..."
+                      />
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex gap-4 pt-6 border-t border-gray-200">
+                      <GradientButton
+                        onClick={() => handleApproveRequest(selectedRequest._id)}
+                        color="green"
+                        className="flex-1 py-4"
+                      >
+                        <span className="flex items-center justify-center gap-3">
+                          <CheckCircle className="w-5 h-5" />
+                          Approve Request
+                        </span>
+                      </GradientButton>
+                      <GradientButton
+                        onClick={handleDeclineRequest}
+                        color="red"
+                        className="flex-1 py-4"
+                        disabled={!declineReason.trim()}
+                      >
+                        <span className="flex items-center justify-center gap-3">
+                          <AlertCircle className="w-5 h-5" />
+                          Decline Request
+                        </span>
+                      </GradientButton>
+                      <button
+                        onClick={() => {
+                          setShowApprovalModal(false);
+                          setSelectedRequest(null);
+                          setDeclineReason('');
+                        }}
+                        className="flex-1 px-6 py-4 bg-gradient-to-b from-gray-100 to-gray-200 text-gray-700 rounded-xl font-semibold hover:from-gray-200 hover:to-gray-300 transition-all duration-300 border border-gray-300"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </GlassCard>
-          </div>
-        )}
+              </GlassCard>
+            </div>
+          )}
+        </div>
       </main>
     </div>
   );
 }
 
 // Enhanced Overview Tab
-const OverviewTab = ({ summary, pendingRequests, issues, technicians, setActiveTab, getAssignedTechName }) => (
+const OverviewTab = ({
+  summary,
+  pendingRequests,
+  issues,
+  technicians,
+  setActiveTab,
+  getAssignedTechName,
+  aiSentiment,
+  loadingAI,
+  aiError,
+  aiRecommendations,
+  loadingRecs,
+  recsError,
+  exportToPDF,
+  exportToExcel
+}) => (
   <div className="space-y-8">
     {/* Overview Cards */}
     <OverviewCards summary={summary} pendingRequests={pendingRequests} />
+
+    {/* AI Insights Section */}
+    <AIInsights
+      aiSentiment={aiSentiment}
+      loadingAI={loadingAI}
+      aiError={aiError}
+      aiRecommendations={aiRecommendations}
+      loadingRecs={loadingRecs}
+      recsError={recsError}
+      exportToPDF={exportToPDF}
+      exportToExcel={exportToExcel}
+    />
 
     {/* Grid Layout */}
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1336,8 +1464,8 @@ const AssignmentForm = ({ assignmentData, setAssignmentData, technicians, onAssi
         >
           <option value="">Select technician...</option>
           {technicians.map((tech, i) => (
-            <option key={tech._id || tech.id || `opt-${i}`} value={tech._id || tech.id || ''}>
-              {`🧑‍🔧 ${tech.name}`}
+            <option key={tech.id || tech._id || `tech-${i}`} value={tech.id || tech._id || ''}>
+              {`🧑‍🔧 ${tech.name || tech.username || 'Unnamed'}`}
             </option>
           ))}
         </select>
@@ -1680,5 +1808,80 @@ const FeedbackTab = ({ feedbacks, loadingFeedbacks }) => (
     )}
   </div>
 );
+
+const AIInsights = ({ aiSentiment, loadingAI, aiError, aiRecommendations, loadingRecs, recsError, exportToPDF, exportToExcel }) => {
+  if (loadingAI || loadingRecs) return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      <div className="p-8 bg-white/50 rounded-2xl animate-pulse text-center border border-gray-100">Analysing sentiment trends...</div>
+      <div className="p-8 bg-white/50 rounded-2xl animate-pulse text-center border border-gray-100">Generating proactive recommendations...</div>
+    </div>
+  );
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      {/* Sentiment Analysis Card */}
+      <GlassCard className="p-6 bg-gradient-to-br from-indigo-50 to-white border-indigo-100">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="p-2 bg-indigo-100 rounded-lg">
+            <TrendingUp className="w-5 h-5 text-indigo-600" />
+          </div>
+          <h3 className="text-lg font-bold text-gray-900">AI Sentiment Analysis</h3>
+        </div>
+
+        {aiSentiment ? (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-gray-600">Overall Vibe:</span>
+              <span className={`px-3 py-1 rounded-full text-xs font-bold ${aiSentiment.overallSentiment === 'Positive' ? 'bg-green-100 text-green-700' :
+                aiSentiment.overallSentiment === 'Negative' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'
+                }`}>
+                {aiSentiment.overallSentiment}
+              </span>
+            </div>
+            <p className="text-sm text-gray-700 italic leading-relaxed">"{aiSentiment.summary}"</p>
+            
+          </div>
+        ) : aiError ? (
+          <div className="flex items-center gap-2 p-3 bg-red-50 text-red-700 rounded-xl text-xs border border-red-100">
+            <AlertCircle className="w-4 h-4" />
+            <span>Analysis failed: {aiError}</span>
+          </div>
+        ) : (
+          <div className="text-gray-500 text-sm italic">No data available for sentiment analysis.</div>
+        )}
+      </GlassCard>
+
+      {/* Predictive Recommendations Card */}
+      <GlassCard className="p-6 bg-gradient-to-br from-purple-50 to-white border-purple-100">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="p-2 bg-purple-100 rounded-lg">
+            <Star className="w-5 h-5 text-purple-600" />
+          </div>
+          <h3 className="text-lg font-bold text-gray-900">Predictive Recommendations</h3>
+        </div>
+        <div className="space-y-3">
+          {aiRecommendations.length > 0 ? (
+            aiRecommendations.map((rec, i) => (
+              <div key={i} className="p-3 bg-white hover:bg-purple-50 transition-colors rounded-xl border border-purple-100 shadow-sm">
+                <p className="text-[10px] text-purple-600 font-bold mb-1 tracking-wider uppercase">{rec.type}</p>
+                <p className="font-bold text-gray-900 text-sm mb-1">{rec.title}</p>
+                <p className="text-xs text-gray-700 line-clamp-2">{rec.content}</p>
+              </div>
+            ))
+          ) : recsError ? (
+            <div className="flex items-center gap-2 p-3 bg-red-50 text-red-700 rounded-xl text-xs border border-red-100">
+              <AlertCircle className="w-4 h-4" />
+              <span>Recommendations failed: {recsError}</span>
+            </div>
+          ) : (
+            <div className="text-gray-500 text-sm italic py-4 text-center">
+              Processing system patterns for your first recommendations...
+            </div>
+          )}
+        </div>
+      </GlassCard>
+    </div>
+  );
+};
 
 export default ManagerDashboard;
