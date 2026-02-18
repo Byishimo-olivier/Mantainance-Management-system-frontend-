@@ -50,12 +50,14 @@ export default function PropertyDetails() {
         setAssets((allA.data || []).filter(a => String(a.propertyId) === String(id) || String(a.property?._id) === String(id)));
       }
 
-      // for assignment
-      try {
-        const tr = await api.get('/api/technicians/for-assignment');
-        setTechs(tr.data || []);
-      } catch (e) {
-        setTechs([]);
+      // for assignment - only if authenticated
+      if (localStorage.getItem('token')) {
+        try {
+          const tr = await api.get('/api/technicians/for-assignment');
+          setTechs(tr.data || []);
+        } catch (e) {
+          setTechs([]);
+        }
       }
 
     } catch (err) {

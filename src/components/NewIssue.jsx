@@ -64,6 +64,8 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userId, setUserId] = useState(null);
   const [anonId, setAnonId] = useState(null);
+  const [internalTechnicians, setInternalTechnicians] = useState([]);
+  const [selectedTechnicianId, setSelectedTechnicianId] = useState("");
 
   // Floating particles animation
   const [particles, setParticles] = useState([]);
