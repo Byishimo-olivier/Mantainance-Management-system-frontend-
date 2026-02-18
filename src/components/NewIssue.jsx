@@ -134,6 +134,10 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
   }
 
   async function loadInternalTechnicians(propertyId) {
+    if (!localStorage.getItem('token')) {
+      setInternalTechnicians([]);
+      return;
+    }
     try {
       // Auth handled by interceptor
       const res = await api.get(`/api/internal-technicians/by-property/${propertyId}`);

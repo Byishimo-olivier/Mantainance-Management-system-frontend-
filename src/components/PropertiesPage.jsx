@@ -182,12 +182,16 @@ function PropertiesPage() {
         setSelectedProperty((prev) => ({ ...(prev || property), assets: [] }));
       }
 
-      // Fetch technicians (non-fatal)
-      try {
-        const techResponse = await api.get('/api/technicians/for-assignment');
-        setTechnicians(techResponse.data || []);
-      } catch (err) {
-        console.error('Error loading technicians:', err);
+      // Fetch technicians (non-fatal) - only if authenticated
+      if (localStorage.getItem('token')) {
+        try {
+          const techResponse = await api.get('/api/technicians/for-assignment');
+          setTechnicians(techResponse.data || []);
+        } catch (err) {
+          console.error('Error loading technicians:', err);
+          setTechnicians([]);
+        }
+      } else {
         setTechnicians([]);
       }
     } catch (err) {
