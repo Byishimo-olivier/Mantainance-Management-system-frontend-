@@ -214,92 +214,26 @@ const StatCard = ({ title, value, change, icon, color, trend = "up" }) => {
   const config = colorMap[color] || colorMap.blue;
 
   return (
-    <div className="relative group">
-      <div className="absolute inset-0 bg-gradient-to-r opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-2xl blur-xl" />
-      <div className="relative bg-gradient-to-br from-white to-gray-50 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-gray-600 mb-2">{title}</p>
-            <p className="text-3xl font-bold bg-gradient-to-r bg-clip-text text-transparent from-gray-900 to-gray-700">
-              {value}
-            </p>
-            {change && (
-              <div className="flex items-center gap-1 mt-2">
-                <span className={`text-sm ${trend === 'up' ? 'text-emerald-600' : 'text-rose-600'}`}>
-                  {change}
-                </span>
-                <span className="text-xs text-gray-500">from last week</span>
-              </div>
-            )}
-          </div>
-          <div className={`p-3 rounded-xl ${config.iconBg}`}>
-            {icon}
-          </div>
+    <div className={`bg-gradient-to-br ${config.bg} rounded-xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300`}>
+      <div className="flex items-start justify-between mb-4">
+        <div>
+          <p className="text-sm font-medium opacity-90">{title}</p>
+          <p className="text-3xl font-bold mt-2">{value}</p>
         </div>
-        <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-b-2xl" />
+        <div className={`${config.iconBg} p-3 rounded-lg`}>
+          {icon && <icon className="w-6 h-6" />}
+        </div>
       </div>
+      {change && (
+        <div className="flex items-center gap-2 text-sm">
+          {trend === "up" ? <TrendingUp className="w-4 h-4" /> : <TrendingUp className="w-4 h-4 rotate-180" />}
+          <span>{change}</span>
+        </div>
+      )}
     </div>
   );
 };
 
-// Enhanced Overview Cards
-const OverviewCards = ({ summary, pendingRequests }) => (
-  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-    <StatCard
-      title="Total Issues"
-      value={summary.pending + summary.inProgress + summary.completed + summary.overdue}
-      icon={<BarChart3 className="w-6 h-6 text-blue-600" />}
-      color="blue"
-      trend="up"
-      change="+12%"
-    />
-    <StatCard
-      title="Pending Approval"
-      value={pendingRequests.length}
-      icon={<Clock className="w-6 h-6 text-orange-600" />}
-      color="orange"
-      trend={pendingRequests.length > 0 ? "up" : "down"}
-      change={pendingRequests.length > 0 ? "+2" : "0"}
-    />
-    <StatCard
-      title="In Progress"
-      value={summary.inProgress}
-      icon={<Wrench className="w-6 h-6 text-purple-600" />}
-      color="purple"
-      trend="up"
-      change="+5"
-    />
-    <StatCard
-      title="Completed"
-      value={summary.completed}
-      icon={<CheckCircle className="w-6 h-6 text-emerald-600" />}
-      color="green"
-      trend="up"
-      change={`+${Math.round((summary.completed / (summary.pending + summary.inProgress + summary.completed + summary.overdue)) * 100)}%`}
-    />
-  </div>
-);
-
-// Gradient Button Component
-const GradientButton = ({ children, onClick, color = "blue", className = "" }) => {
-  const colorMap = {
-    blue: "from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600",
-    green: "from-emerald-500 to-green-500 hover:from-emerald-600 hover:to-green-600",
-    orange: "from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600",
-    purple: "from-purple-500 to-violet-500 hover:from-purple-600 hover:to-violet-600",
-    red: "from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600",
-  };
-
-  return (
-    <button
-      onClick={onClick}
-      className={`relative overflow-hidden px-6 py-3 rounded-xl font-semibold text-white shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5 bg-gradient-to-r ${colorMap[color]} ${className}`}
-    >
-      <span className="relative z-10">{children}</span>
-      <div className="absolute inset-0 bg-white/10 opacity-0 hover:opacity-100 transition-opacity duration-300" />
-    </button>
-  );
-};
 
 // Glass Card Component
 const GlassCard = ({ children, className = "" }) => (
