@@ -15,6 +15,8 @@
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.22.0",
     "react-select": "^5.10.2"
+    ,
+    "recharts": "^2.6.2"
   },
   "optionalDependencies": {
     "html2canvas": "^1.4.1",

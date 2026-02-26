@@ -522,25 +522,27 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
               </select>
             </div>
           </div>
-          <div className="mt-4">
-            <label className="block font-semibold mb-2 text-gray-700" htmlFor="technician">
-              Assigned Technician (optional)
-            </label>
-            <select
-              id="technician"
-              name="technician"
-              className="w-full rounded-2xl border-2 border-gray-200 px-4 py-4 text-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-300 bg-white/80 backdrop-blur-sm"
-              value={selectedTechnicianId}
-              onChange={(e) => setSelectedTechnicianId(e.target.value)}
-            >
-              <option value="">-- Select internal technician (optional) --</option>
-              {internalTechnicians.map(t => (
-                <option key={t.id || t._id} value={t.id || t._id}>
-                  {t.name} ({Array.isArray(t.specialty) ? t.specialty.join(', ') : (t.specialty || 'General')})
-                </option>
-              ))}
-            </select>
-          </div>
+          {isAuthenticated && (
+            <div className="mt-4">
+              <label className="block font-semibold mb-2 text-gray-700" htmlFor="technician">
+                Assigned Technician (optional)
+              </label>
+              <select
+                id="technician"
+                name="technician"
+                className="w-full rounded-2xl border-2 border-gray-200 px-4 py-4 text-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-300 bg-white/80 backdrop-blur-sm"
+                value={selectedTechnicianId}
+                onChange={(e) => setSelectedTechnicianId(e.target.value)}
+              >
+                <option value="">-- Select internal technician (optional) --</option>
+                {internalTechnicians.map(t => (
+                  <option key={t.id || t._id} value={t.id || t._id}>
+                    {t.name} ({Array.isArray(t.specialty) ? t.specialty.join(', ') : (t.specialty || 'General')})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </motion.div>
       </motion.div>
     ),
