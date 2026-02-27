@@ -1370,12 +1370,6 @@ function ManagerDashboard() {
               />
             )}
           </div>
-
-          {/* Ask Nova Floating Button */}
-          <button className="fixed bottom-8 right-8 flex items-center gap-3 px-6 py-3 bg-gradient-to-r from-[#6366f1] to-[#ec4899] text-white rounded-full shadow-2xl hover:scale-105 transition-all group z-40">
-            <Sparkles className="w-5 h-5 group-hover:rotate-12 transition-transform" />
-            <span className="font-bold">Ask Nova</span>
-          </button>
         </div>
       </main>
 
@@ -1516,6 +1510,55 @@ function ManagerDashboard() {
 }
 
 // Enhanced Overview Tab
+// Small helper component to render top-level KPIs
+const OverviewCards = ({ summary = {}, pendingRequests = [], issues = [], technicians = [] }) => {
+  const totalIssues = summary.totalIssues ?? summary.issuesCount ?? (Array.isArray(issues) ? issues.length : 0) ?? 0;
+  const completed = summary.completed ?? 0;
+  const completionRate = summary.completionRate ?? (totalIssues ? Math.round((completed / Math.max(1, totalIssues)) * 100) : (completed ? Math.round(completed * 100) : 0));
+  const openRequests = Array.isArray(pendingRequests) ? pendingRequests.length : (summary.pendingRequests ?? summary.pending ?? 0);
+  const techniciansCount = Array.isArray(technicians) ? technicians.length : (summary.techniciansCount ?? summary.techCount ?? 0);
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="p-4 bg-white rounded-lg border shadow-sm">
+        <div className="text-sm text-gray-500">Total Issues</div>
+        <div className="text-2xl font-bold text-gray-900">{totalIssues}</div>
+      </div>
+      <div className="p-4 bg-white rounded-lg border shadow-sm">
+        <div className="text-sm text-gray-500">Completion Rate</div>
+        <div className="text-2xl font-bold text-gray-900">{completionRate}%</div>
+      </div>
+      <div className="p-4 bg-white rounded-lg border shadow-sm">
+        <div className="text-sm text-gray-500">Pending Approvals</div>
+        <div className="text-2xl font-bold text-gray-900">{openRequests}</div>
+      </div>
+      <div className="p-4 bg-white rounded-lg border shadow-sm">
+        <div className="text-sm text-gray-500">Technicians</div>
+        <div className="text-2xl font-bold text-gray-900">{techniciansCount}</div>
+      </div>
+    </div>
+  );
+};
+
+// Simple gradient button used across the dashboard when the original
+// shared component isn't available in this file. Keep styling minimal
+// and support `color`, `className`, `onClick`, `disabled` props.
+const GradientButton = ({ children, color = 'blue', className = '', onClick, disabled }) => {
+  const base = `inline-flex items-center justify-center rounded-lg font-semibold shadow-sm ${className}`;
+  const colors = {
+    blue: 'bg-gradient-to-b from-blue-600 to-blue-500 text-white border border-blue-600',
+    green: 'bg-gradient-to-b from-green-600 to-green-500 text-white border border-green-600',
+    red: 'bg-gradient-to-b from-red-600 to-red-500 text-white border border-red-600',
+    orange: 'bg-gradient-to-b from-orange-500 to-orange-400 text-white border border-orange-500'
+  };
+  const cls = `${base} ${colors[color] || colors.blue} ${disabled ? 'opacity-60 pointer-events-none' : ''}`;
+  return (
+    <button className={cls} onClick={onClick} disabled={disabled}>
+      {children}
+    </button>
+  );
+};
+
 const OverviewTab = ({
   summary,
   pendingRequests,
@@ -1534,7 +1577,7 @@ const OverviewTab = ({
 }) => (
   <div className="space-y-8">
     {/* Overview Cards */}
-    <OverviewCards summary={summary} pendingRequests={pendingRequests} />
+    <OverviewCards summary={summary} pendingRequests={pendingRequests} issues={issues} technicians={technicians} />
 
     {/* AI Insights Section */}
     <AIInsights
@@ -1691,7 +1734,7 @@ const OverviewTab = ({
   </div>
 );
 
-// Enhanced Requests Tab
+// Enhanced Requests Tab with Table
 const RequestsTab = ({ pendingRequests, setSelectedRequest, setShowApprovalModal }) => (
   <div>
     <div className="mb-6">
@@ -1720,60 +1763,90 @@ const RequestsTab = ({ pendingRequests, setSelectedRequest, setShowApprovalModal
         </GradientButton>
       </GlassCard>
     ) : (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {pendingRequests.map((request, i) => (
-          <div key={request._id || request.id || `pending-full-${i}`} className="group relative">
-            <div className="absolute inset-0 bg-gradient-to-r from-orange-500 to-amber-500 rounded-2xl blur opacity-0 group-hover:opacity-20 transition-opacity duration-300" />
-            <GlassCard className="relative p-6 hover:scale-[1.02] transition-all duration-300">
-              {/* Request Header */}
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex-1">
-                  <h3 className="text-lg font-bold text-gray-900 mb-2">{request.title}</h3>
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="px-2 py-1 bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 rounded-lg text-xs font-medium">
-                      📍 {request.location}
+      <div className="bg-white rounded-lg border border-gray-100 overflow-hidden shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead className="bg-[#fcfcfd] border-b border-gray-100">
+              <tr>
+                <th className="py-4 px-4 w-10">
+                  <input type="checkbox" className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                </th>
+                <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Request ID</th>
+                <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Title</th>
+                <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Description</th>
+                <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Location</th>
+                <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Priority</th>
+                <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Submitted</th>
+                <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pendingRequests.map((request, i) => (
+                <tr key={request._id || request.id || `pending-${i}`} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors group">
+                  <td className="py-4 px-4">
+                    <input type="checkbox" className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                  </td>
+                  <td className="py-4 px-4">
+                    <span className="text-xs font-bold text-blue-600 font-mono">
+                      {String(normalizeId(request._id || request.id)).slice(-8)}
                     </span>
+                  </td>
+                  <td className="py-4 px-4">
+                    <div className="flex items-center gap-3">
+                      {getImageUrl(request.beforePhoto || request.photo) && (
+                        <img
+                          src={getImageUrl(request.beforePhoto || request.photo)}
+                          alt={request.title}
+                          className="w-10 h-10 rounded-lg object-cover border border-gray-100"
+                        />
+                      )}
+                      <div>
+                        <div className="text-sm font-bold text-gray-900">{request.title}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="py-4 px-4">
+                    <p className="text-sm text-gray-600 line-clamp-2 max-w-xs">{request.description}</p>
+                  </td>
+                  <td className="py-4 px-4">
+                    <div className="flex items-center gap-2">
+                      <MapPin className="w-4 h-4 text-gray-400" />
+                      <span className="text-sm font-medium text-gray-700">{request.location}</span>
+                    </div>
+                  </td>
+                  <td className="py-4 px-4">
                     <PriorityBadge priority={request.priority || 'MEDIUM'} />
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-xs text-gray-500 mb-1">Submitted</div>
-                  <div className="text-sm font-medium text-gray-900">
-                    {new Date(request.createdAt).toLocaleDateString()}
-                  </div>
-                </div>
-              </div>
-
-              {/* Request Description */}
-              <p className="text-gray-600 text-sm mb-4 line-clamp-3">{request.description}</p>
-
-              {/* Request Image */}
-              {getImageUrl(request.beforePhoto || request.photo) && (
-                <div className="mb-4">
-                  <img
-                    src={getImageUrl(request.beforePhoto || request.photo)}
-                    alt="Issue"
-                    className="w-full h-48 object-cover rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300"
-                  />
-                </div>
-              )}
-
-              {/* Action Buttons */}
-              <div className="flex gap-3">
-                <GradientButton
-                  onClick={() => { setSelectedRequest(request); setShowApprovalModal(true); }}
-                  color="green"
-                  className="flex-1 py-2.5 text-sm"
-                >
-                  <span className="flex items-center justify-center gap-2">
-                    <CheckCircle className="w-4 h-4" />
-                    Review
-                  </span>
-                </GradientButton>
-              </div>
-            </GlassCard>
-          </div>
-        ))}
+                  </td>
+                  <td className="py-4 px-4">
+                    <div className="text-sm font-medium text-gray-700">
+                      {new Date(request.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}
+                    </div>
+                    <div className="text-xs text-gray-400 font-medium">
+                      {new Date(request.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                  </td>
+                  <td className="py-4 px-4 text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      <GradientButton
+                        onClick={() => { setSelectedRequest(request); setShowApprovalModal(true); }}
+                        color="green"
+                        className="px-3 py-1.5 text-xs"
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <Eye className="w-3.5 h-3.5" />
+                          Review
+                        </span>
+                      </GradientButton>
+                      <button className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
+                        <MoreHorizontal className="w-4 h-4 text-gray-400" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     )}
   </div>

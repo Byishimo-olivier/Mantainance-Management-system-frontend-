@@ -1,2096 +1,1638 @@
-import React, { useState, useEffect } from "react";
-import Header from "./Header";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import ScheduleMaintenanceForm from './ScheduleMaintenanceForm';
-import AssetDetail from './AssetDetail';
-import AssetMovementForm from './AssetMovementForm';
-
 import api from "../api/axios";
 import { useNavigate } from "react-router-dom";
-import AssetDetails from './AssetDetails';
-import SparePartsList from './SparePartsList';
-import AssetMapView from './AssetMapView';
+import NewIssue from './NewIssue';
 
-const statusCards = [
-  {
-    label: "Preventive",
-    colorClass: "text-indigo-300",
-    bgClass: "bg-indigo-900 border-indigo-800",
-    icon: (
-      <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
-        <rect x="4" y="4" width="16" height="16" rx="8" fill="#3730a3" />
-        <path d="M8 12h8" stroke="#c7d2fe" strokeWidth="2" strokeLinecap="round" />
-      </svg>
-    ),
-  },
-  {
-    label: "Routine",
-    colorClass: "text-teal-300",
-    bgClass: "bg-teal-900 border-teal-800",
-    icon: (
-      <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
-        <rect x="4" y="4" width="16" height="16" rx="8" fill="#0f766e" />
-        <path d="M12 8v4l3 3" stroke="#99f6e4" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    ),
-  },
-  {
-    label: "Pending",
-    colorClass: "text-yellow-300",
-    bgClass: "bg-yellow-900 border-yellow-800",
-    icon: (
-      <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
-        <rect x="4" y="4" width="16" height="16" rx="8" fill="#b45309" />
-        <path d="M12 8v4l3 3" stroke="#fde68a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        <circle cx="12" cy="12" r="9" stroke="#fde68a" strokeWidth="2" />
-      </svg>
-    ),
-  },
-  {
-    label: "In Progress",
-    colorClass: "text-blue-300",
-    bgClass: "bg-blue-900 border-blue-800",
-    icon: (
-      <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
-        <rect x="4" y="4" width="16" height="16" rx="8" fill="#2563eb" />
-        <path d="M12 8v4l3 3" stroke="#dbeafe" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        <circle cx="12" cy="12" r="9" stroke="#dbeafe" strokeWidth="2" />
-      </svg>
-    ),
-  },
-  {
-    label: "Completed",
-    colorClass: "text-green-300",
-    bgClass: "bg-green-900 border-green-800",
-    icon: (
-      <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
-        <rect x="4" y="4" width="16" height="16" rx="8" fill="#059669" />
-        <path d="M9 12l2 2 4-4" stroke="#d1fae5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        <circle cx="12" cy="12" r="9" stroke="#d1fae5" strokeWidth="2" />
-      </svg>
-    ),
-  },
-  {
-    label: "Overdue",
-    colorClass: "text-red-300",
-    bgClass: "bg-red-900 border-red-800",
-    icon: (
-      <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
-        <rect x="4" y="4" width="16" height="16" rx="8" fill="#dc2626" />
-        <path d="M15 9l-6 6M9 9l6 6" stroke="#fee2e2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        <circle cx="12" cy="12" r="9" stroke="#fee2e2" strokeWidth="2" />
-      </svg>
-    ),
-  },
-];
+// ── Icons ─────────────────────────────────────────────────────────────────────
+const Icon = {
+  Dashboard: () => (
+    <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+      <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+    </svg>
+  ),
+  Requests: () => (
+    <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+      <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>
+      <rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/>
+    </svg>
+  ),
+  Properties: () => (
+    <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+      <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+    </svg>
+  ),
+  Assets: () => (
+    <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+      <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/>
+    </svg>
+  ),
+  Staff: () => (
+    <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+      <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/>
+      <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
+    </svg>
+  ),
+  Templates: () => (
+    <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
+      <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+    </svg>
+  ),
+  Logout: () => (
+    <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+      <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/>
+    </svg>
+  ),
+  Plus: () => (
+    <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" viewBox="0 0 24 24">
+      <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+    </svg>
+  ),
+  Clock: () => (
+    <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+    </svg>
+  ),
+  Alert: () => (
+    <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+      <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+      <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+    </svg>
+  ),
+  ChevronRight: () => (
+    <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+      <polyline points="9 18 15 12 9 6"/>
+    </svg>
+  ),
+  Bell: () => (
+    <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+      <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/>
+    </svg>
+  ),
+  Export: () => (
+    <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+    </svg>
+  ),
+  Check: () => (
+    <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+      <polyline points="20 6 9 17 4 12"/>
+    </svg>
+  ),
+  X: () => (
+    <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+    </svg>
+  ),
+  Download: () => (
+    <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+    </svg>
+  ),
+};
 
+// ── Helper Functions ──────────────────────────────────────────────────────────
+const extractId = (obj) => {
+  if (!obj) return null;
+  if (typeof obj === 'string') return obj;
+  return obj._id || obj.id || null;
+};
+
+// ── Status badge ─────────────────────────────────────────────────────────────
+function StatusBadge({ status }) {
+  const s = (status || '').toUpperCase().replace(/_/g, ' ');
+  const map = {
+    'PENDING':     { bg: '#FEF3C7', text: '#92400E', dot: '#F59E0B' },
+    'IN PROGRESS': { bg: '#DBEAFE', text: '#1E40AF', dot: '#3B82F6' },
+    'COMPLETE':    { bg: '#D1FAE5', text: '#065F46', dot: '#10B981' },
+    'COMPLETED':   { bg: '#D1FAE5', text: '#065F46', dot: '#10B981' },
+    'APPROVED':    { bg: '#D1FAE5', text: '#065F46', dot: '#10B981' },
+    'OVERDUE':     { bg: '#FEE2E2', text: '#991B1B', dot: '#EF4444' },
+    'REJECTED':    { bg: '#FEE2E2', text: '#991B1B', dot: '#EF4444' },
+  };
+  const { bg, text, dot } = map[s] || { bg: '#F3F4F6', text: '#374151', dot: '#9CA3AF' };
+  return (
+    <span style={{ background: bg, color: text, display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600, letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>
+      <span style={{ width: 6, height: 6, borderRadius: '50%', background: dot, flexShrink: 0 }} />
+      {s}
+    </span>
+  );
+}
+
+// ── Stat card ─────────────────────────────────────────────────────────────────
+function StatCard({ label, value, sub, accent, icon }) {
+  const accents = {
+    blue:   { bg: '#EFF6FF', border: '#BFDBFE', val: '#1D4ED8', icon: '#3B82F6' },
+    green:  { bg: '#ECFDF5', border: '#A7F3D0', val: '#065F46', icon: '#10B981' },
+    red:    { bg: '#FEF2F2', border: '#FECACA', val: '#991B1B', icon: '#EF4444' },
+    indigo: { bg: '#EEF2FF', border: '#C7D2FE', val: '#3730A3', icon: '#6366F1' },
+    amber:  { bg: '#FFFBEB', border: '#FDE68A', val: '#92400E', icon: '#F59E0B' },
+  };
+  const c = accents[accent] || accents.blue;
+  return (
+    <div style={{ background: c.bg, border: `1px solid ${c.border}`, borderRadius: 14, padding: '20px 22px', display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+      <div style={{ width: 40, height: 40, borderRadius: 10, background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 4px rgba(0,0,0,0.08)', color: c.icon, flexShrink: 0 }}>
+        {icon}
+      </div>
+      <div>
+        <div style={{ fontSize: 26, fontWeight: 700, color: c.val, lineHeight: 1 }}>{value}</div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginTop: 4 }}>{label}</div>
+        {sub && <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 2 }}>{sub}</div>}
+      </div>
+    </div>
+  );
+}
+
+// ── Section header ────────────────────────────────────────────────────────────
+function SectionHeader({ title, count, action }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <h2 style={{ fontSize: 20, fontWeight: 700, color: '#111827', margin: 0 }}>{title}</h2>
+        {count !== undefined && (
+          <span style={{ background: '#F3F4F6', color: '#6B7280', fontSize: 12, fontWeight: 600, padding: '2px 8px', borderRadius: 20 }}>{count}</span>
+        )}
+      </div>
+      {action}
+    </div>
+  );
+}
+
+// ── Table ─────────────────────────────────────────────────────────────────────
+function Table({ heads, rows, empty = 'No data found.' }) {
+  return (
+    <div style={{ border: '1px solid #E5E7EB', borderRadius: 12, overflow: 'hidden' }}>
+      {rows.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '48px 24px', color: '#9CA3AF', fontSize: 14 }}>{empty}</div>
+      ) : (
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr style={{ background: '#F9FAFB', borderBottom: '1px solid #E5E7EB' }}>
+              {heads.map((h, i) => (
+                <th key={i} style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, i) => (
+              <tr key={i} style={{ borderBottom: i < rows.length - 1 ? '1px solid #F3F4F6' : 'none', transition: 'background 0.15s' }}
+                onMouseEnter={e => e.currentTarget.style.background = '#F9FAFB'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+              >
+                {row}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
+const Td = ({ children, mono }) => (
+  <td style={{ padding: '12px 16px', fontSize: 13, color: '#374151', fontFamily: mono ? 'monospace' : 'inherit' }}>{children ?? '—'}</td>
+);
+
+// ── Input / Select ────────────────────────────────────────────────────────────
+const inputStyle = { border: '1px solid #D1D5DB', borderRadius: 8, padding: '9px 12px', fontSize: 13, color: '#111827', background: 'white', outline: 'none', width: '100%', boxSizing: 'border-box', fontFamily: 'inherit' };
+const Input = ({ style, ...props }) => <input style={{ ...inputStyle, ...style }} {...props} />;
+const Select = ({ style, children, ...props }) => <select style={{ ...inputStyle, ...style }} {...props}>{children}</select>;
+
+// ── Button ────────────────────────────────────────────────────────────────────
+function Btn({ children, variant = 'primary', size = 'md', onClick, disabled, type = 'button', style }) {
+  const base = { border: 'none', cursor: disabled ? 'not-allowed' : 'pointer', fontFamily: 'inherit', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 6, transition: 'all 0.15s', opacity: disabled ? 0.5 : 1, borderRadius: 8 };
+  const sizes = { sm: { padding: '5px 12px', fontSize: 12 }, md: { padding: '8px 16px', fontSize: 13 }, lg: { padding: '10px 20px', fontSize: 14 } };
+  const variants = {
+    primary: { background: '#1D4ED8', color: 'white' },
+    danger: { background: '#EF4444', color: 'white' },
+    ghost: { background: '#F3F4F6', color: '#374151' },
+    outline: { background: 'white', color: '#374151', border: '1px solid #D1D5DB' },
+    success: { background: '#10B981', color: 'white' },
+    teal: { background: '#0F766E', color: 'white' },
+  };
+  return (
+    <button type={type} onClick={onClick} disabled={disabled} style={{ ...base, ...sizes[size], ...variants[variant], ...style }}>
+      {children}
+    </button>
+  );
+}
+
+// ── Sidebar nav item ──────────────────────────────────────────────────────────
+function NavItem({ label, icon, active, onClick, danger }) {
+  return (
+    <button onClick={onClick} style={{
+      width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10,
+      padding: '9px 12px', borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+      fontSize: 13, fontWeight: active ? 700 : 500, transition: 'all 0.15s',
+      background: active ? '#EFF6FF' : 'transparent',
+      color: danger ? '#EF4444' : active ? '#1D4ED8' : '#4B5563',
+    }}>
+      <span style={{ color: active ? '#1D4ED8' : danger ? '#EF4444' : '#9CA3AF' }}>{icon}</span>
+      {label}
+    </button>
+  );
+}
+
+// ── Main Component ────────────────────────────────────────────────────────────
 function ClientDashboard() {
-  const backendBase = import.meta.env.VITE_API_URL + '';
-  const imageSrc = (path) => {
+  const navigate = useNavigate();
+  const backendBase = (import.meta.env.VITE_API_URL || '') + '';
+
+  const imageSrc = useCallback((path) => {
     if (!path || path === 'null' || path === 'undefined') return null;
     try {
       if (String(path).startsWith('http') || String(path).startsWith('//')) return path;
       if (String(path).startsWith('/')) return `${backendBase}${path}`;
       return path;
-    } catch (e) {
+    } catch {
       return path;
     }
-  };
-  // State declarations
+  }, [backendBase]);
+
+  // ── State ──────────────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState('dashboard');
   const [properties, setProperties] = useState([]);
+  const [propertyUseNamedBlocks, setPropertyUseNamedBlocks] = useState(false);
   const [assets, setAssets] = useState([]);
   const [internalTechnicians, setInternalTechnicians] = useState([]);
   const [technicians, setTechnicians] = useState([]);
-  const [maintenanceTemplates, setMaintenanceTemplates] = useState([]);
   const [maintenanceSchedules, setMaintenanceSchedules] = useState([]);
   const [editingProperty, setEditingProperty] = useState(null);
-  const [propertyForm, setPropertyForm] = useState({ name: '', type: '', address: '', beds: '', baths: '', levels: '', area: '', floors: '', blocks: '', rooms: '' });
+  const [propertyForm, setPropertyForm] = useState({ name: '', type: '', address: '', beds: '', baths: '', area: '', floors: '', blocks: '', rooms: '', namedBlocks: [], roomNames: [] });
   const [propertyFiles, setPropertyFiles] = useState(null);
   const [editingAsset, setEditingAsset] = useState(null);
-  const [selectedAssetId, setSelectedAssetId] = useState(null);
-  const [assetForm, setAssetForm] = useState({ name: '', type: '', description: '', propertyId: '', quantity: 1, building: '', blocks: [] });
+  const [assetForm, setAssetForm] = useState({ name: '', type: '', description: '', propertyId: '', quantity: 1, building: '', blocks: [], room: '' });
   const [originalAssetBlocks, setOriginalAssetBlocks] = useState([]);
   const [editingTech, setEditingTech] = useState(null);
   const [techForm, setTechForm] = useState({ name: '', email: '', phone: '', password: '', specialty: [], rating: 0, completed: 0, propertyId: '' });
-  const [editingTemplate, setEditingTemplate] = useState(null);
-  const [templateForm, setTemplateForm] = useState({ name: '', type: '', frequency: '' });
   const [editingSchedule, setEditingSchedule] = useState(null);
-  const [scheduleForm, setScheduleForm] = useState({ name: '', status: '', nextDate: '', technicianId: '' });
   const [showScheduleForm, setShowScheduleForm] = useState(false);
   const [reminders, setReminders] = useState([]);
   const [showAdminPanel, setShowAdminPanel] = useState(false);
-  const [showSchedulesInTemplates, setShowSchedulesInTemplates] = useState(false);
   const [issues, setIssues] = useState([]);
   const [allIssues, setAllIssues] = useState([]);
-  const [issuesByProperty, setIssuesByProperty] = useState({});
   const [selectedTechs, setSelectedTechs] = useState({});
   const [assignLoading, setAssignLoading] = useState({});
-  const [statusCounts, setStatusCounts] = useState({
-    Pending: 0,
-    "In Progress": 0,
-    Completed: 0,
-    Overdue: 0,
-  });
-  const [maintenanceCounts, setMaintenanceCounts] = useState({
-    Preventive: 0,
-    Routine: 0,
-    Pending: 0,
-    "In Progress": 0,
-    Completed: 0,
-    Overdue: 0,
-  });
-  const [combinedCounts, setCombinedCounts] = useState({
-    Pending: 0,
-    "In Progress": 0,
-    Completed: 0,
-    Overdue: 0,
-  });
-  const [preventiveMatches, setPreventiveMatches] = useState([]);
-  const [showPreventiveDetails, setShowPreventiveDetails] = useState(false);
-  const [feedbacks, setFeedbacks] = useState([]);
-  const [userName, setUserName] = useState("");
+  const [statusCounts, setStatusCounts] = useState({ Pending: 0, 'In Progress': 0, Completed: 0, Overdue: 0 });
+  const [maintenanceCounts, setMaintenanceCounts] = useState({ Preventive: 0, Routine: 0, Pending: 0, 'In Progress': 0, Completed: 0, Overdue: 0 });
+  const [userName, setUserName] = useState('');
   const [currentUser, setCurrentUser] = useState(null);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [selectedTechForAssign, setSelectedTechForAssign] = useState(null);
-  const [selectedIssueForAssign, setSelectedIssueForAssign] = useState("");
+  const [selectedIssueForAssign, setSelectedIssueForAssign] = useState('');
+  const [selectedDueDate, setSelectedDueDate] = useState('');
   const [assignableIssues, setAssignableIssues] = useState([]);
-  const [loading, setLoading] = useState({
-    properties: false,
-    assets: false,
-    internalTechnicians: false,
-    maintenanceTemplates: false,
-  });
-  const [errors, setErrors] = useState({
-    properties: '',
-    assets: '',
-    internalTechnicians: '',
-    maintenanceTemplates: '',
-  });
-  const navigate = useNavigate();
+  const [showNewIssueModal, setShowNewIssueModal] = useState(false);
+  const [newIssueModel, setNewIssueModel] = useState(null);
+  const [loading, setLoading] = useState({ properties: false, assets: false, internalTechnicians: false });
+  const [errors, setErrors] = useState({ properties: null, assets: null, internalTechnicians: null });
+  const [showReminderPanel, setShowReminderPanel] = useState(true);
+  const importFileRef = useRef(null);
+  const importAssetsRef = useRef(null);
+  const inviteEmailRef = useRef(null);
+  const inviteRoleRef = useRef(null);
+  const inviteLocationRef = useRef(null);
 
-  // Helper to extract id strings from different shapes returned by the API
-  const extractId = (val) => {
-    if (!val && val !== 0) return null;
-    if (typeof val === 'string') return val;
-    if (typeof val === 'number') return String(val);
-    if (typeof val === 'object') {
-      // common fields
-      if (val.id) return val.id;
-      if (val._id) return val._id;
-      if (val.$oid) return val.$oid;
-      if (val.$id) return val.$id;
-      // nested object like { property: { id: '...' } }
-      if (val.property && (val.property.id || val.property._id)) return val.property.id || val.property._id;
-      try {
-        // fallback: if it's an ObjectId-like from some serializers
-        if (typeof val.toString === 'function') {
-          const s = val.toString();
-          if (s && s !== '[object Object]') return s;
-        }
-      } catch (e) {
-        // ignore
-      }
+  // ── Helper Functions ───────────────────────────────────────────────────────
+  const getCurrentUser = useCallback(() => {
+    try {
+      const stored = localStorage.getItem('user');
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
     }
-    return null;
-  };
+  }, []);
+
+  const getCurrentUserId = useCallback(() => {
+    const user = getCurrentUser();
+    return user?.id || user?._id || null;
+  }, [getCurrentUser]);
+
+  // ── Data fetching ──────────────────────────────────────────────────────────
+  const fetchIssues = useCallback(async () => {
+    try {
+      const res = await api.get('/api/issues');
+      const now = new Date();
+      const fetched = (res.data || []).map(issue => {
+        const diff = now - new Date(issue.createdAt);
+        const hours = Math.floor(diff / 3600000);
+        const time = hours > 24 ? `${Math.floor(hours / 24)}d ago` : hours > 0 ? `${hours}h ago` : 'Just now';
+        const st = (issue.status || '').toUpperCase();
+        const isOverdue = (st === 'PENDING' || st.includes('PROGRESS')) && hours > 72;
+        return { ...issue, time, overdue: issue.overdue ?? isOverdue };
+      }).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+      setIssues(fetched);
+      setAllIssues(fetched);
+      const counts = { Pending: 0, 'In Progress': 0, Completed: 0, Overdue: 0 };
+      fetched.forEach(issue => {
+        const st = (issue.status || '').toLowerCase().replace(/_/g, ' ');
+        if (st.includes('pending')) counts.Pending++;
+        else if (st.includes('progress')) counts['In Progress']++;
+        else if (st.includes('complete') || st.includes('verified') || st.includes('approved')) counts.Completed++;
+        if (issue.overdue) counts.Overdue++;
+      });
+      setStatusCounts(counts);
+    } catch {
+      setIssues([]);
+      setAllIssues([]);
+    }
+  }, []);
+
+  const refreshSchedules = useCallback(async () => {
+    try {
+      const r = await api.get('/api/maintenance-schedules');
+      setMaintenanceSchedules(r.data || []);
+    } catch {
+      // Handle error silently
+    }
+  }, []);
 
   useEffect(() => {
-    (async () => {
-      const storedUser = localStorage.getItem("user");
-      const token = localStorage.getItem("token");
-      if (!storedUser || !token) {
-        navigate("/login");
-        return;
-      }
-      const userObj = JSON.parse(storedUser);
-      setUserName(userObj.name || "");
-      setCurrentUser(userObj);
-      // axios.defaults.headers.common["Authorization"] is handled in api/axios.js
-
-      async function fetchEntities() {
-        setLoading(l => ({ ...l, properties: true, assets: true, internalTechnicians: true, maintenanceTemplates: true }));
-        setErrors(e => ({ ...e, properties: '', assets: '', internalTechnicians: '', maintenanceTemplates: '' }));
-
-        try {
-          const propRes = await api.get('/api/properties');
-          const propertiesData = propRes.data || [];
-
-          setProperties(propertiesData);
-          // If client user, fetch internal technicians per-property (client should only see their property's staff)
-          if (userObj && userObj.role === 'client' && propertiesData.length) {
-            try {
-              const techPromises = propertiesData.map(p => {
-                const pid = p.id || p._id || p._oid || p.$oid;
-                return api.get(`/api/internal-technicians/by-property/${pid}`);
-              });
-              const settled = await Promise.allSettled(techPromises);
-              let combined = [];
-              settled.forEach(r => {
-                if (r.status === 'fulfilled' && Array.isArray(r.value.data)) combined = combined.concat(r.value.data);
-              });
-              if (combined.length) {
-
-                setInternalTechnicians(combined);
-              }
-              // Also fetch assets for these properties so client only sees their assets
-              try {
-                const assetPromises = propertiesData.map(p => {
-                  const pid = p.id || p._id || p._oid || p.$oid;
-                  return api.get(`/api/assets?propertyId=${pid}`);
-                });
-                const settledAssets = await Promise.allSettled(assetPromises);
-                let combinedAssets = [];
-                settledAssets.forEach(r => {
-                  if (r.status === 'fulfilled' && Array.isArray(r.value.data)) combinedAssets = combinedAssets.concat(r.value.data);
-                });
-                if (combinedAssets.length) {
-                  setAssets(combinedAssets);
-                }
-              } catch (assetErr) {
-                console.error('Failed to fetch assets per property for client', assetErr);
-              }
-            } catch (e) {
-              console.error('Failed to fetch internal technicians per property for client', e);
-            }
-          }
-
-          return propertiesData;
-        } catch (err) {
-          setProperties([]);
-          setErrors(e => ({ ...e, properties: err?.response?.data?.message || err.message || 'Failed to fetch properties' }));
-          return [];
-        } finally {
-          setLoading(l => ({ ...l, properties: false }));
+    const fetchData = async () => {
+      let userObj = null;
+      try {
+        const stored = localStorage.getItem('user');
+        if (stored) {
+          userObj = JSON.parse(stored);
+          setCurrentUser(userObj);
+          setUserName(userObj.name || userObj.email || 'User');
         }
+      } catch (e) {
+        console.error('Error parsing user:', e);
       }
 
-      async function fetchRest() {
+      // Properties
+      setLoading(l => ({ ...l, properties: true }));
+      try {
+        const res = await api.get('/api/properties');
+        const propertiesData = res.data || [];
+        setProperties(propertiesData);
+
+        if (userObj?.role === 'client') {
+          const pids = propertiesData.map(p => p._id || p.id).filter(Boolean);
+          const [techResults, assetResults] = await Promise.all([
+            Promise.allSettled(pids.map(pid => api.get(`/api/internal-technicians?propertyId=${pid}`))),
+            Promise.allSettled(pids.map(pid => api.get(`/api/assets?propertyId=${pid}`))),
+          ]);
+          const techData = techResults.flatMap(r => r.status === 'fulfilled' && Array.isArray(r.value.data) ? r.value.data : []);
+          const assetData = assetResults.flatMap(r => r.status === 'fulfilled' && Array.isArray(r.value.data) ? r.value.data : []);
+          if (techData.length) setInternalTechnicians(techData);
+          if (assetData.length) setAssets(assetData);
+        }
+      } catch (err) {
+        setErrors(e => ({ ...e, properties: err?.response?.data?.message || err.message }));
+      } finally {
+        setLoading(l => ({ ...l, properties: false }));
+      }
+
+      // Assets + Techs (non-client)
+      if (!(userObj?.role === 'client')) {
+        setLoading(l => ({ ...l, assets: true }));
         try {
-          // Do not overwrite per-property assets for client users — those were
-          // fetched per-property inside `fetchEntities` above. Only fetch the
-          // global assets list for non-client roles.
-          if (!(userObj && userObj.role === 'client')) {
-            const assetRes = await api.get('/api/assets');
-            setAssets(assetRes.data || []);
-          }
+          const r = await api.get('/api/assets');
+          setAssets(r.data || []);
         } catch (err) {
-          if (!(userObj && userObj.role === 'client')) {
-            setAssets([]);
-            setErrors(e => ({ ...e, assets: err?.response?.data?.message || err.message || 'Failed to fetch assets' }));
-          }
+          setErrors(e => ({ ...e, assets: err?.response?.data?.message || err.message }));
         } finally {
           setLoading(l => ({ ...l, assets: false }));
         }
 
+        setLoading(l => ({ ...l, internalTechnicians: true }));
         try {
-          // If client user we already attempted to fetch internal technicians per-property above.
-          if (!(userObj && userObj.role === 'client')) {
-            const techRes = await api.get('/api/internal-technicians');
-
-            setInternalTechnicians(techRes.data || []);
-          }
+          const r = await api.get('/api/internal-technicians');
+          setInternalTechnicians(r.data || []);
         } catch (err) {
-          setInternalTechnicians([]);
-          setErrors(e => ({ ...e, internalTechnicians: err?.response?.data?.message || err.message || 'Failed to fetch internal technicians' }));
+          setErrors(e => ({ ...e, internalTechnicians: err?.response?.data?.message || err.message }));
         } finally {
           setLoading(l => ({ ...l, internalTechnicians: false }));
         }
-        // fetch technicians: admin/manager get minimal assign list; clients get public list for their property
-        try {
-          if (userObj && (userObj.role === 'manager' || userObj.role === 'admin')) {
-            const assignRes = await api.get(`/api/technicians/for-assignment`);
-            setTechnicians(assignRes.data || []);
-          } else {
-            // clients and other roles: fetch public list of technicians so clients can request assignment
-            const allTechRes = await api.get(`/api/technicians`);
-            setTechnicians(allTechRes.data || []);
-          }
-        } catch (e) {
-          setTechnicians([]);
-        }
-
-        try {
-          const tmplRes = await api.get('/api/maintenance-templates');
-          setMaintenanceTemplates(tmplRes.data || []);
-        } catch (err) {
-          setMaintenanceTemplates([]);
-          setErrors(e => ({ ...e, maintenanceTemplates: err?.response?.data?.message || err.message || 'Failed to fetch maintenance templates' }));
-        } finally {
-          setLoading(l => ({ ...l, maintenanceTemplates: false }));
-        }
-
-        try {
-          const schedRes = await api.get('/api/maintenance-schedules');
-          setMaintenanceSchedules(schedRes.data || []);
-
-          // Compute upcoming reminders within next 24 hours
-          const now = new Date();
-          const cutoff = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-          const upcoming = (schedRes.data || []).filter(s =>
-            s && s.routine && s.nextDate &&
-            new Date(s.nextDate) <= cutoff &&
-            (!s.lastReminder || new Date(s.lastReminder) < new Date(s.nextDate))
-          );
-          setReminders(upcoming);
-
-          // Compute maintenance counts for dashboard
-          const counts = { Preventive: 0, Routine: 0, Pending: 0, 'In Progress': 0, Completed: 0, Overdue: 0 };
-          const nowC = new Date();
-
-          // Routine counts come from schedules
-          (schedRes.data || []).forEach(s => {
-            if (!s) return;
-            if (s.routine) counts.Routine++;
-            const next = s.nextDate ? new Date(s.nextDate) : null;
-
-            if (next && next < nowC && !(s.status && s.status.toLowerCase().includes('complete'))) {
-              counts.Overdue++;
-              return;
-            }
-
-            const st = (s.status || '').toLowerCase();
-            if (st.includes('complete')) counts.Completed++;
-            else if (st.includes('in progress') || st.includes('in_progress')) counts['In Progress']++;
-            else counts.Pending++;
-          });
-
-          // Preventive counts come from issues
-          const matches = (schedRes.data || []).filter(issue => {
-            if (!issue) return false;
-            const title = (issue.title || '').toLowerCase();
-            const rawTags = Array.isArray(issue.tags) ? issue.tags : [];
-            const tags = rawTags.map(t => {
-              if (!t) return '';
-              if (typeof t === 'string') return String(t).toLowerCase();
-              if (typeof t === 'object' && t.label) return String(t.label).toLowerCase();
-              return String(t).toLowerCase();
-            });
-            const issueType = String(issue.issueType || issue.type || issue.category || '').toLowerCase();
-
-            if (tags.includes('preventive')) return true;
-            if (issueType === 'preventive') return true;
-            if (title.includes('preventive')) return true;
-            return false;
-          });
-
-          counts.Preventive = matches.length;
-          setPreventiveMatches(matches.slice(0, 20));
-          setMaintenanceCounts(counts);
-
-          // Send email reminders for upcoming items
-          (async function sendEmails() {
-            for (const s of upcoming) {
-              const id = s._id || s.id;
-              if (!id) continue;
-              try {
-                await api.post(`/api/maintenance-schedules/${id}/emailReminder`);
-              } catch (e) {
-                console.error('Failed to send email for schedule', id, e?.message || e);
-              }
-            }
-
-            // Refresh schedules after emails
-            try {
-              const refreshed = await api.get('/api/maintenance-schedules');
-              setMaintenanceSchedules(refreshed.data || []);
-              const now2 = new Date();
-              const cutoff2 = new Date(now2.getTime() + 24 * 60 * 60 * 1000);
-              const upcoming2 = (refreshed.data || []).filter(s =>
-                s && s.routine && s.nextDate &&
-                new Date(s.nextDate) <= cutoff2 &&
-                (!s.lastReminder || new Date(s.lastReminder) < new Date(s.nextDate))
-              );
-              setReminders(upcoming2);
-            } catch (e) {
-              // ignore
-            }
-          })();
-        } catch (err) {
-          setMaintenanceSchedules([]);
-        }
       }
 
-      // Fetch entities (properties, assets, etc.) first so property-scoped issue queries
-      // can be executed for client users (to surface anonymous property issues).
-      const fetchedProps = await fetchEntities();
-      // Added call to fetchRest which was previously unreachable
-      await fetchRest();
-
-      let filteredProps = fetchedProps;
-      // If the logged-in user is a client, attempt to narrow the properties list
-      // to those owned/linked to this client when such ownership fields exist
-      // (ownerId, userId, clientId, client, owner or nested `user`). This helps
-      // ensure clients only see their own properties even when the API returns
-      // all properties.
+      // External technicians
       try {
-        if (userObj && userObj.role === 'client') {
-          const uid = userObj.id || userObj._id || userObj.userId;
-          if (uid && Array.isArray(fetchedProps) && fetchedProps.length) {
-            filteredProps = (fetchedProps || []).filter(p => {
-              const owner = p.ownerId || p.userId || p.clientId || p.client || p.owner || (p.user && (p.user.id || p.user._id));
-              if (!owner) return false;
-              return String(owner) === String(uid);
-            });
-
-            if (filteredProps.length) setProperties(filteredProps);
-          }
-        }
-      } catch (e) {
-        // non-fatal: keep whatever properties were loaded
+        const ep = (userObj?.role === 'manager' || userObj?.role === 'admin') ? '/api/technicians/for-assignment' : '/api/technicians';
+        const r = await api.get(ep);
+        setTechnicians(r.data || []);
+      } catch {
+        // Handle error silently
       }
 
-      async function fetchIssues() {
-        try {
-          console.log('[Dashboard] Fetching issues...');
-          const res = await api.get(`/api/issues`);
-          const rawIssues = res.data || [];
-          console.log(`[Dashboard] Fetched ${rawIssues.length} issues`);
-
-          const fetched = rawIssues.map(issue => {
-            const createdAt = new Date(issue.createdAt);
-            const now = new Date();
-            const diff = now - createdAt;
-            const hours = Math.floor(diff / (1000 * 60 * 60));
-
-            let time = 'Recent';
-            if (hours > 24) time = `${Math.floor(hours / 24)}d ago`;
-            else if (hours > 0) time = `${hours}h ago`;
-            else time = 'Just now';
-
-            // Simple overdue logic: if status is PENDING or IN PROGRESS and older than 3 days
-            const statusUpper = (issue.status || '').toUpperCase();
-            const isOverdue = (statusUpper === 'PENDING' || statusUpper === 'IN PROGRESS' || statusUpper === 'IN_PROGRESS') && (hours > 72);
-
-            return {
-              ...issue,
-              time,
-              overdue: issue.overdue !== undefined ? issue.overdue : isOverdue
-            };
-          }).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-
-          // Group issues by propertyId for the UI
-          const issuesByProp = {};
-          fetched.forEach(issue => {
-            const pid = extractId(issue.propertyId);
-            if (pid) {
-              if (!issuesByProp[pid]) issuesByProp[pid] = [];
-              issuesByProp[pid].push(issue);
-            }
-          });
-
-          setIssues(fetched);
-          setAllIssues(fetched);
-          setIssuesByProperty(issuesByProp);
-
-          // Count issues by status
-          const counts = { Pending: 0, "In Progress": 0, Completed: 0, Overdue: 0 };
-          fetched.forEach(issue => {
-            const status = (issue.status || '').toLowerCase().replace(/_/g, ' ');
-            if (status.includes('pending')) counts.Pending++;
-            else if (status.includes('progress')) counts["In Progress"]++;
-            else if (status.includes('complete') || status.includes('verified') || status.includes('approved')) counts.Completed++;
-
-            if (issue.overdue) counts.Overdue++;
-          });
-          setStatusCounts(counts);
-        } catch (err) {
-          console.error('Error fetching issues:', err);
-          setIssues([]);
-          setAllIssues([]);
-          setStatusCounts({ Pending: 0, "In Progress": 0, Completed: 0, Overdue: 0 });
-        }
+      // Schedules
+      try {
+        const r = await api.get('/api/maintenance-schedules');
+        setMaintenanceSchedules(r.data || []);
+        const now = new Date();
+        const cutoff = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+        setReminders((r.data || []).filter(s => s?.routine && s.nextDate && new Date(s.nextDate) <= cutoff && (!s.lastReminder || new Date(s.lastReminder) < new Date(s.nextDate))));
+        const counts = { Preventive: 0, Routine: 0, Pending: 0, 'In Progress': 0, Completed: 0, Overdue: 0 };
+        (r.data || []).forEach(s => {
+          if (!s) return;
+          s.routine ? counts.Routine++ : counts.Preventive++;
+          const st = (s.status || '').toLowerCase();
+          if (st.includes('pending')) counts.Pending++;
+          else if (st.includes('progress')) counts['In Progress']++;
+          else if (st.includes('complete')) counts.Completed++;
+          if (s.nextDate && new Date(s.nextDate) < now && !st.includes('complete')) counts.Overdue++;
+        });
+        setMaintenanceCounts(counts);
+      } catch {
+        // Handle error silently
       }
 
+      // Issues
       await fetchIssues();
-    })();
-  }, [navigate]);
+    };
 
-  async function approveIssue(issueId) {
+    fetchData();
+  }, [fetchIssues]);
+
+  // Issue actions
+  const approveIssue = useCallback(async (id) => {
     try {
-      await api.put(`/api/issues/${issueId}`, {
-        status: 'APPROVED'
-      });
-      // refresh issues
-      const res = await api.get('/api/issues');
-      const fetched = (res.data || []).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-      setIssues(fetched);
-      setAllIssues(fetched);
-    } catch (e) {
-      console.error('Approve failed', e);
-      alert('Failed to approve issue');
+      await api.put(`/api/issues/${id}`, { status: 'APPROVED' });
+      await fetchIssues();
+    } catch {
+      alert('Failed to approve');
     }
-  }
+  }, [fetchIssues]);
 
-  async function declineIssue(issueId) {
+  const declineIssue = useCallback(async (id) => {
     try {
-      await api.put(`/api/issues/${issueId}`, {
-        status: 'REJECTED'
-      });
-      // refresh issues
-      const res = await api.get('/api/issues');
-      const fetched = (res.data || []).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-      setIssues(fetched);
-      setAllIssues(fetched);
-    } catch (e) {
-      console.error('Decline failed', e);
-      alert('Failed to decline issue');
+      await api.put(`/api/issues/${id}`, { status: 'REJECTED' });
+      await fetchIssues();
+    } catch {
+      alert('Failed to decline');
     }
-  }
+  }, [fetchIssues]);
 
-  async function resubmitIssue(issueId) {
+  const resubmitIssue = useCallback(async (id) => {
     try {
-      await api.post(`/api/issues/${issueId}/resubmit`);
-      // refresh issues
-      const res = await api.get('/api/issues');
-      const fetched = (res.data || []).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-      setIssues(fetched);
-      setAllIssues(fetched);
-    } catch (e) {
-      console.error('Resubmit failed', e);
-      alert('Failed to resubmit issue');
+      await api.post(`/api/issues/${id}/resubmit`);
+      await fetchIssues();
+    } catch {
+      alert('Failed to resubmit');
     }
-  }
+  }, [fetchIssues]);
 
-  async function assignInternal(issueId, internalTechId) {
+  const assignInternal = useCallback(async (issueId, internalTechId, dueDate) => {
+    if (!internalTechId) return;
     try {
-      if (!internalTechId) return;
       setAssignLoading(s => ({ ...s, [issueId]: true }));
-      await api.post(`/api/issues/${issueId}/assign-internal`, { internalTechId });
-      // refresh issues
-      const res = await api.get('/api/issues');
-      const fetched = (res.data || []).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-      setIssues(fetched);
-      setAllIssues(fetched);
+      const payload = { internalTechId };
+      if (dueDate) payload.dueDate = dueDate;
+      await api.post(`/api/issues/${issueId}/assign-internal`, payload);
+      await fetchIssues();
+    } catch {
+      alert('Failed to assign');
+    } finally {
       setAssignLoading(s => ({ ...s, [issueId]: false }));
-    } catch (e) {
-      setAssignLoading(s => ({ ...s, [issueId]: false }));
-      console.error('Assign internal failed', e);
-      alert('Failed to assign internal technician');
     }
-  }
+  }, [fetchIssues]);
 
-  async function assignToTech(issueId, techId) {
+  const assignToTech = useCallback(async (issueId, techId) => {
+    if (!techId) return;
     try {
-      if (!techId) return;
       setAssignLoading(s => ({ ...s, [issueId]: true }));
       await api.post(`/api/issues/${issueId}/assign`, { techId });
-      // refresh issues
-      const res = await api.get('/api/issues');
-      const fetched = (res.data || []).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-      setIssues(fetched);
-      setAllIssues(fetched);
+      await fetchIssues();
+    } catch {
+      alert('Failed to assign');
+    } finally {
       setAssignLoading(s => ({ ...s, [issueId]: false }));
-    } catch (e) {
-      setAssignLoading(s => ({ ...s, [issueId]: false }));
-      console.error('Assign to technician failed', e);
-      alert('Failed to assign technician');
     }
-  }
+  }, [fetchIssues]);
 
-  useEffect(() => {
-    // Combine issue counts and maintenance counts for shared status cards
-    setCombinedCounts({
-      Pending: (statusCounts.Pending || 0) + (maintenanceCounts.Pending || 0),
-      "In Progress": (statusCounts['In Progress'] || 0) + (maintenanceCounts['In Progress'] || 0),
-      Completed: (statusCounts.Completed || 0) + (maintenanceCounts.Completed || 0),
-      Overdue: (statusCounts.Overdue || 0) + (maintenanceCounts.Overdue || 0),
+  // Reminder actions
+  const dismissOne = useCallback(async (id) => {
+    try {
+      await api.post(`/api/maintenance-schedules/${id}/dismiss`, { userId: getCurrentUserId() });
+      setReminders(r => r.filter(x => (x._id || x.id) !== id));
+      refreshSchedules();
+    } catch {
+      // Handle error silently
+    }
+  }, [getCurrentUserId, refreshSchedules]);
+
+  const snoozeOne = useCallback(async (id) => {
+    try {
+      await api.post(`/api/maintenance-schedules/${id}/snooze`, { minutes: 60, userId: getCurrentUserId() });
+      setReminders(r => r.filter(x => (x._id || x.id) !== id));
+      refreshSchedules();
+    } catch {
+      // Handle error silently
+    }
+  }, [getCurrentUserId, refreshSchedules]);
+
+  const dismissAll = useCallback(async () => {
+    for (const s of reminders) {
+      await dismissOne(s._id || s.id).catch(() => {});
+    }
+  }, [reminders, dismissOne]);
+
+  const snoozeAll = useCallback(async () => {
+    for (const s of reminders) {
+      await snoozeOne(s._id || s.id).catch(() => {});
+    }
+  }, [reminders, snoozeOne]);
+
+  const handleLogout = useCallback(() => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    navigate('/login', { replace: true });
+  }, [navigate]);
+
+  const exportIssuesPDF = useCallback(async () => {
+    try {
+      const { jsPDF } = await import('jspdf');
+      const doc = new jsPDF();
+      let y = 20;
+      doc.setFontSize(16);
+      doc.text('Issues Report', 14, 16);
+      doc.setFontSize(11);
+      if (!issues.length) {
+        doc.text('No issues to export.', 14, y);
+      } else {
+        issues.forEach((issue, idx) => {
+          doc.text(`${idx + 1}. ${issue.title || 'Untitled'}`, 14, y);
+          y += 7;
+          doc.text(`Status: ${issue.status || 'N/A'}  |  ${issue.location || ''}`, 14, y);
+          y += 6;
+          const split = doc.splitTextToSize(issue.description || '', 180);
+          doc.text(split, 14, y);
+          y += split.length * 6 + 8;
+          if (y > 270) {
+            doc.addPage();
+            y = 20;
+          }
+        });
+      }
+      doc.save('issues-report.pdf');
+    } catch (err) {
+      alert('PDF export failed: ' + err?.message);
+    }
+  }, [issues]);
+
+  // Resolve property name from issue (fallback to lookup by id)
+  const getPropertyName = useCallback((issue) => {
+    if (!issue) return '—';
+    if (issue.property && (issue.property.name || issue.property.title)) return issue.property.name || issue.property.title;
+    const pid = extractId(issue.propertyId) || (issue.property && (issue.property.id || issue.property._id));
+    if (!pid) return '—';
+    const p = properties.find(pp => {
+      const ids = [pp._id, pp.id].filter(Boolean).map(String);
+      return ids.includes(String(pid));
     });
-  }, [statusCounts, maintenanceCounts]);
+    return p ? (p.name || p.title || String(pid)) : String(pid);
+  }, [properties]);
 
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    navigate("/login", { replace: true });
-  };
+  // Resolve assigned technician name from issue (check assignedTo, technician, internal/ external lists)
+  const getAssignedName = useCallback((issue) => {
+    if (!issue) return '—';
+    if (issue.assignedTo && typeof issue.assignedTo === 'object' && (issue.assignedTo.name || issue.assignedTo.fullName)) return issue.assignedTo.name || issue.assignedTo.fullName;
+    const aid = extractId(issue.assignedTo) || extractId(issue.technician) || (issue.assignedTo && String(issue.assignedTo));
+    if (!aid) return '—';
+    // Look in internal technicians first
+    let tech = internalTechnicians.find(t => [t._id, t.id, t.userId].filter(Boolean).map(String).includes(String(aid)));
+    if (tech) return tech.name || tech.fullName || tech.email || String(aid);
+    // Then external technicians
+    tech = technicians.find(t => [t._id, t.id, t.userId].filter(Boolean).map(String).includes(String(aid)));
+    if (tech) return tech.name || tech.fullName || tech.email || String(aid);
+    // Fallback: if assignedTo is a string name already
+    if (typeof issue.assignedTo === 'string' && issue.assignedTo.length && isNaN(Number(issue.assignedTo))) return issue.assignedTo;
+    return String(aid);
+  }, [internalTechnicians, technicians]);
 
-  async function dismissAll() {
+  // Import assets from Excel (.xlsx/.xls)
+  const handleImportAssetsFile = useCallback(async (file) => {
+    if (!file) return;
     try {
-      const stored = localStorage.getItem('user');
-      let userId = null;
-      try { userId = stored ? JSON.parse(stored).id || JSON.parse(stored)._id : null; } catch (e) { userId = null; }
-
-      for (const s of reminders) {
-        const id = s._id || s.id;
-        if (!id) continue;
-        await api.post(`/api/maintenance-schedules/${id}/dismiss`, { userId });
+      const { read, utils } = await import('xlsx');
+      const buf = await file.arrayBuffer();
+      const wb = read(buf, { type: 'array' });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = utils.sheet_to_json(sheet, { defval: '' });
+      if (!rows.length) {
+        alert('No rows found in spreadsheet.');
+        return;
       }
-
-      const schedRes = await api.get('/api/maintenance-schedules');
-      setMaintenanceSchedules(schedRes.data || []);
-      setReminders([]);
-    } catch (e) {
-      console.error('Failed to dismiss reminders', e);
-    }
-  }
-
-  async function snoozeAll(minutes = 60) {
-    try {
-      const stored = localStorage.getItem('user');
-      let userId = null;
-      try { userId = stored ? JSON.parse(stored).id || JSON.parse(stored)._id : null; } catch (e) { userId = null; }
-
-      for (const s of reminders) {
-        const id = s._id || s.id;
-        if (!id) continue;
-        await api.post(`/api/maintenance-schedules/${id}/snooze`, { minutes, userId });
+      const created = [];
+      const skipped = [];
+      for (const r of rows) {
+        const name = r.Name || r.Asset || r.AssetName;
+        if (!name) {
+          skipped.push(r);
+          continue;
+        }
+        const locationName = r.Location || r.LocationName || r.Site || r.Property;
+        const prop = properties.find(p => String(p.name).toLowerCase() === String(locationName || '').toLowerCase());
+        if (!prop) {
+          skipped.push(r);
+          continue;
+        }
+        const payload = {
+          name: String(name).trim(),
+          type: r.Type || r.Category || '',
+          description: r.Description || r.Notes || '',
+          quantity: +r.Quantity || +r.Qty || 1,
+          propertyId: prop.id || prop._id,
+          building: r.Building || '',
+          blocks: r.Blocks ? String(r.Blocks).split(/[;,|]/).map(s => s.trim()).filter(Boolean) : [],
+          room: r.Room || r.RoomName || ''
+        };
+        try {
+          await api.post('/api/assets', payload);
+          created.push(payload);
+        } catch {
+          skipped.push(r);
+        }
       }
-
-      const schedRes = await api.get('/api/maintenance-schedules');
-      setMaintenanceSchedules(schedRes.data || []);
-      setReminders([]);
-    } catch (e) {
-      console.error('Failed to snooze reminders', e);
+      const r = await api.get('/api/assets');
+      setAssets(r.data || []);
+      alert(`Import finished. Created: ${created.length}, Skipped: ${skipped.length}`);
+    } catch (err) {
+      alert('Import failed: ' + (err?.message || err));
     }
-  }
+  }, [properties]);
 
-  async function dismissOne(id) {
-    try {
-      const stored = localStorage.getItem('user');
-      let userId = null;
-      try { userId = stored ? JSON.parse(stored).id || JSON.parse(stored)._id : null; } catch (e) { userId = null; }
-
-      await api.post(`/api/maintenance-schedules/${id}/dismiss`, { userId });
-      setReminders(r => r.filter(x => (x._id || x.id) !== id));
-      api.get('/api/maintenance-schedules').then(res => setMaintenanceSchedules(res.data || [])).catch(() => { });
-    } catch (e) {
-      console.error('Failed to dismiss reminder', e);
-    }
-  }
-
-  async function snoozeOne(id, minutes = 60) {
-    try {
-      const stored = localStorage.getItem('user');
-      let userId = null;
-      try { userId = stored ? JSON.parse(stored).id || JSON.parse(stored)._id : null; } catch (e) { userId = null; }
-
-      await api.post(`/api/maintenance-schedules/${id}/snooze`, { minutes, userId });
-      setReminders(r => r.filter(x => (x._id || x.id) !== id));
-      api.get('/api/maintenance-schedules').then(res => setMaintenanceSchedules(res.data || [])).catch(() => { });
-    } catch (e) {
-      console.error('Failed to snooze reminder', e);
-      console.error('Failed to snooze reminder', e);
-    }
-  }
-
-  const openAssignModal = (tech) => {
-    // Find pending issues for this technician's property
-    // tech may have propertyId directly or via property object
+  // Assign modal
+  const openAssignModal = useCallback((tech) => {
     const techPropId = tech.propertyId || (tech.property && (tech.property.id || tech.property._id));
-
     if (!techPropId) {
-      alert("This technician is not linked to a specific property.");
+      alert('Technician is not linked to a property.');
+      return;
+    }
+    const pending = allIssues.filter(i => {
+      const pid = extractId(i.propertyId) || (i.property && (i.property.id || i.property._id));
+      const st = (i.status || '').toUpperCase();
+      return String(pid) === String(techPropId) && (st === 'PENDING' || st.includes('PROGRESS'));
+    });
+    setAssignableIssues(pending);
+    setSelectedTechForAssign(tech);
+    setSelectedIssueForAssign('');
+    setAssignModalOpen(true);
+  }, [allIssues]);
+
+  const handleAssignSubmit = useCallback(async (e) => {
+    e.preventDefault();
+    if (!selectedTechForAssign || !selectedIssueForAssign) return;
+    try {
+      await assignInternal(selectedIssueForAssign, selectedTechForAssign.id || selectedTechForAssign._id, selectedDueDate || undefined);
+      setAssignModalOpen(false);
+      setSelectedTechForAssign(null);
+      setSelectedIssueForAssign('');
+      setSelectedDueDate('');
+      alert('Assigned successfully!');
+    } catch {
+      alert('Assignment failed.');
+    }
+  }, [selectedTechForAssign, selectedIssueForAssign, selectedDueDate, assignInternal]);
+
+  const handleInvite = useCallback(async () => {
+    const email = inviteEmailRef.current?.value?.trim();
+    const role = inviteRoleRef.current?.value;
+    const loc = inviteLocationRef.current?.value;
+
+    if (!email) {
+      alert('Enter an email');
       return;
     }
 
-    // Filter issues: must be PENDING and match property
-    const pending = allIssues.filter(i => {
-      const issuePropId = extractId(i.propertyId) || (i.property && (i.property.id || i.property._id));
-      const status = (i.status || '').toUpperCase();
-      // check if unassigned? usually yes, but maybe we want to reassign.
-      // let's assume valid to assign if PENDING or IN PROGRESS but not verified/completed
-      // and ideally not already assigned to THIS tech.
-      return (String(issuePropId) === String(techPropId)) && (status === 'PENDING' || status === 'IN PROGRESS');
-    });
-
-    setAssignableIssues(pending);
-    setSelectedTechForAssign(tech);
-    setSelectedIssueForAssign("");
-    setAssignModalOpen(true);
-  };
-
-  const handleAssignSubmit = async (e) => {
-    e.preventDefault();
-    if (!selectedTechForAssign || !selectedIssueForAssign) return;
-
     try {
-      await assignInternal(selectedIssueForAssign, selectedTechForAssign.id || selectedTechForAssign._id);
-      setAssignModalOpen(false);
-      setSelectedTechForAssign(null);
-      setSelectedIssueForAssign("");
-      alert("Issue assigned successfully!");
-    } catch (e) {
-      console.error("Assignment failed", e);
-      alert("Failed to assign issue.");
+      if (role === 'internal') {
+        await api.post('/api/internal-technicians/invite', { email, propertyId: loc || undefined });
+        alert('Invitation sent (internal)');
+      } else {
+        await api.post('/api/technicians/invite', { email, categories: [] });
+        alert('Invitation sent (external)');
+      }
+    } catch {
+      alert('Invite failed');
     }
-  };
+  }, []);
+
+  // ── Last 7 days chart ─────────────────────────────────────────────────────
+  const last7 = Array.from({ length: 7 }).map((_, i) => {
+    const day = new Date();
+    day.setHours(0, 0, 0, 0);
+    day.setDate(day.getDate() - (6 - i));
+    return issues.filter(it => {
+      try {
+        const d = new Date(it.createdAt);
+        d.setHours(0, 0, 0, 0);
+        return d.getTime() === day.getTime();
+      } catch {
+        return false;
+      }
+    }).length;
+  });
+
+  const dayLabels = Array.from({ length: 7 }).map((_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - (6 - i));
+    return d.toLocaleDateString('en', { weekday: 'short' });
+  });
+
+  const combinedPending = (statusCounts.Pending || 0) + (maintenanceCounts.Pending || 0);
+  const combinedInProgress = (statusCounts['In Progress'] || 0) + (maintenanceCounts['In Progress'] || 0);
+  const combinedCompleted = (statusCounts.Completed || 0) + (maintenanceCounts.Completed || 0);
+  const combinedOverdue = (statusCounts.Overdue || 0) + (maintenanceCounts.Overdue || 0);
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+  const navItems = [
+    { key: 'dashboard', label: 'Overview', icon: <Icon.Dashboard /> },
+    { key: 'requests', label: 'Requests', icon: <Icon.Requests /> },
+    { key: 'properties', label: 'Locations', icon: <Icon.Properties /> },
+    { key: 'assets', label: 'Assets', icon: <Icon.Assets /> },
+    { key: 'internalTechnicians', label: 'Staff', icon: <Icon.Staff /> },
+    { key: 'organization', label: 'Organization', icon: <Icon.Templates /> },
+    { key: 'maintenanceTemplates', label: 'Maintenance', icon: <Icon.Templates /> },
+  ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header
-        title="Client Dashboard"
-        subtitle={`Welcome, ${userName}`}
-        user={currentUser}
-        right={
-          <div className="flex items-center gap-4">
-            <button
-              className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-gray-100 text-gray-700 font-semibold transition border border-transparent hover:border-gray-200"
-              onClick={() => setActiveTab('dashboard')}
-            >
-              Dashboard
-            </button>
-            <button
-              className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-gray-100 text-gray-700 font-semibold transition border border-transparent hover:border-gray-200"
-              onClick={() => navigate("/issues")}
-            >
-              All Issues
-            </button>
-            <button
-              onClick={async () => {
-                // PDF Export Logic (kept as-is)
-                try {
-                  const { jsPDF } = await import('jspdf');
-                  const doc = new jsPDF();
-                  const left = 14;
-                  let y = 20;
-                  doc.setFontSize(16);
-                  doc.text('Issues Report', left, 16);
-                  doc.setFontSize(11);
-                  if (!issues || issues.length === 0) {
-                    doc.text('No issues to export.', left, y);
-                  } else {
-                    issues.forEach((issue, idx) => {
-                      const title = `${idx + 1}. ${issue.title || 'Untitled'}`;
-                      doc.text(title, left, y);
-                      y += 7;
-                      const meta = `Status: ${issue.status || 'N/A'}  |  Location: ${issue.location || issue.address || 'N/A'}`;
-                      doc.text(meta, left, y);
-                      y += 6;
-                      const desc = (issue.description || '').toString();
-                      const split = doc.splitTextToSize(desc, 180);
-                      doc.text(split, left, y);
-                      y += split.length * 6 + 8;
-                      if (y > 270) { doc.addPage(); y = 20; }
-                    });
-                  }
-                  doc.save('issues-report.pdf');
-                } catch (err) {
-                  console.error('PDF export failed', err);
-                  alert('Failed to export PDF: ' + (err?.message || err));
-                }
-              }}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-indigo-50 text-indigo-700 font-semibold border border-indigo-200 transition shadow-sm"
-            >
-              Export PDF
-            </button>
-            <button
-              onClick={handleLogout}
-              className="px-4 py-2 bg-red-100 text-red-700 border border-red-200 rounded-lg font-semibold hover:bg-red-200 transition"
-            >
-              Logout
-            </button>
-          </div>
-        }
-      />
+    <div style={{ display: 'flex', minHeight: '100vh', background: '#F9FAFB', fontFamily: "'DM Sans', 'Segoe UI', system-ui, sans-serif" }}>
 
-      {/* Reminders Panel */}
-      {reminders.length > 0 && (
-        <div className="fixed top-20 right-4 z-50 max-w-md">
-          <div className="bg-blue-800 border-l-4 border-blue-500 text-white p-4 shadow-lg rounded-r-lg">
-            <div className="flex justify-between items-center mb-2">
-              <p className="font-bold text-lg">⏰ Upcoming Maintenance</p>
-              <button
-                onClick={() => setReminders([])}
-                className="text-blue-200 hover:text-white"
-              >
-                ×
-              </button>
+      {/* ── Sidebar ── */}
+      <aside style={{ width: 220, background: 'white', borderRight: '1px solid #E5E7EB', display: 'flex', flexDirection: 'column', position: 'sticky', top: 0, height: '100vh', overflowY: 'auto', flexShrink: 0 }}>
+        {/* Logo */}
+        <div style={{ padding: '24px 16px 20px', borderBottom: '1px solid #F3F4F6' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 32, height: 32, background: 'linear-gradient(135deg,#1D4ED8,#3B82F6)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="16" height="16" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+              </svg>
             </div>
-            <p className="text-sm mb-3 text-blue-100">You have {reminders.length} routine maintenance items due within 24 hours.</p>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#111827', lineHeight: 1.2 }}>Client Portal</div>
+              <div style={{ fontSize: 11, color: '#9CA3AF' }}>Property Management</div>
+            </div>
+          </div>
+        </div>
 
-            <div className="space-y-2 max-h-56 overflow-auto">
-              {reminders.map((r) => {
+        {/* User */}
+        <div style={{ padding: '12px 16px', borderBottom: '1px solid #F3F4F6' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 34, height: 34, borderRadius: '50%', background: 'linear-gradient(135deg,#EFF6FF,#DBEAFE)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#1D4ED8', flexShrink: 0 }}>
+              {(userName || 'U').charAt(0).toUpperCase()}
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{userName}</div>
+              <div style={{ fontSize: 11, color: '#9CA3AF', textTransform: 'capitalize' }}>{currentUser?.role || 'client'}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Nav */}
+        <nav style={{ flex: 1, padding: '12px 10px' }}>
+          <div style={{ marginBottom: 4, padding: '0 6px', fontSize: 10, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Menu</div>
+          {navItems.map(({ key, label, icon }) => (
+            <NavItem key={key} label={label} icon={icon} active={activeTab === key} onClick={() => setActiveTab(key)} />
+          ))}
+        </nav>
+
+        {/* Bottom actions */}
+        <div style={{ padding: '10px', borderTop: '1px solid #F3F4F6' }}>
+          <NavItem label="Export PDF" icon={<Icon.Export />} onClick={exportIssuesPDF} />
+          <NavItem label="Import CSV" icon={<Icon.Download />} onClick={() => importFileRef.current?.click()} />
+          <input type="file" ref={importFileRef} accept=".csv" onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (!f) return;
+            const r = new FileReader();
+            r.onload = () => {
+              console.log('Import preview:', r.result?.slice(0, 2000));
+              alert('Import complete (preview in console).');
+            };
+            r.readAsText(f);
+          }} style={{ display: 'none' }} />
+          <input type="file" ref={importAssetsRef} accept=".xlsx,.xls" onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (!f) return;
+            handleImportAssetsFile(f);
+          }} style={{ display: 'none' }} />
+          <NavItem label="Logout" icon={<Icon.Logout />} onClick={handleLogout} danger />
+        </div>
+      </aside>
+
+      {/* ── Main ── */}
+      <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+
+        {/* Top bar */}
+        <header style={{ background: 'white', borderBottom: '1px solid #E5E7EB', padding: '0 28px', height: 60, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 10 }}>
+          <div>
+            <h1 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#111827' }}>
+              {navItems.find(n => n.key === activeTab)?.label || 'Dashboard'}
+            </h1>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {reminders.length > 0 && (
+              <button onClick={() => setShowReminderPanel(v => !v)} style={{ position: 'relative', background: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: 8, padding: '7px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: '#92400E' }}>
+                <Icon.Bell />
+                <span>{reminders.length} Reminder{reminders.length > 1 ? 's' : ''}</span>
+              </button>
+            )}
+            <Btn onClick={() => {
+              setNewIssueModel({ category: '', requestedType: currentUser ? 'inspection' : 'request' });
+              setShowNewIssueModal(true);
+            }} variant="primary">
+              <Icon.Plus /> New Request
+            </Btn>
+          </div>
+        </header>
+
+        {/* Reminder panel */}
+        {reminders.length > 0 && showReminderPanel && (
+          <div style={{ background: '#FFFBEB', borderBottom: '1px solid #FDE68A', padding: '12px 28px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700, color: '#92400E', fontSize: 13 }}>
+                <Icon.Alert />
+                {reminders.length} upcoming maintenance item{reminders.length > 1 ? 's' : ''} due within 24 hours
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <Btn size="sm" variant="ghost" onClick={snoozeAll}>Snooze All 1h</Btn>
+                <Btn size="sm" variant="ghost" onClick={dismissAll}>Dismiss All</Btn>
+                <button onClick={() => setShowReminderPanel(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF', display: 'flex', padding: 4 }}><Icon.X /></button>
+              </div>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {reminders.map(r => {
                 const id = r._id || r.id;
                 return (
-                  <div key={id} className="bg-blue-900 p-3 rounded shadow-sm flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">{r.name || r.title || 'Maintenance'}</p>
-                      <p className="text-xs text-blue-300">
-                        Due: {r.nextDate ? new Date(r.nextDate).toLocaleString() : 'N/A'}
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        className="px-3 py-1 bg-blue-700 text-sm rounded hover:bg-blue-600 transition text-white"
-                        onClick={() => dismissOne(id)}
-                      >
-                        Dismiss
-                      </button>
-                      <button
-                        className="px-3 py-1 bg-yellow-600 text-sm rounded hover:bg-yellow-500 transition text-white"
-                        onClick={() => snoozeOne(id, 60)}
-                      >
-                        Snooze 1h
-                      </button>
-                    </div>
+                  <div key={id} style={{ background: 'white', border: '1px solid #FDE68A', borderRadius: 8, padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 10, fontSize: 12 }}>
+                    <span style={{ fontWeight: 600, color: '#111827' }}>{r.name || r.title || 'Maintenance'}</span>
+                    <span style={{ color: '#9CA3AF' }}>{r.nextDate ? new Date(r.nextDate).toLocaleDateString() : ''}</span>
+                    <button onClick={() => snoozeOne(id)} style={{ fontSize: 11, background: '#FEF3C7', border: 'none', borderRadius: 4, padding: '2px 7px', cursor: 'pointer', color: '#92400E', fontWeight: 600 }}>Snooze</button>
+                    <button onClick={() => dismissOne(id)} style={{ fontSize: 11, background: '#F3F4F6', border: 'none', borderRadius: 4, padding: '2px 7px', cursor: 'pointer', color: '#374151', fontWeight: 600 }}>Dismiss</button>
                   </div>
                 );
               })}
             </div>
-
-            <div className="mt-3 flex gap-2 items-center">
-              <button
-                className="px-3 py-1 bg-blue-700 text-white text-sm rounded hover:bg-blue-600 transition"
-                onClick={dismissAll}
-              >
-                Dismiss All
-              </button>
-              <button
-                className="px-3 py-1 bg-yellow-600 text-white text-sm rounded hover:bg-yellow-500 transition"
-                onClick={() => snoozeAll(60)}
-              >
-                Snooze All 1h
-              </button>
-              <button
-                className="px-3 py-1 bg-white text-blue-800 text-sm rounded hover:bg-gray-100 transition ml-auto"
-                onClick={() => setShowAdminPanel(!showAdminPanel)}
-              >
-                {showAdminPanel ? 'Close Alerts' : 'Alerts View'}
-              </button>
-            </div>
-
-            {showAdminPanel && (
-              <div className="mt-3 bg-blue-900 p-3 rounded max-h-64 overflow-auto">
-                <p className="font-semibold mb-2 text-white">Alerts: Snoozed / Dismissed Schedules</p>
-                {maintenanceSchedules.filter(s => s && (s.snoozedUntil || (s.dismissedBy && Object.keys(s.dismissedBy || {}).length > 0))).length === 0 ? (
-                  <p className="text-sm text-blue-300">No snoozed or dismissed schedules</p>
-                ) : (
-                  maintenanceSchedules.filter(s => s && (s.snoozedUntil || (s.dismissedBy && Object.keys(s.dismissedBy || {}).length > 0))).map(s => {
-                    const id = s._id || s.id;
-                    return (
-                      <div key={id} className="mb-2 p-2 bg-blue-800 rounded shadow-sm flex justify-between items-start">
-                        <div>
-                          <p className="font-medium text-white">{s.name || s.title || 'Maintenance'}</p>
-                          {s.snoozedUntil && (
-                            <p className="text-xs text-blue-300">
-                              Snoozed Until: {new Date(s.snoozedUntil).toLocaleString()}
-                            </p>
-                          )}
-                        </div>
-                        <div className="flex flex-col gap-2">
-                          <button
-                            className="px-2 py-1 bg-blue-700 rounded text-sm hover:bg-blue-600 transition text-white"
-                            onClick={() => {/* Add clear snooze function */ }}
-                          >
-                            Clear Snooze
-                          </button>
-                          <button
-                            className="px-2 py-1 bg-blue-700 rounded text-sm hover:bg-blue-600 transition text-white"
-                            onClick={() => {/* Add clear dismissals function */ }}
-                          >
-                            Clear Dismissals
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            )}
           </div>
-        </div>
-      )}
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        {/* Welcome Banner - Dark Blue Gradient */}
-        <div className="bg-gradient-to-r from-blue-900 to-blue-700 rounded-2xl shadow-lg p-8 mb-8 text-white">
-          <div className="flex flex-col md:flex-row items-center justify-between">
-            <div className="mb-6 md:mb-0">
-              <h1 className="text-3xl md:text-4xl font-bold mb-2">
-                Welcome back, {userName}!
-              </h1>
-              <p className="text-lg opacity-90">
-                Here's a quick overview of your recent activity.
-              </p>
-            </div>
-            <div>
-              <svg width="80" height="80" viewBox="0 0 24 24" fill="none" className="drop-shadow-lg">
-                <circle cx="12" cy="12" r="10" fill="#fff" fillOpacity="0.15" />
-                <path d="M12 8v4l3 3" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                <circle cx="12" cy="12" r="9" stroke="#fff" strokeWidth="2" />
-              </svg>
-            </div>
-          </div>
-        </div>
+        )}
 
-        {/* Property Issue Cards - Removed as per user request */}
+        {/* Content */}
+        <div style={{ flex: 1, padding: '28px', overflowY: 'auto' }}>
 
-        {/* Tabs Navigation - Dark Blue Theme */}
-        <div className="bg-white rounded-xl shadow mb-6 border border-blue-100">
-          <div className="flex overflow-x-auto border-b border-blue-100">
-            {['dashboard', 'properties', 'assets', 'internalTechnicians', 'maintenanceTemplates'].map((tab) => (
-              <button
-                key={tab}
-                className={`px-6 py-3 font-medium whitespace-nowrap ${activeTab === tab
-                  ? 'border-b-2 border-blue-600 text-blue-600'
-                  : 'text-gray-600 hover:text-blue-600'
-                  }`}
-                onClick={() => setActiveTab(tab)}
-              >
-                {tab.charAt(0).toUpperCase() + tab.slice(1)}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Tab Content */}
-        <div className="bg-white rounded-xl shadow p-6 border border-blue-50">
+          {/* ── Dashboard ── */}
           {activeTab === 'dashboard' && (
             <div>
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-gray-800">Recent Issues</h2>
-                <div className="flex items-center gap-3">
-
-                  <button
-                    onClick={() => navigate("/issues")}
-                    className="text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1"
-                  >
-                    View All Issues
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </button>
+              {/* Welcome */}
+              <div style={{ background: 'linear-gradient(135deg, #1E3A8A 0%, #1D4ED8 50%, #2563EB 100%)', borderRadius: 16, padding: '28px 32px', marginBottom: 24, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'space-between', overflow: 'hidden', position: 'relative' }}>
+                <div style={{ position: 'absolute', right: -30, top: -30, width: 180, height: 180, borderRadius: '50%', background: 'rgba(255,255,255,0.05)' }} />
+                <div style={{ position: 'absolute', right: 40, bottom: -50, width: 220, height: 220, borderRadius: '50%', background: 'rgba(255,255,255,0.05)' }} />
+                <div style={{ position: 'relative' }}>
+                  <div style={{ fontSize: 13, opacity: 0.8, marginBottom: 4 }}>{new Date().toLocaleDateString('en', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</div>
+                  <h2 style={{ margin: 0, fontSize: 26, fontWeight: 800, letterSpacing: '-0.02em' }}>Welcome back, {userName.split(' ')[0]}!</h2>
+                  <p style={{ margin: '6px 0 0', opacity: 0.8, fontSize: 14 }}>Here's your property activity overview.</p>
+                </div>
+                <div style={{ display: 'flex', gap: 10, position: 'relative', flexShrink: 0 }}>
+                  <Btn onClick={() => setActiveTab('requests')} style={{ background: 'rgba(255,255,255,0.15)', color: 'white', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.2)' }}>View Requests</Btn>
                 </div>
               </div>
+
+              {/* Stats */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
+                <StatCard label="Pending" value={combinedPending} sub="Awaiting action" accent="amber"
+                  icon={<svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>} />
+                <StatCard label="In Progress" value={combinedInProgress} sub="Currently active" accent="blue"
+                  icon={<svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>} />
+                <StatCard label="Completed" value={combinedCompleted} sub="Successfully resolved" accent="green"
+                  icon={<svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>} />
+                <StatCard label="Overdue" value={combinedOverdue} sub="Requires attention" accent="red"
+                  icon={<svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>} />
+              </div>
+
+              {/* Charts + Quick Actions */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 240px', gap: 16, marginBottom: 28 }}>
+                {/* Issues chart */}
+                <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 14, padding: '20px 24px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+                    <div>
+                      <div style={{ fontSize: 13, color: '#6B7280', fontWeight: 500 }}>Issues — Last 7 Days</div>
+                      <div style={{ fontSize: 22, fontWeight: 700, color: '#111827', marginTop: 2 }}>{last7.reduce((a, b) => a + b, 0)} total</div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <div style={{ fontSize: 11, padding: '3px 8px', background: '#EFF6FF', color: '#1D4ED8', borderRadius: 20, fontWeight: 600 }}>Issues</div>
+                    </div>
+                  </div>
+                  {/* Bar chart */}
+                  <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, height: 64, marginBottom: 6 }}>
+                    {last7.map((v, i) => {
+                      const max = Math.max(...last7, 1);
+                      return (
+                        <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, height: '100%', justifyContent: 'flex-end' }}>
+                          <div title={`${v} issues`} style={{ width: '100%', background: 'linear-gradient(180deg, #3B82F6, #1D4ED8)', borderRadius: '4px 4px 0 0', height: `${Math.max(4, (v / max) * 100)}%`, minHeight: 4, transition: 'height 0.4s ease' }} />
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    {dayLabels.map((d, i) => <div key={i} style={{ flex: 1, textAlign: 'center', fontSize: 10, color: '#9CA3AF' }}>{d}</div>)}
+                  </div>
+                </div>
+
+                {/* Quick actions */}
+                <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 14, padding: '20px' }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#111827', marginBottom: 14 }}>Quick Actions</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <Btn onClick={() => {
+                      setNewIssueModel({ category: '', requestedType: currentUser ? 'inspection' : 'request' });
+                      setShowNewIssueModal(true);
+                    }} variant="primary" style={{ justifyContent: 'center', width: '100%' }}><Icon.Plus /> New Request</Btn>
+                    <Btn onClick={() => setActiveTab('requests')} variant="outline" style={{ justifyContent: 'center', width: '100%' }}>All Requests</Btn>
+                    <Btn onClick={exportIssuesPDF} variant="ghost" style={{ justifyContent: 'center', width: '100%' }}><Icon.Export /> Export PDF</Btn>
+                    <Btn onClick={() => setActiveTab('maintenanceTemplates')} variant="ghost" style={{ justifyContent: 'center', width: '100%' }}>
+                      <Icon.Templates /> Schedule Maintenance
+                    </Btn>
+                  </div>
+
+                  <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid #F3F4F6' }}>
+                    <div style={{ fontSize: 11, color: '#9CA3AF', fontWeight: 600, marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Portfolio</div>
+                    {[{ label: 'Locations', value: properties.length }, { label: 'Assets', value: assets.length }, { label: 'Staff', value: internalTechnicians.length }].map(({ label, value }) => (
+                      <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', fontSize: 13 }}>
+                        <span style={{ color: '#6B7280' }}>{label}</span>
+                        <span style={{ fontWeight: 700, color: '#111827' }}>{value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Recent issues */}
+              <SectionHeader title="Recent Issues" count={issues.length}
+                action={<button onClick={() => setActiveTab('requests')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#1D4ED8', fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>View all <Icon.ChevronRight /></button>} />
 
               {issues.length === 0 ? (
-                <div className="text-center py-12 text-gray-500">
-                  <svg className="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  <p className="text-lg">No recent issues found.</p>
+                <div style={{ textAlign: 'center', padding: '48px 24px', background: 'white', border: '1px solid #E5E7EB', borderRadius: 14, color: '#9CA3AF' }}>
+                  <div style={{ fontSize: 40, marginBottom: 8 }}>📋</div>
+                  <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>No issues found</div>
+                  <div style={{ fontSize: 13 }}>Submit a new request to get started</div>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {issues.slice(0, 5).map((issue) => (
-                    <div
-                      key={issue.id || issue._id}
-                      className="border rounded-lg p-4 hover:shadow-md transition-shadow border-blue-100"
-                    >
-
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                            <h3 className="font-semibold text-gray-900">{issue.title}</h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {issues.slice(0, 5).map(issue => {
+                    const id = issue.id || issue._id;
+                    return (
+                      <div key={id} style={{ background: 'white', border: issue.overdue ? '1px solid #FECACA' : '1px solid #E5E7EB', borderRadius: 12, padding: '16px 20px', display: 'flex', gap: 14 }}>
+                        {/* Left accent */}
+                        <div style={{ width: 3, borderRadius: 4, background: issue.overdue ? '#EF4444' : issue.status?.includes('PROGRESS') ? '#3B82F6' : issue.status?.includes('COMPLETE') || issue.status === 'APPROVED' ? '#10B981' : '#F59E0B', flexShrink: 0 }} />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 6 }}>
+                            <div style={{ fontWeight: 600, fontSize: 14, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{issue.title}</div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                              <StatusBadge status={issue.status} />
+                              {issue.overdue && <span style={{ fontSize: 11, fontWeight: 600, color: '#EF4444', background: '#FEF2F2', padding: '2px 7px', borderRadius: 20, border: '1px solid #FECACA' }}>Overdue</span>}
+                            </div>
                           </div>
-                          <p className="text-gray-600 text-sm mb-3">{issue.location}</p>
+                          {issue.location && <div style={{ fontSize: 12, color: '#9CA3AF', marginBottom: 8 }}>{issue.location}</div>}
 
-                          {issue.photo || issue.image ? (
-                            <img
-                              src={imageSrc(issue.photo || issue.image)}
-                              alt="Issue"
-                              className="h-40 w-auto rounded-lg mb-3 border"
-                              onError={(e) => {
-                                e.target.onerror = null;
-                                e.target.src = '/default-issue.png';
-                              }}
-                            />
-                          ) : null}
+                          {(issue.photo || issue.image) && (
+                            <img src={imageSrc(issue.photo || issue.image)} alt="Issue" style={{ height: 100, width: 'auto', borderRadius: 8, marginBottom: 10, border: '1px solid #E5E7EB', objectFit: 'cover' }} onError={e => { e.target.onerror = null; e.target.style.display = 'none'; }} />
+                          )}
 
-                          <div className="flex flex-wrap gap-2 mb-2">
-                            {Array.isArray(issue.tags) &&
-                              issue.tags
-                                .filter(tag => !["PENDING", "IN PROGRESS", "COMPLETE", "OVERDUE"].includes(tag))
-                                .map((tag, i) => {
-                                  const label = tag.label || tag;
-                                  const colorClass = label === "URGENT"
-                                    ? "bg-red-100 text-red-700 border border-red-200"
-                                    : "bg-blue-50 text-blue-700 border border-blue-100";
-                                  return (
-                                    <span
-                                      className={`px-2 py-1 text-xs rounded ${colorClass}`}
-                                      key={i}
-                                    >
-                                      {label}
-                                    </span>
-                                  );
-                                })}
-
-                            {issue.status && (
-                              <span
-                                className={`px-2 py-1 text-xs rounded font-medium border ${issue.status === "IN PROGRESS"
-                                  ? "bg-blue-50 text-blue-700 border-blue-200"
-                                  : issue.status === "PENDING"
-                                    ? "bg-yellow-50 text-yellow-700 border-yellow-200"
-                                    : issue.status === "COMPLETE"
-                                      ? "bg-green-50 text-green-700 border-green-200"
-                                      : issue.status === "OVERDUE"
-                                        ? "bg-red-50 text-red-700 border-red-200"
-                                        : "bg-gray-50 text-gray-700 border-gray-200"
-                                  }`}
-                              >
-                                {issue.status.replace("_", " ")}
-                              </span>
-                            )}
-                          </div>
-
-                          {/* Show assigned technicians */}
-                          {issue.assignees && Array.isArray(issue.assignees) && issue.assignees.length > 0 && (
-                            <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded">
-                              <p className="text-xs font-semibold text-green-800 mb-1">Assigned to:</p>
-                              {issue.assignees.map((assignee, idx) => (
-                                <div key={idx} className="text-xs text-green-700">
-                                  <span className="font-medium">{assignee.name || 'Unknown'}</span>
-                                  {assignee.email && <span className="text-green-600"> ({assignee.email})</span>}
-                                  {assignee.role && <span className="ml-1 px-1 py-0.5 bg-green-100 rounded text-green-800">({assignee.role})</span>}
-                                </div>
-                              ))}
+                          {/* Tags */}
+                          {Array.isArray(issue.tags) && issue.tags.filter(t => !['PENDING','IN PROGRESS','COMPLETE','OVERDUE'].includes(t?.label || t)).length > 0 && (
+                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+                              {issue.tags.filter(t => !['PENDING','IN PROGRESS','COMPLETE','OVERDUE'].includes(t?.label || t)).map((tag, i) => {
+                                const label = tag.label || tag;
+                                return <span key={i} style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: label === 'URGENT' ? '#FEE2E2' : '#EFF6FF', color: label === 'URGENT' ? '#991B1B' : '#1D4ED8', border: `1px solid ${label === 'URGENT' ? '#FECACA' : '#BFDBFE'}` }}>{label}</span>;
+                              })}
                             </div>
                           )}
 
-                          {/* Accept and Decline buttons for clients on PENDING issues */}
+                          {/* Assignees */}
+                          {Array.isArray(issue.assignees) && issue.assignees.length > 0 && (
+                            <div style={{ fontSize: 12, color: '#059669', fontWeight: 500, marginBottom: 8 }}>
+                              👤 {issue.assignees.map(a => a.name || 'Unknown').join(', ')}
+                            </div>
+                          )}
+
+                          {/* Client actions */}
                           {issue.status === 'PENDING' && currentUser?.role === 'client' && (
-                            <div className="mt-3 flex gap-2">
-                              <button
-                                className="bg-green-500 text-white px-3 py-1 rounded text-sm font-semibold hover:bg-green-600"
-                                onClick={() => approveIssue(issue.id || issue._id)}
-                              >
-                                Accept
-                              </button>
-                              <button
-                                className="bg-red-500 text-white px-3 py-1 rounded text-sm font-semibold hover:bg-red-600"
-                                onClick={() => declineIssue(issue.id || issue._id)}
-                              >
-                                Decline
-                              </button>
-                              <button
-                                className="bg-blue-500 text-white px-3 py-1 rounded text-sm font-semibold hover:bg-blue-600"
-                                onClick={() => resubmitIssue(issue.id || issue._id)}
-                              >
-                                Resubmit
-                              </button>
+                            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                              <Btn size="sm" variant="success" onClick={() => approveIssue(id)}><Icon.Check /> Accept</Btn>
+                              <Btn size="sm" variant="danger" onClick={() => declineIssue(id)}><Icon.X /> Decline</Btn>
+                              <Btn size="sm" variant="ghost" onClick={() => resubmitIssue(id)}>Resubmit</Btn>
                             </div>
                           )}
-                          {/* Manager/Admin: assign internal technician */}
-                          {(currentUser?.role === 'manager' || currentUser?.role === 'admin') && internalTechnicians && internalTechnicians.length > 0 && (
-                            <div className="mt-3 flex items-center gap-2">
-                              <select
-                                className="border rounded px-2 py-1 text-sm"
-                                value={(selectedTechs[issue.id || issue._id] && selectedTechs[issue.id || issue._id].internal) || ''}
-                                onChange={(e) => setSelectedTechs(s => ({ ...s, [issue.id || issue._id]: { ...(s[issue.id || issue._id] || {}), internal: e.target.value } }))}
-                              >
-                                <option key="default-internal" value="">Assign internal technician...</option>
-                                {internalTechnicians.map((t, idx) => (
-                                  <option key={t.id || t._id || `internal-${idx}`} value={t.id || t._id}>{t.name}{t.email ? ` (${t.email})` : ''}</option>
-                                ))}
-                              </select>
-                              <button
-                                className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-500"
-                                disabled={!((selectedTechs[issue.id || issue._id] && selectedTechs[issue.id || issue._id].internal)) || assignLoading[issue.id || issue._id]}
-                                onClick={() => assignInternal(issue.id || issue._id, (selectedTechs[issue.id || issue._id] || {}).internal)}
-                              >
-                                {assignLoading[issue.id || issue._id] ? 'Assigning...' : 'Assign'}
-                              </button>
-                            </div>
-                          )}
-                          {(currentUser?.role === 'manager' || currentUser?.role === 'admin') && technicians && technicians.length > 0 && issue.status === 'APPROVED' && (
-                            <div className="mt-3 flex items-center gap-2">
-                              <select
-                                className="border rounded px-2 py-1 text-sm"
-                                value={(selectedTechs[issue.id || issue._id] && selectedTechs[issue.id || issue._id].external) || ''}
-                                onChange={(e) => setSelectedTechs(s => ({ ...s, [issue.id || issue._id]: { ...(s[issue.id || issue._id] || {}), external: e.target.value } }))}
-                              >
-                                <option key="default-external" value="">Assign technician...</option>
-                                {technicians.map((t, idx) => (
-                                  <option key={t.id || t._id || `external-${idx}`} value={t.id || t._id}>{t.name}{t.email ? ` (${t.email})` : ''}</option>
-                                ))}
-                              </select>
-                              <button
-                                className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-500"
-                                disabled={!((selectedTechs[issue.id || issue._id] && selectedTechs[issue.id || issue._id].external)) || assignLoading[issue.id || issue._id]}
-                                onClick={() => assignToTech(issue.id || issue._id, (selectedTechs[issue.id || issue._id] || {}).external)}
-                              >
-                                {assignLoading[issue.id || issue._id] ? 'Assigning...' : 'Assign'}
-                              </button>
-                            </div>
-                          )}
-                          {/* Client: show external technicians assigned to this property (how saved in DB shown) */}
-                          {currentUser?.role === 'client' && (() => {
-                            const pid = issue.propertyId || (issue.property && (issue.property.id || issue.property._id)) || (issue.assetId ? (assets.find(a => (a.id || a._id) === issue.assetId)?.propertyId) : null);
-                            const extTechs = (technicians || []).filter(t => {
-                              const tid = extractId(t.propertyId || t.property);
-                              return tid && pid && (String(tid) === String(pid));
-                            });
 
-                            const isApproved = (issue.approved === true) || String(issue.status || '').toUpperCase() === 'APPROVED';
-                            // If no external technicians tied to property, fall back to all technicians
-                            const availableExternal = extTechs.length ? extTechs : (technicians || []);
-                            if (!availableExternal.length) {
-                              return null;
-                            }
-                            if (!isApproved) {
-                              return (
-                                <p className="text-sm text-gray-500 mt-2">Assignment available only for approved issues.</p>
-                              );
-                            }
-                            return (
-                              <div className="mt-3 flex items-center gap-2">
-                                <div className="flex-1">
-                                  <label className="text-sm text-gray-600 block mb-1">Available technicians for this property</label>
-                                  <select
-                                    className="border rounded px-2 py-1 text-sm w-full"
-                                    value={(selectedTechs[issue.id || issue._id] && selectedTechs[issue.id || issue._id].external) || ''}
-                                    onChange={(e) => setSelectedTechs(s => ({ ...s, [issue.id || issue._id]: { ...(s[issue.id || issue._id] || {}), external: e.target.value } }))}
-                                  >
-                                    <option key="default-assign-ext" value="">Assign technician...</option>
-                                    {availableExternal.map((t, idx) => (
-                                      <option key={t.id || t._id || `assign-ext-${idx}`} value={t.id || t._id}>
-                                        {t.name}{t.email ? ` (${t.email})` : ''}{t.specialty ? ` — ${Array.isArray(t.specialty) ? t.specialty.join(', ') : t.specialty}` : ''}{t.rating ? ` • ${t.rating}⭐` : ''}
-                                      </option>
-                                    ))}
-                                  </select>
-                                  <p className="text-xs text-gray-500 mt-1">Technician record fields: propertyId, name, email, phone, specialty[], rating, completed, status, createdAt</p>
-                                </div>
-                                <div>
-                                  <button
-                                    className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-500"
-                                    disabled={!((selectedTechs[issue.id || issue._id] && selectedTechs[issue.id || issue._id].external)) || assignLoading[issue.id || issue._id]}
-                                    onClick={() => assignToTech(issue.id || issue._id, (selectedTechs[issue.id || issue._id] || {}).external)}
-                                  >
-                                    {assignLoading[issue.id || issue._id] ? 'Assigning...' : 'Assign'}
-                                  </button>
-                                </div>
-                              </div>
-                            );
-                          })()}
+                          {/* Manager internal assign */}
+                          {(currentUser?.role === 'manager' || currentUser?.role === 'admin') && internalTechnicians.length > 0 && (
+                            <div style={{ display: 'flex', gap: 8, marginTop: 10, alignItems: 'center' }}>
+                              <Select style={{ flex: 1, fontSize: 12, padding: '5px 8px' }} value={(selectedTechs[id]?.internal) || ''} onChange={e => setSelectedTechs(s => ({ ...s, [id]: { ...s[id], internal: e.target.value } }))}>
+                                <option value="">Assign internal technician…</option>
+                                {internalTechnicians.map((t, i) => <option key={t.id || t._id || i} value={t.id || t._id}>{t.name}{t.email ? ` (${t.email})` : ''}</option>)}
+                              </Select>
+                              <Btn size="sm" variant="primary" disabled={!selectedTechs[id]?.internal || assignLoading[id]} onClick={() => assignInternal(id, selectedTechs[id]?.internal)}>
+                                {assignLoading[id] ? '…' : 'Assign'}
+                              </Btn>
+                            </div>
+                          )}
+
+                          {/* Manager external assign */}
+                          {(currentUser?.role === 'manager' || currentUser?.role === 'admin') && technicians.length > 0 && issue.status === 'APPROVED' && (
+                            <div style={{ display: 'flex', gap: 8, marginTop: 8, alignItems: 'center' }}>
+                              <Select style={{ flex: 1, fontSize: 12, padding: '5px 8px' }} value={(selectedTechs[id]?.external) || ''} onChange={e => setSelectedTechs(s => ({ ...s, [id]: { ...s[id], external: e.target.value } }))}>
+                                <option value="">Assign technician…</option>
+                                {technicians.map((t, i) => <option key={t.id || t._id || i} value={t.id || t._id}>{t.name}{t.email ? ` (${t.email})` : ''}</option>)}
+                              </Select>
+                              <Btn size="sm" variant="primary" disabled={!selectedTechs[id]?.external || assignLoading[id]} onClick={() => assignToTech(id, selectedTechs[id]?.external)}>
+                                {assignLoading[id] ? '…' : 'Assign'}
+                              </Btn>
+                            </div>
+                          )}
                         </div>
 
-                        <div className="flex flex-col items-end">
-                          <span className="flex items-center gap-1 text-yellow-600 font-medium">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3" />
-                              <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth={2} />
-                            </svg>
-                            {issue.time}
-                          </span>
-                          {issue.overdue && (
-                            <span className="text-red-600 text-sm font-medium mt-1">Overdue</span>
-                          )}
+                        <div style={{ flexShrink: 0, textAlign: 'right', fontSize: 12, color: '#9CA3AF', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, paddingTop: 2 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Icon.Clock />{issue.time}</div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
           )}
+
+          {/* ── Requests ── */}
+          {activeTab === 'requests' && (
+            <div>
+              <SectionHeader title="All Requests" count={allIssues.length}
+                action={<Btn onClick={exportIssuesPDF} variant="outline" size="sm"><Icon.Export /> Export PDF</Btn>} />
+              <Table
+                heads={['#', 'Title', 'Status', 'Location', 'Assigned To', 'Created', 'Actions']}
+                empty="No requests found."
+                rows={allIssues.map((issue, idx) => [
+                  <Td key="n">{idx + 1}</Td>,
+                  <Td key="t"><span style={{ fontWeight: 600, color: '#111827' }}>{issue.title || issue.summary || '—'}</span></Td>,
+                  <Td key="s"><StatusBadge status={issue.status} /></Td>,
+                  <Td key="p">{getPropertyName(issue)}</Td>,
+                  <Td key="a">{getAssignedName(issue)}</Td>,
+                  <Td key="c">{issue.createdAt ? new Date(issue.createdAt).toLocaleDateString() : '—'}</Td>,
+                  <Td key="x">
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <Btn size="sm" variant="outline" onClick={() => navigate(`/issues/${issue.id || issue._id}`)}>View</Btn>
+                      <Btn size="sm" variant="danger" onClick={async () => {
+                        if (window.confirm('Delete issue?')) {
+                          try {
+                            await api.delete(`/api/issues/${issue._id || issue.id}`);
+                            await fetchIssues();
+                          } catch {
+                            alert('Delete failed');
+                          }
+                        }
+                      }}>Delete</Btn>
+                    </div>
+                  </Td>,
+                ])}
+              />
+            </div>
+          )}
+
+          {/* ── Properties ── */}
           {activeTab === 'properties' && (
             <div>
-              {loading.properties && (
-                <div className="text-center py-8">
-                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                  <p className="mt-2 text-gray-600">Loading properties...</p>
-                </div>
-              )}
+              <SectionHeader title="Locations" count={properties.length}
+                action={!editingProperty && <Btn onClick={() => setEditingProperty({})} variant="primary" size="sm"><Icon.Plus /> Add Locations</Btn>} />
 
-              {errors.properties && (
-                <div className="bg-red-50 text-red-700 p-4 rounded-lg mb-4 border border-red-200">
-                  Error: {errors.properties}
-                </div>
-              )}
+              {loading.properties && <div style={{ textAlign: 'center', padding: 40, color: '#9CA3AF' }}>Loading…</div>}
+              {errors.properties && <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 10, padding: 14, marginBottom: 16, color: '#991B1B', fontSize: 13 }}>Error: {errors.properties}</div>}
 
-              <form
-                className="bg-blue-50 p-4 rounded-lg mb-6 border border-blue-100"
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  try {
-                    const storedUser = localStorage.getItem("user");
-                    let userId = null;
+              {/* Form */}
+              {editingProperty !== null && (
+                <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 14, padding: 24, marginBottom: 20 }}>
+                  <div style={{ fontWeight: 700, fontSize: 15, color: '#111827', marginBottom: 16 }}>{editingProperty._id || editingProperty.id ? 'Edit Location' : 'New Location'}</div>
+                  <form onSubmit={async (e) => {
+                    e.preventDefault();
                     try {
-                      userId = storedUser ? JSON.parse(storedUser).id || JSON.parse(storedUser)._id : null;
-                    } catch (e) {
-                      userId = null;
-                    }
-                    const payload = {
-                      name: propertyForm.name,
-                      type: propertyForm.type,
-                      address: propertyForm.address,
-                      beds: propertyForm.beds ? parseInt(propertyForm.beds) : undefined,
-                      baths: propertyForm.baths ? parseInt(propertyForm.baths) : undefined,
-                      levels: propertyForm.levels ? parseInt(propertyForm.levels) : undefined,
-                      area: propertyForm.area ? parseInt(propertyForm.area) : undefined,
-                      floors: propertyForm.floors ? parseInt(propertyForm.floors) : undefined,
-                      blocks: propertyForm.blocks ? parseInt(propertyForm.blocks) : undefined,
-                      rooms: propertyForm.rooms ? parseInt(propertyForm.rooms) : undefined,
-                      clientId: userId,
-                      userId: userId,
-                    };
-
-                    if (editingProperty) {
-                      await api.put(
-                        `/api/properties/${editingProperty._id || editingProperty.id}`,
-                        payload
-                      );
-
-                      // upload files if any
-                      if (propertyFiles && propertyFiles.length > 0) {
-                        try {
-                          const form = new FormData();
-                          Array.from(propertyFiles).forEach(f => form.append('photos', f));
-                          await api.post(
-                            `/api/properties/${editingProperty._id || editingProperty.id}/photos`,
-                            form,
-                            { headers: { 'Content-Type': 'multipart/form-data' } }
-                          );
-                        } catch (e) {
-                          console.error('Failed to upload photos:', e);
+                      const userId = getCurrentUserId();
+                      const payload = { 
+                        ...propertyForm, 
+                        beds: propertyForm.beds ? +propertyForm.beds : undefined, 
+                        baths: propertyForm.baths ? +propertyForm.baths : undefined, 
+                        area: propertyForm.area ? +propertyForm.area : undefined, 
+                        floors: propertyForm.floors ? +propertyForm.floors : undefined, 
+                        rooms: propertyForm.rooms ? +propertyForm.rooms : undefined, 
+                        clientId: userId, 
+                        userId 
+                      };
+                      if (propertyUseNamedBlocks) {
+                        payload.blocks = (propertyForm.namedBlocks || []).join(',');
+                        payload.blocksModifiable = true;
+                      } else {
+                        payload.blocks = propertyForm.blocks ? +propertyForm.blocks : undefined;
+                        payload.blocksModifiable = false;
+                      }
+                      if (propertyForm.roomNames && Array.isArray(propertyForm.roomNames)) payload.roomNames = propertyForm.roomNames.join(',');
+                      const eid = editingProperty._id || editingProperty.id;
+                      if (eid) {
+                        await api.put(`/api/properties/${eid}`, payload);
+                      } else {
+                        const r = await api.post('/api/properties', payload);
+                        if (propertyFiles?.length) {
+                          const fd = new FormData();
+                          Array.from(propertyFiles).forEach(f => fd.append('photos', f));
+                          await api.post(`/api/properties/${r.data.id || r.data._id}/photos`, fd, { headers: { 'Content-Type': 'multipart/form-data' } }).catch(() => {});
                         }
                       }
-
+                      if (eid && propertyFiles?.length) {
+                        const fd = new FormData();
+                        Array.from(propertyFiles).forEach(f => fd.append('photos', f));
+                        await api.post(`/api/properties/${eid}/photos`, fd, { headers: { 'Content-Type': 'multipart/form-data' } }).catch(() => {});
+                      }
                       setEditingProperty(null);
-                    } else {
-                      const createRes = await api.post('/api/properties', payload);
-                      const created = createRes.data;
-
-                      // upload files if any
-                      if (propertyFiles && propertyFiles.length > 0) {
-                        try {
-                          const form = new FormData();
-                          Array.from(propertyFiles).forEach(f => form.append('photos', f));
-                          await api.post(
-                            `/api/properties/${created.id || created._id}/photos`,
-                            form,
-                            { headers: { 'Content-Type': 'multipart/form-data' } }
-                          );
-                        } catch (e) {
-                          console.error('Failed to upload photos:', e);
-                        }
-                      }
+                      setPropertyFiles(null);
+                      setPropertyForm({ name: '', type: '', address: '', beds: '', baths: '', area: '', floors: '', blocks: '', rooms: '', namedBlocks: [], roomNames: [] });
+                      const res = await api.get('/api/properties');
+                      setProperties(res.data || []);
+                    } catch {
+                      alert('Failed to save property.');
                     }
-
-                    setPropertyForm({ name: '', type: '', address: '', beds: '', baths: '', levels: '', area: '', floors: '', blocks: '', rooms: '' });
-                    setPropertyFiles(null);
-                    const res = await api.get('/api/properties');
-                    setProperties(res.data || []);
-                  } catch (err) {
-                    console.error('Error saving property:', err);
-                    alert('Failed to save property. Please try again.');
-                  }
-                }}
-              >
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                  <input
-                    className="border border-blue-200 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Property Name"
-                    value={propertyForm.name}
-                    onChange={(e) => setPropertyForm(f => ({ ...f, name: e.target.value }))}
-                    required
-                  />
-                  <input
-                    className="border border-blue-200 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Type"
-                    value={propertyForm.type}
-                    onChange={(e) => setPropertyForm(f => ({ ...f, type: e.target.value }))}
-                    required
-                  />
-                  <input
-                    className="border border-blue-200 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Address"
-                    value={propertyForm.address}
-                    onChange={(e) => setPropertyForm(f => ({ ...f, address: e.target.value }))}
-                    required
-                  />
-                  <input
-                    className="border border-blue-200 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    type="number"
-                    placeholder="Beds"
-                    value={propertyForm.beds}
-                    onChange={(e) => setPropertyForm(f => ({ ...f, beds: e.target.value }))}
-                  />
-                  <input
-                    className="border border-blue-200 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    type="number"
-                    placeholder="Baths"
-                    value={propertyForm.baths}
-                    onChange={(e) => setPropertyForm(f => ({ ...f, baths: e.target.value }))}
-                  />
-                  <input
-                    className="border border-blue-200 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    type="number"
-                    placeholder="Levels"
-                    value={propertyForm.levels}
-                    onChange={(e) => setPropertyForm(f => ({ ...f, levels: e.target.value }))}
-                  />
-                  <input
-                    className="border border-blue-200 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    type="number"
-                    placeholder="Area"
-                    value={propertyForm.area}
-                    onChange={(e) => setPropertyForm(f => ({ ...f, area: e.target.value }))}
-                  />
-                  <input
-                    className="border border-blue-200 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    type="number"
-                    placeholder="Floors"
-                    value={propertyForm.floors}
-                    onChange={(e) => setPropertyForm(f => ({ ...f, floors: e.target.value }))}
-                  />
-                  <input
-                    className="border border-blue-200 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    type="number"
-                    placeholder="Blocks"
-                    value={propertyForm.blocks}
-                    onChange={(e) => setPropertyForm(f => ({ ...f, blocks: e.target.value }))}
-                  />
-                  <input
-                    className="border border-blue-200 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    type="number"
-                    placeholder="Rooms"
-                    value={propertyForm.rooms}
-                    onChange={(e) => setPropertyForm(f => ({ ...f, rooms: e.target.value }))}
-                  />
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Photos</label>
-                    <div className="flex items-start gap-3">
-                      <div
-                        className="flex-1 border-dashed border-2 border-blue-200 rounded p-3 text-center cursor-pointer"
-                        onClick={() => document.getElementById('property-photos-input')?.click()}
-                        onDragOver={(e) => { e.preventDefault(); }}
-                        onDrop={(e) => { e.preventDefault(); const files = e.dataTransfer.files; setPropertyFiles(files); }}
-                      >
-                        {propertyFiles && propertyFiles.length > 0 ? (
-                          <div className="flex gap-2 overflow-x-auto p-1">
-                            {Array.from(propertyFiles).slice(0, 6).map((f, idx) => (
-                              <img key={idx} src={URL.createObjectURL(f)} alt={f.name} className="h-20 w-28 object-cover rounded border" />
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="text-sm text-gray-500">Click or drag images here to upload (multiple)</div>
-                        )}
+                  }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+                      {[['Location Name', 'name', 'text', true], ['Type', 'type', 'text', true], ['Address', 'address', 'text', true], ['Beds', 'beds', 'number'], ['Baths', 'baths', 'number'], ['Area (sqft)', 'area', 'number'], ['Floors', 'floors', 'number'], ['Blocks', 'blocks', 'number'], ['Rooms', 'rooms', 'number']].map(([ph, field, type, req]) => (
+                        <div key={field}>
+                          <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{ph}</label>
+                          <Input placeholder={ph} type={type} value={propertyForm[field]} onChange={e => setPropertyForm(f => ({ ...f, [field]: e.target.value }))} required={req} />
+                        </div>
+                      ))}
+                      <div style={{ gridColumn: '1 / -1', marginTop: 8 }}>
+                        <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: 4, textTransform: 'uppercase' }}>Room Names (comma separated)</label>
+                        <textarea value={(propertyForm.roomNames || []).join(', ')} onChange={e => setPropertyForm(f => ({ ...f, roomNames: String(e.target.value).split(/[;,|]/).map(s => s.trim()).filter(Boolean) }))} style={{ width: '100%', minHeight: 64, padding: 8, borderRadius: 8, border: '1px solid #D1D5DB', fontFamily: 'inherit' }} />
                       </div>
-                      <div className="flex flex-col items-center justify-center">
-                        <input id="property-photos-input" type="file" multiple accept="image/*" className="hidden" onChange={(e) => setPropertyFiles(e.target.files)} />
-                        {propertyFiles && propertyFiles.length > 0 ? (
-                          <button type="button" className="text-sm text-red-600" onClick={() => setPropertyFiles(null)}>Clear</button>
-                        ) : (
-                          <button type="button" className="text-sm text-blue-600" onClick={() => document.getElementById('property-photos-input')?.click()}>Choose files</button>
-                        )}
+                      <div style={{ gridColumn: '1 / -1' }}>
+                        <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Photos</label>
+                        <div onClick={() => document.getElementById('property-photos-input')?.click()} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); setPropertyFiles(e.dataTransfer.files); }} style={{ border: '2px dashed #D1D5DB', borderRadius: 8, padding: 16, textAlign: 'center', cursor: 'pointer', background: '#F9FAFB' }}>
+                          {propertyFiles?.length ? (
+                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
+                              {Array.from(propertyFiles).slice(0, 6).map((f, i) => <img key={i} src={URL.createObjectURL(f)} alt="" style={{ height: 72, width: 90, objectFit: 'cover', borderRadius: 6, border: '1px solid #E5E7EB' }} />)}
+                            </div>
+                          ) : <div style={{ fontSize: 13, color: '#9CA3AF' }}>Click or drag to upload photos</div>}
+                        </div>
+                        <input id="property-photos-input" type="file" multiple accept="image/*" style={{ display: 'none' }} onChange={e => setPropertyFiles(e.target.files)} />
                       </div>
                     </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition flex-1 font-medium"
-                      type="submit"
-                    >
-                      {editingProperty ? 'Update' : 'Add'}
-                    </button>
-                    {editingProperty && (
-                      <button
-                        className="bg-gray-200 text-gray-700 px-4 py-2 rounded hover:bg-gray-300 transition font-medium"
-                        type="button"
-                        onClick={() => {
-                          setEditingProperty(null);
-                          setPropertyForm({ name: '', type: '', address: '', beds: '', baths: '', levels: '', area: '', floors: '', blocks: '', rooms: '' });
-                        }}
-                      >
-                        Cancel
-                      </button>
-                    )}
-                  </div>
+                    <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+                      <Btn type="submit" variant="primary">Save Property</Btn>
+                      <Btn onClick={() => {
+                        setEditingProperty(null);
+                        setPropertyFiles(null);
+                        setPropertyForm({ name: '', type: '', address: '', beds: '', baths: '', area: '', floors: '', blocks: '', rooms: '', namedBlocks: [], roomNames: [] });
+                      }} variant="ghost">Cancel</Btn>
+                    </div>
+                  </form>
                 </div>
-              </form>
+              )}
 
-              <div className="space-y-3">
-                {properties.length === 0 && !loading.properties && !errors.properties && (
-                  <div className="text-center py-8 text-gray-500">
-                    No properties found. Add your first property above.
-                  </div>
-                )}
-
-                {properties.map((property) => (
-                  <div
-                    key={property.id || property._id}
-                    className="border border-blue-100 rounded-lg p-4 hover:shadow-md transition-shadow bg-white"
-                  >
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <h3 className="font-semibold text-gray-900">{property.name}</h3>
-                        <div className="text-sm text-gray-600 mt-1">
-                          <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded mr-2 border border-blue-100">{property.type}</span>
-                          <span className="text-gray-700">{property.address}</span>
-                        </div>
-                        <div className="mt-3 grid grid-cols-4 gap-3 text-center text-gray-600 text-sm">
-                          <div>
-                            <div className="text-gray-400 text-xs">Beds</div>
-                            <div className="font-medium">{property.beds ?? '-'}</div>
-                          </div>
-                          <div>
-                            <div className="text-gray-400 text-xs">Baths</div>
-                            <div className="font-medium">{property.baths ?? '-'}</div>
-                          </div>
-                          <div>
-                            <div className="text-gray-400 text-xs">Levels</div>
-                            <div className="font-medium">{property.levels ?? property.floors ?? '-'}</div>
-                          </div>
-                          <div>
-                            <div className="text-gray-400 text-xs">Area</div>
-                            <div className="font-medium">{property.area ?? property.sqft ?? '-'}</div>
-                          </div>
-                        </div>
-                        <div className="mt-2 grid grid-cols-4 gap-3 text-center text-gray-600 text-sm">
-                          <div>
-                            <div className="text-gray-400 text-xs">Floors</div>
-                            <div className="font-medium">{property.floors ?? '-'}</div>
-                          </div>
-                          <div>
-                            <div className="text-gray-400 text-xs">Blocks</div>
-                            <div className="font-medium">{property.blocks ?? '-'}</div>
-                          </div>
-                          <div>
-                            <div className="text-gray-400 text-xs">Rooms</div>
-                            <div className="font-medium">{property.rooms ?? '-'}</div>
-                          </div>
-                          <div className="flex items-center justify-center">
-                            {/* <button
-                              className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition text-sm"
-                              onClick={() => navigate('/properties')}
-                            >
-                              View Details
-                            </button> */}
-                          </div>
-                        </div>
-                        {property.photos && property.photos.length > 0 && (
-                          <div className="mt-3 flex gap-2 overflow-x-auto">
-                            {property.photos.slice(0, 4).map((p, idx) => (
-                              <img key={idx} src={imageSrc(p)} alt={`${property.name}-photo-${idx}`} className="h-14 w-24 object-cover rounded border" onError={(e) => { e.target.onerror = null; e.target.src = '/default-property.png' }} />
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="flex gap-2">
-                        <button
-                          className="text-blue-600 hover:text-blue-800 px-3 py-1 rounded hover:bg-blue-50 transition border border-blue-200"
-                          onClick={() => {
-                            setEditingProperty(property);
-                            setPropertyForm({
-                              name: property.name,
-                              type: property.type,
-                              address: property.address,
-                              beds: property.beds ?? '',
-                              baths: property.baths ?? '',
-                              levels: property.levels ?? property.floors ?? '',
-                              area: property.area ?? property.sqft ?? '',
-                              floors: property.floors ?? '',
-                              blocks: property.blocks ?? '',
-                              rooms: property.rooms ?? '',
-                            });
-                            setPropertyFiles(null);
-                          }}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          className="text-red-600 hover:text-red-800 px-3 py-1 rounded hover:bg-red-50 transition border border-red-200"
-                          onClick={async () => {
-                            if (window.confirm('Are you sure you want to delete this property?')) {
-                              try {
-                                await api.delete(
-                                  `/api/properties/${property._id || property.id}`
-                                );
-                                setProperties(properties.filter(p => (p._id || p.id) !== (property._id || property.id)));
-                              } catch (err) {
-                                console.error('Error deleting property:', err);
-                                alert('Failed to delete property. Please try again.');
-                              }
-                            }
-                          }}
-                        >
-                          Delete
-                        </button>
-                      </div>
+              <Table heads={['Name', 'Type', 'Address', 'Beds', 'Baths', 'Area', 'Actions']} empty="No properties yet. Add your first one."
+                rows={properties.map(p => [
+                  <Td key="n"><span style={{ fontWeight: 600 }}>{p.name}</span></Td>,
+                  <Td key="t"><span style={{ background: '#EFF6FF', color: '#1D4ED8', padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 600 }}>{p.type}</span></Td>,
+                  <Td key="a">{p.address}</Td>, <Td key="b">{p.beds ?? '—'}</Td>, <Td key="ba">{p.baths ?? '—'}</Td>, <Td key="ar">{p.area ?? p.sqft ?? '—'}</Td>,
+                  <Td key="x">
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <Btn size="sm" variant="outline" onClick={() => {
+                        const named = Array.isArray(p.blocks) || (p.blocks && isNaN(parseInt(String(p.blocks))));
+                        setEditingProperty(p);
+                        setPropertyUseNamedBlocks(!!named);
+                        setPropertyForm({
+                          name: p.name || '',
+                          type: p.type || '',
+                          address: p.address || '',
+                          beds: p.beds || '',
+                          baths: p.baths || '',
+                          area: p.area || '',
+                          floors: p.floors || '',
+                          blocks: !named ? (p.blocks || '') : '',
+                          namedBlocks: named ? (Array.isArray(p.blocks) ? p.blocks : String(p.blocks).split(/[;,|]/).map(s => s.trim()).filter(Boolean)) : [],
+                          rooms: p.rooms || '',
+                          roomNames: Array.isArray(p.roomNames) ? p.roomNames : (p.roomNames ? String(p.roomNames).split(/[;,|]/).map(s => s.trim()).filter(Boolean) : [])
+                        });
+                      }}>Edit</Btn>
+                      <Btn size="sm" variant="danger" onClick={async () => {
+                        if (window.confirm('Delete property?')) {
+                          try {
+                            await api.delete(`/api/properties/${p._id || p.id}`);
+                            const r = await api.get('/api/properties');
+                            setProperties(r.data || []);
+                          } catch {
+                            alert('Delete failed');
+                          }
+                        }
+                      }}>Delete</Btn>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  </Td>,
+                ])}
+              />
             </div>
           )}
 
+          {/* ── Assets ── */}
           {activeTab === 'assets' && (
             <div>
-              <h2 className="text-2xl font-bold text-gray-800 mb-6">
-                Assets <span className="text-gray-500 text-lg">({assets.length})</span>
-              </h2>
+              <SectionHeader title="Assets" count={assets.length}
+                action={!editingAsset && <div style={{ display: 'flex', gap: 8 }}><Btn onClick={() => setEditingAsset({})} variant="primary" size="sm"><Icon.Plus /> Add Asset</Btn><Btn onClick={() => importAssetsRef.current?.click()} variant="outline" size="sm">Import Excel</Btn></div>} />
 
-              {loading.assets && (
-                <div className="text-center py-8">
-                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                  <p className="mt-2 text-gray-600">Loading assets...</p>
-                </div>
-              )}
+              {loading.assets && <div style={{ textAlign: 'center', padding: 40, color: '#9CA3AF' }}>Loading…</div>}
+              {errors.assets && <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 10, padding: 14, marginBottom: 16, color: '#991B1B', fontSize: 13 }}>Error: {errors.assets}</div>}
 
-              {errors.assets && (
-                <div className="bg-red-50 text-red-700 p-4 rounded-lg mb-4 border border-red-200">
-                  Error: {errors.assets}
-                </div>
-              )}
-
-              <form
-                className="bg-blue-50 p-4 rounded-lg mb-6 border border-blue-100"
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  try {
-                    // Always include propertyId in payload
-                    const payload = { ...assetForm };
-                    if (!payload.propertyId) {
-                      // Try to infer propertyId from selected property if available
-                      if (typeof selectedProperty === 'object' && (selectedProperty?.id || selectedProperty?._id)) {
-                        payload.propertyId = selectedProperty.id || selectedProperty._id;
+              {editingAsset !== null && (
+                <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 14, padding: 24, marginBottom: 20 }}>
+                  <div style={{ fontWeight: 700, fontSize: 15, color: '#111827', marginBottom: 16 }}>{editingAsset._id || editingAsset.id ? 'Edit Asset' : 'New Asset'}</div>
+                  <form onSubmit={async (e) => {
+                    e.preventDefault();
+                    try {
+                      const payload = { ...assetForm };
+                      const eid = editingAsset._id || editingAsset.id;
+                      if (eid) {
+                        const prev = originalAssetBlocks.map(String);
+                        const now = (assetForm.blocks || []).map(String);
+                        const remove = prev.filter(p => !now.includes(p));
+                        if (remove.length) payload.removeBlocks = remove;
+                        await api.put(`/api/assets/${eid}`, payload);
+                        setEditingAsset(null);
+                        setOriginalAssetBlocks([]);
+                      } else {
+                        const userId = getCurrentUserId();
+                        await api.post('/api/assets', { ...payload, userId });
+                        setEditingAsset(null);
                       }
+                      setAssetForm({ name: '', type: '', description: '', propertyId: '', quantity: 1, building: '', blocks: [], room: '' });
+                      const r = await api.get('/api/assets');
+                      setAssets(r.data || []);
+                    } catch {
+                      alert('Failed to save asset.');
                     }
-                    if (editingAsset) {
-                      // compute removed blocks
-                      const prev = Array.isArray(originalAssetBlocks) ? originalAssetBlocks.map(String) : [];
-                      const now = Array.isArray(assetForm.blocks) ? assetForm.blocks.map(String) : [];
-                      const remove = prev.filter(p => !now.includes(p));
-                      if (remove.length > 0) payload.removeBlocks = remove;
-                      await api.put(`/api/assets/${editingAsset._id || editingAsset.id}`, payload);
-                      setEditingAsset(null);
-                      setOriginalAssetBlocks([]);
-                    } else {
-                      const storedUser = localStorage.getItem("user");
-                      let userId = null;
-                      try {
-                        userId = storedUser ? JSON.parse(storedUser).id || JSON.parse(storedUser)._id : null;
-                      } catch (e) {
-                        userId = null;
-                      }
-                      // Only send propertyId and userId as flat fields
-                      await api.post('/api/assets', { ...payload, userId, propertyId: payload.propertyId });
-                    }
-                    setAssetForm({ name: '', type: '', description: '', propertyId: '', quantity: 1, building: '', blocks: [] });
-                    const res = await api.get('/api/assets');
-                    setAssets(res.data || []);
-                  } catch (err) {
-                    console.error('Error saving asset:', err);
-                    alert('Failed to save asset. Please try again.');
-                  }
-                }}
-              >
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-3">
-                  <input
-                    className="border border-blue-200 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Asset Name"
-                    value={assetForm.name}
-                    onChange={(e) => setAssetForm(f => ({ ...f, name: e.target.value }))}
-                    required
-                  />
-                  <input
-                    className="border border-blue-200 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Type"
-                    value={assetForm.type}
-                    onChange={(e) => setAssetForm(f => ({ ...f, type: e.target.value }))}
-                    required
-                  />
-                  <input
-                    className="border border-blue-200 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Description"
-                    value={assetForm.description}
-                    onChange={(e) => setAssetForm(f => ({ ...f, description: e.target.value }))}
-                  />
-                  <div className="flex items-center gap-2 border border-blue-200 rounded px-3 py-2">
-                    <button type="button" className="px-2 py-1 bg-gray-100 rounded" onClick={() => setAssetForm(f => ({ ...f, quantity: Math.max(1, (f.quantity || 1) - 1) }))}>-</button>
-                    <input
-                      className="w-16 text-center outline-none"
-                      type="number"
-                      min="1"
-                      placeholder="Quantity"
-                      value={assetForm.quantity}
-                      onChange={(e) => setAssetForm(f => ({ ...f, quantity: Math.max(1, parseInt(e.target.value) || 1) }))}
-                      required
-                    />
-                    <button type="button" className="px-2 py-1 bg-gray-100 rounded" onClick={() => setAssetForm(f => ({ ...f, quantity: (f.quantity || 1) + 1 }))}>+</button>
-                  </div>
-
-                  <select
-                    className="border border-blue-200 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    value={assetForm.propertyId}
-                    onChange={(e) => {
-                      const pid = e.target.value;
-                      const prop = properties.find(p => (p.id || p._id) === pid);
-                      setAssetForm(f => ({ ...f, propertyId: pid, building: prop?.name || '', blocks: [] }));
-                    }}
-                    required
-                  >
-                    <option value="">Select Property</option>
-                    {properties.map(p => (
-                      <option key={p.id || p._id} value={p.id || p._id}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </select>
-
-                  {(() => {
-                    const prop = properties.find(p => (p.id || p._id) === assetForm.propertyId);
-                    const blocksCount = parseInt(prop?.blocks) || 0;
-                    if (blocksCount > 0) {
-                      // render checkboxes to select multiple blocks
-                      return (
-                        <div className="col-span-6">
-                          <div className="text-sm text-gray-600 mb-1">Select Blocks (optional)</div>
-                          <div className="grid grid-cols-6 gap-2">
-                            {Array.from({ length: blocksCount }).map((_, idx) => {
-                              const val = String(idx + 1);
-                              const checked = (assetForm.blocks || []).includes(val);
-                              return (
-                                <label key={val} className={`px-2 py-1 border rounded text-center ${checked ? 'bg-blue-600 text-white' : 'bg-white text-gray-700'}`}>
-                                  <input type="checkbox" className="mr-1" checked={checked} onChange={() => {
-                                    setAssetForm(f => {
-                                      const cur = f.blocks || [];
-                                      if (cur.includes(val)) return { ...f, blocks: cur.filter(x => x !== val) };
-                                      return { ...f, blocks: [...cur, val] };
-                                    });
-                                  }} />
-                                  {`Block ${val}`}
-                                </label>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      );
-                    }
-                    return (
-                      <input
-                        className="border border-blue-200 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="Block (optional)"
-                        value={(assetForm.blocks || []).join(', ')}
-                        onChange={(e) => setAssetForm(f => ({ ...f, blocks: e.target.value.split(/[;,|]/).map(s => s.trim()).filter(Boolean) }))}
-                      />
-                    );
-                  })()}
-                  <div className="flex gap-2">
-                    <button
-                      className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition flex-1 font-medium"
-                      type="submit"
-                    >
-                      {editingAsset ? 'Update' : 'Add'}
-                    </button>
-                    {editingAsset && (
-                      <button
-                        className="bg-gray-200 text-gray-700 px-4 py-2 rounded hover:bg-gray-300 transition font-medium"
-                        type="button"
-                        onClick={() => {
-                          setEditingAsset(null);
-                          setAssetForm({ name: '', type: '', description: '', propertyId: '', quantity: 1, building: '', blocks: [] });
-                        }}
-                      >
-                        Cancel
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </form>
-
-              <div className="space-y-3">
-                {assets.length === 0 && !loading.assets && !errors.assets && (
-                  <div className="text-center py-8 text-gray-500">
-                    No assets found. Add your first asset above.
-                  </div>
-                )}
-
-                {assets.map((asset) => (
-                  <div
-                    key={asset.id || asset._id}
-                    className="border border-blue-100 rounded-lg p-4 hover:shadow-md transition-shadow bg-white"
-                  >
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h3 className="font-semibold text-gray-900">{asset.name}</h3>
-                        <div className="text-sm text-gray-600 mt-1 space-y-1">
-                          <div>
-                            <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded mr-2 border border-blue-100">{asset.type}</span>
-                            <span className="text-blue-600 font-medium">Qty: {asset.quantity || 1}</span>
-                          </div>
-                          {asset.description && (
-                            <p className="mt-1 text-gray-700">{asset.description}</p>
-                          )}
-                          <p className="text-gray-600">
-                            Property: {asset.property ? asset.property.name : 'N/A'}
-                          </p>
-                          {asset.building && (
-                            <p className="text-gray-600">Building: {asset.building}</p>
-                          )}
-                          {asset.block && (
-                            <p className="text-gray-600">Block: {asset.block}</p>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="flex gap-2">
-                        <button
-                          className="text-blue-600 hover:text-blue-800 px-3 py-1 rounded hover:bg-blue-50 transition border border-blue-200"
-                          onClick={() => {
-                            // normalize blocks for editing
-                            let blocksArr = [];
-                            if (asset.blocks && Array.isArray(asset.blocks)) blocksArr = asset.blocks.map(String);
-                            else if (asset.block) {
-                              if (Array.isArray(asset.block)) blocksArr = asset.block.map(String);
-                              else blocksArr = String(asset.block).split(/[;,|]/).map(s => s.trim()).filter(Boolean);
-                            } else if (asset.location) {
-                              const loc = asset.location;
-                              if (typeof loc === 'string') {
-                                try { const parsed = JSON.parse(loc); if (parsed && parsed.block) blocksArr = Array.isArray(parsed.block) ? parsed.block.map(String) : String(parsed.block).split(/[;,|]/).map(s => s.trim()).filter(Boolean); } catch (e) { }
-                              } else if (typeof loc === 'object' && loc.block) {
-                                blocksArr = Array.isArray(loc.block) ? loc.block.map(String) : String(loc.block).split(/[;,|]/).map(s => s.trim()).filter(Boolean);
-                              }
-                            }
-                            setEditingAsset(asset);
-                            setOriginalAssetBlocks(blocksArr || []);
-                            setAssetForm({
-                              name: asset.name,
-                              type: asset.type,
-                              description: asset.description || '',
-                              propertyId: asset.propertyId,
-                              quantity: asset.quantity || 1,
-                              building: asset.building || asset.property?.name || '',
-                              blocks: blocksArr || [],
-                            });
-                          }}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          className="text-red-600 hover:text-red-800 px-3 py-1 rounded hover:bg-red-50 transition border border-red-200"
-                          onClick={async () => {
-                            if (window.confirm('Are you sure you want to delete this asset?')) {
-                              try {
-                                await api.delete(
-                                  `/api/assets/${asset._id || asset.id}`
-                                );
-                                setAssets(assets.filter(a => (a._id || a.id) !== (asset._id || asset.id)));
-                              } catch (err) {
-                                console.error('Error deleting asset:', err);
-                                alert('Failed to delete asset. Please try again.');
-                              }
-                            }
-                          }}
-                        >
-                          Delete
-                        </button>
-                      </div>
+                  }}>
+                    <div style={{ marginBottom: 12, display: 'flex', gap: 12, alignItems: 'center' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                        <input type="checkbox" checked={propertyUseNamedBlocks} onChange={e => setPropertyUseNamedBlocks(e.target.checked)} />
+                        Use named blocks (comma separated)
+                      </label>
                     </div>
-                  </div>
-                ))}
-              </div>
+                    {propertyUseNamedBlocks && (
+                      <div style={{ marginBottom: 12 }}>
+                        <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: 4, textTransform: 'uppercase' }}>Block Names</label>
+                        <textarea value={(propertyForm.namedBlocks || []).join(', ')} onChange={e => setPropertyForm(f => ({ ...f, namedBlocks: String(e.target.value).split(/[;,|]/).map(s => s.trim()).filter(Boolean) }))} style={{ width: '100%', minHeight: 64, padding: 8, borderRadius: 8, border: '1px solid #D1D5DB', fontFamily: 'inherit' }} />
+                      </div>
+                    )}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+                      {[['Asset Name', 'name', 'text', true], ['Type', 'type', 'text', true], ['Description', 'description', 'text']].map(([ph, field, type, req]) => (
+                        <div key={field}>
+                          <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{ph}</label>
+                          <Input placeholder={ph} type={type} value={assetForm[field] || ''} onChange={e => setAssetForm(f => ({ ...f, [field]: e.target.value }))} required={req} />
+                        </div>
+                      ))}
+                      <div>
+                        <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Quantity</label>
+                        <div style={{ display: 'flex', alignItems: 'center', border: '1px solid #D1D5DB', borderRadius: 8, overflow: 'hidden' }}>
+                          <button type="button" onClick={() => setAssetForm(f => ({ ...f, quantity: Math.max(1, (f.quantity || 1) - 1) }))} style={{ padding: '9px 14px', background: '#F9FAFB', border: 'none', cursor: 'pointer', fontSize: 16, color: '#374151' }}>−</button>
+                          <input type="number" min="1" value={assetForm.quantity} onChange={e => setAssetForm(f => ({ ...f, quantity: Math.max(1, +e.target.value || 1) }))} style={{ flex: 1, textAlign: 'center', border: 'none', outline: 'none', fontSize: 14, fontWeight: 600 }} />
+                          <button type="button" onClick={() => setAssetForm(f => ({ ...f, quantity: (f.quantity || 1) + 1 }))} style={{ padding: '9px 14px', background: '#F9FAFB', border: 'none', cursor: 'pointer', fontSize: 16, color: '#374151' }}>+</button>
+                        </div>
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Property</label>
+                        <Select value={assetForm.propertyId} onChange={e => {
+                          const pid = e.target.value;
+                          const prop = properties.find(p => (p.id || p._id) === pid);
+                          setAssetForm(f => ({ ...f, propertyId: pid, building: prop?.name || '', blocks: [] }));
+                        }} required>
+                          <option value="">Select location…</option>
+                          {properties.map(p => <option key={p.id || p._id} value={p.id || p._id}>{p.name}</option>)}
+                        </Select>
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Room</label>
+                        <Input placeholder="Room (optional)" value={assetForm.room || ''} onChange={e => setAssetForm(f => ({ ...f, room: e.target.value }))} />
+                      </div>
+                      {/* Blocks */}
+                      {(() => {
+                        const prop = properties.find(p => (p.id || p._id) === assetForm.propertyId) || {};
+                        let namedBlocks = [];
+                        let blocksCount = 0;
+                        if (Array.isArray(prop.blocks)) namedBlocks = prop.blocks.map(String);
+                        else if (prop.blocks && String(prop.blocks).match(/[,|;]/)) namedBlocks = String(prop.blocks).split(/[;,|]/).map(s => s.trim()).filter(Boolean);
+                        else blocksCount = parseInt(prop?.blocks) || 0;
+
+                        if (namedBlocks.length > 0) return (
+                          <div style={{ gridColumn: '1 / -1' }}>
+                            <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Blocks</label>
+                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                              {namedBlocks.map((name, idx) => {
+                                const val = String(name);
+                                const checked = (assetForm.blocks || []).map(String).includes(val);
+                                return <label key={idx} style={{ cursor: 'pointer', padding: '5px 12px', borderRadius: 6, border: `1px solid ${checked ? '#1D4ED8' : '#D1D5DB'}`, background: checked ? '#EFF6FF' : 'white', fontSize: 12, fontWeight: 600, color: checked ? '#1D4ED8' : '#374151', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                  <input type="checkbox" style={{ display: 'none' }} checked={checked} onChange={() => setAssetForm(f => {
+                                    const cur = (f.blocks || []).map(String);
+                                    return { ...f, blocks: cur.includes(val) ? cur.filter(x => x !== val) : [...cur, val] };
+                                  })} />
+                                  {val}
+                                </label>;
+                              })}
+                            </div>
+                          </div>
+                        );
+
+                        if (blocksCount > 0) return (
+                          <div style={{ gridColumn: '1 / -1' }}>
+                            <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Blocks</label>
+                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                              {Array.from({ length: blocksCount }).map((_, idx) => {
+                                const val = String(idx + 1);
+                                const checked = (assetForm.blocks || []).includes(val);
+                                return <label key={val} style={{ cursor: 'pointer', padding: '5px 12px', borderRadius: 6, border: `1px solid ${checked ? '#1D4ED8' : '#D1D5DB'}`, background: checked ? '#EFF6FF' : 'white', fontSize: 12, fontWeight: 600, color: checked ? '#1D4ED8' : '#374151', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                  <input type="checkbox" style={{ display: 'none' }} checked={checked} onChange={() => setAssetForm(f => {
+                                    const cur = f.blocks || [];
+                                    return { ...f, blocks: cur.includes(val) ? cur.filter(x => x !== val) : [...cur, val] };
+                                  })} />
+                                  Block {val}
+                                </label>;
+                              })}
+                            </div>
+                          </div>
+                        );
+
+                        return (
+                          <div>
+                            <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Block</label>
+                            <Input placeholder="Block (optional)" value={(assetForm.blocks || []).join(', ')} onChange={e => setAssetForm(f => ({ ...f, blocks: String(e.target.value).split(/[;,|]/).map(s => s.trim()).filter(Boolean) }))} />
+                          </div>
+                        );
+                      })()}
+                    </div>
+                    <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+                      <Btn type="submit" variant="primary">Save Asset</Btn>
+                      <Btn onClick={() => {
+                        setEditingAsset(null);
+                        setAssetForm({ name: '', type: '', description: '', propertyId: '', quantity: 1, building: '', blocks: [], room: '' });
+                      }} variant="ghost">Cancel</Btn>
+                    </div>
+                  </form>
+                </div>
+              )}
+
+              <Table heads={['Name', 'Type', 'Qty', 'Location', 'Building', 'Room', 'Block', 'Description', 'Actions']} empty="No assets yet."
+                rows={assets.map(asset => [
+                  <Td key="n"><span style={{ fontWeight: 600 }}>{asset.name}</span></Td>,
+                  <Td key="t"><span style={{ background: '#EFF6FF', color: '#1D4ED8', padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 600 }}>{asset.type}</span></Td>,
+                  <Td key="q"><span style={{ fontWeight: 700 }}>{asset.quantity || 1}</span></Td>,
+                  <Td key="p">{asset.property?.name || '—'}</Td>,
+                  <Td key="bu">{asset.building || '—'}</Td>,
+                  <Td key="ro">{asset.room || '—'}</Td>,
+                  <Td key="bl">{asset.block || '—'}</Td>,
+                  <Td key="d"><span style={{ color: '#9CA3AF' }}>{asset.description || '—'}</span></Td>,
+                  <Td key="x">
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <Btn size="sm" variant="outline" onClick={() => {
+                        let blocksArr = [];
+                        if (Array.isArray(asset.blocks)) blocksArr = asset.blocks.map(String);
+                        else if (asset.block) blocksArr = Array.isArray(asset.block) ? asset.block.map(String) : String(asset.block).split(/[;,|]/).map(s => s.trim()).filter(Boolean);
+                        setEditingAsset(asset);
+                        setOriginalAssetBlocks(blocksArr);
+                        setAssetForm({
+                          name: asset.name,
+                          type: asset.type,
+                          description: asset.description || '',
+                          propertyId: asset.propertyId,
+                          quantity: asset.quantity || 1,
+                          building: asset.building || '',
+                          blocks: blocksArr,
+                          room: asset.room || ''
+                        });
+                      }}>Edit</Btn>
+                      <Btn size="sm" variant="danger" onClick={async () => {
+                        if (window.confirm('Delete this asset?')) {
+                          try {
+                            await api.delete(`/api/assets/${asset._id || asset.id}`);
+                            setAssets(assets.filter(a => (a._id || a.id) !== (asset._id || asset.id)));
+                          } catch {
+                            alert('Delete failed');
+                          }
+                        }
+                      }}>Delete</Btn>
+                    </div>
+                  </Td>,
+                ])}
+              />
             </div>
           )}
 
+          {/* ── Staff ── */}
           {activeTab === 'internalTechnicians' && (
             <div>
-              <h2 className="text-2xl font-bold text-gray-800 mb-6">Internal Technicians</h2>
+              <SectionHeader title="Internal Technicians" count={internalTechnicians.length}
+                action={!editingTech && <Btn onClick={() => setEditingTech({})} variant="primary" size="sm"><Icon.Plus /> Add Technician</Btn>} />
 
-              {loading.internalTechnicians && (
-                <div className="text-center py-8">
-                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                  <p className="mt-2 text-gray-600">Loading technicians...</p>
-                </div>
-              )}
+              {loading.internalTechnicians && <div style={{ textAlign: 'center', padding: 40, color: '#9CA3AF' }}>Loading…</div>}
+              {errors.internalTechnicians && <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 10, padding: 14, marginBottom: 16, color: '#991B1B', fontSize: 13 }}>Error: {errors.internalTechnicians}</div>}
 
-              {errors.internalTechnicians && (
-                <div className="bg-red-50 text-red-700 p-4 rounded-lg mb-4 border border-red-200">
-                  Error: {errors.internalTechnicians}
-                </div>
-              )}
-
-              <form
-                className="bg-blue-50 p-4 rounded-lg mb-6 border border-blue-100"
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  try {
-                    const storedUser = localStorage.getItem("user");
-                    let userId = null;
+              {editingTech !== null && (
+                <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 14, padding: 24, marginBottom: 20 }}>
+                  <div style={{ fontWeight: 700, fontSize: 15, color: '#111827', marginBottom: 16 }}>{editingTech._id || editingTech.id ? 'Edit Technician' : 'New Technician'}</div>
+                  <form onSubmit={async (e) => {
+                    e.preventDefault();
                     try {
-                      userId = storedUser ? JSON.parse(storedUser).id || JSON.parse(storedUser)._id : null;
-                    } catch (e) {
-                      userId = null;
-                    }
-                    const data = {
-                      ...techForm,
-                      specialty: techForm.specialty.filter(s => s.trim()),
-                      userId,
-                    };
-
-                    if (editingTech) {
-                      await api.put(
-                        `/api/internal-technicians/${editingTech._id || editingTech.id}`,
-                        data
-                      );
+                      const userId = getCurrentUserId();
+                      const data = { ...techForm, specialty: techForm.specialty.filter(s => s.trim()), userId };
+                      const eid = editingTech._id || editingTech.id;
+                      if (eid) {
+                        await api.put(`/api/internal-technicians/${eid}`, data);
+                      } else {
+                        await api.post('/api/internal-technicians', data);
+                      }
                       setEditingTech(null);
-                    } else {
-                      await api.post('/api/internal-technicians', data);
+                      setTechForm({ name: '', email: '', phone: '', password: '', specialty: [], rating: 0, completed: 0, propertyId: '' });
+                      const r = await api.get('/api/internal-technicians');
+                      setInternalTechnicians(r.data || []);
+                    } catch {
+                      alert('Failed to save technician.');
                     }
-
-                    setTechForm({
-                      name: '',
-                      email: '',
-                      phone: '',
-                      password: '',
-                      specialty: [],
-                      rating: 0,
-                      completed: 0,
-                      propertyId: '',
-                    });
-
-                    const res = await api.get('/api/internal-technicians');
-                    setInternalTechnicians(res.data || []);
-                  } catch (err) {
-                    console.error('Error saving technician:', err);
-                    alert('Failed to save technician. Please try again.');
-                  }
-                }}
-              >
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <input
-                    className="border border-blue-200 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Name"
-                    value={techForm.name}
-                    onChange={(e) => setTechForm(f => ({ ...f, name: e.target.value }))}
-                    required
-                  />
-                  <input
-                    className="border border-blue-200 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    type="email"
-                    placeholder="Email"
-                    value={techForm.email}
-                    onChange={(e) => setTechForm(f => ({ ...f, email: e.target.value }))}
-                  />
-                  <input
-                    className="border border-blue-200 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Phone"
-                    value={techForm.phone}
-                    onChange={(e) => setTechForm(f => ({ ...f, phone: e.target.value }))}
-                    required
-                  />
-                  <input
-                    className="border border-blue-200 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Specialty (comma separated)"
-                    value={techForm.specialty.join(', ')}
-                    onChange={(e) =>
-                      setTechForm(f => ({
-                        ...f,
-                        specialty: e.target.value.split(',').map(s => s.trim()),
-                      }))
-                    }
-                  />
-                  <input
-                    className="border border-blue-200 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    type="number"
-                    step="0.1"
-                    min="0"
-                    max="5"
-                    placeholder="Rating"
-                    value={techForm.rating}
-                    onChange={(e) =>
-                      setTechForm(f => ({ ...f, rating: parseFloat(e.target.value) || 0 }))
-                    }
-                  />
-                  <input
-                    className="border border-blue-200 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    type="number"
-                    min="0"
-                    placeholder="Completed Jobs"
-                    value={techForm.completed}
-                    onChange={(e) =>
-                      setTechForm(f => ({ ...f, completed: parseInt(e.target.value) || 0 }))
-                    }
-                  />
-                  <select
-                    className="border border-blue-200 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent md:col-span-2"
-                    value={techForm.propertyId}
-                    onChange={(e) => setTechForm(f => ({ ...f, propertyId: e.target.value }))}
-                    required
-                  >
-                    <option value="">Select Property</option>
-                    {properties.map(p => (
-                      <option key={p.id || p._id} value={p.id || p._id}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="mt-3">
-                  <input
-                    className="border border-blue-200 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-full md:w-1/2"
-                    type="password"
-                    placeholder="Password (optional)"
-                    value={techForm.password}
-                    onChange={(e) => setTechForm(f => ({ ...f, password: e.target.value }))}
-                  />
-                </div>
-
-                <div className="flex gap-3 mt-4">
-                  <button
-                    className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition font-medium"
-                    type="submit"
-                  >
-                    {editingTech ? 'Update' : 'Add Technician'}
-                  </button>
-                  {editingTech && (
-                    <button
-                      className="bg-gray-200 text-gray-700 px-6 py-2 rounded hover:bg-gray-300 transition font-medium"
-                      type="button"
-                      onClick={() => {
-                        setEditingTech(null);
-                        setTechForm({
-                          name: '',
-                          email: '',
-                          phone: '',
-                          specialty: [],
-                          rating: 0,
-                          completed: 0,
-                          propertyId: '',
-                        });
-                      }}
-                    >
-                      Cancel
-                    </button>
-                  )}
-                </div>
-              </form>
-
-              <div className="space-y-3">
-                {internalTechnicians.length === 0 &&
-                  !loading.internalTechnicians &&
-                  !errors.internalTechnicians && (
-                    <div className="text-center py-8 text-gray-500">
-                      No technicians found. Add your first technician above.
-                    </div>
-                  )}
-
-                {internalTechnicians.map((tech) => (
-                  <div
-                    key={tech.id || tech._id}
-                    className="border border-blue-100 rounded-lg p-4 hover:shadow-md transition-shadow bg-white"
-                  >
-                    <div className="flex justify-between items-start">
+                  }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+                      {[['Name', 'name', 'text', true], ['Email', 'email', 'email'], ['Phone', 'phone', 'text', true]].map(([ph, field, type, req]) => (
+                        <div key={field}>
+                          <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{ph}</label>
+                          <Input placeholder={ph} type={type} value={techForm[field] || ''} onChange={e => setTechForm(f => ({ ...f, [field]: e.target.value }))} required={req} />
+                        </div>
+                      ))}
                       <div>
-                        <h3 className="font-semibold text-gray-900">{tech.name}</h3>
-                        <div className="text-sm text-gray-600 mt-2 space-y-1">
-                          <div className="flex items-center gap-4">
-                            <span>📧 {tech.email || 'N/A'}</span>
-                            <span>📞 {tech.phone}</span>
-                          </div>
-                          <div className="flex items-center gap-4">
-                            <span>
-                              <span className="text-yellow-600">⭐ {tech.rating || 0}</span> Rating
-                            </span>
-                            <span>✅ {tech.completed || 0} Jobs</span>
-                          </div>
-                          <div>
-                            <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded mr-2 border border-blue-100">
-                              {Array.isArray(tech.specialty)
-                                ? tech.specialty.join(', ')
-                                : tech.specialty || 'N/A'}
-                            </span>
-                          </div>
-                          <p className="text-gray-600">
-                            Property: {tech.property ? tech.property.name : 'N/A'}
-                          </p>
+                        <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Specialty</label>
+                        <Input placeholder="e.g. Plumbing, HVAC" value={techForm.specialty.join(', ')} onChange={e => setTechForm(f => ({ ...f, specialty: e.target.value.split(',').map(s => s.trim()) }))} />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Rating (0–5)</label>
+                        <Input type="number" step="0.1" min="0" max="5" value={techForm.rating} onChange={e => setTechForm(f => ({ ...f, rating: parseFloat(e.target.value) || 0 }))} />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Completed Jobs</label>
+                        <Input type="number" min="0" value={techForm.completed} onChange={e => setTechForm(f => ({ ...f, completed: parseInt(e.target.value) || 0 }))} />
+                      </div>
+                      <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                        <div>
+                          <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Location</label>
+                          <Select value={techForm.propertyId} onChange={e => setTechForm(f => ({ ...f, propertyId: e.target.value }))} required>
+                            <option value="">Select location…</option>
+                            {properties.map(p => <option key={p.id || p._id} value={p.id || p._id}>{p.name}</option>)}
+                          </Select>
+                        </div>
+                        <div>
+                          <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Password (optional)</label>
+                          <Input type="password" placeholder="Password" value={techForm.password} onChange={e => setTechForm(f => ({ ...f, password: e.target.value }))} />
                         </div>
                       </div>
-
-                      <div className="flex gap-2">
-                        <button
-                          className="text-blue-600 hover:text-blue-800 px-3 py-1 rounded hover:bg-blue-50 transition border border-blue-200"
-                          onClick={() => {
-                            setEditingTech(tech);
-                            setTechForm({
-                              name: tech.name,
-                              email: tech.email || '',
-                              phone: tech.phone,
-                              specialty: Array.isArray(tech.specialty) ? tech.specialty : [],
-                              rating: tech.rating || 0,
-                              completed: tech.completed || 0,
-                              propertyId: tech.propertyId,
-                            });
-                          }}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          className="text-green-600 hover:text-green-800 px-3 py-1 rounded hover:bg-green-50 transition border border-green-200"
-                          onClick={() => openAssignModal(tech)}
-                        >
-                          Assign Issue
-                        </button>
-                        <button
-                          className="text-red-600 hover:text-red-800 px-3 py-1 rounded hover:bg-red-50 transition border border-red-200"
-                          onClick={async () => {
-                            if (window.confirm('Are you sure you want to delete this technician?')) {
-                              try {
-                                await api.delete(
-                                  `/api/internal-technicians/${tech._id || tech.id}`
-                                );
-                                setInternalTechnicians(
-                                  internalTechnicians.filter(t => (t._id || t.id) !== (tech._id || tech.id))
-                                );
-                              } catch (err) {
-                                console.error('Error deleting technician:', err);
-                                alert('Failed to delete technician. Please try again.');
-                              }
-                            }
-                          }}
-                        >
-                          Delete
-                        </button>
-                      </div>
                     </div>
+                    <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+                      <Btn type="submit" variant="primary">Save Technician</Btn>
+                      <Btn onClick={() => {
+                        setEditingTech(null);
+                        setTechForm({ name: '', email: '', phone: '', password: '', specialty: [], rating: 0, completed: 0, propertyId: '' });
+                      }} variant="ghost">Cancel</Btn>
+                    </div>
+                  </form>
+                </div>
+              )}
+
+              <Table heads={['Name', 'Contact', 'Specialty', 'Rating', 'Jobs', 'Location', 'Actions']} empty="No technicians yet."
+                rows={internalTechnicians.map(tech => [
+                  <Td key="n"><span style={{ fontWeight: 600 }}>{tech.name}</span></Td>,
+                  <Td key="c"><div style={{ fontSize: 12 }}><div>{tech.email || '—'}</div><div style={{ color: '#9CA3AF' }}>{tech.phone || ''}</div></div></Td>,
+                  <Td key="s">{Array.isArray(tech.specialty) ? tech.specialty.filter(Boolean).join(', ') : tech.specialty || '—'}</Td>,
+                  <Td key="r"><span style={{ color: '#F59E0B', fontWeight: 700 }}>★ {tech.rating || 0}</span></Td>,
+                  <Td key="j"><span style={{ fontWeight: 600 }}>{tech.completed || 0}</span></Td>,
+                  <Td key="p">{tech.property?.name || '—'}</Td>,
+                  <Td key="x">
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <Btn size="sm" variant="outline" onClick={() => {
+                        setEditingTech(tech);
+                        setTechForm({
+                          name: tech.name,
+                          email: tech.email || '',
+                          phone: tech.phone,
+                          specialty: Array.isArray(tech.specialty) ? tech.specialty : [],
+                          rating: tech.rating || 0,
+                          completed: tech.completed || 0,
+                          propertyId: tech.propertyId
+                        });
+                      }}>Edit</Btn>
+                      <Btn size="sm" variant="ghost" onClick={() => {
+                        setNewIssueModel({ category: '', propertyId: tech.propertyId, technicianId: tech.id || tech._id });
+                        setShowNewIssueModal(true);
+                      }}>Report Issue</Btn>
+                      <Btn size="sm" variant="success" onClick={() => openAssignModal(tech)}>Assign</Btn>
+                      <Btn size="sm" variant="danger" onClick={async () => {
+                        if (window.confirm('Delete this technician?')) {
+                          try {
+                            await api.delete(`/api/internal-technicians/${tech._id || tech.id}`);
+                            setInternalTechnicians(internalTechnicians.filter(t => (t._id || t.id) !== (tech._id || tech.id)));
+                          } catch {
+                            alert('Delete failed');
+                          }
+                        }
+                      }}>Delete</Btn>
+                    </div>
+                  </Td>,
+                ])}
+              />
+            </div>
+          )}
+
+          {/* ── Organization / Team ── */}
+          {activeTab === 'organization' && (
+            <div>
+              <SectionHeader title="Organization" />
+              <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 14, padding: 20, marginBottom: 20 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 220px', gap: 12 }}>
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: 4 }}>Organization Name</label>
+                    <Input value={(localStorage.getItem('organization') && JSON.parse(localStorage.getItem('organization') || '{}').name) || ''} onChange={(e) => {
+                      const cur = localStorage.getItem('organization') ? JSON.parse(localStorage.getItem('organization') || '{}') : {};
+                      cur.name = e.target.value;
+                      localStorage.setItem('organization', JSON.stringify(cur));
+                    }} />
                   </div>
-                ))}
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: 4 }}>Admin Email</label>
+                    <Input value={(localStorage.getItem('organization') && JSON.parse(localStorage.getItem('organization') || '{}').email) || ''} onChange={(e) => {
+                      const cur = localStorage.getItem('organization') ? JSON.parse(localStorage.getItem('organization') || '{}') : {};
+                      cur.email = e.target.value;
+                      localStorage.setItem('organization', JSON.stringify(cur));
+                    }} />
+                  </div>
+                </div>
+                <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: '1fr 160px 160px', gap: 12 }}>
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: 4 }}>Invite technician (email)</label>
+                    <input ref={inviteEmailRef} placeholder="email@domain.com" style={{ width: '100%', padding: 8, borderRadius: 8, border: '1px solid #D1D5DB' }} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: 4 }}>Role</label>
+                    <select ref={inviteRoleRef} style={{ width: '100%', padding: 8, borderRadius: 8, border: '1px solid #D1D5DB' }}>
+                      <option value="internal">Internal</option>
+                      <option value="external">External</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: 4 }}>Location</label>
+                    <select ref={inviteLocationRef} style={{ width: '100%', padding: 8, borderRadius: 8, border: '1px solid #D1D5DB' }}>
+                      <option value="">(optional)</option>
+                      {properties.map(p => <option key={p.id || p._id} value={p.id || p._id}>{p.name}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+                  <Btn onClick={handleInvite}>Invite</Btn>
+                </div>
+                <div style={{ marginTop: 8, fontSize: 12, color: '#9CA3AF' }}>Invited technicians receive an email and can set up their account without manual signup steps.</div>
               </div>
             </div>
           )}
 
+          {/* ── Maintenance Templates ── */}
           {activeTab === 'maintenanceTemplates' && (
             <div>
-              <h2 className="text-2xl font-bold text-gray-800 mb-6">Maintenance</h2>
+              <SectionHeader title="Maintenance" count={maintenanceSchedules.length} />
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                <div
-                  className="bg-gradient-to-r from-blue-900 to-blue-800 border border-blue-700 rounded-xl p-6 cursor-pointer hover:shadow-md transition-shadow hover:scale-105 transform duration-200"
-                  onClick={() => navigate('/new-issue')}
-                >
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="bg-blue-700 p-3 rounded-lg">
-                      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    </div>
-                    <h3 className="text-xl font-semibold text-white">Preventive Maintenance</h3>
-                  </div>
-                  <p className="text-blue-200">
-                    Report issues for preventive maintenance. We'll assign professional technicians, notify you when assigned, and provide feedback with evidence upon completion.
-                  </p>
-                </div>
-
-                <div
-                  className="bg-gradient-to-r from-teal-700 to-teal-600 border border-teal-600 rounded-xl p-6 cursor-pointer hover:shadow-md transition-shadow hover:scale-105 transform duration-200"
-                  onClick={() => setShowScheduleForm(true)}
-                >
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="bg-teal-600 p-3 rounded-lg">
-                      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                    </div>
-                    <h3 className="text-xl font-semibold text-white">Routine Maintenance</h3>
-                  </div>
-                  <p className="text-teal-200">
-                    Schedule routine maintenance tasks like cleaning or inspection on daily, weekly, or monthly intervals. Set recurring tasks to maintain your assets proactively.
-                  </p>
-                </div>
+              {/* Cards */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
+                {[{
+                  title: 'Preventive Maintenance',
+                  desc: 'Report issues for preventive maintenance. Technicians will be assigned, and you\'ll be notified upon completion.',
+                  bg: 'linear-gradient(135deg,#1E3A8A,#1D4ED8)',
+                  border: '#1D4ED8',
+                  iconBg: 'rgba(255,255,255,0.15)',
+                  icon: <svg width="20" height="20" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>,
+                  onClick: () => {
+                    setNewIssueModel({ category: '', requestedType: currentUser ? 'inspection' : 'request' });
+                    setShowNewIssueModal(true);
+                  },
+                }, {
+                  title: 'Routine Maintenance',
+                  desc: 'Schedule recurring tasks like cleaning or inspection on daily, weekly, or monthly intervals.',
+                  bg: 'linear-gradient(135deg,#0F766E,#0D9488)',
+                  border: '#0F766E',
+                  iconBg: 'rgba(255,255,255,0.15)',
+                  icon: <svg width="20" height="20" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>,
+                  onClick: () => setShowScheduleForm(true),
+                }].map(({ title, desc, bg, icon, onClick }) => (
+                  <button key={title} onClick={onClick} style={{ background: bg, border: 'none', borderRadius: 14, padding: '24px', textAlign: 'left', cursor: 'pointer', transition: 'transform 0.15s, box-shadow 0.15s', color: 'white' }}
+                    onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 30px rgba(0,0,0,0.2)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; }}>
+                    <div style={{ width: 44, height: 44, borderRadius: 10, background: 'rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>{icon}</div>
+                    <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>{title}</div>
+                    <div style={{ fontSize: 13, opacity: 0.8, lineHeight: 1.5 }}>{desc}</div>
+                  </button>
+                ))}
               </div>
 
               {showScheduleForm && (
-                <div className="mb-8">
+                <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 14, padding: 24, marginBottom: 24 }}>
                   <ScheduleMaintenanceForm
                     technicians={internalTechnicians}
                     assets={assets}
                     initialData={editingSchedule}
                     onSuccess={async () => {
-                      const res = await api.get('/api/maintenance-schedules');
-                      setMaintenanceSchedules(res.data || []);
+                      await refreshSchedules();
                       setShowScheduleForm(false);
                       setEditingSchedule(null);
                     }}
@@ -2102,209 +1644,105 @@ function ClientDashboard() {
                 </div>
               )}
 
-              <div className="mt-8">
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-xl font-bold text-gray-800">Scheduled Maintenance</h3>
-                  <span className="text-gray-500">{maintenanceSchedules.length} schedules</span>
-                </div>
+              <SectionHeader title="Scheduled Maintenance" count={maintenanceSchedules.length}
+                action={<Btn onClick={() => setShowScheduleForm(true)} variant="outline" size="sm"><Icon.Plus /> New Schedule</Btn>} />
 
-                {loading.maintenanceTemplates && (
-                  <div className="text-center py-8">
-                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                    <p className="mt-2 text-gray-600">Loading schedules...</p>
-                  </div>
-                )}
-
-                {errors.maintenanceTemplates && (
-                  <div className="bg-red-50 text-red-700 p-4 rounded-lg mb-4 border border-red-200">
-                    Error: {errors.maintenanceTemplates}
-                  </div>
-                )}
-
-                {maintenanceSchedules.length === 0 ? (
-                  <div className="text-center py-12 text-gray-500">
-                    <svg className="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    <p className="text-lg">No maintenance schedules found.</p>
-                    <p className="mt-2">Click "Routine Maintenance" above to create your first schedule.</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {maintenanceSchedules.map((schedule) => (
-                      <div
-                        key={schedule.id || schedule._id}
-                        className="border border-blue-100 rounded-lg p-4 hover:shadow-md transition-shadow bg-white"
-                      >
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2">
-                              <h4 className="font-semibold text-gray-900">{schedule.name || 'Unnamed Schedule'}</h4>
-                              <span
-                                className={`px-2 py-1 text-xs rounded-full ${schedule.routine
-                                  ? 'bg-teal-100 text-teal-800 border border-teal-200'
-                                  : 'bg-blue-100 text-blue-800 border border-blue-200'
-                                  }`}
-                              >
-                                {schedule.routine ? 'Routine' : 'Preventive'}
-                              </span>
-                              <span
-                                className={`px-2 py-1 text-xs rounded-full ${schedule.status && schedule.status.toLowerCase().includes('complete')
-                                  ? 'bg-green-100 text-green-800 border border-green-200'
-                                  : schedule.nextDate && new Date(schedule.nextDate) < new Date()
-                                    ? 'bg-red-100 text-red-800 border border-red-200'
-                                    : 'bg-yellow-100 text-yellow-800 border border-yellow-200'
-                                  }`}
-                              >
-                                {schedule.status || (schedule.routine ? 'Routine' : 'Preventive')}
-                              </span>
-                            </div>
-
-                            <div className="text-sm text-gray-600 space-y-1">
-                              <div>
-                                <span className="font-medium">Next:</span>{' '}
-                                {schedule.nextDate
-                                  ? new Date(schedule.nextDate).toLocaleString()
-                                  : 'TBD'}
-                              </div>
-
-                              {schedule.routine && (
-                                <div>
-                                  <span className="font-medium">Frequency:</span>{' '}
-                                  {schedule.frequency || 'daily'}
-                                  {schedule.interval && ` (every ${schedule.interval})`}
-                                </div>
-                              )}
-
-                              {schedule.description && (
-                                <p className="mt-1 text-gray-700">{schedule.description}</p>
-                              )}
-
-                              <div>
-                                <span className="font-medium">Assigned Assets:</span>{' '}
-                                {(() => {
-                                  const assetIds = Array.isArray(schedule.assets)
-                                    ? schedule.assets
-                                    : typeof schedule.assets === 'string' && schedule.assets.length > 0
-                                      ? schedule.assets.split(',')
-                                      : [];
-
-                                  if (assetIds.length === 0) return 'Unassigned';
-
-                                  return assetIds
-                                    .map(id => {
-                                      const asset = assets.find(a => (a.id || a._id) === id);
-                                      return asset ? asset.name : id;
-                                    })
-                                    .join(', ');
-                                })()}
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="flex gap-2">
-                            <button
-                              className="text-blue-600 hover:text-blue-800 px-3 py-1 rounded hover:bg-blue-50 transition border border-blue-200"
-                              onClick={() => {
-                                setEditingSchedule(schedule);
-                                setShowScheduleForm(true);
-                              }}
-                            >
-                              Edit
-                            </button>
-                            <button
-                              className="text-red-600 hover:text-red-800 px-3 py-1 rounded hover:bg-red-50 transition border border-red-200"
-                              onClick={async () => {
-                                if (window.confirm('Are you sure you want to delete this schedule?')) {
-                                  try {
-                                    await api.delete(
-                                      `/api/maintenance-schedules/${schedule._id || schedule.id}`
-                                    );
-                                    setMaintenanceSchedules(
-                                      maintenanceSchedules.filter(s => (s._id || s.id) !== (schedule._id || schedule.id))
-                                    );
-                                  } catch (err) {
-                                    console.error('Error deleting schedule:', err);
-                                    alert('Failed to delete schedule. Please try again.');
-                                  }
-                                }
-                              }}
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        </div>
+              <Table heads={['Name', 'Type', 'Status', 'Next Date', 'Frequency', 'Assets', 'Actions']} empty="No maintenance schedules. Create one above."
+                rows={maintenanceSchedules.map(schedule => {
+                  const sid = schedule.id || schedule._id;
+                  const assetIds = Array.isArray(schedule.assets) ? schedule.assets : typeof schedule.assets === 'string' && schedule.assets.length ? schedule.assets.split(',') : [];
+                  const assetNames = assetIds.map(id => assets.find(a => (a.id || a._id) === id)?.name || id).join(', ');
+                  const isOverdue = schedule.nextDate && new Date(schedule.nextDate) < new Date() && !(schedule.status || '').toLowerCase().includes('complete');
+                  return [
+                    <Td key="n"><span style={{ fontWeight: 600 }}>{schedule.name || 'Unnamed'}</span></Td>,
+                    <Td key="t"><span style={{ background: schedule.routine ? '#ECFDF5' : '#EFF6FF', color: schedule.routine ? '#065F46' : '#1D4ED8', padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 600 }}>{schedule.routine ? 'Routine' : 'Preventive'}</span></Td>,
+                    <Td key="s"><StatusBadge status={isOverdue ? 'OVERDUE' : schedule.status || 'Scheduled'} /></Td>,
+                    <Td key="nd">{schedule.nextDate ? new Date(schedule.nextDate).toLocaleDateString() : 'TBD'}</Td>,
+                    <Td key="f">{schedule.routine ? (schedule.frequency || 'daily') : '—'}</Td>,
+                    <Td key="a"><span style={{ color: assetNames ? '#374151' : '#9CA3AF' }}>{assetNames || 'Unassigned'}</span></Td>,
+                    <Td key="x">
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <Btn size="sm" variant="outline" onClick={() => {
+                          setEditingSchedule(schedule);
+                          setShowScheduleForm(true);
+                        }}>Edit</Btn>
+                        <Btn size="sm" variant="danger" onClick={async () => {
+                          if (window.confirm('Delete this schedule?')) {
+                            try {
+                              await api.delete(`/api/maintenance-schedules/${sid}`);
+                              setMaintenanceSchedules(maintenanceSchedules.filter(s => (s._id || s.id) !== sid));
+                            } catch {
+                              alert('Delete failed');
+                            }
+                          }
+                        }}>Delete</Btn>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+                    </Td>,
+                  ];
+                })}
+              />
             </div>
           )}
         </div>
-      </div>
+      </main>
 
-      {/* Assign Issue Modal */}
+      {/* ── New Issue Modal ── */}
+      {showNewIssueModal && (
+        <NewIssue model={newIssueModel} asModal={true} onClose={(submitted) => {
+          setShowNewIssueModal(false);
+          setNewIssueModel(null);
+          if (submitted) {
+            fetchIssues().catch(() => {});
+            setActiveTab('requests');
+          }
+        }} />
+      )}
+
+      {/* ── Assign Modal ── */}
       {assignModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 animate-fade-in-up">
-            <h3 className="text-2xl font-bold mb-4 text-gray-800">Assign Issue to {selectedTechForAssign?.name}</h3>
-
-            <p className="text-gray-600 mb-6">
-              Select a pending issue from <strong>{selectedTechForAssign?.property?.name || 'this property'}</strong> to assign.
-            </p>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 20 }}>
+          <div style={{ background: 'white', borderRadius: 16, boxShadow: '0 20px 60px rgba(0,0,0,0.2)', maxWidth: 520, width: '100%', padding: 28 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#111827' }}>Assign to {selectedTechForAssign?.name}</h3>
+                <p style={{ margin: '4px 0 0', fontSize: 13, color: '#9CA3AF' }}>Select a pending issue from {selectedTechForAssign?.property?.name || 'this property'}</p>
+              </div>
+              <button onClick={() => setAssignModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF', padding: 4 }}><Icon.X /></button>
+            </div>
 
             {assignableIssues.length === 0 ? (
-              <div className="text-center py-8 bg-gray-50 rounded-lg border border-gray-100 mb-6">
-                <span className="text-4xl">🤷‍♂️</span>
-                <p className="text-gray-500 mt-2">No pending issues found for this property.</p>
+              <div style={{ textAlign: 'center', padding: '32px 24px', background: '#F9FAFB', borderRadius: 10, marginBottom: 20 }}>
+                <div style={{ fontSize: 36, marginBottom: 8 }}>🤷</div>
+                <div style={{ fontSize: 14, color: '#9CA3AF' }}>No pending issues for this property</div>
               </div>
             ) : (
-              <div className="space-y-4 max-h-60 overflow-y-auto mb-6 pr-2">
-                {assignableIssues.map(issue => (
-                  <label
-                    key={issue.id || issue._id}
-                    className={`block p-3 rounded-lg border cursor-pointer transition-all ${selectedIssueForAssign === (issue.id || issue._id) ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200' : 'border-gray-200 hover:border-blue-300'}`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <input
-                        type="radio"
-                        name="issueAssign"
-                        value={issue.id || issue._id}
-                        checked={selectedIssueForAssign === (issue.id || issue._id)}
-                        onChange={(e) => setSelectedIssueForAssign(e.target.value)}
-                        className="mt-1"
-                      />
+              <div style={{ maxHeight: 280, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }}>
+                {assignableIssues.map(issue => {
+                  const iid = issue.id || issue._id;
+                  const selected = selectedIssueForAssign === iid;
+                  return (
+                    <label key={iid} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: 14, borderRadius: 10, border: `1.5px solid ${selected ? '#1D4ED8' : '#E5E7EB'}`, background: selected ? '#EFF6FF' : 'white', cursor: 'pointer', transition: 'all 0.15s' }}>
+                      <input type="radio" name="issueAssign" value={iid} checked={selected} onChange={e => setSelectedIssueForAssign(e.target.value)} style={{ marginTop: 2 }} />
                       <div>
-                        <div className="font-semibold text-gray-800">{issue.title}</div>
-                        <div className="text-sm text-gray-500 line-clamp-1">{issue.description}</div>
-                        <div className="text-xs text-blue-600 mt-1">
-                          {new Date(issue.createdAt).toLocaleDateString()}
-                        </div>
+                        <div style={{ fontWeight: 600, fontSize: 13, color: '#111827' }}>{issue.title}</div>
+                        {issue.description && <div style={{ fontSize: 12, color: '#9CA3AF', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{issue.description}</div>}
+                        <div style={{ fontSize: 11, color: '#1D4ED8', marginTop: 4 }}>{new Date(issue.createdAt).toLocaleDateString()}</div>
                       </div>
-                    </div>
-                  </label>
-                ))}
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+            {assignableIssues.length > 0 && (
+              <div style={{ marginBottom: 12, display: 'flex', gap: 8, alignItems: 'center' }}>
+                <label style={{ fontSize: 12, color: '#6B7280', fontWeight: 600 }}>Due date/time</label>
+                <input type="datetime-local" value={selectedDueDate} onChange={e => setSelectedDueDate(e.target.value)} style={{ border: '1px solid #D1D5DB', borderRadius: 8, padding: '6px 8px' }} />
               </div>
             )}
 
-            <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-gray-100">
-              <button
-                onClick={() => setAssignModalOpen(false)}
-                className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleAssignSubmit}
-                disabled={!selectedIssueForAssign || assignableIssues.length === 0}
-                className={`px-4 py-2 rounded-lg text-white font-medium transition shadow-sm ${!selectedIssueForAssign || assignableIssues.length === 0
-                  ? 'bg-gray-300 cursor-not-allowed'
-                  : 'bg-blue-600 hover:bg-blue-700 hover:shadow-md'
-                  }`}
-              >
-                Confirm Assignment
-              </button>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              <Btn onClick={() => setAssignModalOpen(false)} variant="ghost">Cancel</Btn>
+              <Btn onClick={handleAssignSubmit} variant="primary" disabled={!selectedIssueForAssign || assignableIssues.length === 0}>Confirm Assignment</Btn>
             </div>
           </div>
         </div>

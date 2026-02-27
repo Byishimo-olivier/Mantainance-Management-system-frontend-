@@ -183,7 +183,8 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
 
     try {
       const location = `Block ${form.building} - Floor ${form.floor} - Unit ${form.unit}`;
-      const tags = [form.category.toUpperCase(), "PENDING"];
+      const statusTag = isAuthenticated ? 'INSPECTION' : 'REQUESTOR';
+      const tags = [String(form.category || 'UNSPECIFIED').toUpperCase(), statusTag, "PENDING"];
       const formData = new FormData();
 
       formData.append("title", form.title);
@@ -355,6 +356,8 @@ export default function NewIssue({ model: propModel = null, onClose = null, asMo
             <option value="">Select category</option>
             <option value="Plumbing">Plumbing</option>
             <option value="Electrical">Electrical</option>
+            <option value="Mechanical">Mechanical</option>
+            <option value="Civil Structural">Civil Structural</option>
             <option value="Cleaning">Cleaning</option>
             <option value="Other">Other</option>
           </select>
