@@ -1,7 +1,17 @@
 import axios from 'axios';
 
 // Create an axios instance with default config
-let baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+// Determine baseURL: use environment variable if provided, otherwise
+// default to the current origin (makes production deploys work without
+// manually setting VITE_API_URL) or localhost for local dev.
+let baseURL = import.meta.env.VITE_API_URL;
+if (!baseURL) {
+  if (typeof window !== 'undefined' && window.location) {
+    baseURL = window.location.origin;
+  } else {
+    baseURL = 'http://localhost:5000';
+  }
+}
 // ensure API prefix is included
 if (!baseURL.endsWith('/api')) {
   baseURL = baseURL.replace(/\/+$/,'') + '/api';
