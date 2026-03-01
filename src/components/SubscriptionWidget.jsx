@@ -173,11 +173,6 @@ const SubscriptionWidget = ({ userId }) => {
         email,
         paymentMethod,
       };
-      
-      // Only include phone number if payment method is mobile_money
-      if (paymentMethod === 'mobile_money' && phoneNumber) {
-        updateData.phoneNumber = phoneNumber;
-      }
 
       // Update subscription - user can update their own subscription
       const response = await subscriptionAPI.updateMySubscription(
