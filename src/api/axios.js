@@ -16,10 +16,15 @@ const api = axios.create({
 // prepend /api to any relative URL that doesn't already start with it
 api.interceptors.request.use(
     (config) => {
+        // debug: log original request URL
+        if (config.url) {
+            console.log('[API Request] original url', config.url);
+        }
         if (config.url && typeof config.url === 'string' && !config.url.match(/^https?:\/\//i)) {
             if (!config.url.startsWith('/api')) {
                 // avoid double slashes
                 config.url = '/api' + (config.url.startsWith('/') ? '' : '/') + config.url;
+                console.log('[API Request] rewritten to', config.url);
             }
         }
         const token = localStorage.getItem('token');
