@@ -9,7 +9,7 @@ if (!baseURL) {
   if (typeof window !== 'undefined' && window.location) {
     baseURL = window.location.origin;
   } else {
-    baseURL = 'http://localhost:5000';
+    baseURL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
   }
 }
 // ensure API prefix is included
