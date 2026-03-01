@@ -321,6 +321,13 @@ const SubscriptionWidget = ({ userId }) => {
               <p className="text-gray-700 text-sm mt-1">
                 {subscription.email}
               </p>
+
+              {subscription.property && (
+                <p className="text-gray-600 text-xs mt-1">
+                  Property: <span className="font-medium text-gray-800">{subscription.property.name}</span>
+                </p>
+              )}
+
               <p className="text-gray-600 text-xs mt-1">
                 {subscription.billingCycle?.charAt(0).toUpperCase() + subscription.billingCycle?.slice(1)} cycle - ${subscription.amount?.toFixed(2)}
               </p>
