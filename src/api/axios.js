@@ -1,23 +1,9 @@
 import axios from 'axios';
 
-// Create an axios instance with default config
-// Determine baseURL: use environment variable if provided, otherwise
-// default to the current origin (makes production deploys work without
-// manually setting VITE_API_URL) or localhost for local dev.
-let baseURL = import.meta.env.VITE_API_URL;
-if (!baseURL) {
-  if (typeof window !== 'undefined' && window.location) {
-    baseURL = window.location.origin;
-  } else {
-    baseURL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-  }
-}
-// ensure API prefix is included
-if (!baseURL.endsWith('/api')) {
-  baseURL = baseURL.replace(/\/+$/,'') + '/api';
-}
+
+let baseURL = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/+$/,'') : '';
 console.log('[API Debug] VITE_API_URL:', import.meta.env.VITE_API_URL);
-console.log('[API Debug] Using baseURL:', baseURL);
+console.log('[API Debug] Using baseURL:', baseURL || '(relative)');
 
 const api = axios.create({
     baseURL,
