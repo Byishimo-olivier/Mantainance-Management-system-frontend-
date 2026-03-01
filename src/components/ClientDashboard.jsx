@@ -3,6 +3,8 @@ import ScheduleMaintenanceForm from './ScheduleMaintenanceForm';
 import api from "../api/axios";
 import { useNavigate } from "react-router-dom";
 import NewIssue from './NewIssue';
+import SubscriptionWidget from './SubscriptionWidget';
+import SubscriptionManagement from './SubscriptionManagement';
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 const Icon = {
@@ -52,6 +54,12 @@ const Icon = {
   Clock: () => (
     <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
       <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+    </svg>
+  ),
+  Subscription: () => (
+    <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+      <rect x="2" y="5" width="20" height="14" rx="2"/>
+      <line x1="2" y1="10" x2="22" y2="10"/>
     </svg>
   ),
   Alert: () => (
@@ -543,6 +551,11 @@ function ClientDashboard() {
     navigate('/login', { replace: true });
   }, [navigate]);
 
+  const handleNewRequest = () => {
+    setNewIssueModel({ category: '', requestedType: currentUser ? 'inspection' : 'request' });
+    setShowNewIssueModal(true);
+  };
+
   const exportIssuesPDF = useCallback(async () => {
     try {
       const { jsPDF } = await import('jspdf');
@@ -748,6 +761,7 @@ function ClientDashboard() {
     { key: 'internalTechnicians', label: 'Staff', icon: <Icon.Staff /> },
     { key: 'organization', label: 'Organization', icon: <Icon.Templates /> },
     { key: 'maintenanceTemplates', label: 'Maintenance', icon: <Icon.Templates /> },
+    { key: 'subscription', label: 'Subscriptions', icon: <Icon.Subscription /> },
   ];
 
   return (
@@ -831,12 +845,7 @@ function ClientDashboard() {
                 <span>{reminders.length} Reminder{reminders.length > 1 ? 's' : ''}</span>
               </button>
             )}
-            <Btn onClick={() => {
-              setNewIssueModel({ category: '', requestedType: currentUser ? 'inspection' : 'request' });
-              setShowNewIssueModal(true);
-            }} variant="primary">
-              <Icon.Plus /> New Request
-            </Btn>
+            {/* New Request button moved to Requests tab */}
           </div>
         </header>
 
@@ -935,10 +944,6 @@ function ClientDashboard() {
                 <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 14, padding: '20px' }}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: '#111827', marginBottom: 14 }}>Quick Actions</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    <Btn onClick={() => {
-                      setNewIssueModel({ category: '', requestedType: currentUser ? 'inspection' : 'request' });
-                      setShowNewIssueModal(true);
-                    }} variant="primary" style={{ justifyContent: 'center', width: '100%' }}><Icon.Plus /> New Request</Btn>
                     <Btn onClick={() => setActiveTab('requests')} variant="outline" style={{ justifyContent: 'center', width: '100%' }}>All Requests</Btn>
                     <Btn onClick={exportIssuesPDF} variant="ghost" style={{ justifyContent: 'center', width: '100%' }}><Icon.Export /> Export PDF</Btn>
                     <Btn onClick={() => setActiveTab('maintenanceTemplates')} variant="ghost" style={{ justifyContent: 'center', width: '100%' }}>
@@ -1058,8 +1063,57 @@ function ClientDashboard() {
           {activeTab === 'requests' && (
             <div>
               <SectionHeader title="All Requests" count={allIssues.length}
-                action={<Btn onClick={exportIssuesPDF} variant="outline" size="sm"><Icon.Export /> Export PDF</Btn>} />
+                action={
+                  <>
+                    <Btn onClick={handleNewRequest} variant="primary" size="sm"><Icon.Plus /> New Request</Btn>
+                    <Btn onClick={exportIssuesPDF} variant="outline" size="sm"><Icon.Export /> Export PDF</Btn>
+                  </>
+                } />
               <Table
+                heads={['#', 'Title', 'Status', 'Location', 'Assigned To', 'Created', 'Actions']}
+                empty="No requests found."
+                rows={allIssues.map((issue, idx) => [
+                  <Td key="n">{idx + 1}</Td>,
+                  <Td key="t"><span style={{ fontWeight: 600, color: '#111827' }}>{issue.title || issue.summary || '—'}</span></Td>,
+                  <Td key="s"><StatusBadge status={issue.status} /></Td>,
+                  <Td key="p">{getPropertyName(issue)}</Td>,
+                  <Td key="a">{getAssignedName(issue)}</Td>,
+                  <Td key="c">{issue.createdAt ? new Date(issue.createdAt).toLocaleDateString() : '—'}</Td>,
+                  <Td key="x">
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <Btn size="sm" variant="outline" onClick={() => navigate(`/issues/${issue.id || issue._id}`)}>View</Btn>
+                      <Btn size="sm" variant="danger" onClick={async () => {
+                        if (window.confirm('Delete issue?')) {
+                          try {
+                            await api.delete(`/api/issues/${issue._id || issue.id}`);
+                            await fetchIssues();
+                          } catch {
+                            alert('Delete failed');
+                          }
+                        }
+                      }}>Delete</Btn>
+                    </div>
+                  </Td>,
+                ])}
+              />
+            </div>
+          )}
+
+          {/* ── Subscription ── */}
+          {activeTab === 'subscription' && (
+            <div style={{ padding: '24px' }}>
+              {(currentUser?.role === 'admin' || currentUser?.role === 'manager') ? (
+                <SubscriptionManagement />
+              ) : (
+                <SubscriptionWidget userId={currentUser?._id || currentUser?.id} />
+              )}
+            </div>
+          )}
+
+          {/* ── Properties ── */}
+          {activeTab === 'properties' && (
+            <div>
+              <SectionHeader title="Locations" count={properties.length}
                 heads={['#', 'Title', 'Status', 'Location', 'Assigned To', 'Created', 'Actions']}
                 empty="No requests found."
                 rows={allIssues.map((issue, idx) => [

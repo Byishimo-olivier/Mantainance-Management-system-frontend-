@@ -1,7 +1,11 @@
 import axios from 'axios';
 
 // Create an axios instance with default config
-const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+let baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+// ensure API prefix is included
+if (!baseURL.endsWith('/api')) {
+  baseURL = baseURL.replace(/\/+$/,'') + '/api';
+}
 console.log('[API Debug] VITE_API_URL:', import.meta.env.VITE_API_URL);
 console.log('[API Debug] Using baseURL:', baseURL);
 

@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import Header from "./Header";
+import SubscriptionManagement from './SubscriptionManagement';
 import {
   Shield,
   BarChart3,
@@ -58,7 +59,8 @@ import {
   SlidersHorizontal,
   CircleDashed,
   Play,
-  X
+  X,
+  CreditCard
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -839,6 +841,12 @@ function ManagerDashboard() {
             badge={pendingRequests.length}
             badgeColor="bg-blue-600"
           />
+          <NavItem
+            active={activeTab === 'subscriptions'}
+            onClick={() => setActiveTab('subscriptions')}
+            icon={CreditCard}
+            label="Subscriptions"
+          />
 
           <SectionLabel>Data & Analytics</SectionLabel>
           <NavItem
@@ -1304,6 +1312,8 @@ function ManagerDashboard() {
                 setSelectedRequest={setSelectedRequest}
                 setShowApprovalModal={setShowApprovalModal}
               />
+            ) : activeTab === 'subscriptions' ? (
+              <SubscriptionManagement />
             ) : activeTab === 'issues' ? (
               <IssuesTab
                 issues={getFilteredIssues()}
