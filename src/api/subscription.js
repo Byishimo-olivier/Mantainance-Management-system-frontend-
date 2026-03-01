@@ -4,11 +4,13 @@ import api from './axios';
 const CLIENT_ID = 'ee00cab6-155a-11f1-a1f5-deadd43720af';
 const SECRET_ID = '630eecbbb285bd9d5760f299a7231c9eda39a3ee5e6b4b0d3255bfef95601890afd80709';
 
+const BASE = '/api/subscriptions';
+
 const subscriptionAPI = {
   // Create a new subscription
   createSubscription: async (userId, email, plan = 'basic', billingCycle = 'monthly', paymentMethod = 'card', metadata = {}) => {
     try {
-      const response = await api.post('/subscriptions', {
+      const response = await api.post(`${BASE}`, {
         userId,
         email,
         plan,
@@ -27,7 +29,7 @@ const subscriptionAPI = {
   // Get subscription by client ID (alias for user subscription)
   getSubscriptionByClientId: async (clientId) => {
     try {
-      const response = await api.get(`/subscriptions/client/${clientId}`);
+      const response = await api.get(`${BASE}/client/${clientId}`);
       return response.data;
     } catch (error) {
       throw error.response?.data || error.message;
@@ -43,7 +45,7 @@ const subscriptionAPI = {
   // Get subscription by subscription ID
   getSubscriptionById: async (id) => {
     try {
-      const response = await api.get(`/subscriptions/${id}`);
+      const response = await api.get(`${BASE}/${id}`);
       return response.data;
     } catch (error) {
       throw error.response?.data || error.message;
@@ -59,7 +61,7 @@ const subscriptionAPI = {
       if (filters.billingCycle) params.append('billingCycle', filters.billingCycle);
       if (filters.paymentStatus) params.append('paymentStatus', filters.paymentStatus);
       const queryString = params.toString();
-      const response = await api.get(`/subscriptions${queryString ? '?' + queryString : ''}`);
+      const response = await api.get(`${BASE}${queryString ? '?' + queryString : ''}`);
       return response.data;
     } catch (error) {
       throw error.response?.data || error.message;
@@ -69,7 +71,7 @@ const subscriptionAPI = {
   // Update subscription
   updateSubscription: async (subscriptionId, updateData) => {
     try {
-      const response = await api.put(`/subscriptions/${subscriptionId}`, updateData);
+      const response = await api.put(`${BASE}/${subscriptionId}`, updateData);
       return response.data;
     } catch (error) {
       throw error.response?.data || error.message;
@@ -79,7 +81,7 @@ const subscriptionAPI = {
   // Change billing cycle
   changeBillingCycle: async (subscriptionId, billingCycle) => {
     try {
-      const response = await api.post(`/subscriptions/${subscriptionId}/billing-cycle`, {
+      const response = await api.post(`${BASE}/${subscriptionId}/billing-cycle`, {
         billingCycle,
       });
       return response.data;
@@ -91,7 +93,7 @@ const subscriptionAPI = {
   // Upgrade subscription
   upgradeSubscription: async (subscriptionId, newPlan) => {
     try {
-      const response = await api.post(`/subscriptions/${subscriptionId}/upgrade`, {
+      const response = await api.post(`${BASE}/${subscriptionId}/upgrade`, {
         plan: newPlan,
       });
       return response.data;
@@ -103,7 +105,7 @@ const subscriptionAPI = {
   // Cancel subscription
   cancelSubscription: async (subscriptionId) => {
     try {
-      const response = await api.post(`/subscriptions/${subscriptionId}/cancel`);
+      const response = await api.post(`${BASE}/${subscriptionId}/cancel`);
       return response.data;
     } catch (error) {
       throw error.response?.data || error.message;
@@ -113,7 +115,7 @@ const subscriptionAPI = {
   // Delete subscription
   deleteSubscription: async (subscriptionId) => {
     try {
-      const response = await api.delete(`/subscriptions/${subscriptionId}`);
+      const response = await api.delete(`${BASE}/${subscriptionId}`);
       return response.data;
     } catch (error) {
       throw error.response?.data || error.message;
@@ -123,7 +125,7 @@ const subscriptionAPI = {
   // Get subscription analytics
   getAnalytics: async () => {
     try {
-      const response = await api.get('/subscriptions/analytics/summary');
+      const response = await api.get(`${BASE}/analytics/summary`);
       return response.data;
     } catch (error) {
       throw error.response?.data || error.message;
@@ -133,7 +135,7 @@ const subscriptionAPI = {
   // Get pricing
   getPricing: async () => {
     try {
-      const response = await api.get('/subscriptions/public/pricing');
+      const response = await api.get(`${BASE}/public/pricing`);
       return response.data;
     } catch (error) {
       throw error.response?.data || error.message;
@@ -143,7 +145,7 @@ const subscriptionAPI = {
   // Verify subscription is active
   verifyActive: async (subscriptionId) => {
     try {
-      const response = await api.get(`/subscriptions/${subscriptionId}/verify`);
+      const response = await api.get(`${BASE}/${subscriptionId}/verify`);
       return response.data;
     } catch (error) {
       throw error.response?.data || error.message;
@@ -154,7 +156,7 @@ const subscriptionAPI = {
   // Process payment (simulated or real PayPack)
   processPayment: async (subscriptionId, amount, paymentMethod, phoneNumber = null, email = null) => {
     try {
-      const response = await api.post('/subscriptions/payments/process', {
+      const response = await api.post(`${BASE}/payments/process`, {
         subscriptionId,
         amount,
         paymentMethod,
@@ -170,7 +172,7 @@ const subscriptionAPI = {
   // Initiate PayPack payment
   initiatePayPackPayment: async (subscriptionId, amount, paymentMethod, phoneNumber = null, email = null) => {
     try {
-      const response = await api.post('/subscriptions/payments/initiate-paypack', {
+      const response = await api.post(`${BASE}/payments/initiate-paypack`, {
         subscriptionId,
         amount,
         paymentMethod,
@@ -186,7 +188,7 @@ const subscriptionAPI = {
   // Get payment by ID
   getPaymentById: async (paymentId) => {
     try {
-      const response = await api.get(`/subscriptions/payments/${paymentId}`);
+      const response = await api.get(`${BASE}/payments/${paymentId}`);
       return response.data;
     } catch (error) {
       throw error.response?.data || error.message;
@@ -196,7 +198,7 @@ const subscriptionAPI = {
   // Get subscription payments
   getSubscriptionPayments: async (subscriptionId) => {
     try {
-      const response = await api.get(`/subscriptions/payments/subscription/${subscriptionId}`);
+      const response = await api.get(`${BASE}/payments/subscription/${subscriptionId}`);
       return response.data;
     } catch (error) {
       throw error.response?.data || error.message;
@@ -206,7 +208,7 @@ const subscriptionAPI = {
   // Refund payment
   refundPayment: async (paymentId, reason = '') => {
     try {
-      const response = await api.post(`/subscriptions/payments/${paymentId}/refund`, { reason });
+      const response = await api.post(`${BASE}/payments/${paymentId}/refund`, { reason });
       return response.data;
     } catch (error) {
       throw error.response?.data || error.message;
