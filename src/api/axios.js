@@ -13,8 +13,15 @@ const api = axios.create({
 });
 
 // Add a request interceptor to include the token in all requests
+// prepend /api to any relative URL that doesn't already start with it
 api.interceptors.request.use(
     (config) => {
+        if (config.url && typeof config.url === 'string' && !config.url.match(/^https?:\/\//i)) {
+            if (!config.url.startsWith('/api')) {
+                // avoid double slashes
+                config.url = '/api' + (config.url.startsWith('/') ? '' : '/') + config.url;
+            }
+        }
         const token = localStorage.getItem('token');
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
