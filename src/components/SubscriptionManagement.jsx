@@ -109,6 +109,63 @@ const SubscriptionManagement = () => {
     }
   };
 
+  const handleUpdateSubscription = async (e) => {
+    e.preventDefault();
+    if (!selectedSubscription) return;
+    setLoading(true);
+    try {
+      const updateData = {
+        email: formData.email,
+        plan: formData.plan,
+        billingCycle: formData.billingCycle,
+        metadata: formData.metadata,
+      };
+      const response = await subscriptionAPI.updateSubscription(selectedSubscription.id, updateData);
+      setSubscriptions(subscriptions.map(sub => (sub.id === selectedSubscription.id ? response.data : sub)));
+      showSuccess('Subscription updated successfully!');
+      closeModal();
+    } catch (err) {
+      setError(err.error || 'Failed to update subscription');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRenewSubscription = async (subscription) => {
+    if (!pricing) {
+      setError('Pricing not loaded yet');
+      return;
+    }
+
+    const plan = subscription.plan;
+    const cycle = subscription.billingCycle;
+    const amount = pricing?.[plan]?.[cycle];
+
+    if (!amount) {
+      setError('Unable to determine price for this plan/billing cycle');
+      return;
+    }
+
+    if (!window.confirm(`Proceed to pay ${plan} (${cycle}) for $${amount}?`)) return;
+
+    setLoading(true);
+    try {
+      const resp = await subscriptionAPI.initiatePayPackPayment(subscription.id, amount, subscription.paymentMethod || 'mobile_money', null, subscription.email);
+      // api helper returns response.data – it should contain redirect_url
+      const redirectUrl = resp.redirect_url || resp.authorization_url || resp.redirectUrl || (resp.data && (resp.data.redirect_url || resp.data.authorization_url));
+      if (redirectUrl) {
+        window.open(redirectUrl, '_blank');
+        showSuccess('Payment initiated; please complete payment in the opened tab.');
+      } else {
+        showSuccess('Payment initiated. Check your payments page for status.');
+      }
+    } catch (err) {
+      setError(err.error || err.message || 'Failed to initiate payment');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleUpgradeSubscription = async (subscriptionId, newPlan) => {
     setLoading(true);
     try {
@@ -387,7 +444,9 @@ const SubscriptionManagement = () => {
                 {subscriptions.map((subscription) => (
                   <tr key={subscription.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 text-sm text-gray-800 font-mono">
-                      {subscription.userId.slice(0, 8)}...
+                      {subscription.userId
+                        ? `${subscription.userId.slice(0, 8)}...`
+                        : "—"}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-800">{subscription.email}</td>
                     <td className="px-6 py-4">
@@ -407,7 +466,25 @@ const SubscriptionManagement = () => {
                       {new Date(subscription.nextBillingDate).toLocaleDateString()}
                     </td>
                     <td className="px-6 py-4 text-sm">
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 items-center">
+                        <button
+                          onClick={() => openModal('edit', subscription)}
+                          disabled={loading}
+                          className="text-blue-600 hover:text-blue-800 disabled:opacity-50"
+                          title="Edit / Change Plan"
+                        >
+                          <Edit2 size={18} />
+                        </button>
+
+                        <button
+                          onClick={() => handleRenewSubscription(subscription)}
+                          disabled={loading}
+                          className="text-green-600 hover:text-green-800 disabled:opacity-50"
+                          title="Renew Subscription"
+                        >
+                          <CreditCard size={18} />
+                        </button>
+
                         <button
                           onClick={() => handleCancelSubscription(subscription.id)}
                           disabled={subscription.status === 'cancelled' || loading}
@@ -447,7 +524,7 @@ const SubscriptionManagement = () => {
               </button>
             </div>
 
-            <form onSubmit={handleCreateSubscription} className="p-6 space-y-4">
+            <form onSubmit={modalMode === 'create' ? handleCreateSubscription : handleUpdateSubscription} className="p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">User ID</label>
                 <input

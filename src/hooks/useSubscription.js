@@ -7,6 +7,19 @@ export const useSubscription = (userId) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // grab the currently logged in user from localStorage
+  const getCurrentUser = () => {
+    try {
+      const raw = localStorage.getItem('user');
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const currentUser = getCurrentUser();
+  const userRole = currentUser?.role || null;
+
   const fetchSubscription = useCallback(async () => {
     if (!userId) {
       setLoading(false);
@@ -88,6 +101,14 @@ export const useSubscription = (userId) => {
     fetchSubscription();
   }, [fetchSubscription]);
 
+  const canUpdate = !!(
+    subscription &&
+    (currentUser &&
+      (currentUser.id === subscription.userId ||
+        currentUser._id === subscription.userId ||
+        ['admin', 'manager'].includes(userRole)))
+  );
+
   return {
     subscription,
     loading,
@@ -99,6 +120,8 @@ export const useSubscription = (userId) => {
     isActive: subscription?.status === 'active',
     isProfessional: subscription?.plan === 'professional',
     isEnterprise: subscription?.plan === 'enterprise',
+    userRole,
+    canUpdate,
   };
 };
 

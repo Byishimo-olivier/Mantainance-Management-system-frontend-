@@ -78,6 +78,16 @@ const subscriptionAPI = {
     }
   },
 
+  // Convenience alias for updating a subscription as the current user
+  updateMySubscription: async (subscriptionId, updateData, config = {}) => {
+    try {
+      const response = await api.put(`${BASE}/${subscriptionId}`, updateData, config);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
   // Change billing cycle
   changeBillingCycle: async (subscriptionId, billingCycle) => {
     try {
@@ -135,10 +145,18 @@ const subscriptionAPI = {
   // Get pricing
   getPricing: async () => {
     try {
-      const response = await api.get(`${BASE}/public/pricing`);
-      return response.data;
+      // public pricing endpoint should be accessible without Authorization header
+      const base = api.defaults.baseURL || '';
+      const url = (base ? base.replace(/\/+$/,'') : '') + `${BASE}/public/pricing`;
+      const res = await fetch(url, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        throw errBody || new Error('Failed to fetch pricing');
+      }
+      const body = await res.json();
+      return body;
     } catch (error) {
-      throw error.response?.data || error.message;
+      throw error;
     }
   },
 
@@ -205,10 +223,34 @@ const subscriptionAPI = {
     }
   },
 
-  // Refund payment
   refundPayment: async (paymentId, reason = '') => {
     try {
       const response = await api.post(`${BASE}/payments/${paymentId}/refund`, { reason });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  // Get property associated with subscription
+  getSubscriptionProperty: async (subscriptionId) => {
+    try {
+      const response = await api.get(`${BASE}/${subscriptionId}/property`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  // Get properties (from properties API) - accepts optional axios config (headers/query)
+  getPropertiesForUser: async (userId, config = {}) => {
+    try {
+      // If caller provided userId in config.params, prefer that; otherwise include as param
+      const finalConfig = { ...(config || {}) };
+      if (userId && !finalConfig.params) {
+        finalConfig.params = { userId };
+      }
+      const response = await api.get('/api/properties', finalConfig);
       return response.data;
     } catch (error) {
       throw error.response?.data || error.message;

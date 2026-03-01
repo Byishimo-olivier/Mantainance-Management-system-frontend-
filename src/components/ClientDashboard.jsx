@@ -1102,7 +1102,7 @@ function ClientDashboard() {
           {/* ── Subscription ── */}
           {activeTab === 'subscription' && (
             <div style={{ padding: '24px' }}>
-              {(currentUser?.role === 'admin' || currentUser?.role === 'manager') ? (
+              {(currentUser?.role === 'admin' || currentUser?.role === 'Manager') ? (
                 <SubscriptionManagement />
               ) : (
                 <SubscriptionWidget userId={currentUser?._id || currentUser?.id} />
