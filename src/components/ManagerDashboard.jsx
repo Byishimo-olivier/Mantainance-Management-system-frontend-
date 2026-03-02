@@ -305,6 +305,23 @@ const normalizeDate = (val) => {
   return new Date(val);
 };
 
+// Combine people and users arrays, deduplicating by id/_id/email
+const combinePeopleUsers = (peopleArr = [], usersArr = []) => {
+  const seen = new Set();
+  const out = [];
+  const push = (p) => {
+    const key = String(p?.id || p?._id || p?.email || p?.username || '');
+    if (!key) return;
+    if (!seen.has(key)) {
+      seen.add(key);
+      out.push(p);
+    }
+  };
+  (peopleArr || []).forEach(push);
+  (usersArr || []).forEach(push);
+  return out;
+};
+
 function ManagerDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
   const [issues, setIssues] = useState([]);
@@ -2770,21 +2787,27 @@ const AnalyticsTab = ({ issues, technicians, aiSentiment, aiRecommendations, loa
 const MetersTab = () => {
   const [meterSearch, setMeterSearch] = useState('');
   const [meterFilter, setMeterFilter] = useState('All');
-
-  const meters = [
-    { id: 'M-001', name: 'Main Electricity', type: 'Electricity', reading: 12847, unit: 'kWh', trend: +3.2, status: 'Normal', location: 'Block A - Main Panel', lastRead: '2 hours ago', icon: '⚡' },
-    { id: 'M-002', name: 'Water Meter - East', type: 'Water', reading: 5234, unit: 'm³', trend: -1.4, status: 'Normal', location: 'Block B - Ground Floor', lastRead: '1 hour ago', icon: '💧' },
-    { id: 'M-003', name: 'Gas Supply Main', type: 'Gas', reading: 3012, unit: 'm³', trend: +12.7, status: 'Alert', location: 'Block A - Basement', lastRead: '30 min ago', icon: '🔥' },
-    { id: 'M-004', name: 'Generator Output', type: 'Electricity', reading: 4560, unit: 'kWh', trend: 0.0, status: 'Normal', location: 'Block C - Roof', lastRead: '5 min ago', icon: '⚡' },
-    { id: 'M-005', name: 'Water Meter - West', type: 'Water', reading: 2891, unit: 'm³', trend: +5.6, status: 'Warning', location: 'Block D - Level 2', lastRead: '4 hours ago', icon: '💧' },
-    { id: 'M-006', name: 'Solar Panel Output', type: 'Electricity', reading: 1204, unit: 'kWh', trend: -8.3, status: 'Normal', location: 'Rooftop Array', lastRead: '10 min ago', icon: '☀️' },
-  ];
+  const [meters, setMeters] = useState([]);
+  const [loadingMeters, setLoadingMeters] = useState(false);
+  const [showAddMeterModal, setShowAddMeterModal] = useState(false);
+  const [newMeter, setNewMeter] = useState({ name: '', type: 'Electricity', reading: 0, unit: 'kWh', status: 'Normal', location: '' });
 
   const types = ['All', 'Electricity', 'Water', 'Gas'];
 
-  const filtered = meters.filter(m =>
+  useEffect(() => {
+    let mounted = true;
+    setLoadingMeters(true);
+    api.get('/api/meters').then(res => {
+      if (mounted) setMeters(res.data || []);
+    }).catch(err => {
+      console.error('Failed to load meters', err);
+    }).finally(() => { if (mounted) setLoadingMeters(false); });
+    return () => { mounted = false; };
+  }, []);
+
+  const filtered = (meters || []).filter(m =>
     (meterFilter === 'All' || m.type === meterFilter) &&
-    (m.name.toLowerCase().includes(meterSearch.toLowerCase()) || m.location.toLowerCase().includes(meterSearch.toLowerCase()))
+    ((m.name||'').toLowerCase().includes(meterSearch.toLowerCase()) || (m.location||'').toLowerCase().includes(meterSearch.toLowerCase()))
   );
 
   const getStatusConfig = (status) => ({
@@ -2801,18 +2824,52 @@ const MetersTab = () => {
           <h2 className="text-xl font-bold text-gray-900">Meters</h2>
           <p className="text-sm text-gray-500 mt-0.5">Live readings from all property meters</p>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition-colors shadow-sm">
+        <button onClick={() => setShowAddMeterModal(true)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition-colors shadow-sm">
           <Plus className="w-4 h-4" />
           Add Meter
         </button>
       </div>
 
+      {/* Add Meter Modal */}
+      {showAddMeterModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowAddMeterModal(false)} />
+          <div className="relative bg-white rounded-xl p-6 w-full max-w-md shadow-xl z-10">
+            <h3 className="text-lg font-bold mb-3">Add Meter</h3>
+            <div className="flex flex-col gap-2">
+              <input value={newMeter.name} onChange={e => setNewMeter({...newMeter, name: e.target.value})} placeholder="Name" className="p-2 border rounded" />
+              <select value={newMeter.type} onChange={e => setNewMeter({...newMeter, type: e.target.value, unit: e.target.value === 'Water' ? 'm³' : 'kWh'})} className="p-2 border rounded">
+                <option>Electricity</option>
+                <option>Water</option>
+                <option>Gas</option>
+              </select>
+              <input value={newMeter.location} onChange={e => setNewMeter({...newMeter, location: e.target.value})} placeholder="Location" className="p-2 border rounded" />
+              <div className="flex items-center gap-2">
+                <input type="number" value={newMeter.reading} onChange={e => setNewMeter({...newMeter, reading: Number(e.target.value)})} className="p-2 border rounded w-full" />
+                <input value={newMeter.unit} onChange={e => setNewMeter({...newMeter, unit: e.target.value})} className="p-2 border rounded w-28" />
+              </div>
+              <div className="flex items-center justify-end gap-2 mt-3">
+                <button onClick={() => setShowAddMeterModal(false)} className="px-3 py-2 bg-white border rounded">Cancel</button>
+                <button onClick={async () => {
+                  try {
+                    const res = await api.post('/api/meters', newMeter);
+                    setMeters(prev => [res.data, ...(prev || [])]);
+                    setNewMeter({ name: '', type: 'Electricity', reading: 0, unit: 'kWh', status: 'Normal', location: '' });
+                    setShowAddMeterModal(false);
+                  } catch (e) { console.error('Add meter failed', e); alert('Failed to add meter'); }
+                }} className="px-3 py-2 bg-blue-600 text-white rounded">Create</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Summary Cards */}
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: 'Total Electricity', value: `${(meters.filter(m => m.type === 'Electricity').reduce((s, m) => s + m.reading, 0) / 1000).toFixed(1)} MWh`, icon: '⚡', color: 'from-amber-50 to-yellow-50 border-amber-100' },
-          { label: 'Total Water', value: `${meters.filter(m => m.type === 'Water').reduce((s, m) => s + m.reading, 0).toLocaleString()} m³`, icon: '💧', color: 'from-blue-50 to-cyan-50 border-blue-100' },
-          { label: 'Active Alerts', value: meters.filter(m => m.status !== 'Normal').length, icon: '🚨', color: 'from-rose-50 to-pink-50 border-rose-100' },
+          { label: 'Total Electricity', value: `${((meters||[]).filter(m => m.type === 'Electricity').reduce((s, m) => s + (Number(m.reading)||0), 0) / 1000).toFixed(1)} MWh`, icon: '⚡', color: 'from-amber-50 to-yellow-50 border-amber-100' },
+          { label: 'Total Water', value: `${((meters||[]).filter(m => m.type === 'Water').reduce((s, m) => s + (Number(m.reading)||0), 0)).toLocaleString()} m³`, icon: '💧', color: 'from-blue-50 to-cyan-50 border-blue-100' },
+          { label: 'Active Alerts', value: (meters||[]).filter(m => m.status !== 'Normal').length, icon: '🚨', color: 'from-rose-50 to-pink-50 border-rose-100' },
         ].map(c => (
           <div key={c.label} className={`bg-gradient-to-br ${c.color} border rounded-xl p-4 flex items-center gap-4`}>
             <span className="text-3xl">{c.icon}</span>
@@ -2895,7 +2952,7 @@ const MetersTab = () => {
                     <td className="py-4 px-4 text-sm text-gray-500">{m.lastRead}</td>
                     <td className="py-4 px-4 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <button className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors" title="View">
+                        <button onClick={() => alert(JSON.stringify(m, null, 2))} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors" title="View">
                           <Eye className="w-4 h-4 text-blue-600" />
                         </button>
                         <button className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors" title="More">
@@ -2927,29 +2984,37 @@ const MetersTab = () => {
 const EdgeTab = () => {
   const [edgeFilter, setEdgeFilter] = useState('All');
   const [edgeSearch, setEdgeSearch] = useState('');
-
-  const devices = [
-    { id: 'DEV-001', name: 'Lobby Camera A', type: 'Camera', status: 'Online', signal: 92, lastPing: '2s ago', location: 'Block A - Lobby', firmware: 'v2.3.1', battery: null },
-    { id: 'DEV-002', name: 'Temp Sensor B2', type: 'Sensor', status: 'Online', signal: 78, lastPing: '15s ago', location: 'Block B - Level 2', firmware: 'v1.9.4', battery: 82 },
-    { id: 'DEV-003', name: 'Access Point 1', type: 'Network', status: 'Offline', signal: 0, lastPing: '4h ago', location: 'Block A - Roof', firmware: 'v3.1.0', battery: null },
-    { id: 'DEV-004', name: 'Motion Sensor C', type: 'Sensor', status: 'Online', signal: 88, lastPing: '8s ago', location: 'Block C - Corridor', firmware: 'v1.9.4', battery: 45 },
-    { id: 'DEV-005', name: 'Smart Lock D3', type: 'Lock', status: 'Online', signal: 65, lastPing: '1m ago', location: 'Block D - Floor 3', firmware: 'v4.0.2', battery: 21 },
-    { id: 'DEV-006', name: 'Parking Sensor', type: 'Sensor', status: 'Offline', signal: 0, lastPing: '2d ago', location: 'Basement Parking', firmware: 'v1.8.0', battery: 8 },
-    { id: 'DEV-007', name: 'Rooftop Camera', type: 'Camera', status: 'Online', signal: 95, lastPing: '1s ago', location: 'Rooftop', firmware: 'v2.3.1', battery: null },
-    { id: 'DEV-008', name: 'HVAC Controller', type: 'Controller', status: 'Online', signal: 84, lastPing: '30s ago', location: 'Block A - Basement', firmware: 'v5.1.0', battery: null },
-  ];
+  const [devices, setDevices] = useState([]);
+  const [loadingDevices, setLoadingDevices] = useState(false);
 
   const statuses = ['All', 'Online', 'Offline'];
 
-  const filtered = devices.filter(d =>
-    (edgeFilter === 'All' || d.status === edgeFilter) &&
-    (d.name.toLowerCase().includes(edgeSearch.toLowerCase()) || d.location.toLowerCase().includes(edgeSearch.toLowerCase()))
-  );
-
-  const online = devices.filter(d => d.status === 'Online').length;
   const typeIcon = { Camera: '📷', Sensor: '📡', Network: '🌐', Lock: '🔒', Controller: '🎛️' };
 
   const getSignalColor = (s) => s >= 80 ? 'bg-emerald-500' : s >= 50 ? 'bg-amber-500' : 'bg-rose-500';
+
+  useEffect(() => {
+    let mounted = true;
+    setLoadingDevices(true);
+    api.get('/api/devices').then(res => { if (mounted) setDevices(res.data || []); }).catch(e => console.error('Failed to load devices', e)).finally(() => { if (mounted) setLoadingDevices(false); });
+    return () => { mounted = false; };
+  }, []);
+
+  const handleDeviceAction = async (id, action) => {
+    try {
+      const res = await api.post(`/api/devices/${id}/actions/${action}`);
+      setDevices(prev => prev.map(d => (String(d.id) === String(res.data.id) ? res.data : d)));
+    } catch (e) { console.error('Device action failed', e); alert('Action failed'); }
+  };
+
+  const filtered = (devices || []).filter(d =>
+    (edgeFilter === 'All' || d.status === edgeFilter) &&
+    ((d.name||'').toLowerCase().includes(edgeSearch.toLowerCase()) || (d.location||'').toLowerCase().includes(edgeSearch.toLowerCase()))
+  );
+
+  const online = (devices||[]).filter(d => d.status === 'Online').length;
+  const [showAddDeviceModal, setShowAddDeviceModal] = useState(false);
+  const [newDevice, setNewDevice] = useState({ name: '', type: 'Sensor', status: 'Online', signal: 80, firmware: 'v1.0.0', location: '', battery: null });
 
   return (
     <div className="flex flex-col gap-6">
@@ -2959,11 +3024,47 @@ const EdgeTab = () => {
           <h2 className="text-xl font-bold text-gray-900">Edge Devices</h2>
           <p className="text-sm text-gray-500 mt-0.5">IoT and connected device management</p>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition-colors shadow-sm">
+        <button onClick={() => setShowAddDeviceModal(true)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition-colors shadow-sm">
           <Plus className="w-4 h-4" />
           Add Device
         </button>
       </div>
+
+      {/* Add Device Modal */}
+      {showAddDeviceModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowAddDeviceModal(false)} />
+          <div className="relative bg-white rounded-xl p-6 w-full max-w-md shadow-xl z-10">
+            <h3 className="text-lg font-bold mb-3">Add Edge Device</h3>
+            <div className="flex flex-col gap-2">
+              <input value={newDevice.name} onChange={e => setNewDevice({...newDevice, name: e.target.value})} placeholder="Name" className="p-2 border rounded" />
+              <select value={newDevice.type} onChange={e => setNewDevice({...newDevice, type: e.target.value})} className="p-2 border rounded">
+                <option>Sensor</option>
+                <option>Camera</option>
+                <option>Network</option>
+                <option>Lock</option>
+                <option>Controller</option>
+              </select>
+              <input value={newDevice.location} onChange={e => setNewDevice({...newDevice, location: e.target.value})} placeholder="Location" className="p-2 border rounded" />
+              <div className="flex gap-2">
+                <input value={newDevice.firmware} onChange={e => setNewDevice({...newDevice, firmware: e.target.value})} placeholder="Firmware" className="p-2 border rounded flex-1" />
+                <input type="number" value={newDevice.battery ?? ''} onChange={e => setNewDevice({...newDevice, battery: e.target.value ? Number(e.target.value) : null})} placeholder="Battery %" className="p-2 border rounded w-28" />
+              </div>
+              <div className="flex items-center justify-end gap-2 mt-3">
+                <button onClick={() => setShowAddDeviceModal(false)} className="px-3 py-2 bg-white border rounded">Cancel</button>
+                <button onClick={async () => {
+                  try {
+                    const res = await api.post('/api/devices', newDevice);
+                    setDevices(prev => [res.data, ...(prev || [])]);
+                    setNewDevice({ name: '', type: 'Sensor', status: 'Online', signal: 80, firmware: 'v1.0.0', location: '', battery: null });
+                    setShowAddDeviceModal(false);
+                  } catch (e) { console.error('Add device failed', e); alert('Failed to add device'); }
+                }} className="px-3 py-2 bg-blue-600 text-white rounded">Create</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Summary */}
       <div className="grid grid-cols-4 gap-4">
@@ -3056,14 +3157,20 @@ const EdgeTab = () => {
                   <td className="py-4 px-4 text-sm text-gray-500">{d.lastPing}</td>
                   <td className="py-4 px-4 text-sm text-gray-500">{d.firmware}</td>
                   <td className="py-4 px-4 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <button className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors" title="View">
-                        <Eye className="w-4 h-4 text-blue-600" />
-                      </button>
-                      <button className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors" title="More">
-                        <MoreHorizontal className="w-4 h-4 text-gray-400" />
-                      </button>
-                    </div>
+                      <div className="flex items-center justify-end gap-2">
+                        <button onClick={() => alert(JSON.stringify(d, null, 2))} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors" title="View">
+                          <Eye className="w-4 h-4 text-blue-600" />
+                        </button>
+                        <button onClick={() => handleDeviceAction(d.id, 'reboot')} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors" title="Reboot">
+                          <Play className="w-4 h-4 text-gray-600" />
+                        </button>
+                        <button onClick={() => handleDeviceAction(d.id, 'firmwareUpdate')} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors" title="Update Firmware">
+                          <Upload className="w-4 h-4 text-gray-600" />
+                        </button>
+                        <button className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors" title="More">
+                          <MoreHorizontal className="w-4 h-4 text-gray-400" />
+                        </button>
+                      </div>
                   </td>
                 </tr>
               ))}
@@ -3239,13 +3346,139 @@ const LocationsTab = ({ locations = [], assets = [] }) => {
 
 // People & Teams Tab
 const PeopleTab = ({ technicians = [] }) => {
+  const [people, setPeople] = useState([]);
+  const [teams, setTeams] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [showAddPerson, setShowAddPerson] = useState(false);
+  const [showAddTeam, setShowAddTeam] = useState(false);
+  const [newPerson, setNewPerson] = useState({ name: '', email: '', phone: '', role: 'Technician' });
+  const [newTeam, setNewTeam] = useState({ name: '', members: [] });
+  const [teamImageFile, setTeamImageFile] = useState(null);
+  const [teamImagePreview, setTeamImagePreview] = useState(null);
+  const [showEditTeam, setShowEditTeam] = useState(false);
+  const [editTeam, setEditTeam] = useState(null);
+  const [editTeamImageFile, setEditTeamImageFile] = useState(null);
+  const [editTeamImagePreview, setEditTeamImagePreview] = useState(null);
+  const [teamFiles, setTeamFiles] = useState([]);
+  const [teamFilesPreview, setTeamFilesPreview] = useState([]);
+  const [editTeamFiles, setEditTeamFiles] = useState([]);
+  const [editTeamFilesPreview, setEditTeamFilesPreview] = useState([]);
+  
+
+  useEffect(() => {
+    let mounted = true;
+    setLoading(true);
+    Promise.allSettled([api.get('/api/people'), api.get('/api/teams'), api.get('/api/users')])
+      .then((results) => {
+        if (!mounted) return;
+        const [pRes, tRes, uRes] = results;
+        if (pRes.status === 'fulfilled') setPeople(pRes.value.data || []);
+        else console.warn('[People] fetch failed:', pRes.status, pRes.reason && pRes.reason.message);
+
+        if (tRes.status === 'fulfilled') setTeams(tRes.value.data || []);
+        else console.warn('[Teams] fetch failed:', tRes.status, tRes.reason && tRes.reason.message);
+
+        if (uRes.status === 'fulfilled') setUsers(uRes.value.data || []);
+        else console.warn('[Users] fetch failed:', uRes.status, uRes.reason && uRes.reason.message);
+      })
+      .catch(err => {
+        console.error('Unexpected error loading people/teams/users', err);
+      })
+      .finally(() => { if (mounted) setLoading(false); });
+    return () => { mounted = false; };
+  }, []);
+
   const exportCSV = () => {
-    if (!technicians || technicians.length === 0) return;
+    const combined = combinePeopleUsers(people, users);
+    if (!combined || combined.length === 0) return;
     const keys = ['id','name','email','phone','role'];
-    const rows = technicians.map(t => ({ id: t._id || t.id || '', name: t.name || t.username || '', email: t.email || '', phone: t.phone || '', role: t.role || t.type || 'Technician' }));
+    const rows = combined.map(t => ({ id: t._id || t.id || '', name: t.name || t.username || '', email: t.email || '', phone: t.phone || '', role: t.role || t.type || 'Technician' }));
     const csv = [keys.join(',')].concat(rows.map(r => keys.map(k => (`"${String(r[k] ?? '').replace(/"/g,'""')}"`)).join(','))).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'people-export.csv'; a.click(); URL.revokeObjectURL(url);
+  };
+
+  const handleCreatePerson = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await api.post('/api/people', newPerson);
+      setPeople(prev => [res.data, ...(prev || [])]);
+      setShowAddPerson(false);
+      setNewPerson({ name: '', email: '', phone: '', role: 'Technician' });
+    } catch (err) {
+      console.error('Failed to create person', err);
+      alert('Failed to create person');
+    }
+  };
+
+  const handleCreateTeam = async (e) => {
+    e.preventDefault();
+    try {
+      const form = new FormData();
+      form.append('name', newTeam.name || '');
+      // append members as JSON string
+      form.append('members', JSON.stringify(newTeam.members || []));
+      if (teamImageFile) form.append('image', teamImageFile);
+      if (teamFiles && teamFiles.length) for (const f of teamFiles) form.append('files', f);
+
+      const res = await api.post('/api/teams', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+      setTeams(prev => [res.data, ...(prev || [])]);
+      setShowAddTeam(false);
+      setNewTeam({ name: '', members: [] });
+      setTeamImageFile(null);
+      setTeamImagePreview(null);
+      setTeamFiles([]);
+      setTeamFilesPreview([]);
+    } catch (err) {
+      console.error('Failed to create team', err);
+      alert('Failed to create team');
+    }
+  };
+
+  const openEditTeam = (team) => {
+    setEditTeam(team);
+    setEditTeamImagePreview(team.image ? getImageUrl(team.image) : null);
+    setEditTeamImageFile(null);
+    setEditTeamFiles([]);
+    setEditTeamFilesPreview([]);
+    setShowEditTeam(true);
+  };
+
+  const handleUpdateTeam = async (e) => {
+    e.preventDefault();
+    if (!editTeam) return;
+    try {
+      const form = new FormData();
+      form.append('name', editTeam.name || '');
+      form.append('members', JSON.stringify(editTeam.members || []));
+      if (editTeamImageFile) form.append('image', editTeamImageFile);
+      if (editTeamFiles && editTeamFiles.length) for (const f of editTeamFiles) form.append('files', f);
+
+      const id = editTeam.id || editTeam._id;
+      const res = await api.put(`/api/teams/${id}`, form, { headers: { 'Content-Type': 'multipart/form-data' } });
+      setTeams(prev => prev.map(t => (String(t._id || t.id) === String(id) ? res.data : t)));
+      setShowEditTeam(false);
+      setEditTeam(null);
+      setEditTeamImageFile(null);
+      setEditTeamFiles([]);
+      setEditTeamImagePreview(null);
+      setEditTeamFilesPreview([]);
+    } catch (err) {
+      console.error('Failed to update team', err);
+      alert('Failed to update team');
+    }
+  };
+
+  const handleDeleteTeam = async (id) => {
+    if (!confirm('Delete this team?')) return;
+    try {
+      await api.delete(`/api/teams/${id}`);
+      setTeams(prev => (prev || []).filter(t => String(t._id || t.id) !== String(id)));
+    } catch (err) {
+      console.error('Failed to delete team', err);
+      alert('Failed to delete team');
+    }
   };
 
   return (
@@ -3257,6 +3490,8 @@ const PeopleTab = ({ technicians = [] }) => {
         </div>
         <div className="flex items-center gap-3">
           <button onClick={exportCSV} className="px-3 py-2 bg-white border rounded-xl text-sm font-semibold hover:bg-gray-50">Export CSV</button>
+          <button onClick={() => setShowAddPerson(true)} className="px-3 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700">Add Person</button>
+          <button onClick={() => setShowAddTeam(true)} className="px-3 py-2 bg-green-600 text-white rounded-xl text-sm font-semibold hover:bg-green-700">Add Team</button>
         </div>
       </div>
 
@@ -3273,8 +3508,8 @@ const PeopleTab = ({ technicians = [] }) => {
               </tr>
             </thead>
             <tbody>
-              {technicians.map((t, idx) => (
-                <tr key={t._id || t.id || `tech-${idx}`} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+              {(combinePeopleUsers(people, users) || []).map((t, idx) => (
+                <tr key={t._id || t.id || `person-${idx}`} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
                   <td className="py-4 px-4"><div className="text-sm font-bold text-gray-900">{t.name || t.username || 'Unnamed'}</div></td>
                   <td className="py-4 px-4 text-sm text-gray-600 font-mono">{String(t._id || t.id || '').slice(-8)}</td>
                   <td className="py-4 px-4 text-sm text-gray-600">{t.email || '-'}</td>
@@ -3282,11 +3517,178 @@ const PeopleTab = ({ technicians = [] }) => {
                   <td className="py-4 px-4 text-right"><div className="flex items-center justify-end gap-2"><button className="p-1.5 hover:bg-gray-100 rounded-lg"><Eye className="w-4 h-4 text-blue-600" /></button></div></td>
                 </tr>
               ))}
-              {technicians.length === 0 && (<tr><td colSpan="5" className="py-20 text-center"><p className="text-gray-500">No people found</p></td></tr>)}
+              {(people || []).length === 0 && (<tr><td colSpan="5" className="py-20 text-center"><p className="text-gray-500">No people found</p></td></tr>)}
             </tbody>
           </table>
         </div>
       </div>
+
+      {/* Teams List */}
+      <div className="mt-6 bg-white rounded-lg border border-gray-100 overflow-hidden shadow-sm">
+        <div className="p-4 border-b flex items-center justify-between">
+          <div>
+            <h3 className="text-md font-bold">Teams</h3>
+            <p className="text-xs text-gray-500">Teams and members</p>
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead className="bg-[#fcfcfd] border-b border-gray-100">
+              <tr>
+                <th className="py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Image</th>
+                <th className="py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Name</th>
+                <th className="py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Members</th>
+                <th className="py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">ID</th>
+                <th className="py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(teams || []).map((tm, i) => (
+                <tr key={tm._id || tm.id || `team-${i}`} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+                  <td className="py-3 px-4"><div className="w-10 h-10 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center">
+                    {tm.image ? <img src={getImageUrl(tm.image)} alt={tm.name} className="w-full h-full object-cover" /> : <div className="text-sm text-gray-600">{(tm.name||'T').slice(0,1)}</div>}
+                  </div></td>
+                  <td className="py-3 px-4"><div className="text-sm font-bold text-gray-900">{tm.name || 'Unnamed'}</div></td>
+                      <td className="py-3 px-4 text-sm text-gray-600">{
+                        (() => {
+                          const allPeople = (people || []).concat(users || []);
+                          if (!tm.members || tm.members.length === 0) return '-';
+                          const names = (Array.isArray(tm.members) ? tm.members : String(tm.members).split(',')).map(id => {
+                            const found = allPeople.find(p => String(p.id || p._id) === String(id));
+                            return found ? (found.name || found.username || found.email) : String(id).slice(0,8);
+                          }).filter(Boolean);
+                          return names.slice(0,3).join(', ') + (names.length > 3 ? ` (+${names.length-3})` : '');
+                        })()
+                      }</td>
+                  <td className="py-3 px-4 text-sm text-gray-600 font-mono">{String(tm._id || tm.id || '').slice(-8)}</td>
+                  <td className="py-3 px-4 text-right"><div className="flex items-center justify-end gap-2">
+                    <button onClick={() => openEditTeam(tm)} className="p-1.5 hover:bg-gray-100 rounded-lg"><Edit className="w-4 h-4 text-green-600" /></button>
+                    <button onClick={() => handleDeleteTeam(tm._id || tm.id)} className="p-1.5 hover:bg-gray-100 rounded-lg"><Trash2 className="w-4 h-4 text-red-600" /></button>
+                  </div></td>
+                </tr>
+              ))}
+              {(teams || []).length === 0 && (<tr><td colSpan="5" className="py-16 text-center"><p className="text-gray-500">No teams found</p></td></tr>)}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Add Person Modal */}
+      {showAddPerson && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowAddPerson(false)} />
+          <form onSubmit={handleCreatePerson} className="bg-white rounded-xl p-6 z-50 w-full max-w-md">
+            <h3 className="text-lg font-bold mb-3">Add Person</h3>
+            <div className="flex flex-col gap-2">
+              <input className="border p-2 rounded" placeholder="Name" value={newPerson.name} onChange={e => setNewPerson({...newPerson, name: e.target.value})} />
+              <input className="border p-2 rounded" placeholder="Email" value={newPerson.email} onChange={e => setNewPerson({...newPerson, email: e.target.value})} />
+              <input className="border p-2 rounded" placeholder="Phone" value={newPerson.phone} onChange={e => setNewPerson({...newPerson, phone: e.target.value})} />
+              <select className="border p-2 rounded" value={newPerson.role} onChange={e => setNewPerson({...newPerson, role: e.target.value})}>
+                <option>Technician</option>
+                <option>Manager</option>
+                <option>Staff</option>
+              </select>
+              <div className="flex items-center justify-end gap-2 mt-3">
+                <button type="button" onClick={() => setShowAddPerson(false)} className="px-3 py-2 rounded border">Cancel</button>
+                <button type="submit" className="px-3 py-2 rounded bg-blue-600 text-white">Create</button>
+              </div>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Add Team Modal */}
+      {showAddTeam && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowAddTeam(false)} />
+          <form onSubmit={handleCreateTeam} className="bg-white rounded-xl p-6 z-50 w-full max-w-md">
+            <h3 className="text-lg font-bold mb-3">Add Team</h3>
+              <div className="flex flex-col gap-2">
+              <input className="border p-2 rounded" placeholder="Team Name" value={newTeam.name} onChange={e => setNewTeam({...newTeam, name: e.target.value})} />
+              <label className="text-sm text-gray-600">Members</label>
+              <select multiple className="border p-2 rounded h-32" value={newTeam.members} onChange={e => setNewTeam({...newTeam, members: Array.from(e.target.selectedOptions).map(o => o.value)})}>
+                {((people || []).concat(users || [])).map(p => (<option key={(p.id || p._id || p._id_str || p._id)} value={p.id || p._id}>{p.name || p.username || p.email}</option>))}
+              </select>
+              <label className="text-sm text-gray-600 mt-2">Team Image (optional)</label>
+              <input type="file" accept="image/*" onChange={e => {
+                const f = e.target.files && e.target.files[0];
+                setTeamImageFile(f || null);
+                setTeamImagePreview(f ? URL.createObjectURL(f) : null);
+              }} />
+              {teamImagePreview && (
+                <div className="mt-2">
+                  <p className="text-xs text-gray-500 mb-1">Preview:</p>
+                  <img src={teamImagePreview} alt="preview" className="w-24 h-24 object-cover rounded-md border" />
+                </div>
+              )}
+              <label className="text-sm text-gray-600 mt-2">Attachments (optional)</label>
+              <input type="file" multiple onChange={e => {
+                const files = e.target.files ? Array.from(e.target.files) : [];
+                setTeamFiles(files);
+                setTeamFilesPreview(files.map(f => f.name));
+              }} />
+              {teamFilesPreview && teamFilesPreview.length > 0 && (
+                <div className="mt-2 text-xs text-gray-600">
+                  <p className="mb-1">Files:</p>
+                  <ul className="list-disc ml-5">
+                    {teamFilesPreview.map((n, i) => <li key={i}>{n}</li>)}
+                  </ul>
+                </div>
+              )}
+              <div className="flex items-center justify-end gap-2 mt-3">
+                <button type="button" onClick={() => setShowAddTeam(false)} className="px-3 py-2 rounded border">Cancel</button>
+                <button type="submit" className="px-3 py-2 rounded bg-green-600 text-white">Create Team</button>
+              </div>
+            </div>
+          </form>
+        </div>
+      )}
+      {/* Edit Team Modal */}
+      {showEditTeam && editTeam && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowEditTeam(false)} />
+          <form onSubmit={handleUpdateTeam} className="bg-white rounded-xl p-6 z-50 w-full max-w-md">
+            <h3 className="text-lg font-bold mb-3">Edit Team</h3>
+            <div className="flex flex-col gap-2">
+              <input className="border p-2 rounded" placeholder="Team Name" value={editTeam.name || ''} onChange={e => setEditTeam({...editTeam, name: e.target.value})} />
+              <label className="text-sm text-gray-600">Members</label>
+              <select multiple className="border p-2 rounded h-32" value={editTeam.members || []} onChange={e => setEditTeam({...editTeam, members: Array.from(e.target.selectedOptions).map(o => o.value)})}>
+                {((people || []).concat(users || [])).map(p => (<option key={(p.id || p._id || p._id_str || p._id)} value={p.id || p._id}>{p.name || p.username || p.email}</option>))}
+              </select>
+              <label className="text-sm text-gray-600 mt-2">Team Image (optional)</label>
+              <input type="file" accept="image/*" onChange={e => {
+                const f = e.target.files && e.target.files[0];
+                setEditTeamImageFile(f || null);
+                setEditTeamImagePreview(f ? URL.createObjectURL(f) : (editTeam.image ? getImageUrl(editTeam.image) : null));
+              }} />
+              {editTeamImagePreview && (
+                <div className="mt-2">
+                  <p className="text-xs text-gray-500 mb-1">Preview:</p>
+                  <img src={editTeamImagePreview} alt="preview" className="w-24 h-24 object-cover rounded-md border" />
+                </div>
+              )}
+              <label className="text-sm text-gray-600 mt-2">Attachments (optional)</label>
+              <input type="file" multiple onChange={e => {
+                const files = e.target.files ? Array.from(e.target.files) : [];
+                setEditTeamFiles(files);
+                setEditTeamFilesPreview(files.map(f => f.name));
+              }} />
+              {editTeamFilesPreview && editTeamFilesPreview.length > 0 && (
+                <div className="mt-2 text-xs text-gray-600">
+                  <p className="mb-1">Files:</p>
+                  <ul className="list-disc ml-5">
+                    {editTeamFilesPreview.map((n, i) => <li key={i}>{n}</li>)}
+                  </ul>
+                </div>
+              )}
+              <div className="flex items-center justify-end gap-2 mt-3">
+                <button type="button" onClick={() => setShowEditTeam(false)} className="px-3 py-2 rounded border">Cancel</button>
+                <button type="submit" className="px-3 py-2 rounded bg-green-600 text-white">Save</button>
+              </div>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 };
