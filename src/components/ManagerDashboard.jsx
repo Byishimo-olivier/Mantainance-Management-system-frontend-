@@ -233,8 +233,8 @@ const StatCard = ({ title, value, change, icon, color, trend = "up" }) => {
           <span>{change}</span>
         </div>
       )}
-          {/* View Team Modal */}
-            <TeamDetailsModal show={showViewTeam} team={viewTeam} people={people} users={users} onClose={() => setShowViewTeam(false)} />
+      {/* View Team Modal */}
+      <TeamDetailsModal show={showViewTeam} team={viewTeam} people={people} users={users} onClose={() => setShowViewTeam(false)} />
     </div>
   );
 };
@@ -1716,6 +1716,7 @@ const OverviewTab = ({
             <thead>
               <tr className="border-b border-gray-200">
                 <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Issue</th>
+                <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Image</th>
                 <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Status</th>
                 <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Technician</th>
                 <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Due Date</th>
@@ -1729,6 +1730,19 @@ const OverviewTab = ({
                   <td className="py-4 px-4">
                     <div className="font-medium text-gray-900">{issue.title}</div>
                     <div className="text-sm text-gray-600 truncate max-w-xs">{issue.description}</div>
+                  </td>
+                  <td className="py-4 px-4">
+                    {getImageUrl(issue.photo || issue.image || issue.beforePhoto) ? (
+                      <img
+                        src={getImageUrl(issue.photo || issue.image || issue.beforePhoto)}
+                        alt={issue.title}
+                        className="w-12 h-12 rounded object-cover border border-gray-200"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 bg-gray-100 rounded flex items-center justify-center text-gray-400 text-xs text-center border border-gray-200">
+                        No img
+                      </div>
+                    )}
                   </td>
                   <td className="py-4 px-4">
                     <StatusBadge status={issue.status} />
@@ -1835,15 +1849,62 @@ const RequestsTab = ({ pendingRequests, setSelectedRequest, setShowApprovalModal
                   </td>
                   <td className="py-4 px-4">
                     <div className="flex items-center gap-3">
-                      {getImageUrl(request.beforePhoto || request.photo) && (
-                        <img
-                          src={getImageUrl(request.beforePhoto || request.photo)}
-                          alt={request.title}
-                          className="w-10 h-10 rounded-lg object-cover border border-gray-100"
-                        />
-                      )}
+                      {/* Photo attachment */}
+                      {(request.beforePhoto || request.photo) && (() => {
+                        const photoPath = request.beforePhoto || request.photo;
+                        const photoUrl = getImageUrl(photoPath);
+                        const ext = photoPath.split('.').pop().toLowerCase();
+                        const browserUnsupported = ['heic', 'heif', 'tiff', 'tif', 'bmp'].includes(ext);
+                        if (browserUnsupported) {
+                          return (
+                            <a
+                              href={photoUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              download
+                              className="flex items-center gap-1 px-2 py-1 bg-blue-50 border border-blue-200 rounded-lg text-xs font-semibold text-blue-700 hover:bg-blue-100 transition-colors"
+                              title={`Download photo (.${ext})`}
+                            >
+                              <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
+                              Photo (.{ext})
+                            </a>
+                          );
+                        }
+                        return (
+                          <img
+                            src={photoUrl}
+                            alt={request.title}
+                            className="w-10 h-10 rounded-lg object-cover border border-gray-100"
+                            onError={e => { e.target.onerror = null; e.target.style.display = 'none'; }}
+                          />
+                        );
+                      })()}
                       <div>
                         <div className="text-sm font-bold text-gray-900">{request.title}</div>
+                        {/* File attachments (PDFs etc.) */}
+                        {Array.isArray(request.files) && request.files.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {request.files.map((filePath, fi) => {
+                              const fileUrl = getImageUrl(filePath);
+                              const fileName = filePath.split('/').pop();
+                              const fileExt = fileName.split('.').pop().toLowerCase();
+                              return (
+                                <a
+                                  key={fi}
+                                  href={fileUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  download
+                                  className="flex items-center gap-1 px-2 py-0.5 bg-gray-50 border border-gray-200 rounded text-xs font-medium text-gray-600 hover:bg-gray-100 transition-colors"
+                                  title={fileName}
+                                >
+                                  <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
+                                  .{fileExt}
+                                </a>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </td>
@@ -2240,7 +2301,7 @@ const AnalyticsTab = ({ issues, technicians, aiSentiment, aiRecommendations, loa
           if (!techId) return;
           techCounts[techId] = (techCounts[techId] || 0) + 1;
         });
-        const topTechId = Object.keys(techCounts).sort((a,b)=>techCounts[b]-techCounts[a])[0] || null;
+        const topTechId = Object.keys(techCounts).sort((a, b) => techCounts[b] - techCounts[a])[0] || null;
         const topTechnician = topTechId ? (technicians.find(t => t.id === topTechId || t._id === topTechId) || { id: topTechId, completed: techCounts[topTechId] }) : null;
 
         // Top locations
@@ -2249,24 +2310,24 @@ const AnalyticsTab = ({ issues, technicians, aiSentiment, aiRecommendations, loa
           const loc = i.location || i.address || i.propertyId || 'Unknown';
           locCounts[loc] = (locCounts[loc] || 0) + 1;
         });
-        const topLocations = Object.entries(locCounts).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([loc,count])=>({ location: loc, count }));
+        const topLocations = Object.entries(locCounts).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([loc, count]) => ({ location: loc, count }));
 
         // Response & cycle times
         const responseTimes = issues.filter(i => i.status && !String(i.status).toLowerCase().includes('pending') && i.createdAt && i.updatedAt)
           .map(i => (new Date(i.updatedAt) - new Date(i.createdAt)) / 3600000);
-        const avgResponseHrs = responseTimes.length ? (responseTimes.reduce((a,b)=>a+b,0)/responseTimes.length) : 0;
+        const avgResponseHrs = responseTimes.length ? (responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length) : 0;
         const cycleTimes = issues.filter(i => i.status && String(i.status).toLowerCase().includes('complete') && i.createdAt && i.updatedAt)
           .map(i => (new Date(i.updatedAt) - new Date(i.createdAt)) / 3600000);
-        const avgCycleHrs = cycleTimes.length ? (cycleTimes.reduce((a,b)=>a+b,0)/cycleTimes.length) : 0;
+        const avgCycleHrs = cycleTimes.length ? (cycleTimes.reduce((a, b) => a + b, 0) / cycleTimes.length) : 0;
 
         const backlog = issues.filter(i => !i.status || String(i.status).toLowerCase().includes('pending')).length;
 
-        const upcomingPreventive = (schedules || []).filter(s => s && s.nextDate && new Date(s.nextDate) > new Date()).slice(0,10);
+        const upcomingPreventive = (schedules || []).filter(s => s && s.nextDate && new Date(s.nextDate) > new Date()).slice(0, 10);
 
         // Cost
         const assetCosts = assets.map(a => Number(a.purchaseCost || 0)).filter(c => !isNaN(c));
-        const totalCost = assetCosts.reduce((a,b)=>a+b,0);
-        const avgCost = assetCosts.length ? totalCost/assetCosts.length : 0;
+        const totalCost = assetCosts.reduce((a, b) => a + b, 0);
+        const avgCost = assetCosts.length ? totalCost / assetCosts.length : 0;
 
         // Asset downtime and utilization
         const assetDowntimeMap = {};
@@ -2276,26 +2337,26 @@ const AnalyticsTab = ({ issues, technicians, aiSentiment, aiRecommendations, loa
           const hours = ft ? (ft / 60) : 0;
           assetDowntimeMap[i.assetId] = (assetDowntimeMap[i.assetId] || 0) + hours;
         });
-        const assetDowntimes = Object.entries(assetDowntimeMap).map(([assetId, hrs])=>({ assetId, hrs })).sort((a,b)=>b.hrs-a.hrs);
+        const assetDowntimes = Object.entries(assetDowntimeMap).map(([assetId, hrs]) => ({ assetId, hrs })).sort((a, b) => b.hrs - a.hrs);
         const assetWithMostDowntime = assetDowntimes[0] || null;
 
-        const openAssetIds = new Set(issues.filter(i => !i.status || !String(i.status).toLowerCase().includes('complete')).map(i=>i.assetId).filter(Boolean));
+        const openAssetIds = new Set(issues.filter(i => !i.status || !String(i.status).toLowerCase().includes('complete')).map(i => i.assetId).filter(Boolean));
         const assetsByLocation = {};
         const assetsByCategory = {};
         assets.forEach(a => {
           const loc = (a.location && (a.location.building || a.location.room || a.location.floor)) || a.propertyId || 'Unknown';
-          assetsByLocation[loc] = assetsByLocation[loc] || { total:0, free:0 };
+          assetsByLocation[loc] = assetsByLocation[loc] || { total: 0, free: 0 };
           assetsByLocation[loc].total += 1;
           if (!openAssetIds.has(a.id) && !openAssetIds.has(a._id)) assetsByLocation[loc].free += 1;
 
           const cat = a.type || 'Unknown';
-          assetsByCategory[cat] = assetsByCategory[cat] || { total:0, free:0 };
+          assetsByCategory[cat] = assetsByCategory[cat] || { total: 0, free: 0 };
           assetsByCategory[cat].total += 1;
           if (!openAssetIds.has(a.id) && !openAssetIds.has(a._id)) assetsByCategory[cat].free += 1;
         });
 
-        const utilizationByLocation = Object.entries(assetsByLocation).map(([loc,vals])=>({ location: loc, utilization: vals.total ? Math.round((vals.free/vals.total)*100) : 0 }));
-        const utilizationByCategory = Object.entries(assetsByCategory).map(([cat,vals])=>({ category: cat, utilization: vals.total ? Math.round((vals.free/vals.total)*100) : 0 }));
+        const utilizationByLocation = Object.entries(assetsByLocation).map(([loc, vals]) => ({ location: loc, utilization: vals.total ? Math.round((vals.free / vals.total) * 100) : 0 }));
+        const utilizationByCategory = Object.entries(assetsByCategory).map(([cat, vals]) => ({ category: cat, utilization: vals.total ? Math.round((vals.free / vals.total) * 100) : 0 }));
 
         if (!mounted) return;
         setMetrics({
@@ -2357,13 +2418,13 @@ const AnalyticsTab = ({ issues, technicians, aiSentiment, aiRecommendations, loa
     const cat = i.category || (i.tags && i.tags.length ? (typeof i.tags[0] === 'string' ? i.tags[0] : i.tags[0].label) : 'Other') || 'Other';
     categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
   });
-  const categoryEntries = Object.entries(categoryCounts).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  const categoryEntries = Object.entries(categoryCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
   const colors = ['#6366f1', '#3b82f6', '#10b981', '#f59e0b', '#ef4444'];
   const costData = categoryEntries.map(([name, count], i) => ({ name, value: Math.round((metrics.avgCost || 0) * count), color: colors[i % colors.length] }));
   const totalCost = costData.reduce((s, c) => s + c.value, metrics.totalCost || 0);
 
   // Asset downtime derived from metrics (approx by category/location)
-  const assetData = (metrics.utilizationByCategory || []).slice(0,5).map(u => ({ name: u.category || u.location || 'Asset', uptime: u.utilization, downtime: Math.max(0, 100 - u.utilization) }));
+  const assetData = (metrics.utilizationByCategory || []).slice(0, 5).map(u => ({ name: u.category || u.location || 'Asset', uptime: u.utilization, downtime: Math.max(0, 100 - u.utilization) }));
 
   const subTabs = [
     { id: 'team-performance', label: 'Team Performance' },
@@ -2822,7 +2883,7 @@ const MetersTab = () => {
 
   const filtered = (meters || []).filter(m =>
     (meterFilter === 'All' || m.type === meterFilter) &&
-    ((m.name||'').toLowerCase().includes(meterSearch.toLowerCase()) || (m.location||'').toLowerCase().includes(meterSearch.toLowerCase()))
+    ((m.name || '').toLowerCase().includes(meterSearch.toLowerCase()) || (m.location || '').toLowerCase().includes(meterSearch.toLowerCase()))
   );
 
   const getStatusConfig = (status) => ({
@@ -2852,16 +2913,16 @@ const MetersTab = () => {
           <div className="relative bg-white rounded-xl p-6 w-full max-w-md shadow-xl z-10">
             <h3 className="text-lg font-bold mb-3">Add Meter</h3>
             <div className="flex flex-col gap-2">
-              <input value={newMeter.name} onChange={e => setNewMeter({...newMeter, name: e.target.value})} placeholder="Name" className="p-2 border rounded" />
-              <select value={newMeter.type} onChange={e => setNewMeter({...newMeter, type: e.target.value, unit: e.target.value === 'Water' ? 'm³' : 'kWh'})} className="p-2 border rounded">
+              <input value={newMeter.name} onChange={e => setNewMeter({ ...newMeter, name: e.target.value })} placeholder="Name" className="p-2 border rounded" />
+              <select value={newMeter.type} onChange={e => setNewMeter({ ...newMeter, type: e.target.value, unit: e.target.value === 'Water' ? 'm³' : 'kWh' })} className="p-2 border rounded">
                 <option>Electricity</option>
                 <option>Water</option>
                 <option>Gas</option>
               </select>
-              <input value={newMeter.location} onChange={e => setNewMeter({...newMeter, location: e.target.value})} placeholder="Location" className="p-2 border rounded" />
+              <input value={newMeter.location} onChange={e => setNewMeter({ ...newMeter, location: e.target.value })} placeholder="Location" className="p-2 border rounded" />
               <div className="flex items-center gap-2">
-                <input type="number" value={newMeter.reading} onChange={e => setNewMeter({...newMeter, reading: Number(e.target.value)})} className="p-2 border rounded w-full" />
-                <input value={newMeter.unit} onChange={e => setNewMeter({...newMeter, unit: e.target.value})} className="p-2 border rounded w-28" />
+                <input type="number" value={newMeter.reading} onChange={e => setNewMeter({ ...newMeter, reading: Number(e.target.value) })} className="p-2 border rounded w-full" />
+                <input value={newMeter.unit} onChange={e => setNewMeter({ ...newMeter, unit: e.target.value })} className="p-2 border rounded w-28" />
               </div>
               <div className="flex items-center justify-end gap-2 mt-3">
                 <button onClick={() => setShowAddMeterModal(false)} className="px-3 py-2 bg-white border rounded">Cancel</button>
@@ -2882,9 +2943,9 @@ const MetersTab = () => {
       {/* Summary Cards */}
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: 'Total Electricity', value: `${((meters||[]).filter(m => m.type === 'Electricity').reduce((s, m) => s + (Number(m.reading)||0), 0) / 1000).toFixed(1)} MWh`, icon: '⚡', color: 'from-amber-50 to-yellow-50 border-amber-100' },
-          { label: 'Total Water', value: `${((meters||[]).filter(m => m.type === 'Water').reduce((s, m) => s + (Number(m.reading)||0), 0)).toLocaleString()} m³`, icon: '💧', color: 'from-blue-50 to-cyan-50 border-blue-100' },
-          { label: 'Active Alerts', value: (meters||[]).filter(m => m.status !== 'Normal').length, icon: '🚨', color: 'from-rose-50 to-pink-50 border-rose-100' },
+          { label: 'Total Electricity', value: `${((meters || []).filter(m => m.type === 'Electricity').reduce((s, m) => s + (Number(m.reading) || 0), 0) / 1000).toFixed(1)} MWh`, icon: '⚡', color: 'from-amber-50 to-yellow-50 border-amber-100' },
+          { label: 'Total Water', value: `${((meters || []).filter(m => m.type === 'Water').reduce((s, m) => s + (Number(m.reading) || 0), 0)).toLocaleString()} m³`, icon: '💧', color: 'from-blue-50 to-cyan-50 border-blue-100' },
+          { label: 'Active Alerts', value: (meters || []).filter(m => m.status !== 'Normal').length, icon: '🚨', color: 'from-rose-50 to-pink-50 border-rose-100' },
         ].map(c => (
           <div key={c.label} className={`bg-gradient-to-br ${c.color} border rounded-xl p-4 flex items-center gap-4`}>
             <span className="text-3xl">{c.icon}</span>
@@ -3024,10 +3085,10 @@ const EdgeTab = () => {
 
   const filtered = (devices || []).filter(d =>
     (edgeFilter === 'All' || d.status === edgeFilter) &&
-    ((d.name||'').toLowerCase().includes(edgeSearch.toLowerCase()) || (d.location||'').toLowerCase().includes(edgeSearch.toLowerCase()))
+    ((d.name || '').toLowerCase().includes(edgeSearch.toLowerCase()) || (d.location || '').toLowerCase().includes(edgeSearch.toLowerCase()))
   );
 
-  const online = (devices||[]).filter(d => d.status === 'Online').length;
+  const online = (devices || []).filter(d => d.status === 'Online').length;
   const [showAddDeviceModal, setShowAddDeviceModal] = useState(false);
   const [newDevice, setNewDevice] = useState({ name: '', type: 'Sensor', status: 'Online', signal: 80, firmware: 'v1.0.0', location: '', battery: null });
 
@@ -3052,18 +3113,18 @@ const EdgeTab = () => {
           <div className="relative bg-white rounded-xl p-6 w-full max-w-md shadow-xl z-10">
             <h3 className="text-lg font-bold mb-3">Add Edge Device</h3>
             <div className="flex flex-col gap-2">
-              <input value={newDevice.name} onChange={e => setNewDevice({...newDevice, name: e.target.value})} placeholder="Name" className="p-2 border rounded" />
-              <select value={newDevice.type} onChange={e => setNewDevice({...newDevice, type: e.target.value})} className="p-2 border rounded">
+              <input value={newDevice.name} onChange={e => setNewDevice({ ...newDevice, name: e.target.value })} placeholder="Name" className="p-2 border rounded" />
+              <select value={newDevice.type} onChange={e => setNewDevice({ ...newDevice, type: e.target.value })} className="p-2 border rounded">
                 <option>Sensor</option>
                 <option>Camera</option>
                 <option>Network</option>
                 <option>Lock</option>
                 <option>Controller</option>
               </select>
-              <input value={newDevice.location} onChange={e => setNewDevice({...newDevice, location: e.target.value})} placeholder="Location" className="p-2 border rounded" />
+              <input value={newDevice.location} onChange={e => setNewDevice({ ...newDevice, location: e.target.value })} placeholder="Location" className="p-2 border rounded" />
               <div className="flex gap-2">
-                <input value={newDevice.firmware} onChange={e => setNewDevice({...newDevice, firmware: e.target.value})} placeholder="Firmware" className="p-2 border rounded flex-1" />
-                <input type="number" value={newDevice.battery ?? ''} onChange={e => setNewDevice({...newDevice, battery: e.target.value ? Number(e.target.value) : null})} placeholder="Battery %" className="p-2 border rounded w-28" />
+                <input value={newDevice.firmware} onChange={e => setNewDevice({ ...newDevice, firmware: e.target.value })} placeholder="Firmware" className="p-2 border rounded flex-1" />
+                <input type="number" value={newDevice.battery ?? ''} onChange={e => setNewDevice({ ...newDevice, battery: e.target.value ? Number(e.target.value) : null })} placeholder="Battery %" className="p-2 border rounded w-28" />
               </div>
               <div className="flex items-center justify-end gap-2 mt-3">
                 <button onClick={() => setShowAddDeviceModal(false)} className="px-3 py-2 bg-white border rounded">Cancel</button>
@@ -3172,20 +3233,20 @@ const EdgeTab = () => {
                   <td className="py-4 px-4 text-sm text-gray-500">{d.lastPing}</td>
                   <td className="py-4 px-4 text-sm text-gray-500">{d.firmware}</td>
                   <td className="py-4 px-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button onClick={() => alert(JSON.stringify(d, null, 2))} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors" title="View">
-                          <Eye className="w-4 h-4 text-blue-600" />
-                        </button>
-                        <button onClick={() => handleDeviceAction(d.id, 'reboot')} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors" title="Reboot">
-                          <Play className="w-4 h-4 text-gray-600" />
-                        </button>
-                        <button onClick={() => handleDeviceAction(d.id, 'firmwareUpdate')} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors" title="Update Firmware">
-                          <Upload className="w-4 h-4 text-gray-600" />
-                        </button>
-                        <button className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors" title="More">
-                          <MoreHorizontal className="w-4 h-4 text-gray-400" />
-                        </button>
-                      </div>
+                    <div className="flex items-center justify-end gap-2">
+                      <button onClick={() => alert(JSON.stringify(d, null, 2))} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors" title="View">
+                        <Eye className="w-4 h-4 text-blue-600" />
+                      </button>
+                      <button onClick={() => handleDeviceAction(d.id, 'reboot')} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors" title="Reboot">
+                        <Play className="w-4 h-4 text-gray-600" />
+                      </button>
+                      <button onClick={() => handleDeviceAction(d.id, 'firmwareUpdate')} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors" title="Update Firmware">
+                        <Upload className="w-4 h-4 text-gray-600" />
+                      </button>
+                      <button className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors" title="More">
+                        <MoreHorizontal className="w-4 h-4 text-gray-400" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -3212,7 +3273,7 @@ const AssetsTab = ({ assets = [] }) => {
 
   const exportCSV = () => {
     if (!assets || assets.length === 0) return;
-    const keys = ['id','name','category','propertyName','purchaseCost'];
+    const keys = ['id', 'name', 'category', 'propertyName', 'purchaseCost'];
     const rows = assets.map(a => ({
       id: a.id || a._id || '',
       name: a.name || a.title || '',
@@ -3220,7 +3281,7 @@ const AssetsTab = ({ assets = [] }) => {
       propertyName: a.property?.name || a.propertyName || '',
       purchaseCost: a.purchaseCost || ''
     }));
-    const csv = [keys.join(',')].concat(rows.map(r => keys.map(k => (`"${String(r[k] ?? '').replace(/"/g,'""')}"`)).join(','))).join('\n');
+    const csv = [keys.join(',')].concat(rows.map(r => keys.map(k => (`"${String(r[k] ?? '').replace(/"/g, '""')}"`)).join(','))).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = url; a.download = 'assets-export.csv'; a.click(); URL.revokeObjectURL(url);
@@ -3240,7 +3301,7 @@ const AssetsTab = ({ assets = [] }) => {
         header.forEach((h, i) => obj[h] = parts[i] || '');
         return obj;
       });
-      console.log('Imported assets (preview):', parsed.slice(0,20));
+      console.log('Imported assets (preview):', parsed.slice(0, 20));
       alert(`Imported ${parsed.length} rows (preview in console).`);
     };
     reader.readAsText(f);
@@ -3308,9 +3369,9 @@ const AssetsTab = ({ assets = [] }) => {
 const LocationsTab = ({ locations = [], assets = [] }) => {
   const exportCSV = () => {
     if (!locations || locations.length === 0) return;
-    const keys = ['id','name','address','assetCount'];
+    const keys = ['id', 'name', 'address', 'assetCount'];
     const rows = locations.map(l => ({ id: l.id || l._id || '', name: l.name || l.title || '', address: l.address || l.street || '', assetCount: (assets.filter(a => String(a.propertyId) === String(l._id || l.id)).length) }));
-    const csv = [keys.join(',')].concat(rows.map(r => keys.map(k => (`"${String(r[k] ?? '').replace(/"/g,'""')}"`)).join(','))).join('\n');
+    const csv = [keys.join(',')].concat(rows.map(r => keys.map(k => (`"${String(r[k] ?? '').replace(/"/g, '""')}"`)).join(','))).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = url; a.download = 'locations-export.csv'; a.click(); URL.revokeObjectURL(url);
@@ -3385,7 +3446,7 @@ const PeopleTab = ({ technicians = [] }) => {
   const [editTeamFiles, setEditTeamFiles] = useState([]);
   const [editTeamFilesPreview, setEditTeamFilesPreview] = useState([]);
   const [editTeamExtractFromFiles, setEditTeamExtractFromFiles] = useState(false);
-  
+
 
   useEffect(() => {
     let mounted = true;
@@ -3413,9 +3474,9 @@ const PeopleTab = ({ technicians = [] }) => {
   const exportCSV = () => {
     const combined = combinePeopleUsers(people, users);
     if (!combined || combined.length === 0) return;
-    const keys = ['id','name','email','phone','role'];
+    const keys = ['id', 'name', 'email', 'phone', 'role'];
     const rows = combined.map(t => ({ id: t._id || t.id || '', name: t.name || t.username || '', email: t.email || '', phone: t.phone || '', role: t.role || t.type || 'Technician' }));
-    const csv = [keys.join(',')].concat(rows.map(r => keys.map(k => (`"${String(r[k] ?? '').replace(/"/g,'""')}"`)).join(','))).join('\n');
+    const csv = [keys.join(',')].concat(rows.map(r => keys.map(k => (`"${String(r[k] ?? '').replace(/"/g, '""')}"`)).join(','))).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'people-export.csv'; a.click(); URL.revokeObjectURL(url);
   };
@@ -3594,44 +3655,44 @@ const PeopleTab = ({ technicians = [] }) => {
               {(teams || []).map((tm, i) => (
                 <tr key={tm._id || tm.id || `team-${i}`} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
                   <td className="py-3 px-4"><div className="w-10 h-10 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center">
-                    {tm.image ? <img src={getImageUrl(tm.image)} alt={tm.name} className="w-full h-full object-cover" /> : <div className="text-sm text-gray-600">{(tm.name||'T').slice(0,1)}</div>}
+                    {tm.image ? <img src={getImageUrl(tm.image)} alt={tm.name} className="w-full h-full object-cover" /> : <div className="text-sm text-gray-600">{(tm.name || 'T').slice(0, 1)}</div>}
                   </div></td>
                   <td className="py-3 px-4"><div className="text-sm font-bold text-gray-900">{tm.name || 'Unnamed'}</div></td>
-                      <td className="py-3 px-4 text-sm text-gray-600">{
-                        (() => {
-                          const allPeople = (people || []).concat(users || []);
-                          if (!tm.members || tm.members.length === 0) return '-';
-                          const membersArray = Array.isArray(tm.members) ? tm.members : (tm.members ? String(tm.members).split(',') : []);
-                          const names = membersArray.map(entry => {
-                            if (!entry && entry !== 0) return null;
-                            // If entry is an object with name/email, prefer that
-                            if (typeof entry === 'object') {
-                              return entry.name || entry.email || null;
-                            }
-                            const raw = String(entry).trim();
-                            // If it's an ID that matches a user/people, return the matched name
-                            const found = allPeople.find(p => String(p.id || p._id) === raw || String(p._id) === raw);
-                            if (found) return found.name || found.username || found.email;
-                            // If looks like JSON object string, parse and extract name/email
-                            if (raw.startsWith('{') || raw.startsWith('[')) {
-                              try {
-                                const parsed = JSON.parse(raw);
-                                if (parsed && typeof parsed === 'object') return parsed.name || parsed.email || null;
-                              } catch (e) { }
-                            }
-                            // If it's a CSV-like line, take first token as name
-                            if (raw.includes(',') || raw.includes(';')) {
-                              const first = raw.split(/[,;]+/)[0].replace(/^["']|["']$/g, '').trim();
-                              if (first && first.length < 120) return first;
-                            }
-                            // Fallback: if looks like an email, return that, else shorten
-                            const emailMatch = raw.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
-                            if (emailMatch) return emailMatch[0];
-                            return raw.length > 12 ? raw.slice(0,12) + '...' : raw;
-                          }).filter(Boolean);
-                          return names.slice(0,3).join(', ') + (names.length > 3 ? ` (+${names.length-3})` : '');
-                        })()
-                      }</td>
+                  <td className="py-3 px-4 text-sm text-gray-600">{
+                    (() => {
+                      const allPeople = (people || []).concat(users || []);
+                      if (!tm.members || tm.members.length === 0) return '-';
+                      const membersArray = Array.isArray(tm.members) ? tm.members : (tm.members ? String(tm.members).split(',') : []);
+                      const names = membersArray.map(entry => {
+                        if (!entry && entry !== 0) return null;
+                        // If entry is an object with name/email, prefer that
+                        if (typeof entry === 'object') {
+                          return entry.name || entry.email || null;
+                        }
+                        const raw = String(entry).trim();
+                        // If it's an ID that matches a user/people, return the matched name
+                        const found = allPeople.find(p => String(p.id || p._id) === raw || String(p._id) === raw);
+                        if (found) return found.name || found.username || found.email;
+                        // If looks like JSON object string, parse and extract name/email
+                        if (raw.startsWith('{') || raw.startsWith('[')) {
+                          try {
+                            const parsed = JSON.parse(raw);
+                            if (parsed && typeof parsed === 'object') return parsed.name || parsed.email || null;
+                          } catch (e) { }
+                        }
+                        // If it's a CSV-like line, take first token as name
+                        if (raw.includes(',') || raw.includes(';')) {
+                          const first = raw.split(/[,;]+/)[0].replace(/^["']|["']$/g, '').trim();
+                          if (first && first.length < 120) return first;
+                        }
+                        // Fallback: if looks like an email, return that, else shorten
+                        const emailMatch = raw.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+                        if (emailMatch) return emailMatch[0];
+                        return raw.length > 12 ? raw.slice(0, 12) + '...' : raw;
+                      }).filter(Boolean);
+                      return names.slice(0, 3).join(', ') + (names.length > 3 ? ` (+${names.length - 3})` : '');
+                    })()
+                  }</td>
                   <td className="py-3 px-4 text-sm text-gray-600 font-mono">{String(tm._id || tm.id || '').slice(-8)}</td>
                   <td className="py-3 px-4 text-right"><div className="flex items-center justify-end gap-2">
                     <button onClick={() => openViewTeam(tm)} title="View team" className="p-1.5 hover:bg-gray-100 rounded-lg"><Eye className="w-4 h-4 text-blue-600" /></button>
@@ -3653,10 +3714,10 @@ const PeopleTab = ({ technicians = [] }) => {
           <form onSubmit={handleCreatePerson} className="bg-white rounded-xl p-6 z-50 w-full max-w-md">
             <h3 className="text-lg font-bold mb-3">Add Person</h3>
             <div className="flex flex-col gap-2">
-              <input className="border p-2 rounded" placeholder="Name" value={newPerson.name} onChange={e => setNewPerson({...newPerson, name: e.target.value})} />
-              <input className="border p-2 rounded" placeholder="Email" value={newPerson.email} onChange={e => setNewPerson({...newPerson, email: e.target.value})} />
-              <input className="border p-2 rounded" placeholder="Phone" value={newPerson.phone} onChange={e => setNewPerson({...newPerson, phone: e.target.value})} />
-              <select className="border p-2 rounded" value={newPerson.role} onChange={e => setNewPerson({...newPerson, role: e.target.value})}>
+              <input className="border p-2 rounded" placeholder="Name" value={newPerson.name} onChange={e => setNewPerson({ ...newPerson, name: e.target.value })} />
+              <input className="border p-2 rounded" placeholder="Email" value={newPerson.email} onChange={e => setNewPerson({ ...newPerson, email: e.target.value })} />
+              <input className="border p-2 rounded" placeholder="Phone" value={newPerson.phone} onChange={e => setNewPerson({ ...newPerson, phone: e.target.value })} />
+              <select className="border p-2 rounded" value={newPerson.role} onChange={e => setNewPerson({ ...newPerson, role: e.target.value })}>
                 <option>Technician</option>
                 <option>Manager</option>
                 <option>Staff</option>
@@ -3676,10 +3737,10 @@ const PeopleTab = ({ technicians = [] }) => {
           <div className="absolute inset-0 bg-black/40" onClick={() => setShowAddTeam(false)} />
           <form onSubmit={handleCreateTeam} className="bg-white rounded-xl p-6 z-50 w-full max-w-md">
             <h3 className="text-lg font-bold mb-3">Add Team</h3>
-              <div className="flex flex-col gap-2">
-              <input className="border p-2 rounded" placeholder="Team Name" value={newTeam.name} onChange={e => setNewTeam({...newTeam, name: e.target.value})} />
+            <div className="flex flex-col gap-2">
+              <input className="border p-2 rounded" placeholder="Team Name" value={newTeam.name} onChange={e => setNewTeam({ ...newTeam, name: e.target.value })} />
               <label className="text-sm text-gray-600">Members</label>
-              <select multiple className="border p-2 rounded h-32" value={newTeam.members} onChange={e => setNewTeam({...newTeam, members: Array.from(e.target.selectedOptions).map(o => o.value)})}>
+              <select multiple className="border p-2 rounded h-32" value={newTeam.members} onChange={e => setNewTeam({ ...newTeam, members: Array.from(e.target.selectedOptions).map(o => o.value) })}>
                 {((people || []).concat(users || [])).map(p => (<option key={(p.id || p._id || p._id_str || p._id)} value={p.id || p._id}>{p.name || p.username || p.email}</option>))}
               </select>
               <label className="text-sm text-gray-600 mt-2">Team Image (optional)</label>
@@ -3727,9 +3788,9 @@ const PeopleTab = ({ technicians = [] }) => {
           <form onSubmit={handleUpdateTeam} className="bg-white rounded-xl p-6 z-50 w-full max-w-md">
             <h3 className="text-lg font-bold mb-3">Edit Team</h3>
             <div className="flex flex-col gap-2">
-              <input className="border p-2 rounded" placeholder="Team Name" value={editTeam.name || ''} onChange={e => setEditTeam({...editTeam, name: e.target.value})} />
+              <input className="border p-2 rounded" placeholder="Team Name" value={editTeam.name || ''} onChange={e => setEditTeam({ ...editTeam, name: e.target.value })} />
               <label className="text-sm text-gray-600">Members</label>
-              <select multiple className="border p-2 rounded h-32" value={editTeam.members || []} onChange={e => setEditTeam({...editTeam, members: Array.from(e.target.selectedOptions).map(o => o.value)})}>
+              <select multiple className="border p-2 rounded h-32" value={editTeam.members || []} onChange={e => setEditTeam({ ...editTeam, members: Array.from(e.target.selectedOptions).map(o => o.value) })}>
                 {((people || []).concat(users || [])).map(p => (<option key={(p.id || p._id || p._id_str || p._id)} value={p.id || p._id}>{p.name || p.username || p.email}</option>))}
               </select>
               <label className="text-sm text-gray-600 mt-2">Team Image (optional)</label>
@@ -3791,9 +3852,9 @@ const ChecklistsTab = () => {
 
   const exportCSV = () => {
     if (!items || items.length === 0) return;
-    const keys = ['id','name','steps'];
+    const keys = ['id', 'name', 'steps'];
     const rows = items.map(it => ({ id: it._id || it.id || '', name: it.name || it.title || '', steps: Array.isArray(it.steps) ? it.steps.length : '' }));
-    const csv = [keys.join(',')].concat(rows.map(r => keys.map(k => (`"${String(r[k] ?? '').replace(/"/g,'""')}"`)).join(','))).join('\n');
+    const csv = [keys.join(',')].concat(rows.map(r => keys.map(k => (`"${String(r[k] ?? '').replace(/"/g, '""')}"`)).join(','))).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'checklists-export.csv'; a.click(); URL.revokeObjectURL(url);
   };
@@ -3857,7 +3918,7 @@ const PartsInventoryTab = () => {
 
   const exportCSV = () => {
     if (!items || items.length === 0) return;
-    const keys = ['id','name','status','availableQty','allocatedQty','onHand','incomingQty','location','barcode'];
+    const keys = ['id', 'name', 'status', 'availableQty', 'allocatedQty', 'onHand', 'incomingQty', 'location', 'barcode'];
     const rows = items.map(it => ({
       id: it._id || it.id || '',
       name: it.name || it.title || it.partName || '',
@@ -3869,7 +3930,7 @@ const PartsInventoryTab = () => {
       location: it.location || it.warehouse || '',
       barcode: it.barcode || ''
     }));
-    const csv = [keys.join(',')].concat(rows.map(r => keys.map(k => (`"${String(r[k] ?? '').replace(/"/g,'""')}"`)).join(','))).join('\n');
+    const csv = [keys.join(',')].concat(rows.map(r => keys.map(k => (`"${String(r[k] ?? '').replace(/"/g, '""')}"`)).join(','))).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'parts-inventory.csv'; a.click(); URL.revokeObjectURL(url);
   };
@@ -3877,7 +3938,7 @@ const PartsInventoryTab = () => {
   const onImport = (e) => {
     const f = e.target.files && e.target.files[0]; if (!f) return;
     const reader = new FileReader();
-    reader.onload = () => { const text = reader.result || ''; console.log('Imported parts preview:', text.slice(0,1000)); alert('Imported file (preview in console)'); };
+    reader.onload = () => { const text = reader.result || ''; console.log('Imported parts preview:', text.slice(0, 1000)); alert('Imported file (preview in console)'); };
     reader.readAsText(f);
   };
 
@@ -3943,9 +4004,9 @@ const PurchaseOrdersTab = () => {
 
   const exportCSV = () => {
     if (!orders || orders.length === 0) return;
-    const keys = ['id','title','poNumber','itemsCount','totalCost','vendor','createdBy'];
-    const rows = orders.map(o => ({ id: o._id||o.id||'', title: o.title||o.name||'', poNumber: o.poNumber||o.number||'', itemsCount: Array.isArray(o.items)?o.items.length:'', totalCost: o.totalCost||o.cost||'', vendor: o.vendor?.name||o.vendor||'', createdBy: o.createdBy?.name||o.createdBy||'' }));
-    const csv = [keys.join(',')].concat(rows.map(r => keys.map(k => (`"${String(r[k] ?? '').replace(/"/g,'""')}"`)).join(','))).join('\n');
+    const keys = ['id', 'title', 'poNumber', 'itemsCount', 'totalCost', 'vendor', 'createdBy'];
+    const rows = orders.map(o => ({ id: o._id || o.id || '', title: o.title || o.name || '', poNumber: o.poNumber || o.number || '', itemsCount: Array.isArray(o.items) ? o.items.length : '', totalCost: o.totalCost || o.cost || '', vendor: o.vendor?.name || o.vendor || '', createdBy: o.createdBy?.name || o.createdBy || '' }));
+    const csv = [keys.join(',')].concat(rows.map(r => keys.map(k => (`"${String(r[k] ?? '').replace(/"/g, '""')}"`)).join(','))).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'purchase-orders.csv'; a.click(); URL.revokeObjectURL(url);
   };
 
@@ -4001,9 +4062,9 @@ const VendorsTab = () => {
 
   const exportCSV = () => {
     if (!vendors || vendors.length === 0) return;
-    const keys = ['id','name','address','phone','contact','email'];
-    const rows = vendors.map(v => ({ id: v._id||v.id||'', name: v.name||v.company||'', address: v.address||v.street||'', phone: v.phone||v.phoneNumber||'', contact: v.contactName||'', email: v.email||'' }));
-    const csv = [keys.join(',')].concat(rows.map(r => keys.map(k => (`"${String(r[k] ?? '').replace(/"/g,'""')}"`)).join(','))).join('\n');
+    const keys = ['id', 'name', 'address', 'phone', 'contact', 'email'];
+    const rows = vendors.map(v => ({ id: v._id || v.id || '', name: v.name || v.company || '', address: v.address || v.street || '', phone: v.phone || v.phoneNumber || '', contact: v.contactName || '', email: v.email || '' }));
+    const csv = [keys.join(',')].concat(rows.map(r => keys.map(k => (`"${String(r[k] ?? '').replace(/"/g, '""')}"`)).join(','))).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'vendors.csv'; a.click(); URL.revokeObjectURL(url);
   };
 
@@ -4171,6 +4232,7 @@ const IssuesTab = ({
             </th>
             <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">WO #</th>
             <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Work Order Title</th>
+            <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Image</th>
             <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Description</th>
             <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Due Date</th>
             <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Start Date</th>
@@ -4204,6 +4266,19 @@ const IssuesTab = ({
                     </div>
                     <ChevronDown className="w-3.5 h-3.5 text-gray-400 opacity-0 group-hover/title:opacity-100 transition-opacity" />
                   </div>
+                </td>
+                <td className="py-4 px-4">
+                  {getImageUrl(issue.photo || issue.image || issue.beforePhoto) ? (
+                    <img
+                      src={getImageUrl(issue.photo || issue.image || issue.beforePhoto)}
+                      alt={issue.title}
+                      className="w-12 h-12 rounded object-cover border border-gray-200"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 bg-gray-100 rounded flex items-center justify-center text-gray-400 text-xs text-center border border-gray-200">
+                      No img
+                    </div>
+                  )}
                 </td>
                 <td className="py-4 px-4">
                   <p className="text-sm text-gray-500 line-clamp-1 max-w-[200px]">{issue.description}</p>
@@ -4461,6 +4536,7 @@ const AllIssuesTab = ({
                 </th>
                 <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">WO #</th>
                 <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Work Order Title</th>
+                <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Image</th>
                 <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Description</th>
                 <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Due Date</th>
                 <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Start Date</th>
@@ -4496,6 +4572,19 @@ const AllIssuesTab = ({
                       </div>
                       <ChevronDown className="w-3.5 h-3.5 text-gray-400 opacity-0 group-hover/title:opacity-100 transition-opacity" />
                     </div>
+                  </td>
+                  <td className="py-4 px-4">
+                    {getImageUrl(issue.photo || issue.image || issue.beforePhoto) ? (
+                      <img
+                        src={getImageUrl(issue.photo || issue.image || issue.beforePhoto)}
+                        alt={issue.title}
+                        className="w-12 h-12 rounded object-cover border border-gray-200"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 bg-gray-100 rounded flex items-center justify-center text-gray-400 text-xs text-center border border-gray-200">
+                        No img
+                      </div>
+                    )}
                   </td>
                   <td className="py-4 px-4">
                     <p className="text-sm text-gray-500 line-clamp-1 max-w-[200px]">{issue.description}</p>

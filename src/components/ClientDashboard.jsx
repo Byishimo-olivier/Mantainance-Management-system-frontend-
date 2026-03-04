@@ -5,97 +5,98 @@ import { useNavigate } from "react-router-dom";
 import NewIssue from './NewIssue';
 import SubscriptionWidget from './SubscriptionWidget';
 import SubscriptionManagement from './SubscriptionManagement';
+import { getImageUrl } from '../utils/imageUrl';
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 const Icon = {
   Dashboard: () => (
     <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-      <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+      <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" />
     </svg>
   ),
   Requests: () => (
     <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-      <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>
-      <rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/>
+      <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" />
+      <rect x="9" y="3" width="6" height="4" rx="1" /><path d="M9 12h6M9 16h4" />
     </svg>
   ),
   Properties: () => (
     <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-      <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+      <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" /><polyline points="9 22 9 12 15 12 15 22" />
     </svg>
   ),
   Assets: () => (
     <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-      <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/>
+      <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z" />
     </svg>
   ),
   Staff: () => (
     <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-      <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/>
-      <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
+      <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="9" cy="7" r="4" />
+      <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />
     </svg>
   ),
   Templates: () => (
     <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
-      <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" />
+      <line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" />
     </svg>
   ),
   Logout: () => (
     <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-      <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/>
+      <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" />
     </svg>
   ),
   Plus: () => (
     <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" viewBox="0 0 24 24">
-      <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+      <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
     </svg>
   ),
   Clock: () => (
     <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-      <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+      <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
     </svg>
   ),
   Subscription: () => (
     <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-      <rect x="2" y="5" width="20" height="14" rx="2"/>
-      <line x1="2" y1="10" x2="22" y2="10"/>
+      <rect x="2" y="5" width="20" height="14" rx="2" />
+      <line x1="2" y1="10" x2="22" y2="10" />
     </svg>
   ),
   Alert: () => (
     <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-      <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
-      <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+      <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+      <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
     </svg>
   ),
   ChevronRight: () => (
     <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-      <polyline points="9 18 15 12 9 6"/>
+      <polyline points="9 18 15 12 9 6" />
     </svg>
   ),
   Bell: () => (
     <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-      <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/>
+      <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" />
     </svg>
   ),
   Export: () => (
     <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
     </svg>
   ),
   Check: () => (
     <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-      <polyline points="20 6 9 17 4 12"/>
+      <polyline points="20 6 9 17 4 12" />
     </svg>
   ),
   X: () => (
     <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+      <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
     </svg>
   ),
   Download: () => (
     <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
     </svg>
   ),
 };
@@ -111,13 +112,13 @@ const extractId = (obj) => {
 function StatusBadge({ status }) {
   const s = (status || '').toUpperCase().replace(/_/g, ' ');
   const map = {
-    'PENDING':     { bg: '#FEF3C7', text: '#92400E', dot: '#F59E0B' },
+    'PENDING': { bg: '#FEF3C7', text: '#92400E', dot: '#F59E0B' },
     'IN PROGRESS': { bg: '#DBEAFE', text: '#1E40AF', dot: '#3B82F6' },
-    'COMPLETE':    { bg: '#D1FAE5', text: '#065F46', dot: '#10B981' },
-    'COMPLETED':   { bg: '#D1FAE5', text: '#065F46', dot: '#10B981' },
-    'APPROVED':    { bg: '#D1FAE5', text: '#065F46', dot: '#10B981' },
-    'OVERDUE':     { bg: '#FEE2E2', text: '#991B1B', dot: '#EF4444' },
-    'REJECTED':    { bg: '#FEE2E2', text: '#991B1B', dot: '#EF4444' },
+    'COMPLETE': { bg: '#D1FAE5', text: '#065F46', dot: '#10B981' },
+    'COMPLETED': { bg: '#D1FAE5', text: '#065F46', dot: '#10B981' },
+    'APPROVED': { bg: '#D1FAE5', text: '#065F46', dot: '#10B981' },
+    'OVERDUE': { bg: '#FEE2E2', text: '#991B1B', dot: '#EF4444' },
+    'REJECTED': { bg: '#FEE2E2', text: '#991B1B', dot: '#EF4444' },
   };
   const { bg, text, dot } = map[s] || { bg: '#F3F4F6', text: '#374151', dot: '#9CA3AF' };
   return (
@@ -131,11 +132,11 @@ function StatusBadge({ status }) {
 // ── Stat card ─────────────────────────────────────────────────────────────────
 function StatCard({ label, value, sub, accent, icon }) {
   const accents = {
-    blue:   { bg: '#EFF6FF', border: '#BFDBFE', val: '#1D4ED8', icon: '#3B82F6' },
-    green:  { bg: '#ECFDF5', border: '#A7F3D0', val: '#065F46', icon: '#10B981' },
-    red:    { bg: '#FEF2F2', border: '#FECACA', val: '#991B1B', icon: '#EF4444' },
+    blue: { bg: '#EFF6FF', border: '#BFDBFE', val: '#1D4ED8', icon: '#3B82F6' },
+    green: { bg: '#ECFDF5', border: '#A7F3D0', val: '#065F46', icon: '#10B981' },
+    red: { bg: '#FEF2F2', border: '#FECACA', val: '#991B1B', icon: '#EF4444' },
     indigo: { bg: '#EEF2FF', border: '#C7D2FE', val: '#3730A3', icon: '#6366F1' },
-    amber:  { bg: '#FFFBEB', border: '#FDE68A', val: '#92400E', icon: '#F59E0B' },
+    amber: { bg: '#FFFBEB', border: '#FDE68A', val: '#92400E', icon: '#F59E0B' },
   };
   const c = accents[accent] || accents.blue;
   return (
@@ -535,13 +536,13 @@ function ClientDashboard() {
 
   const dismissAll = useCallback(async () => {
     for (const s of reminders) {
-      await dismissOne(s._id || s.id).catch(() => {});
+      await dismissOne(s._id || s.id).catch(() => { });
     }
   }, [reminders, dismissOne]);
 
   const snoozeAll = useCallback(async () => {
     for (const s of reminders) {
-      await snoozeOne(s._id || s.id).catch(() => {});
+      await snoozeOne(s._id || s.id).catch(() => { });
     }
   }, [reminders, snoozeOne]);
 
@@ -774,7 +775,7 @@ function ClientDashboard() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ width: 32, height: 32, background: 'linear-gradient(135deg,#1D4ED8,#3B82F6)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <svg width="16" height="16" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-                <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+                <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" /><polyline points="9 22 9 12 15 12 15 22" />
               </svg>
             </div>
             <div>
@@ -902,13 +903,13 @@ function ClientDashboard() {
               {/* Stats */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
                 <StatCard label="Pending" value={combinedPending} sub="Awaiting action" accent="amber"
-                  icon={<svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>} />
+                  icon={<svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>} />
                 <StatCard label="In Progress" value={combinedInProgress} sub="Currently active" accent="blue"
-                  icon={<svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>} />
+                  icon={<svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" /></svg>} />
                 <StatCard label="Completed" value={combinedCompleted} sub="Successfully resolved" accent="green"
-                  icon={<svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>} />
+                  icon={<svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" /></svg>} />
                 <StatCard label="Overdue" value={combinedOverdue} sub="Requires attention" accent="red"
-                  icon={<svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>} />
+                  icon={<svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>} />
               </div>
 
               {/* Charts + Quick Actions */}
@@ -996,9 +997,9 @@ function ClientDashboard() {
                           )}
 
                           {/* Tags */}
-                          {Array.isArray(issue.tags) && issue.tags.filter(t => !['PENDING','IN PROGRESS','COMPLETE','OVERDUE'].includes(t?.label || t)).length > 0 && (
+                          {Array.isArray(issue.tags) && issue.tags.filter(t => !['PENDING', 'IN PROGRESS', 'COMPLETE', 'OVERDUE'].includes(t?.label || t)).length > 0 && (
                             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
-                              {issue.tags.filter(t => !['PENDING','IN PROGRESS','COMPLETE','OVERDUE'].includes(t?.label || t)).map((tag, i) => {
+                              {issue.tags.filter(t => !['PENDING', 'IN PROGRESS', 'COMPLETE', 'OVERDUE'].includes(t?.label || t)).map((tag, i) => {
                                 const label = tag.label || tag;
                                 return <span key={i} style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: label === 'URGENT' ? '#FEE2E2' : '#EFF6FF', color: label === 'URGENT' ? '#991B1B' : '#1D4ED8', border: `1px solid ${label === 'URGENT' ? '#FECACA' : '#BFDBFE'}` }}>{label}</span>;
                               })}
@@ -1070,11 +1071,24 @@ function ClientDashboard() {
                   </>
                 } />
               <Table
-                heads={['#', 'Title', 'Status', 'Location', 'Assigned To', 'Created', 'Actions']}
+                heads={['#', 'Title', 'Image', 'Status', 'Location', 'Assigned To', 'Created', 'Actions']}
                 empty="No requests found."
                 rows={allIssues.map((issue, idx) => [
                   <Td key="n">{idx + 1}</Td>,
                   <Td key="t"><span style={{ fontWeight: 600, color: '#111827' }}>{issue.title || issue.summary || '—'}</span></Td>,
+                  <Td key="img">
+                    {getImageUrl(issue.photo || issue.image || issue.beforePhoto) ? (
+                      <img
+                        src={getImageUrl(issue.photo || issue.image || issue.beforePhoto)}
+                        alt={issue.title}
+                        style={{ width: 48, height: 48, borderRadius: 6, objectFit: 'cover', border: '1px solid #E5E7EB' }}
+                      />
+                    ) : (
+                      <div style={{ width: 48, height: 48, background: '#F3F4F6', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9CA3AF', fontSize: 10, border: '1px solid #E5E7EB', textAlign: 'center' }}>
+                        No img
+                      </div>
+                    )}
+                  </Td>,
                   <Td key="s"><StatusBadge status={issue.status} /></Td>,
                   <Td key="p">{getPropertyName(issue)}</Td>,
                   <Td key="a">{getAssignedName(issue)}</Td>,
@@ -1160,15 +1174,15 @@ function ClientDashboard() {
                     e.preventDefault();
                     try {
                       const userId = getCurrentUserId();
-                      const payload = { 
-                        ...propertyForm, 
-                        beds: propertyForm.beds ? +propertyForm.beds : undefined, 
-                        baths: propertyForm.baths ? +propertyForm.baths : undefined, 
-                        area: propertyForm.area ? +propertyForm.area : undefined, 
-                        floors: propertyForm.floors ? +propertyForm.floors : undefined, 
-                        rooms: propertyForm.rooms ? +propertyForm.rooms : undefined, 
-                        clientId: userId, 
-                        userId 
+                      const payload = {
+                        ...propertyForm,
+                        beds: propertyForm.beds ? +propertyForm.beds : undefined,
+                        baths: propertyForm.baths ? +propertyForm.baths : undefined,
+                        area: propertyForm.area ? +propertyForm.area : undefined,
+                        floors: propertyForm.floors ? +propertyForm.floors : undefined,
+                        rooms: propertyForm.rooms ? +propertyForm.rooms : undefined,
+                        clientId: userId,
+                        userId
                       };
                       if (propertyUseNamedBlocks) {
                         payload.blocks = (propertyForm.namedBlocks || []).join(',');
@@ -1186,13 +1200,13 @@ function ClientDashboard() {
                         if (propertyFiles?.length) {
                           const fd = new FormData();
                           Array.from(propertyFiles).forEach(f => fd.append('photos', f));
-                          await api.post(`/api/properties/${r.data.id || r.data._id}/photos`, fd, { headers: { 'Content-Type': 'multipart/form-data' } }).catch(() => {});
+                          await api.post(`/api/properties/${r.data.id || r.data._id}/photos`, fd, { headers: { 'Content-Type': 'multipart/form-data' } }).catch(() => { });
                         }
                       }
                       if (eid && propertyFiles?.length) {
                         const fd = new FormData();
                         Array.from(propertyFiles).forEach(f => fd.append('photos', f));
-                        await api.post(`/api/properties/${eid}/photos`, fd, { headers: { 'Content-Type': 'multipart/form-data' } }).catch(() => {});
+                        await api.post(`/api/properties/${eid}/photos`, fd, { headers: { 'Content-Type': 'multipart/form-data' } }).catch(() => { });
                       }
                       setEditingProperty(null);
                       setPropertyFiles(null);
@@ -1655,7 +1669,7 @@ function ClientDashboard() {
                   bg: 'linear-gradient(135deg,#1E3A8A,#1D4ED8)',
                   border: '#1D4ED8',
                   iconBg: 'rgba(255,255,255,0.15)',
-                  icon: <svg width="20" height="20" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>,
+                  icon: <svg width="20" height="20" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
                   onClick: () => {
                     setNewIssueModel({ category: '', requestedType: currentUser ? 'inspection' : 'request' });
                     setShowNewIssueModal(true);
@@ -1666,7 +1680,7 @@ function ClientDashboard() {
                   bg: 'linear-gradient(135deg,#0F766E,#0D9488)',
                   border: '#0F766E',
                   iconBg: 'rgba(255,255,255,0.15)',
-                  icon: <svg width="20" height="20" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>,
+                  icon: <svg width="20" height="20" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>,
                   onClick: () => setShowScheduleForm(true),
                 }].map(({ title, desc, bg, icon, onClick }) => (
                   <button key={title} onClick={onClick} style={{ background: bg, border: 'none', borderRadius: 14, padding: '24px', textAlign: 'left', cursor: 'pointer', transition: 'transform 0.15s, box-shadow 0.15s', color: 'white' }}
@@ -1746,7 +1760,7 @@ function ClientDashboard() {
           setShowNewIssueModal(false);
           setNewIssueModel(null);
           if (submitted) {
-            fetchIssues().catch(() => {});
+            fetchIssues().catch(() => { });
             setActiveTab('requests');
           }
         }} />

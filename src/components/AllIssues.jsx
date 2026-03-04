@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import api from "../api/axios";
 import { useNavigate } from "react-router-dom";
+import { getImageUrl } from "../utils/imageUrl";
 
 // Updated IssueCard to handle missing properties
 const IssueCard = ({ issue, userRole, actions }) => {
@@ -19,6 +20,16 @@ const IssueCard = ({ issue, userRole, actions }) => {
         <div className="text-sm text-gray-500 mb-2">
           Status: <span className={`font-semibold ${getStatusColor(status)}`}>{status}</span>
         </div>
+
+        {/* Show image if available */}
+        {getImageUrl(issue.photo || issue.image) && (
+          <img
+            src={getImageUrl(issue.photo || issue.image)}
+            alt="Issue"
+            className="w-full h-32 max-w-xs object-cover rounded mb-2"
+            style={{ aspectRatio: '4/3' }}
+          />
+        )}
 
         {/* Show assigned technicians */}
         {issue.assignees && Array.isArray(issue.assignees) && issue.assignees.length > 0 && (
