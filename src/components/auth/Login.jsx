@@ -78,9 +78,9 @@ export default function Login({ onLogin }) {
           className="w-full p-3 bg-gradient-to-r from-indigo-500 to-blue-600 text-white border-none rounded-md font-semibold text-base cursor-pointer mb-2 shadow-md hover:from-indigo-600 hover:to-blue-700 transition-colors"
         >Login</button>
         {error && <div className="text-red-500 text-center mt-2 font-medium">{error}</div>}
-        <div className="text-center mt-4">
+        {/* <div className="text-center mt-4">
           <a href="/register" className="text-indigo-500 font-medium hover:underline text-sm italic">If you don't have an account, Sign up</a>
-        </div>
+        </div> */}
       </form>
     </div>
   );
