@@ -6,6 +6,7 @@ import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import Header from "./Header";
 import SubscriptionManagement from './SubscriptionManagement';
+import TeamDetailsModal from './TeamDetailsModal';
 import {
   Shield,
   BarChart3,
@@ -232,6 +233,8 @@ const StatCard = ({ title, value, change, icon, color, trend = "up" }) => {
           <span>{change}</span>
         </div>
       )}
+          {/* View Team Modal */}
+            <TeamDetailsModal show={showViewTeam} team={viewTeam} people={people} users={users} onClose={() => setShowViewTeam(false)} />
     </div>
   );
 };
@@ -3356,14 +3359,20 @@ const PeopleTab = ({ technicians = [] }) => {
   const [newTeam, setNewTeam] = useState({ name: '', members: [] });
   const [teamImageFile, setTeamImageFile] = useState(null);
   const [teamImagePreview, setTeamImagePreview] = useState(null);
+  const [teamExtractFromFiles, setTeamExtractFromFiles] = useState(false);
   const [showEditTeam, setShowEditTeam] = useState(false);
   const [editTeam, setEditTeam] = useState(null);
   const [editTeamImageFile, setEditTeamImageFile] = useState(null);
   const [editTeamImagePreview, setEditTeamImagePreview] = useState(null);
+  const [showViewTeam, setShowViewTeam] = useState(false);
+  const [viewTeam, setViewTeam] = useState(null);
+  const [showMapExtracted, setShowMapExtracted] = useState(false);
+  const [mappingState, setMappingState] = useState([]); // { idx, existingId, newName, newEmail }
   const [teamFiles, setTeamFiles] = useState([]);
   const [teamFilesPreview, setTeamFilesPreview] = useState([]);
   const [editTeamFiles, setEditTeamFiles] = useState([]);
   const [editTeamFilesPreview, setEditTeamFilesPreview] = useState([]);
+  const [editTeamExtractFromFiles, setEditTeamExtractFromFiles] = useState(false);
   
 
   useEffect(() => {
@@ -3417,8 +3426,9 @@ const PeopleTab = ({ technicians = [] }) => {
     try {
       const form = new FormData();
       form.append('name', newTeam.name || '');
-      // append members as JSON string
+      // append members as JSON string (if user chose extraction we still send members array but set flag)
       form.append('members', JSON.stringify(newTeam.members || []));
+      if (teamExtractFromFiles) form.append('extractMembers', 'true');
       if (teamImageFile) form.append('image', teamImageFile);
       if (teamFiles && teamFiles.length) for (const f of teamFiles) form.append('files', f);
 
@@ -3445,6 +3455,31 @@ const PeopleTab = ({ technicians = [] }) => {
     setShowEditTeam(true);
   };
 
+  const openViewTeam = (team) => {
+    (async () => {
+      try {
+        const id = team.id || team._id;
+        if (id) {
+          const res = await api.get(`/api/teams/${id}`);
+          if (res && res.data) {
+            setViewTeam(res.data);
+          } else {
+            setViewTeam(team);
+          }
+        } else {
+          setViewTeam(team);
+        }
+      } catch (e) {
+        console.warn('Failed to fetch team details, using provided object', e);
+        setViewTeam(team);
+      } finally {
+        setShowViewTeam(true);
+        setShowMapExtracted(false);
+        setMappingState([]);
+      }
+    })();
+  };
+
   const handleUpdateTeam = async (e) => {
     e.preventDefault();
     if (!editTeam) return;
@@ -3452,6 +3487,7 @@ const PeopleTab = ({ technicians = [] }) => {
       const form = new FormData();
       form.append('name', editTeam.name || '');
       form.append('members', JSON.stringify(editTeam.members || []));
+      if (editTeamExtractFromFiles) form.append('extractMembers', 'true');
       if (editTeamImageFile) form.append('image', editTeamImageFile);
       if (editTeamFiles && editTeamFiles.length) for (const f of editTeamFiles) form.append('files', f);
 
@@ -3553,15 +3589,40 @@ const PeopleTab = ({ technicians = [] }) => {
                         (() => {
                           const allPeople = (people || []).concat(users || []);
                           if (!tm.members || tm.members.length === 0) return '-';
-                          const names = (Array.isArray(tm.members) ? tm.members : String(tm.members).split(',')).map(id => {
-                            const found = allPeople.find(p => String(p.id || p._id) === String(id));
-                            return found ? (found.name || found.username || found.email) : String(id).slice(0,8);
+                          const membersArray = Array.isArray(tm.members) ? tm.members : (tm.members ? String(tm.members).split(',') : []);
+                          const names = membersArray.map(entry => {
+                            if (!entry && entry !== 0) return null;
+                            // If entry is an object with name/email, prefer that
+                            if (typeof entry === 'object') {
+                              return entry.name || entry.email || null;
+                            }
+                            const raw = String(entry).trim();
+                            // If it's an ID that matches a user/people, return the matched name
+                            const found = allPeople.find(p => String(p.id || p._id) === raw || String(p._id) === raw);
+                            if (found) return found.name || found.username || found.email;
+                            // If looks like JSON object string, parse and extract name/email
+                            if (raw.startsWith('{') || raw.startsWith('[')) {
+                              try {
+                                const parsed = JSON.parse(raw);
+                                if (parsed && typeof parsed === 'object') return parsed.name || parsed.email || null;
+                              } catch (e) { }
+                            }
+                            // If it's a CSV-like line, take first token as name
+                            if (raw.includes(',') || raw.includes(';')) {
+                              const first = raw.split(/[,;]+/)[0].replace(/^["']|["']$/g, '').trim();
+                              if (first && first.length < 120) return first;
+                            }
+                            // Fallback: if looks like an email, return that, else shorten
+                            const emailMatch = raw.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+                            if (emailMatch) return emailMatch[0];
+                            return raw.length > 12 ? raw.slice(0,12) + '...' : raw;
                           }).filter(Boolean);
                           return names.slice(0,3).join(', ') + (names.length > 3 ? ` (+${names.length-3})` : '');
                         })()
                       }</td>
                   <td className="py-3 px-4 text-sm text-gray-600 font-mono">{String(tm._id || tm.id || '').slice(-8)}</td>
                   <td className="py-3 px-4 text-right"><div className="flex items-center justify-end gap-2">
+                    <button onClick={() => openViewTeam(tm)} title="View team" className="p-1.5 hover:bg-gray-100 rounded-lg"><Eye className="w-4 h-4 text-blue-600" /></button>
                     <button onClick={() => openEditTeam(tm)} className="p-1.5 hover:bg-gray-100 rounded-lg"><Edit className="w-4 h-4 text-green-600" /></button>
                     <button onClick={() => handleDeleteTeam(tm._id || tm.id)} className="p-1.5 hover:bg-gray-100 rounded-lg"><Trash2 className="w-4 h-4 text-red-600" /></button>
                   </div></td>
@@ -3627,6 +3688,10 @@ const PeopleTab = ({ technicians = [] }) => {
                 setTeamFiles(files);
                 setTeamFilesPreview(files.map(f => f.name));
               }} />
+              <div className="flex items-center gap-2 mt-2">
+                <input id="extractMembers" type="checkbox" checked={teamExtractFromFiles} onChange={e => setTeamExtractFromFiles(e.target.checked)} />
+                <label htmlFor="extractMembers" className="text-sm text-gray-600">Populate members from uploaded files (CSV, XLSX, PDF, DOCX, images)</label>
+              </div>
               {teamFilesPreview && teamFilesPreview.length > 0 && (
                 <div className="mt-2 text-xs text-gray-600">
                   <p className="mb-1">Files:</p>
@@ -3673,6 +3738,10 @@ const PeopleTab = ({ technicians = [] }) => {
                 setEditTeamFiles(files);
                 setEditTeamFilesPreview(files.map(f => f.name));
               }} />
+              <div className="flex items-center gap-2 mt-2">
+                <input id="editExtractMembers" type="checkbox" checked={editTeamExtractFromFiles} onChange={e => setEditTeamExtractFromFiles(e.target.checked)} />
+                <label htmlFor="editExtractMembers" className="text-sm text-gray-600">Populate members from uploaded files (CSV, XLSX, PDF, DOCX, images)</label>
+              </div>
               {editTeamFilesPreview && editTeamFilesPreview.length > 0 && (
                 <div className="mt-2 text-xs text-gray-600">
                   <p className="mb-1">Files:</p>

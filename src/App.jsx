@@ -8,6 +8,7 @@ import Dashboard from './Dashboard';
 import LandingPage from './components/LandingPage';
 import AllIssues from './components/AllIssues';
 import NewIssue from './components/NewIssue';
+import WorkOrder from './components/WorkOrder';
 import AdminDashboard from './components/AdminDashboard';
 import ManagerDashboard from './components/ManagerDashboard';
 import ClientDashboard from './components/ClientDashboard';
@@ -61,7 +62,7 @@ function App() {
   return (
     <>
       <Routes>
-        <Route path="/" element={<PropertiesPage />} />
+        <Route path="/" element={<WorkOrder />} />
         <Route path="/Home" element={<LandingPage />} />
         <Route path="/dashboard" element={<Dashboard user={auth?.user} />} />
         <Route path="/login" element={<Login onLogin={handleLogin} />} />
