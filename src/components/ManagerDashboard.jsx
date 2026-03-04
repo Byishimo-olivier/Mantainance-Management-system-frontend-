@@ -1806,6 +1806,7 @@ const RequestsTab = ({ pendingRequests, setSelectedRequest, setShowApprovalModal
                 <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Description</th>
                 <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Location</th>
                 <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Priority</th>
+                <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Type</th>
                 <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Submitted</th>
                 <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Actions</th>
               </tr>
@@ -1817,7 +1818,18 @@ const RequestsTab = ({ pendingRequests, setSelectedRequest, setShowApprovalModal
                     <input type="checkbox" className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
                   </td>
                   <td className="py-4 px-4">
-                    <span className="text-xs font-bold text-blue-600 font-mono">
+                    {/* Show whether this pending request is an authenticated inspection or anonymous request */}
+                    <div className="inline-flex items-center gap-2">
+                      {request.submissionType === 'inspection' ? (
+                        <span className="px-2 py-1 text-xs font-semibold text-emerald-700 bg-emerald-100 rounded-full">Inspection</span>
+                      ) : (
+                        <span className="px-2 py-1 text-xs font-semibold text-amber-700 bg-amber-100 rounded-full">Request</span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="py-4 px-4">
+                    <span className="text-xs font-bo
+                    ld text-blue-600 font-mono">
                       {String(normalizeId(request._id || request.id)).slice(-8)}
                     </span>
                   </td>
