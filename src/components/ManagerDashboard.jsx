@@ -330,6 +330,7 @@ function ManagerDashboard() {
   const [issues, setIssues] = useState([]);
   const [allIssues, setAllIssues] = useState([]);
   const [pendingRequests, setPendingRequests] = useState([]);
+  const [materialRequests, setMaterialRequests] = useState([]);
   const [technicians, setTechnicians] = useState([]);
   const [locations, setLocations] = useState([]);
   const [assets, setAssets] = useState([]);
@@ -533,6 +534,16 @@ function ManagerDashboard() {
     }
   };
 
+  const fetchMaterialRequests = async () => {
+    try {
+      const res = await api.get('/api/material-requests');
+      setMaterialRequests(res.data || []);
+    } catch (err) {
+      console.error('Failed to fetch material requests:', err);
+      setMaterialRequests([]);
+    }
+  };
+
   // Fetch feedbacks when switching to feedback tab
   const fetchFeedbacks = async () => {
     if (activeTab !== 'feedback') return;
@@ -585,11 +596,15 @@ function ManagerDashboard() {
     fetchDashboardData();
     fetchAISentiment();
     fetchAIRecommendations();
+    fetchMaterialRequests();
   }, []);
 
   useEffect(() => {
     if (activeTab === 'feedback') {
       fetchFeedbacks();
+    }
+    if (activeTab === 'material-requests') {
+      fetchMaterialRequests();
     }
   }, [activeTab]);
 
@@ -859,6 +874,14 @@ function ManagerDashboard() {
             label="Requests"
             badge={pendingRequests.length}
             badgeColor="bg-blue-600"
+          />
+          <NavItem
+            active={activeTab === 'material-requests'}
+            onClick={() => setActiveTab('material-requests')}
+            icon={Package}
+            label="Material Requests"
+            badge={materialRequests.filter(r => r.status === 'PENDING').length || undefined}
+            badgeColor="bg-purple-600"
           />
           <NavItem
             active={activeTab === 'subscriptions'}
@@ -1336,6 +1359,11 @@ function ManagerDashboard() {
                 setAssignmentData={setAssignmentData}
                 handleOpenAssignment={handleOpenAssignment}
                 handleAssignTech={handleAssignTech}
+              />
+            ) : activeTab === 'material-requests' ? (
+              <MaterialRequestsTab
+                materialRequests={materialRequests}
+                onRefresh={fetchMaterialRequests}
               />
             ) : activeTab === 'subscriptions' ? (
               <SubscriptionManagement />
@@ -2000,8 +2028,317 @@ const RequestsTab = ({
     )}
   </div>
 );
+
+// ─── Material Requests Tab ────────────────────────────────────────────────────
+const MaterialRequestsTab = ({ materialRequests = [], onRefresh }) => {
+  const [forwardModal, setForwardModal] = useState(null); // holds the request being forwarded
+  const [clientEmail, setClientEmail] = useState('');
+  const [forwarding, setForwarding] = useState(false);
+  const [filterStatus, setFilterStatus] = useState('ALL');
+  const [toast, setToast] = useState(null);
+
+  const showToast = (msg, type = 'success') => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3500);
+  };
+
+  const urgencyColor = (u) => {
+    const map = {
+      URGENT: 'bg-rose-100 text-rose-700 border-rose-200',
+      HIGH: 'bg-orange-100 text-orange-700 border-orange-200',
+      MEDIUM: 'bg-amber-100 text-amber-700 border-amber-200',
+      LOW: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+    };
+    return map[u] || 'bg-gray-100 text-gray-600 border-gray-200';
+  };
+
+  const statusColor = (s) => {
+    const map = {
+      PENDING: 'bg-amber-50 text-amber-700 border-amber-200',
+      FORWARDED: 'bg-blue-50 text-blue-700 border-blue-200',
+      APPROVED: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+      DECLINED: 'bg-rose-50 text-rose-700 border-rose-200',
+    };
+    return map[s] || 'bg-gray-50 text-gray-600 border-gray-200';
+  };
+
+  const statusIcon = (s) => {
+    if (s === 'PENDING') return '⏳';
+    if (s === 'FORWARDED') return '📤';
+    if (s === 'APPROVED') return '✅';
+    if (s === 'DECLINED') return '❌';
+    return '📦';
+  };
+
+  const filtered = filterStatus === 'ALL'
+    ? materialRequests
+    : materialRequests.filter(r => r.status === filterStatus);
+
+  const counts = {
+    ALL: materialRequests.length,
+    PENDING: materialRequests.filter(r => r.status === 'PENDING').length,
+    FORWARDED: materialRequests.filter(r => r.status === 'FORWARDED').length,
+    APPROVED: materialRequests.filter(r => r.status === 'APPROVED').length,
+    DECLINED: materialRequests.filter(r => r.status === 'DECLINED').length,
+  };
+
+  const handleForward = async () => {
+    if (!clientEmail.trim()) {
+      showToast('Please enter a Client Email', 'error');
+      return;
+    }
+    try {
+      setForwarding(true);
+      await api.post(`/api/material-requests/${forwardModal.id}/forward`, {
+        clientEmail: clientEmail.trim(),
+        issueId: forwardModal.issueId || null
+      });
+      showToast(`Request forwarded to client successfully!`);
+      setForwardModal(null);
+      setClientEmail('');
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      showToast(err.response?.data?.error || 'Failed to forward request', 'error');
+    } finally {
+      setForwarding(false);
+    }
+  };
+
+  return (
+    <div className="relative">
+      {/* Toast notification */}
+      {toast && (
+        <div className={`fixed top-6 right-6 z-[9999] px-5 py-3 rounded-xl shadow-2xl text-sm font-semibold flex items-center gap-3 animate-in slide-in-from-top-4 duration-300 border ${toast.type === 'error' ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>
+          <span>{toast.type === 'error' ? '❌' : '✅'}</span>
+          {toast.msg}
+        </div>
+      )}
+
+      {/* Header */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-1">Material Requests</h2>
+            <p className="text-gray-500 text-sm">Review technician material requests and forward to clients for approval</p>
+          </div>
+          <button
+            onClick={onRefresh}
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-all shadow-sm"
+          >
+            <span className="text-base">↻</span> Refresh
+          </button>
+        </div>
+      </div>
+
+      {/* Status filter tabs */}
+      <div className="flex items-center gap-2 mb-6 flex-wrap">
+        {['ALL', 'PENDING', 'FORWARDED', 'APPROVED', 'DECLINED'].map(s => (
+          <button
+            key={s}
+            onClick={() => setFilterStatus(s)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${filterStatus === s ? 'bg-blue-600 text-white border-blue-600 shadow' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
+          >
+            {statusIcon(s)} {s} {counts[s] > 0 && <span className="ml-1 opacity-70">({counts[s]})</span>}
+          </button>
+        ))}
+      </div>
+
+      {/* Table */}
+      {filtered.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-gray-100 p-16 text-center shadow-sm">
+          <div className="w-20 h-20 bg-gradient-to-br from-purple-100 to-violet-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Package className="w-10 h-10 text-purple-400" />
+          </div>
+          <h3 className="text-xl font-bold text-gray-800 mb-2">No Requests Found</h3>
+          <p className="text-gray-500 text-sm">
+            {filterStatus === 'ALL' ? 'Technicians haven\'t submitted any material requests yet.' : `No ${filterStatus.toLowerCase()} requests at this time.`}
+          </p>
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead className="bg-gray-50 border-b border-gray-100">
+                <tr>
+                  <th className="py-3.5 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Request ID</th>
+                  <th className="py-3.5 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Technician</th>
+                  <th className="py-3.5 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Material</th>
+                  <th className="py-3.5 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Description</th>
+                  <th className="py-3.5 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Qty</th>
+                  <th className="py-3.5 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Urgency</th>
+                  <th className="py-3.5 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
+                  <th className="py-3.5 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Date</th>
+                  <th className="py-3.5 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {filtered.map((req, idx) => {
+                  const reqId = req.id || req._id;
+                  const materialTitle = req.items?.[0]?.title || req.items?.[0]?.materialId || '—';
+                  const qty = req.items?.[0]?.quantity ?? '—';
+                  return (
+                    <tr key={reqId || idx} className="hover:bg-gray-50/60 transition-colors group">
+                      {/* Request ID */}
+                      <td className="py-4 px-4">
+                        <span className="text-xs font-bold text-purple-600 font-mono bg-purple-50 px-2 py-1 rounded">
+                          #{String(reqId || '').slice(-6).toUpperCase()}
+                        </span>
+                      </td>
+                      {/* Technician */}
+                      <td className="py-4 px-4">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-violet-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                            {(req.technicianName || 'T').charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <div className="text-sm font-semibold text-gray-900">{req.technicianName || 'Technician'}</div>
+                            <div className="text-xs text-gray-400 font-mono">{String(req.technicianId || '').slice(-6)}</div>
+                          </div>
+                        </div>
+                      </td>
+                      {/* Material */}
+                      <td className="py-4 px-4">
+                        <div className="text-sm font-semibold text-gray-900">{materialTitle}</div>
+                        <div className="text-xs text-gray-400">{req.items?.length > 1 ? `+${req.items.length - 1} more` : ''}</div>
+                      </td>
+                      {/* Description */}
+                      <td className="py-4 px-4 max-w-[200px]">
+                        <p className="text-sm text-gray-600 line-clamp-2">{req.description || '—'}</p>
+                      </td>
+                      {/* Quantity */}
+                      <td className="py-4 px-4">
+                        <span className="text-sm font-bold text-gray-800">{qty}</span>
+                      </td>
+                      {/* Urgency */}
+                      <td className="py-4 px-4">
+                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold border ${urgencyColor(req.urgency)}`}>
+                          {req.urgency || 'MEDIUM'}
+                        </span>
+                      </td>
+                      {/* Status */}
+                      <td className="py-4 px-4">
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${statusColor(req.status)}`}>
+                          {statusIcon(req.status)} {req.status || 'PENDING'}
+                        </span>
+                        {req.clientResponse && (
+                          <div className="text-[10px] text-gray-400 mt-0.5 font-medium">
+                            Client: {req.clientResponse}
+                          </div>
+                        )}
+                      </td>
+                      {/* Date */}
+                      <td className="py-4 px-4">
+                        <div className="text-sm text-gray-600">
+                          {req.createdAt ? new Date(req.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
+                        </div>
+                        <div className="text-xs text-gray-400">
+                          {req.createdAt ? new Date(req.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : ''}
+                        </div>
+                      </td>
+                      {/* Actions */}
+                      <td className="py-4 px-4 text-right">
+                        {req.status === 'PENDING' ? (
+                          <button
+                            onClick={() => setForwardModal(req)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-bold rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all shadow-sm hover:shadow-md"
+                          >
+                            📤 Forward to Client
+                          </button>
+                        ) : req.status === 'FORWARDED' ? (
+                          <span className="text-xs text-blue-500 font-semibold italic">Awaiting client…</span>
+                        ) : (
+                          <span className="text-xs text-gray-400 font-medium capitalize">{req.status?.toLowerCase()}</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Forward to Client Modal */}
+      {forwardModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 max-w-md w-full">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-5">
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">Forward to Client</h3>
+                  <p className="text-gray-500 text-sm mt-0.5">Send this material request to the issue owner for approval</p>
+                </div>
+                <button
+                  onClick={() => { setForwardModal(null); setClientEmail(''); }}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Request summary */}
+              <div className="bg-gradient-to-br from-purple-50 to-violet-50 rounded-xl p-4 mb-5 border border-purple-100">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-9 h-9 rounded-full bg-purple-600 flex items-center justify-center text-white text-sm font-bold">
+                    {(forwardModal.technicianName || 'T').charAt(0)}
+                  </div>
+                  <div>
+                    <div className="font-semibold text-gray-900 text-sm">{forwardModal.technicianName || 'Technician'}</div>
+                    <div className="text-xs text-gray-500">Requesting materials</div>
+                  </div>
+                </div>
+                <div className="text-sm font-semibold text-gray-800">
+                  📦 {forwardModal.items?.[0]?.title || forwardModal.items?.[0]?.materialId || 'Material'}
+                </div>
+                {forwardModal.description && (
+                  <p className="text-xs text-gray-600 mt-1 italic">{forwardModal.description}</p>
+                )}
+              </div>
+
+              {/* Client Email input */}
+              <div className="mb-5">
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Client Email <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="email"
+                  value={clientEmail}
+                  onChange={e => setClientEmail(e.target.value)}
+                  placeholder="Enter the client's email here…"
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
+                />
+                <p className="text-[11px] text-gray-400 mt-1">
+                  The request will be sent to the user associated with this email.
+                </p>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={handleForward}
+                  disabled={forwarding}
+                  className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-2.5 rounded-xl font-bold text-sm hover:from-blue-700 hover:to-indigo-700 transition-all shadow-md disabled:opacity-60 disabled:pointer-events-none"
+                >
+                  {forwarding ? '⏳ Sending…' : '📤 Forward Request'}
+                </button>
+                <button
+                  onClick={() => { setForwardModal(null); setClientEmail(''); }}
+                  className="px-5 py-2.5 border border-gray-200 rounded-xl font-semibold text-sm text-gray-600 hover:bg-gray-50 transition-all"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // Scheduler Tab Component
 const SchedulerTab = ({ issues, technicians }) => {
+
   const [currentDate, setCurrentDate] = useState(new Date("2026-02-24"));
   const [viewType, setViewType] = useState('Day');
   const [currentPage, setCurrentPage] = useState(1);

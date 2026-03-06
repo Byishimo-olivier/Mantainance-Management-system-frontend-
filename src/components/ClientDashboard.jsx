@@ -129,6 +129,11 @@ const Icon = {
       <rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8M12 17v4" />
     </svg>
   ),
+  User: () => (
+    <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+      <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" /><circle cx="12" cy="7" r="4" />
+    </svg>
+  ),
 };
 
 
@@ -329,6 +334,7 @@ function ClientDashboard() {
   const [showNewIssueModal, setShowNewIssueModal] = useState(false);
   const [newIssueModel, setNewIssueModel] = useState(null);
   const [loading, setLoading] = useState({ properties: false, assets: false, internalTechnicians: false });
+  const [materialRequests, setMaterialRequests] = useState([]);
   const [errors, setErrors] = useState({ properties: null, assets: null, internalTechnicians: null });
   const [showReminderPanel, setShowReminderPanel] = useState(true);
   const importFileRef = useRef(null);
@@ -391,6 +397,17 @@ function ClientDashboard() {
       // Handle error silently
     }
   }, []);
+
+  const fetchMaterialRequests = useCallback(async () => {
+    try {
+      const uid = getCurrentUserId();
+      if (!uid) return;
+      const res = await api.get(`/api/material-requests?clientId=${uid}`);
+      setMaterialRequests(res.data || []);
+    } catch (err) {
+      console.error('Failed to fetch material requests:', err);
+    }
+  }, [getCurrentUserId]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -486,6 +503,9 @@ function ClientDashboard() {
 
       // Issues
       await fetchIssues();
+
+      // Material Requests
+      await fetchMaterialRequests();
     };
 
     fetchData();
@@ -585,6 +605,26 @@ function ClientDashboard() {
     localStorage.removeItem('user');
     navigate('/login', { replace: true });
   }, [navigate]);
+
+  const handleApproveMaterial = useCallback(async (id) => {
+    try {
+      await api.post(`/api/material-requests/${id}/respond`, { response: 'APPROVED' });
+      await fetchMaterialRequests();
+      alert('Request approved successfully!');
+    } catch (err) {
+      alert('Failed to approve request: ' + (err.response?.data?.error || err.message));
+    }
+  }, [fetchMaterialRequests]);
+
+  const handleDeclineMaterial = useCallback(async (id) => {
+    try {
+      await api.post(`/api/material-requests/${id}/respond`, { response: 'DECLINED' });
+      await fetchMaterialRequests();
+      alert('Request declined.');
+    } catch (err) {
+      alert('Failed to decline request: ' + (err.response?.data?.error || err.message));
+    }
+  }, [fetchMaterialRequests]);
 
   const handleNewRequest = () => {
     setNewIssueModel({ category: '', requestedType: currentUser ? 'inspection' : 'request' });
@@ -810,6 +850,7 @@ function ClientDashboard() {
     { key: 'analytics', label: 'Analytics', icon: <Icon.Analytics /> },
     { key: 'meters', label: 'Meters', icon: <Icon.Gauge /> },
     { key: 'edge', label: 'Edge', icon: <Icon.Edge /> },
+    { key: 'materialRequests', label: 'Material Requests', icon: <Icon.Package /> },
   ];
 
   return (
@@ -1191,47 +1232,93 @@ function ClientDashboard() {
             </div>
           )}
 
-          {/* ── Subscription ── */}
-          {activeTab === 'subscription' && (
-            <div style={{ padding: '24px' }}>
-              {(currentUser?.role === 'admin' || currentUser?.role === 'Manager') ? (
-                <SubscriptionManagement />
+          {/* ── Material Requests ── */}
+          {activeTab === 'materialRequests' && (
+            <div className="flex flex-col gap-6">
+              <SectionHeader
+                title="Material Requests"
+                count={materialRequests.length}
+                action={<Btn onClick={fetchMaterialRequests} variant="outline" size="sm">Refresh</Btn>}
+              />
+              {materialRequests.length === 0 ? (
+                <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 14, padding: 60, textAlign: 'center' }}>
+                  <div style={{ fontSize: 40, marginBottom: 16 }}>📦</div>
+                  <div style={{ fontWeight: 700, fontSize: 18, color: '#111827' }}>No Material Requests Found</div>
+                  <p style={{ color: '#6B7280', fontSize: 14, marginTop: 4 }}>Any material requests forwarded to you for approval will appear here.</p>
+                </div>
               ) : (
-                <SubscriptionWidget userId={currentUser?._id || currentUser?.id} />
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {materialRequests.map((req, idx) => {
+                    const reqId = req.id || req._id;
+                    const items = req.items || [];
+                    const firstItem = items[0] || {};
+                    const isPending = req.status === 'FORWARDED' || req.status === 'PENDING';
+                    return (
+                      <div key={reqId || idx} className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all overflow-hidden flex flex-col">
+                        <div className="p-5 flex-1">
+                          <div className="flex justify-between items-start mb-4">
+                            <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-full uppercase tracking-wider">
+                              #{String(reqId).slice(-6).toUpperCase()}
+                            </span>
+                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-black border ${req.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+                              req.status === 'DECLINED' ? 'bg-rose-50 text-rose-700 border-rose-100' :
+                                'bg-amber-50 text-amber-700 border-amber-200'
+                              }`}>
+                              {req.status}
+                            </span>
+                          </div>
+                          <h4 className="font-bold text-gray-900 text-base mb-1">
+                            {firstItem.title || firstItem.materialId || 'Material Request'}
+                            {items.length > 1 && <span className="text-gray-400 font-medium ml-1">+{items.length - 1} more</span>}
+                          </h4>
+                          <div className="flex items-center gap-2 mb-4 text-xs font-semibold text-gray-500">
+                            <Icon.User style={{ width: 14, height: 14 }} />
+                            <span>Requested by: {req.technicianName || 'Technician'}</span>
+                          </div>
+                          <div className="bg-gray-50 rounded-xl p-3 mb-4">
+                            <div className="flex justify-between items-center mb-2">
+                              <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Details</span>
+                              <span className="text-[10px] font-black bg-white border border-gray-200 px-2 py-0.5 rounded shadow-sm">
+                                Qty: {firstItem.quantity || req.quantity || 1}
+                              </span>
+                            </div>
+                            <p className="text-xs text-gray-600 leading-relaxed italic line-clamp-3">
+                              "{req.description || 'No description provided'}"
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-4 text-[11px] text-gray-400 font-bold border-t border-gray-50 pt-3 mt-3">
+                            <div className="flex items-center gap-1.5">
+                              <Icon.Clock style={{ width: 12, height: 12 }} />
+                              {req.createdAt ? new Date(req.createdAt).toLocaleDateString() : '—'}
+                            </div>
+                            <div className="flex items-center gap-1.5 ml-auto">
+                              <Icon.Alert style={{ width: 12, height: 12 }} />
+                              Urgency: <span className={req.urgency === 'URGENT' ? 'text-rose-500' : 'text-amber-500'}>{req.urgency || 'MEDIUM'}</span>
+                            </div>
+                          </div>
+                        </div>
+                        {isPending && (
+                          <div className="p-3 bg-gray-50/50 border-t border-gray-50 flex gap-2">
+                            <button onClick={() => handleApproveMaterial(reqId)} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-xl text-xs font-bold transition-colors shadow-sm">Approve</button>
+                            <button onClick={() => handleDeclineMaterial(reqId)} className="flex-1 bg-white hover:bg-rose-50 border border-gray-200 text-gray-600 hover:text-rose-600 py-2 rounded-xl text-xs font-bold transition-all">Decline</button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </div>
           )}
 
-          {/* ── Properties ── */}
-          {activeTab === 'properties' && (
-            <div>
-              <SectionHeader title="Locations" count={properties.length}
-                heads={['#', 'Title', 'Status', 'Location', 'Assigned To', 'Created', 'Actions']}
-                empty="No requests found."
-                rows={allIssues.map((issue, idx) => [
-                  <Td key="n">{idx + 1}</Td>,
-                  <Td key="t"><span style={{ fontWeight: 600, color: '#111827' }}>{issue.title || issue.summary || '—'}</span></Td>,
-                  <Td key="s"><StatusBadge status={issue.status} /></Td>,
-                  <Td key="p">{getPropertyName(issue)}</Td>,
-                  <Td key="a">{getAssignedName(issue)}</Td>,
-                  <Td key="c">{issue.createdAt ? new Date(issue.createdAt).toLocaleDateString() : '—'}</Td>,
-                  <Td key="x">
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <Btn size="sm" variant="outline" onClick={() => navigate(`/issues/${issue.id || issue._id}`)}>View</Btn>
-                      <Btn size="sm" variant="danger" onClick={async () => {
-                        if (window.confirm('Delete issue?')) {
-                          try {
-                            await api.delete(`/api/issues/${issue._id || issue.id}`);
-                            await fetchIssues();
-                          } catch {
-                            alert('Delete failed');
-                          }
-                        }
-                      }}>Delete</Btn>
-                    </div>
-                  </Td>,
-                ])}
-              />
+          {/* ── Subscription ── */}
+          {activeTab === 'subscription' && (
+            <div style={{ padding: '24px' }}>
+              {(currentUser?.role === 'admin' || currentUser?.role === 'manager') ? (
+                <SubscriptionManagement />
+              ) : (
+                <SubscriptionWidget userId={currentUser?._id || currentUser?.id} />
+              )}
             </div>
           )}
 
