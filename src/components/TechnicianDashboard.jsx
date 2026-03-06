@@ -4,6 +4,97 @@ import { getImageUrl } from '../utils/imageUrl';
 import { useNavigate } from 'react-router-dom';
 import Header from "./Header";
 
+// BEFORE EVIDENCE FORM WITH START DETAILS
+function BeforeEvidenceForm({ issueId, onSuccess, hasExistingImage }) {
+  const [beforeImage, setBeforeImage] = React.useState(null);
+  const [address, setAddress] = React.useState("");
+  const [fixTime, setFixTime] = React.useState("");
+  const [loading, setLoading] = React.useState(false);
+
+  const handleFileChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      setBeforeImage(e.target.files[0]);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    const formData = new FormData();
+    if (beforeImage) formData.append("beforeImage", beforeImage);
+    formData.append("address", address);
+    formData.append("fixTime", fixTime);
+    try {
+      const response = await api.post(
+        `/api/issues/${issueId}/evidence/before`,
+        formData,
+        { headers: { "Content-Type": "multipart/form-data" } }
+      );
+      setBeforeImage(null);
+      setAddress("");
+      setFixTime("");
+      if (onSuccess) onSuccess();
+      alert("Work started! Status set to In Progress.");
+      console.log("BEFORE evidence response:", response.data);
+    } catch (err) {
+      console.error("BEFORE evidence error:", err.response?.data || err.message);
+      alert(`Failed to start work: ${err.response?.data?.error || err.message}`);
+    }
+    setLoading(false);
+  };
+  return (
+    <form className="bg-white rounded-xl shadow-lg border border-orange-100 p-6 max-w-lg mx-auto" onSubmit={handleSubmit}>
+      <h2 className="font-bold text-xl mb-4 text-orange-600 flex items-center gap-2">
+        <span className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center text-sm">1</span>
+        Start Working
+      </h2>
+      <div className="mb-4">
+        <label className="block text-gray-700 mb-1 font-semibold text-sm">
+          {hasExistingImage ? "Upload new BEFORE photo (optional)" : "Upload BEFORE photo *"}
+        </label>
+        <input
+          type="file"
+          accept="image/*"
+          onChange={handleFileChange}
+          required={!hasExistingImage}
+          className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100 transition-colors"
+        />
+        {hasExistingImage && <p className="text-[10px] text-gray-400 mt-1 italic">An image already exists, so this is optional.</p>}
+      </div>
+      <div className="mb-4">
+        <label className="block text-gray-700 mb-1 font-medium">Starting Location/Notes *</label>
+        <input
+          type="text"
+          className="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-orange-500 outline-none"
+          value={address}
+          onChange={(e) => setAddress(e.target.value)}
+          placeholder="Confirm current location or starting notes..."
+          required
+        />
+      </div>
+      <div className="mb-4">
+        <label className="block text-gray-700 mb-1 font-medium">Estimated Time (minutes) *</label>
+        <input
+          type="number"
+          className="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-orange-500 outline-none"
+          value={fixTime}
+          onChange={(e) => setFixTime(e.target.value)}
+          placeholder="How many minutes will this take?"
+          required
+          min="1"
+        />
+      </div>
+      <button
+        type="submit"
+        className="w-full bg-orange-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-orange-700 transition shadow-lg"
+        disabled={loading}
+      >
+        {loading ? "Starting..." : "Start Working Now"}
+      </button>
+    </form>
+  );
+}
+
 // AFTER EVIDENCE FORM WITH COMPLETION DETAILS
 function AfterEvidenceForm({ issueId, onSuccess }) {
   const [afterImage, setAfterImage] = React.useState(null);
@@ -76,6 +167,7 @@ const TechnicianDashboard = () => {
   const [materialRequests, setMaterialRequests] = useState([]);
   const [user, setUser] = useState({ name: "", id: "" });
   const [showAfterForm, setShowAfterForm] = useState({});
+  const [showBeforeForm, setShowBeforeForm] = useState({});
   const [selectedJob, setSelectedJob] = useState(null);
   const [showMaterialRequestForm, setShowMaterialRequestForm] = useState(false);
   const [materialRequestData, setMaterialRequestData] = useState({
@@ -97,20 +189,13 @@ const TechnicianDashboard = () => {
     fetchAssignedIssues();
   };
 
-  const handleStartWork = async (jobId) => {
-    try {
-      // Authorization handled by interceptor
+  const handleBeforeSuccess = (jobId) => {
+    setShowBeforeForm((prev) => ({ ...prev, [jobId]: false }));
+    fetchAssignedIssues();
+  };
 
-      await api.put(`/api/issues/${jobId}`, {
-        status: 'IN PROGRESS'
-      });
-
-      fetchAssignedIssues();
-      alert('Work started! Status set to In Progress.');
-    } catch (error) {
-      console.error("Start work error:", error);
-      alert('Failed to start work');
-    }
+  const handleStartWork = (jobId) => {
+    setShowBeforeForm((prev) => ({ ...prev, [jobId]: !prev[jobId] }));
   };
 
   const toggleAfterForm = (jobId) => {
@@ -172,10 +257,17 @@ const TechnicianDashboard = () => {
   };
 
   const getJobStatus = (job) => {
+    const status = (job.status || 'PENDING').toUpperCase();
+    if (status.includes('COMPLETE')) {
+      return status;
+    }
+    if (status === 'IN PROGRESS' || status === 'IN_PROGRESS') {
+      return 'IN PROGRESS';
+    }
     if (isOverdue(job.dueDate)) {
       return 'OVERDUE';
     }
-    return job.status || 'PENDING';
+    return status;
   };
 
   /* Helper for imageSrc using base URL if needed, but here we just open in new tab.
@@ -583,132 +675,124 @@ const TechnicianDashboard = () => {
       )}
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white rounded-xl shadow p-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div className="bg-white rounded-xl shadow p-6 border-l-4 border-gray-400">
           <h2 className="font-semibold text-lg mb-2">Assigned Issues</h2>
-          <div className="text-3xl font-bold">{jobs.length}</div>
+          <div className="text-3xl font-bold">{jobs.filter(job => getJobStatus(job) !== 'COMPLETE' && getJobStatus(job) !== 'COMPLETED').length}</div>
           <p className="text-sm text-gray-500 mt-2">Total jobs assigned to you</p>
         </div>
 
-        <div className="bg-white rounded-xl shadow p-6">
+        <div className="bg-white rounded-xl shadow p-6 border-l-4 border-blue-500">
           <h2 className="font-semibold text-lg mb-2">In Progress</h2>
-          <div className="text-3xl font-bold">
+          <div className="text-3xl font-bold text-blue-600">
             {jobs.filter(job => getJobStatus(job) === 'IN PROGRESS').length}
           </div>
           <p className="text-sm text-gray-500 mt-2">Currently working on</p>
         </div>
 
-        <div className="bg-white rounded-xl shadow p-6">
+        <div className="bg-white rounded-xl shadow p-6 border-l-4 border-green-500">
+          <h2 className="font-semibold text-lg mb-2">Completed</h2>
+          <div className="text-3xl font-bold text-green-600">
+            {jobs.filter(job => getJobStatus(job) === 'COMPLETE' || getJobStatus(job) === 'COMPLETED').length}
+          </div>
+          <p className="text-sm text-gray-500 mt-2">Finished jobs</p>
+        </div>
+
+        <div className="bg-white rounded-xl shadow p-6 border-l-4 border-purple-500">
           <h2 className="font-semibold text-lg mb-2">Material Requests</h2>
-          <div className="text-3xl font-bold">{materialRequests.length}</div>
+          <div className="text-3xl font-bold text-purple-600">{materialRequests.length}</div>
           <p className="text-sm text-gray-500 mt-2">Requests submitted</p>
         </div>
       </div>
 
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Assigned Issues Section */}
-        <div className="bg-white rounded-xl shadow p-6">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="font-semibold text-xl">Assigned Issues</h2>
-            <span className="text-sm text-gray-500">{jobs.length} total</span>
-          </div>
-
-          {jobs.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              No assigned issues found
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {jobs.map(job => (
-                <div key={job.id || job._id} className="border rounded-lg p-4 hover:shadow-md transition">
-                  <div className="flex flex-col md:flex-row gap-4">
-                    {/* BEFORE Photo */}
-                    {getImageUrl(job.beforePhoto || job.photo || job.image) && (
-                      <div className="flex-shrink-0">
-                        <img
-                          src={getImageUrl(job.beforePhoto || job.photo || job.image)}
-                          alt="Issue"
-                          className="w-20 h-20 object-cover rounded-lg shadow border cursor-pointer hover:opacity-80 transition"
-                          onClick={() => handleImageClick(job.beforePhoto || job.photo || job.image, job.title)}
-                          title="Click to view larger image"
-                        />
-                      </div>
-                    )}
-
-                    <div className="flex-1">
-                      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-2">
-                        <div>
-                          <h3 className="font-semibold text-gray-800">{job.title}</h3>
-                          <div className="flex flex-wrap gap-2 mt-1">
-                            <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${getJobStatus(job) === 'IN PROGRESS' ? 'bg-blue-100 text-blue-700' :
-                              getJobStatus(job) === 'PENDING' ? 'bg-yellow-100 text-yellow-700' :
-                                (getJobStatus(job) === 'COMPLETE' || getJobStatus(job) === 'COMPLETED') ? 'bg-green-100 text-green-700' :
-                                  getJobStatus(job) === 'OVERDUE' ? 'bg-red-100 text-red-700' :
-                                    'bg-gray-100 text-gray-700'
-                              }`}>
-                              {(getJobStatus(job) === 'COMPLETE' || getJobStatus(job) === 'COMPLETED') ? 'Complete' : getJobStatus(job)}
-                            </span>
-                            <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${job.priority === 'HIGH' ? 'bg-red-100 text-red-700' :
-                              job.priority === 'MEDIUM' ? 'bg-yellow-100 text-yellow-700' :
-                                job.priority === 'LOW' ? 'bg-gray-100 text-gray-700' :
-                                  'bg-purple-100 text-purple-700'
-                              }`}>
-                              {job.priority || 'MEDIUM'} Priority
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="flex flex-col items-end">
-                          {job.dueDate && (
-                            <span className={`text-xs ${isOverdue(job.dueDate) ? 'text-red-600 font-semibold' : 'text-gray-500'}`}>
-                              Due: {new Date(job.dueDate).toLocaleDateString()}
-                            </span>
-                          )}
-                          <div className="flex gap-2 mt-2">
-                            <button
-                              onClick={() => handleViewJob(job)}
-                              className="px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600"
-                            >
-                              View
-                            </button>
-
-                            {getJobStatus(job) === 'PENDING' && (
-                              <button
-                                className="px-3 py-1 bg-orange-500 text-white text-xs rounded hover:bg-orange-600"
-                                onClick={() => handleStartWork(job.id || job._id)}
-                              >
-                                Start Work
-                              </button>
-                            )}
-
-                            {getJobStatus(job) === 'IN PROGRESS' && (
-                              <button
-                                className="px-3 py-1 bg-green-500 text-white text-xs rounded hover:bg-green-600"
-                                onClick={() => toggleAfterForm(job.id || job._id)}
-                              >
-                                {showAfterForm[job.id || job._id] ? 'Cancel' : 'Complete'}
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* AFTER FORM */}
-                      {showAfterForm[job.id || job._id] && (
-                        <div className="mt-4 pt-4 border-t">
-                          <AfterEvidenceForm
-                            issueId={job.id || job._id}
-                            onSuccess={() => handleAfterSuccess(job.id || job._id)}
-                          />
-                        </div>
+        {/* Left Side: Work Columns */}
+        <div className="space-y-8">
+          {/* Active Work Section (If any) */}
+          {jobs.filter(j => getJobStatus(j) === 'IN PROGRESS').length > 0 && (
+            <div className="bg-blue-50/50 border border-blue-100 rounded-3xl p-6 shadow-sm">
+              <h2 className="text-2xl font-black text-blue-900 mb-6 flex items-center gap-3">
+                <span className="w-2 h-8 bg-blue-600 rounded-full"></span>
+                Active Work
+                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold rounded-full animate-pulse">LIVE</span>
+              </h2>
+              <div className="space-y-4">
+                {jobs.filter(j => getJobStatus(j) === 'IN PROGRESS').map(job => (
+                  <div key={`active-${job.id || job._id}`} className="bg-white border-l-4 border-blue-500 rounded-2xl p-5 shadow-sm hover:shadow-md transition cursor-pointer" onClick={() => handleViewJob(job)}>
+                    <div className="flex justify-between items-start mb-2">
+                      <span className="text-xs font-bold text-blue-600 uppercase tracking-wider">{job.location}</span>
+                      {job.fixDeadline && (
+                        <span className="text-[10px] font-medium text-gray-400">Due: {new Date(job.fixDeadline).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                       )}
                     </div>
+                    <h3 className="text-lg font-bold text-gray-900 mb-4">{job.title}</h3>
+                    <div className="flex flex-col gap-2">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleViewJob(job); }}
+                        className="w-full py-2 bg-blue-600 text-white text-sm font-bold rounded-xl shadow hover:bg-blue-700 transition"
+                      >
+                        View Actions
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedJob(job);
+                          setShowAfterForm(prev => ({ ...prev, [job.id || job._id]: true }));
+                        }}
+                        className="w-full py-2 bg-green-600 text-white text-sm font-bold rounded-xl shadow hover:bg-green-700 transition flex justify-center items-center gap-2"
+                      >
+                        <span>✓</span> Complete Task & Notify
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           )}
+
+          {/* My Queue (Assigned Issues) */}
+          <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-black text-gray-900 flex items-center gap-3">
+                <span className="w-2 h-8 bg-purple-600 rounded-full"></span>
+                My Queue
+              </h2>
+              <span className="text-xs font-bold bg-gray-100 text-gray-500 px-3 py-1 rounded-full">
+                {jobs.filter(j => getJobStatus(j) !== 'IN PROGRESS' && getJobStatus(j) !== 'COMPLETE' && getJobStatus(j) !== 'COMPLETED').length} TASKS
+              </span>
+            </div>
+
+            {jobs.filter(j => getJobStatus(j) !== 'IN PROGRESS' && getJobStatus(j) !== 'COMPLETE' && getJobStatus(j) !== 'COMPLETED').length === 0 ? (
+              <div className="text-center py-12 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
+                <p className="text-gray-400 font-medium">No pending tasks in your queue</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {jobs.filter(j => getJobStatus(j) !== 'IN PROGRESS' && getJobStatus(j) !== 'COMPLETE' && getJobStatus(j) !== 'COMPLETED').map(job => (
+                  <div key={job.id || job._id} className="group bg-white border border-gray-100 rounded-2xl p-4 hover:border-purple-200 hover:shadow-lg transition-all cursor-pointer" onClick={() => handleViewJob(job)}>
+                    <div className="flex justify-between items-center">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className={`w-2 h-2 rounded-full ${job.priority === 'HIGH' ? 'bg-red-500' : 'bg-amber-400'}`}></span>
+                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{job.location}</span>
+                        </div>
+                        <h3 className="text-base font-bold text-gray-900 group-hover:text-purple-600 transition-colors">{job.title}</h3>
+                      </div>
+                      <div className="shrink-0">
+                        <span className={`px-2 py-1 rounded text-[10px] font-black uppercase tracking-tighter ${getJobStatus(job) === 'OVERDUE' ? 'bg-rose-100 text-rose-700' :
+                          getJobStatus(job) === 'PENDING' ? 'bg-amber-100 text-amber-700' :
+                            'bg-gray-100 text-gray-700'
+                          }`}>
+                          {getJobStatus(job)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Material Requests & Work History */}
@@ -901,10 +985,57 @@ const TechnicianDashboard = () => {
                   </div>
                 </div>
 
-                <div className="flex gap-2 pt-4">
+                <div className="flex flex-col gap-4 pt-6 border-t mt-6">
+                  {/* CONTEXTUAL ACTION BUTTONS INSIDE MODAL */}
+                  {['PENDING', 'ASSIGNED', 'OVERDUE'].includes(getJobStatus(selectedJob).toUpperCase()) && !showBeforeForm[selectedJob.id || selectedJob._id] && (
+                    <button
+                      onClick={() => handleStartWork(selectedJob.id || selectedJob._id)}
+                      className="w-full py-3 bg-orange-600 text-white font-bold rounded-xl hover:bg-orange-700 transition shadow-md flex items-center justify-center gap-2"
+                    >
+                      Notify Start Work
+                    </button>
+                  )}
+
+                  {['IN_PROGRESS', 'IN PROGRESS'].includes(getJobStatus(selectedJob).toUpperCase()) && !showAfterForm[selectedJob.id || selectedJob._id] && (
+                    <button
+                      onClick={() => toggleAfterForm(selectedJob.id || selectedJob._id)}
+                      className="w-full py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition shadow-md flex items-center justify-center gap-2"
+                    >
+                      Complete Task & Submit After evidence
+                    </button>
+                  )}
+
+                  {/* FORM RENDERING INSIDE MODAL */}
+                  {showBeforeForm[selectedJob.id || selectedJob._id] && (
+                    <div className="animate-in fade-in slide-in-from-top-4 duration-300">
+                      <BeforeEvidenceForm
+                        issueId={selectedJob.id || selectedJob._id}
+                        onSuccess={() => {
+                          handleBeforeSuccess(selectedJob.id || selectedJob._id);
+                          setSelectedJob(null);
+                        }}
+                        hasExistingImage={!!(selectedJob.beforePhoto || selectedJob.photo || selectedJob.image)}
+                      />
+                      <button onClick={() => handleStartWork(selectedJob.id || selectedJob._id)} className="w-full mt-2 text-sm text-gray-500 hover:underline">Cancel</button>
+                    </div>
+                  )}
+
+                  {showAfterForm[selectedJob.id || selectedJob._id] && (
+                    <div className="animate-in fade-in slide-in-from-top-4 duration-300">
+                      <AfterEvidenceForm
+                        issueId={selectedJob.id || selectedJob._id}
+                        onSuccess={() => {
+                          handleAfterSuccess(selectedJob.id || selectedJob._id);
+                          setSelectedJob(null);
+                        }}
+                      />
+                      <button onClick={() => toggleAfterForm(selectedJob.id || selectedJob._id)} className="w-full mt-2 text-sm text-gray-500 hover:underline">Cancel</button>
+                    </div>
+                  )}
+
                   <button
                     onClick={() => setSelectedJob(null)}
-                    className="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+                    className="w-full py-2 bg-gray-100 text-gray-600 font-semibold rounded-xl hover:bg-gray-200 transition"
                   >
                     Close
                   </button>

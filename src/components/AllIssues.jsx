@@ -21,15 +21,44 @@ const IssueCard = ({ issue, userRole, actions }) => {
           Status: <span className={`font-semibold ${getStatusColor(status)}`}>{status}</span>
         </div>
 
-        {/* Show image if available */}
-        {getImageUrl(issue.photo || issue.image) && (
-          <img
-            src={getImageUrl(issue.photo || issue.image)}
-            alt="Issue"
-            className="w-full h-32 max-w-xs object-cover rounded mb-2"
-            style={{ aspectRatio: '4/3' }}
-          />
-        )}
+        {/* Show images if available */}
+        <div className="flex flex-wrap gap-4 mt-3 mb-2">
+          {/* Original issue photo */}
+          {(issue.photo || issue.image) && !issue.beforeImage && (
+            <div className="flex flex-col">
+              <span className="text-[10px] uppercase font-bold text-gray-400 mb-1">Issue Photo</span>
+              <img
+                src={getImageUrl(issue.photo || issue.image)}
+                alt="Issue"
+                className="w-40 h-32 object-cover rounded-lg border border-gray-200"
+              />
+            </div>
+          )}
+
+          {/* Before Image */}
+          {issue.beforeImage && (
+            <div className="flex flex-col">
+              <span className="text-[10px] uppercase font-bold text-gray-400 mb-1">Before</span>
+              <img
+                src={getImageUrl(issue.beforeImage)}
+                alt="Before"
+                className="w-40 h-32 object-cover rounded-lg border border-gray-200"
+              />
+            </div>
+          )}
+
+          {/* After Image */}
+          {issue.afterImage && (
+            <div className="flex flex-col">
+              <span className="text-[10px] uppercase font-bold text-gray-400 mb-1">After</span>
+              <img
+                src={getImageUrl(issue.afterImage)}
+                alt="After"
+                className="w-40 h-32 object-cover rounded-lg border border-gray-200"
+              />
+            </div>
+          )}
+        </div>
 
         {/* Show assigned technicians */}
         {issue.assignees && Array.isArray(issue.assignees) && issue.assignees.length > 0 && (

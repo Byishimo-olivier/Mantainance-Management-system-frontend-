@@ -99,7 +99,38 @@ const Icon = {
       <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
     </svg>
   ),
+  Package: () => (
+    <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+      <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z" /><polyline points="3.27 6.96 12 12.01 20.73 6.96" /><line x1="12" y1="22.08" x2="12" y2="12" />
+    </svg>
+  ),
+  ShoppingCart: () => (
+    <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+      <circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" /><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6" />
+    </svg>
+  ),
+  Vendors: () => (
+    <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+      <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 00-3-3.87" /><path d="M16 3.13a4 4 0 010 7.75" />
+    </svg>
+  ),
+  Analytics: () => (
+    <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+      <line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" />
+    </svg>
+  ),
+  Gauge: () => (
+    <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+      <path d="M12 2a10 10 0 0110 10" /><path d="M12 2a10 10 0 00-10 10" /><path d="M12 12l3.5-3.5" /><circle cx="12" cy="12" r="1" />
+    </svg>
+  ),
+  Edge: () => (
+    <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+      <rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8M12 17v4" />
+    </svg>
+  ),
 };
+
 
 // ── Helper Functions ──────────────────────────────────────────────────────────
 const extractId = (obj) => {
@@ -291,6 +322,9 @@ function ClientDashboard() {
   const [selectedTechForAssign, setSelectedTechForAssign] = useState(null);
   const [selectedIssueForAssign, setSelectedIssueForAssign] = useState('');
   const [selectedDueDate, setSelectedDueDate] = useState('');
+  const [issueAssignModalOpen, setIssueAssignModalOpen] = useState(false);
+  const [selectedIssueToAssign, setSelectedIssueToAssign] = useState(null);
+  const [selectedInternalTechForIssue, setSelectedInternalTechForIssue] = useState('');
   const [assignableIssues, setAssignableIssues] = useState([]);
   const [showNewIssueModal, setShowNewIssueModal] = useState(false);
   const [newIssueModel, setNewIssueModel] = useState(null);
@@ -688,6 +722,12 @@ function ClientDashboard() {
     setAssignModalOpen(true);
   }, [allIssues]);
 
+  const openIssueAssignModal = useCallback((issue) => {
+    setSelectedIssueToAssign(issue);
+    setSelectedInternalTechForIssue('');
+    setIssueAssignModalOpen(true);
+  }, []);
+
   const handleAssignSubmit = useCallback(async (e) => {
     e.preventDefault();
     if (!selectedTechForAssign || !selectedIssueForAssign) return;
@@ -763,6 +803,13 @@ function ClientDashboard() {
     { key: 'organization', label: 'Organization', icon: <Icon.Templates /> },
     { key: 'maintenanceTemplates', label: 'Maintenance', icon: <Icon.Templates /> },
     { key: 'subscription', label: 'Subscriptions', icon: <Icon.Subscription /> },
+    // ── Procurement group ──
+    { key: 'parts', label: 'Parts & Inventory', icon: <Icon.Package />, group: 'Procurement' },
+    { key: 'purchaseOrders', label: 'Purchase Orders', icon: <Icon.ShoppingCart />, group: 'Procurement' },
+    // Analytics / Meters / Edge
+    { key: 'analytics', label: 'Analytics', icon: <Icon.Analytics /> },
+    { key: 'meters', label: 'Meters', icon: <Icon.Gauge /> },
+    { key: 'edge', label: 'Edge', icon: <Icon.Edge /> },
   ];
 
   return (
@@ -801,7 +848,12 @@ function ClientDashboard() {
         {/* Nav */}
         <nav style={{ flex: 1, padding: '12px 10px' }}>
           <div style={{ marginBottom: 4, padding: '0 6px', fontSize: 10, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Menu</div>
-          {navItems.map(({ key, label, icon }) => (
+          {navItems.filter(n => !n.group).map(({ key, label, icon }) => (
+            <NavItem key={key} label={label} icon={icon} active={activeTab === key} onClick={() => setActiveTab(key)} />
+          ))}
+          {/* Procurement group */}
+          <div style={{ marginTop: 12, marginBottom: 4, padding: '0 6px', fontSize: 10, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Procurement</div>
+          {navItems.filter(n => n.group === 'Procurement').map(({ key, label, icon }) => (
             <NavItem key={key} label={label} icon={icon} active={activeTab === key} onClick={() => setActiveTab(key)} />
           ))}
         </nav>
@@ -992,9 +1044,32 @@ function ClientDashboard() {
                           </div>
                           {issue.location && <div style={{ fontSize: 12, color: '#9CA3AF', marginBottom: 8 }}>{issue.location}</div>}
 
-                          {(issue.photo || issue.image) && (
-                            <img src={imageSrc(issue.photo || issue.image)} alt="Issue" style={{ height: 100, width: 'auto', borderRadius: 8, marginBottom: 10, border: '1px solid #E5E7EB', objectFit: 'cover' }} onError={e => { e.target.onerror = null; e.target.style.display = 'none'; }} />
-                          )}
+                          {/* Project images */}
+                          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 10 }}>
+                            {/* Original issue photo */}
+                            {(issue.photo || issue.image) && !issue.beforeImage && (
+                              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                <span style={{ fontSize: 9, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', marginBottom: 4 }}>Issue</span>
+                                <img src={imageSrc(issue.photo || issue.image)} alt="Issue" style={{ height: 100, width: 140, borderRadius: 8, border: '1px solid #E5E7EB', objectFit: 'cover' }} onError={e => { e.target.onerror = null; e.target.style.display = 'none'; }} />
+                              </div>
+                            )}
+
+                            {/* Before Image */}
+                            {issue.beforeImage && (
+                              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                <span style={{ fontSize: 9, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', marginBottom: 4 }}>Before</span>
+                                <img src={imageSrc(issue.beforeImage)} alt="Before" style={{ height: 100, width: 140, borderRadius: 8, border: '1px solid #E5E7EB', objectFit: 'cover' }} onError={e => { e.target.onerror = null; e.target.style.display = 'none'; }} />
+                              </div>
+                            )}
+
+                            {/* After Image */}
+                            {issue.afterImage && (
+                              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                <span style={{ fontSize: 9, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', marginBottom: 4 }}>After</span>
+                                <img src={imageSrc(issue.afterImage)} alt="After" style={{ height: 100, width: 140, borderRadius: 8, border: '1px solid #E5E7EB', objectFit: 'cover' }} onError={e => { e.target.onerror = null; e.target.style.display = 'none'; }} />
+                              </div>
+                            )}
+                          </div>
 
                           {/* Tags */}
                           {Array.isArray(issue.tags) && issue.tags.filter(t => !['PENDING', 'IN PROGRESS', 'COMPLETE', 'OVERDUE'].includes(t?.label || t)).length > 0 && (
@@ -1022,8 +1097,8 @@ function ClientDashboard() {
                             </div>
                           )}
 
-                          {/* Manager internal assign */}
-                          {(currentUser?.role === 'manager' || currentUser?.role === 'admin') && internalTechnicians.length > 0 && (
+                          {/* Manager/Client internal assign */}
+                          {(currentUser?.role === 'manager' || currentUser?.role === 'admin' || currentUser?.role === 'client') && internalTechnicians.length > 0 && (
                             <div style={{ display: 'flex', gap: 8, marginTop: 10, alignItems: 'center' }}>
                               <Select style={{ flex: 1, fontSize: 12, padding: '5px 8px' }} value={(selectedTechs[id]?.internal) || ''} onChange={e => setSelectedTechs(s => ({ ...s, [id]: { ...s[id], internal: e.target.value } }))}>
                                 <option value="">Assign internal technician…</option>
@@ -1096,6 +1171,9 @@ function ClientDashboard() {
                   <Td key="x">
                     <div style={{ display: 'flex', gap: 6 }}>
                       <Btn size="sm" variant="outline" onClick={() => navigate(`/issues/${issue.id || issue._id}`)}>View</Btn>
+                      {currentUser?.role === 'client' && (
+                        <Btn size="sm" variant="success" onClick={() => openIssueAssignModal(issue)}>Assign</Btn>
+                      )}
                       <Btn size="sm" variant="danger" onClick={async () => {
                         if (window.confirm('Delete issue?')) {
                           try {
@@ -1751,6 +1829,32 @@ function ClientDashboard() {
               />
             </div>
           )}
+
+          {/* ── Parts & Inventory ── */}
+          {activeTab === 'parts' && (
+            <ClientPartsTab />
+          )}
+
+          {/* ── Purchase Orders ── */}
+          {activeTab === 'purchaseOrders' && (
+            <ClientPurchaseOrdersTab />
+          )}
+
+          {/* ── Analytics ── */}
+          {activeTab === 'analytics' && (
+            <ClientAnalyticsTab allIssues={allIssues} />
+          )}
+
+          {/* ── Meters ── */}
+          {activeTab === 'meters' && (
+            <ClientMetersTab />
+          )}
+
+          {/* ── Edge ── */}
+          {activeTab === 'edge' && (
+            <ClientEdgeTab />
+          )}
+
         </div>
       </main>
 
@@ -1764,6 +1868,55 @@ function ClientDashboard() {
             setActiveTab('requests');
           }
         }} />
+      )}
+
+      {/* ── Issue Assign Modal (For Client) ── */}
+      {issueAssignModalOpen && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 20 }}>
+          <div style={{ background: 'white', borderRadius: 16, boxShadow: '0 20px 60px rgba(0,0,0,0.2)', maxWidth: 450, width: '100%', padding: 28 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#111827' }}>Assign Specialist</h3>
+                <p style={{ margin: '4px 0 0', fontSize: 13, color: '#9CA3AF' }}>Work Order: {selectedIssueToAssign?.title}</p>
+              </div>
+              <button onClick={() => setIssueAssignModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF', padding: 4 }}><Icon.X /></button>
+            </div>
+
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: 6, textTransform: 'uppercase' }}>Available Internal Staff</label>
+              <Select
+                value={selectedInternalTechForIssue}
+                onChange={e => setSelectedInternalTechForIssue(e.target.value)}
+              >
+                <option value="">Select technician…</option>
+                {internalTechnicians
+                  .filter(t => {
+                    const techPid = t.propertyId || (t.property && (t.property.id || t.property._id));
+                    const issuePid = extractId(selectedIssueToAssign?.propertyId) || (selectedIssueToAssign?.property && (selectedIssueToAssign.property.id || selectedIssueToAssign.property._id));
+                    return !techPid || !issuePid || String(techPid) === String(issuePid);
+                  })
+                  .map(t => (
+                    <option key={t.id || t._id} value={t.id || t._id}>{t.name} ({t.email || t.phone})</option>
+                  ))
+                }
+              </Select>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <Btn variant="outline" onClick={() => setIssueAssignModalOpen(false)}>Cancel</Btn>
+              <Btn
+                variant="primary"
+                disabled={!selectedInternalTechForIssue || assignLoading[selectedIssueToAssign?.id || selectedIssueToAssign?._id]}
+                onClick={async () => {
+                  await assignInternal(selectedIssueToAssign.id || selectedIssueToAssign._id, selectedInternalTechForIssue);
+                  setIssueAssignModalOpen(false);
+                }}
+              >
+                {assignLoading[selectedIssueToAssign?.id || selectedIssueToAssign?._id] ? 'Assigning...' : 'Confirm Assignment'}
+              </Btn>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ── Assign Modal ── */}
@@ -1818,5 +1971,360 @@ function ClientDashboard() {
     </div>
   );
 }
+
+// ── Client Sub-Tab Components ─────────────────────────────────────────────────
+
+const ClientPartsTab = () => {
+  const [items, setItems] = React.useState([]);
+  const [search, setSearch] = React.useState('');
+  const fileRef = React.useRef(null);
+  React.useEffect(() => {
+    (async () => {
+      try { const res = await api.get('/api/parts'); setItems(res.data || []); }
+      catch { try { const r2 = await api.get('/api/material-requests'); setItems(r2.data || []); } catch { setItems([]); } }
+    })();
+  }, []);
+  const filtered = items.filter(it => (it.name || it.partName || '').toLowerCase().includes(search.toLowerCase()));
+  const exportCSV = () => {
+    if (!filtered.length) return;
+    const keys = ['name', 'status', 'available', 'allocated', 'onHand', 'incoming', 'location'];
+    const rows = filtered.map(it => ({ name: it.name || it.partName || '', status: it.status || '', available: it.available || it.availableQty || it.quantity || 0, allocated: it.allocated || 0, onHand: it.onHand || 0, incoming: it.incoming || 0, location: it.location || it.warehouse || '' }));
+    const csv = [keys.join(',')].concat(rows.map(r => keys.map(k => `"${String(r[k] ?? '').replace(/"/g, '""')}"`).join(','))).join('\n');
+    const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(new Blob([csv], { type: 'text/csv' })), download: 'parts.csv' }); a.click();
+  };
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-bold text-gray-900">Parts &amp; Inventory</h2>
+          <p className="text-sm text-gray-500 mt-0.5">Manage parts, stock levels and locations</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <button onClick={exportCSV} className="px-3 py-2 bg-white border rounded-xl text-sm font-semibold hover:bg-gray-50">Export CSV</button>
+          <button onClick={() => fileRef.current?.click()} className="px-3 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold">Import</button>
+          <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) alert('Import preview: ' + f.name); }} />
+        </div>
+      </div>
+      <div className="relative max-w-xs">
+        <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" /></svg>
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search parts..." className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+      </div>
+      <div className="bg-white rounded-lg border border-gray-100 overflow-hidden shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead className="bg-[#fcfcfd] border-b border-gray-100">
+              <tr>{['Name', 'Status', 'Available', 'Allocated', 'On Hand', 'Incoming', 'Location', 'Actions'].map(h => <th key={h} className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">{h}</th>)}</tr>
+            </thead>
+            <tbody>
+              {filtered.map((it, idx) => (
+                <tr key={it._id || it.id || `part-${idx}`} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+                  <td className="py-4 px-4 text-sm font-bold text-gray-900">{it.name || it.partName || 'Unnamed'}</td>
+                  <td className="py-4 px-4 text-sm text-gray-600">{it.status || '—'}</td>
+                  <td className="py-4 px-4 text-sm text-gray-600">{it.available || it.availableQty || it.quantity || 0}</td>
+                  <td className="py-4 px-4 text-sm text-gray-600">{it.allocated || 0}</td>
+                  <td className="py-4 px-4 text-sm text-gray-600">{it.onHand || 0}</td>
+                  <td className="py-4 px-4 text-sm text-gray-600">{it.incoming || 0}</td>
+                  <td className="py-4 px-4 text-sm text-gray-600">{it.location || it.warehouse || '—'}</td>
+                  <td className="py-4 px-4 text-right"><button className="p-1.5 hover:bg-gray-100 rounded-lg"><svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg></button></td>
+                </tr>
+              ))}
+              {filtered.length === 0 && <tr><td colSpan="8" className="py-20 text-center text-gray-500">No parts or inventory found</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ClientPurchaseOrdersTab = () => {
+  const [orders, setOrders] = React.useState([]);
+  React.useEffect(() => {
+    (async () => { try { const res = await api.get('/api/purchase-orders'); setOrders(res.data || []); } catch { setOrders([]); } })();
+  }, []);
+  const exportCSV = () => {
+    if (!orders.length) return;
+    const keys = ['title', 'poNumber', 'itemsCount', 'totalCost', 'vendor'];
+    const rows = orders.map(o => ({ title: o.title || o.name || '', poNumber: o.poNumber || o.number || '', itemsCount: Array.isArray(o.items) ? o.items.length : '', totalCost: o.totalCost || o.cost || '', vendor: o.vendor?.name || o.vendor || '' }));
+    const csv = [keys.join(',')].concat(rows.map(r => keys.map(k => `"${String(r[k] ?? '').replace(/"/g, '""')}"`).join(','))).join('\n');
+    const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(new Blob([csv], { type: 'text/csv' })), download: 'purchase-orders.csv' }); a.click();
+  };
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-bold text-gray-900">Purchase Orders</h2>
+          <p className="text-sm text-gray-500 mt-0.5">Create, view and export purchase orders</p>
+        </div>
+        <button onClick={exportCSV} className="px-3 py-2 bg-white border rounded-xl text-sm font-semibold hover:bg-gray-50">Export CSV</button>
+      </div>
+      <div className="bg-white rounded-lg border border-gray-100 overflow-hidden shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead className="bg-[#fcfcfd] border-b border-gray-100">
+              <tr>{['Title', 'PO Number', '# Items', 'Total Cost', 'Vendor', 'Actions'].map(h => <th key={h} className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">{h}</th>)}</tr>
+            </thead>
+            <tbody>
+              {orders.map((o, idx) => (
+                <tr key={o._id || o.id || `po-${idx}`} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+                  <td className="py-4 px-4 text-sm font-bold text-gray-900">{o.title || o.name || 'PO'}</td>
+                  <td className="py-4 px-4 text-sm font-mono text-gray-600">{o.poNumber || o.number || '—'}</td>
+                  <td className="py-4 px-4 text-sm text-gray-600">{Array.isArray(o.items) ? o.items.length : (o.itemsCount || '—')}</td>
+                  <td className="py-4 px-4 text-sm text-gray-600">{o.totalCost ? `$${Number(o.totalCost).toFixed(2)}` : '—'}</td>
+                  <td className="py-4 px-4 text-sm text-gray-600">{o.vendor?.name || o.vendor || '—'}</td>
+                  <td className="py-4 px-4 text-right"><button className="p-1.5 hover:bg-gray-100 rounded-lg"><svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg></button></td>
+                </tr>
+              ))}
+              {orders.length === 0 && <tr><td colSpan="6" className="py-20 text-center text-gray-500">No purchase orders found</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ClientAnalyticsTab = ({ allIssues = [] }) => {
+  const resolved = allIssues.filter(i => (i.status || '').toUpperCase().includes('COMPLETE')).length;
+  const pending = allIssues.filter(i => (i.status || '').toUpperCase() === 'PENDING').length;
+  const inProg = allIssues.filter(i => (i.status || '').toUpperCase().includes('PROGRESS')).length;
+  const overdue = allIssues.filter(i => i.overdue).length;
+  const bars = Array.from({ length: 7 }).map((_, i) => {
+    const day = new Date(); day.setDate(day.getDate() - (6 - i)); day.setHours(0, 0, 0, 0);
+    return { count: allIssues.filter(it => { try { const d = new Date(it.createdAt); d.setHours(0, 0, 0, 0); return d.getTime() === day.getTime(); } catch { return false; } }).length, label: day.toLocaleDateString('en', { weekday: 'short' }) };
+  });
+  const barsMax = Math.max(...bars.map(b => b.count), 1);
+  return (
+    <div className="flex flex-col gap-6">
+      <div>
+        <h2 className="text-xl font-bold text-gray-900">Analytics</h2>
+        <p className="text-sm text-gray-500 mt-0.5">Overview of your maintenance and issue activity</p>
+      </div>
+      <div className="grid grid-cols-4 gap-4">
+        {[
+          { label: 'Total Issues', value: allIssues.length, icon: '📋', color: 'from-blue-50 to-indigo-50 border-blue-100' },
+          { label: 'Resolved', value: resolved, icon: '✅', color: 'from-emerald-50 to-green-50 border-emerald-100' },
+          { label: 'Pending', value: pending, icon: '⏳', color: 'from-amber-50 to-yellow-50 border-amber-100' },
+          { label: 'Overdue', value: overdue, icon: '🚨', color: 'from-rose-50 to-pink-50 border-rose-100' },
+        ].map(c => (
+          <div key={c.label} className={`bg-gradient-to-br ${c.color} border rounded-xl p-4 flex items-center gap-4`}>
+            <span className="text-3xl">{c.icon}</span>
+            <div><p className="text-xs font-bold text-gray-500 uppercase tracking-wider">{c.label}</p><p className="text-2xl font-black text-gray-900 mt-0.5">{c.value}</p></div>
+          </div>
+        ))}
+      </div>
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+        <p className="text-sm font-bold text-gray-900 mb-4">Issues — Last 7 Days</p>
+        <div className="flex items-end gap-2" style={{ height: 80 }}>
+          {bars.map((b, i) => (
+            <div key={i} className="flex-1 flex flex-col items-center gap-1 h-full justify-end">
+              <div style={{ width: '100%', height: `${Math.max(4, (b.count / barsMax) * 100)}%`, minHeight: 4 }} className="bg-gradient-to-t from-blue-700 to-blue-400 rounded-t" />
+              <span className="text-[10px] text-gray-400">{b.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+        <p className="text-sm font-bold text-gray-900 mb-4">Status Breakdown</p>
+        <div className="flex flex-col gap-3">
+          {[
+            { label: 'Pending', color: '#F59E0B', count: pending },
+            { label: 'In Progress', color: '#3B82F6', count: inProg },
+            { label: 'Completed', color: '#10B981', count: resolved },
+            { label: 'Overdue', color: '#EF4444', count: overdue },
+          ].map(s => (
+            <div key={s.label}>
+              <div className="flex justify-between mb-1 text-sm">
+                <span className="font-semibold text-gray-700">{s.label}</span>
+                <span className="font-bold" style={{ color: s.color }}>{s.count}</span>
+              </div>
+              <div className="bg-gray-100 rounded-full h-2 overflow-hidden">
+                <div style={{ width: `${allIssues.length ? Math.round((s.count / allIssues.length) * 100) : 0}%`, background: s.color, transition: 'width 0.5s ease' }} className="h-full rounded-full" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ClientMetersTab = () => {
+  const [meters, setMeters] = React.useState([]);
+  const [search, setSearch] = React.useState('');
+  const [filter, setFilter] = React.useState('All');
+  const [showAdd, setShowAdd] = React.useState(false);
+  const [newMeter, setNewMeter] = React.useState({ name: '', type: 'Electricity', reading: 0, unit: 'kWh', status: 'Normal', location: '' });
+  const types = ['All', 'Electricity', 'Water', 'Gas'];
+  React.useEffect(() => { api.get('/api/meters').then(r => setMeters(r.data || [])).catch(() => setMeters([])); }, []);
+  const filtered = meters.filter(m => (filter === 'All' || m.type === filter) && ((m.name || '').toLowerCase().includes(search.toLowerCase()) || (m.location || '').toLowerCase().includes(search.toLowerCase())));
+  const sc = s => ({ Normal: { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' }, Warning: { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' }, Alert: { bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200' } }[s] || { bg: 'bg-gray-50', text: 'text-gray-700', border: 'border-gray-200' });
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex items-center justify-between">
+        <div><h2 className="text-xl font-bold text-gray-900">Meters</h2><p className="text-sm text-gray-500 mt-0.5">Live readings from all property meters</p></div>
+        <button onClick={() => setShowAdd(true)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 shadow-sm">
+          <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg> Add Meter
+        </button>
+      </div>
+      {showAdd && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowAdd(false)} />
+          <div className="relative bg-white rounded-xl p-6 w-full max-w-md shadow-xl z-10">
+            <h3 className="text-lg font-bold mb-3">Add Meter</h3>
+            <div className="flex flex-col gap-2">
+              <input value={newMeter.name} onChange={e => setNewMeter({ ...newMeter, name: e.target.value })} placeholder="Name" className="p-2 border rounded" />
+              <select value={newMeter.type} onChange={e => setNewMeter({ ...newMeter, type: e.target.value, unit: e.target.value === 'Water' ? 'm³' : 'kWh' })} className="p-2 border rounded">
+                <option>Electricity</option><option>Water</option><option>Gas</option>
+              </select>
+              <input value={newMeter.location} onChange={e => setNewMeter({ ...newMeter, location: e.target.value })} placeholder="Location" className="p-2 border rounded" />
+              <div className="flex gap-2">
+                <input type="number" value={newMeter.reading} onChange={e => setNewMeter({ ...newMeter, reading: Number(e.target.value) })} className="p-2 border rounded flex-1" />
+                <input value={newMeter.unit} onChange={e => setNewMeter({ ...newMeter, unit: e.target.value })} className="p-2 border rounded w-24" />
+              </div>
+              <div className="flex justify-end gap-2 mt-3">
+                <button onClick={() => setShowAdd(false)} className="px-3 py-2 bg-white border rounded">Cancel</button>
+                <button onClick={async () => { try { const res = await api.post('/api/meters', newMeter); setMeters(p => [res.data, ...p]); setShowAdd(false); setNewMeter({ name: '', type: 'Electricity', reading: 0, unit: 'kWh', status: 'Normal', location: '' }); } catch { alert('Failed to add meter'); } }} className="px-3 py-2 bg-blue-600 text-white rounded">Create</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      <div className="grid grid-cols-3 gap-4">
+        {[
+          { label: 'Total Electricity', value: `${(meters.filter(m => m.type === 'Electricity').reduce((s, m) => s + (Number(m.reading) || 0), 0) / 1000).toFixed(1)} MWh`, icon: '⚡', color: 'from-amber-50 to-yellow-50 border-amber-100' },
+          { label: 'Total Water', value: `${meters.filter(m => m.type === 'Water').reduce((s, m) => s + (Number(m.reading) || 0), 0).toLocaleString()} m³`, icon: '💧', color: 'from-blue-50 to-cyan-50 border-blue-100' },
+          { label: 'Active Alerts', value: meters.filter(m => m.status !== 'Normal').length, icon: '🚨', color: 'from-rose-50 to-pink-50 border-rose-100' },
+        ].map(c => (
+          <div key={c.label} className={`bg-gradient-to-br ${c.color} border rounded-xl p-4 flex items-center gap-4`}>
+            <span className="text-3xl">{c.icon}</span>
+            <div><p className="text-xs font-bold text-gray-500 uppercase tracking-wider">{c.label}</p><p className="text-xl font-black text-gray-900 mt-0.5">{c.value}</p></div>
+          </div>
+        ))}
+      </div>
+      <div className="flex items-center gap-3">
+        <div className="relative flex-1 max-w-xs">
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" /></svg>
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search meters..." className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+        </div>
+        <div className="flex bg-gray-100 rounded-xl p-1">
+          {types.map(t => <button key={t} onClick={() => setFilter(t)} className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors ${filter === t ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>{t}</button>)}
+        </div>
+      </div>
+      <div className="bg-white rounded-lg border border-gray-100 overflow-hidden shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead className="bg-[#fcfcfd] border-b border-gray-100">
+              <tr>{['Meter', 'Type', 'Reading', 'Trend', 'Status', 'Location', 'Last Read', 'Actions'].map(h => <th key={h} className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">{h}</th>)}</tr>
+            </thead>
+            <tbody>
+              {filtered.map((m, idx) => {
+                const badge = sc(m.status); return (
+                  <tr key={m.id || m._id || `m-${idx}`} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+                    <td className="py-4 px-4"><div className="flex items-center gap-3"><div className="w-10 h-10 bg-gray-50 border border-gray-100 rounded-xl flex items-center justify-center text-xl">{m.icon || '📊'}</div><div><p className="text-sm font-bold text-gray-900">{m.name}</p><p className="text-[10px] text-gray-400 mt-0.5">{m.type}</p></div></div></td>
+                    <td className="py-4 px-4 text-sm text-gray-600">{m.type}</td>
+                    <td className="py-4 px-4 text-sm font-black text-gray-900">{(m.reading || 0).toLocaleString()} <span className="text-xs text-gray-400 font-medium">{m.unit}</span></td>
+                    <td className="py-4 px-4"><span className={`text-sm font-bold ${(m.trend || 0) > 0 ? 'text-rose-500' : (m.trend || 0) < 0 ? 'text-emerald-500' : 'text-gray-400'}`}>{(m.trend || 0) > 0 ? '+' : ''}{m.trend || 0}%</span></td>
+                    <td className="py-4 px-4"><span className={`px-2 py-0.5 border text-[10px] font-bold rounded-full ${badge.bg} ${badge.text} ${badge.border}`}>{m.status || 'Normal'}</span></td>
+                    <td className="py-4 px-4 text-sm text-gray-600">{m.location || '—'}</td>
+                    <td className="py-4 px-4 text-sm text-gray-500">{m.lastRead || '—'}</td>
+                    <td className="py-4 px-4 text-right"><button className="p-1.5 hover:bg-gray-100 rounded-lg" onClick={() => alert(JSON.stringify(m, null, 2))}><svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg></button></td>
+                  </tr>
+                );
+              })}
+              {filtered.length === 0 && <tr><td colSpan="8" className="py-16 text-center text-gray-500">No meters found</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ClientEdgeTab = () => {
+  const [devices, setDevices] = React.useState([]);
+  const [search, setSearch] = React.useState('');
+  const [filter, setFilter] = React.useState('All');
+  const [showAdd, setShowAdd] = React.useState(false);
+  const [newDevice, setNewDevice] = React.useState({ name: '', type: 'Sensor', status: 'Online', signal: 80, firmware: 'v1.0.0', location: '', battery: null });
+  const statuses = ['All', 'Online', 'Offline'];
+  const typeIcon = { Camera: '📷', Sensor: '📡', Network: '🌐', Lock: '🔒', Controller: '🎛️' };
+  React.useEffect(() => { api.get('/api/devices').then(r => setDevices(r.data || [])).catch(() => setDevices([])); }, []);
+  const filtered = devices.filter(d => (filter === 'All' || d.status === filter) && ((d.name || '').toLowerCase().includes(search.toLowerCase()) || (d.location || '').toLowerCase().includes(search.toLowerCase())));
+  const online = devices.filter(d => d.status === 'Online').length;
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex items-center justify-between">
+        <div><h2 className="text-xl font-bold text-gray-900">Edge Devices</h2><p className="text-sm text-gray-500 mt-0.5">Monitor and manage connected IoT edge devices</p></div>
+        <button onClick={() => setShowAdd(true)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 shadow-sm">
+          <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg> Add Device
+        </button>
+      </div>
+      {showAdd && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowAdd(false)} />
+          <div className="relative bg-white rounded-xl p-6 w-full max-w-md shadow-xl z-10">
+            <h3 className="text-lg font-bold mb-3">Add Device</h3>
+            <div className="flex flex-col gap-2">
+              <input value={newDevice.name} onChange={e => setNewDevice({ ...newDevice, name: e.target.value })} placeholder="Device name" className="p-2 border rounded" />
+              <select value={newDevice.type} onChange={e => setNewDevice({ ...newDevice, type: e.target.value })} className="p-2 border rounded">
+                {Object.keys(typeIcon).map(t => <option key={t}>{t}</option>)}
+              </select>
+              <input value={newDevice.location} onChange={e => setNewDevice({ ...newDevice, location: e.target.value })} placeholder="Location" className="p-2 border rounded" />
+              <div className="flex justify-end gap-2 mt-3">
+                <button onClick={() => setShowAdd(false)} className="px-3 py-2 bg-white border rounded">Cancel</button>
+                <button onClick={async () => { try { const res = await api.post('/api/devices', newDevice); setDevices(p => [res.data, ...p]); setShowAdd(false); } catch { alert('Failed to add device'); } }} className="px-3 py-2 bg-blue-600 text-white rounded">Create</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      <div className="grid grid-cols-3 gap-4">
+        {[
+          { label: 'Total Devices', value: devices.length, icon: '🖥️', color: 'from-blue-50 to-indigo-50 border-blue-100' },
+          { label: 'Online', value: online, icon: '🟢', color: 'from-emerald-50 to-green-50 border-emerald-100' },
+          { label: 'Offline', value: devices.length - online, icon: '🔴', color: 'from-rose-50 to-pink-50 border-rose-100' },
+        ].map(c => (
+          <div key={c.label} className={`bg-gradient-to-br ${c.color} border rounded-xl p-4 flex items-center gap-4`}>
+            <span className="text-3xl">{c.icon}</span>
+            <div><p className="text-xs font-bold text-gray-500 uppercase tracking-wider">{c.label}</p><p className="text-2xl font-black text-gray-900 mt-0.5">{c.value}</p></div>
+          </div>
+        ))}
+      </div>
+      <div className="flex items-center gap-3">
+        <div className="relative flex-1 max-w-xs">
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" /></svg>
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search devices..." className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+        </div>
+        <div className="flex bg-gray-100 rounded-xl p-1">
+          {statuses.map(s => <button key={s} onClick={() => setFilter(s)} className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 ${filter === s ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>{s !== 'All' && <span className={`w-1.5 h-1.5 rounded-full ${s === 'Online' ? 'bg-emerald-500' : 'bg-gray-400'}`} />}{s}</button>)}
+        </div>
+      </div>
+      <div className="bg-white rounded-lg border border-gray-100 overflow-hidden shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead className="bg-[#fcfcfd] border-b border-gray-100">
+              <tr>{['Device', 'Type', 'Location', 'Status', 'Signal', 'Firmware', 'Actions'].map(h => <th key={h} className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">{h}</th>)}</tr>
+            </thead>
+            <tbody>
+              {filtered.map((d, idx) => (
+                <tr key={d.id || d._id || `dev-${idx}`} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+                  <td className="py-4 px-4"><div className="flex items-center gap-3"><div className="w-10 h-10 bg-gray-50 border border-gray-100 rounded-xl flex items-center justify-center text-xl">{typeIcon[d.type] || '📟'}</div><div><p className="text-sm font-bold text-gray-900">{d.name}</p><p className="text-[10px] text-gray-400 mt-0.5 font-mono">{String(d.id || d._id || '').slice(-8)}</p></div></div></td>
+                  <td className="py-4 px-4 text-sm text-gray-600">{d.type}</td>
+                  <td className="py-4 px-4 text-sm text-gray-600">{d.location || '—'}</td>
+                  <td className="py-4 px-4"><span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${d.status === 'Online' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : d.status === 'Offline' ? 'bg-rose-50 text-rose-700 border-rose-100' : 'bg-amber-50 text-amber-700 border-amber-100'}`}>{d.status}</span></td>
+                  <td className="py-4 px-4"><div className="flex items-center gap-2"><div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden"><div style={{ width: `${d.signal || 0}%` }} className={`h-full rounded-full ${(d.signal || 0) >= 80 ? 'bg-emerald-500' : (d.signal || 0) >= 50 ? 'bg-amber-500' : 'bg-rose-500'}`} /></div><span className="text-xs text-gray-500">{d.signal || 0}%</span></div></td>
+                  <td className="py-4 px-4 text-xs font-mono text-gray-500">{d.firmware || '—'}</td>
+                  <td className="py-4 px-4 text-right"><button className="p-1.5 hover:bg-gray-100 rounded-lg"><svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg></button></td>
+                </tr>
+              ))}
+              {filtered.length === 0 && <tr><td colSpan="7" className="py-16 text-center text-gray-500">No edge devices found. Add your first device above.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export default ClientDashboard;

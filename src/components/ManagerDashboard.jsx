@@ -416,15 +416,11 @@ function ManagerDashboard() {
       const allIssuesData = issuesRes.data;
       setAllIssues(allIssuesData);
 
-      const approvedIssues = allIssuesData.filter(issue =>
-        issue.approved === true || issue.assignedTo || (issue.status !== 'PENDING' && issue.status !== 'REJECTED')
-      );
-      const pendingRequests = allIssuesData.filter(issue =>
-        issue.status === 'PENDING' && !issue.assignedTo && !issue.approved
-      );
+      const approvedWorkOrders = allIssuesData.filter(issue => issue.approved);
+      const pendingRequestsData = allIssuesData.filter(issue => !issue.approved && issue.status !== 'REJECTED');
 
-      setIssues(approvedIssues);
-      setPendingRequests(pendingRequests);
+      setIssues(approvedWorkOrders);
+      setPendingRequests(pendingRequestsData);
       setTechnicians(techRes.data || []);
       setLocations(locationsRes.data || []);
       setAssets(assetsRes.data || []);
@@ -711,7 +707,10 @@ function ManagerDashboard() {
 
   // Filter function
   const getFilteredIssues = () => {
-    let allIssues = [...pendingRequests, ...issues];
+    // If we are in the Work Orders tab, only show assigned issues.
+    // In the All Issues tab, show both pending requests and work orders.
+    let baseList = activeTab === 'issues' ? issues : [...pendingRequests, ...issues];
+    let allIssues = [...baseList];
 
     if (searchQuery) {
       allIssues = allIssues.filter(issue =>
@@ -1331,6 +1330,12 @@ function ManagerDashboard() {
                 pendingRequests={pendingRequests}
                 setSelectedRequest={setSelectedRequest}
                 setShowApprovalModal={setShowApprovalModal}
+                technicians={technicians}
+                assigning={assigning}
+                assignmentData={assignmentData}
+                setAssignmentData={setAssignmentData}
+                handleOpenAssignment={handleOpenAssignment}
+                handleAssignTech={handleAssignTech}
               />
             ) : activeTab === 'subscriptions' ? (
               <SubscriptionManagement />
@@ -1384,7 +1389,7 @@ function ManagerDashboard() {
             ) : activeTab === 'locations' ? (
               <LocationsTab locations={locations || []} assets={assets} />
             ) : activeTab === 'people' ? (
-              <PeopleTab technicians={technicians || []} />
+              <PeopleTab technicians={technicians || []} allIssues={allIssues || []} onRefresh={fetchDashboardData} />
             ) : activeTab === 'checklists' ? (
               <ChecklistsTab />
             ) : activeTab === 'parts' ? (
@@ -1431,17 +1436,31 @@ function ManagerDashboard() {
               <div className="space-y-6">
                 {/* Header with image */}
                 <div className="flex flex-col md:flex-row gap-6">
-                  {(selectedRequest.beforePhoto || selectedRequest.photo) && (
-                    <div className="md:w-1/3">
+                  <div className="md:w-1/3 flex flex-col gap-4">
+                    {/* Before/Request Image */}
+                    {(selectedRequest.beforePhoto || selectedRequest.photo || selectedRequest.image || selectedRequest.beforeImage) && (
                       <div className="rounded-2xl overflow-hidden shadow-lg">
+                        <span className="text-[10px] uppercase font-bold text-gray-400 mb-1 px-4 block bg-white/80">Before</span>
                         <img
-                          src={getImageUrl(selectedRequest.beforePhoto || selectedRequest.photo)}
-                          alt="Issue"
-                          className="w-full h-64 object-cover hover:scale-105 transition-transform duration-300"
+                          src={getImageUrl(selectedRequest.beforeImage || selectedRequest.beforePhoto || selectedRequest.photo || selectedRequest.image)}
+                          alt="Before"
+                          className="w-full h-48 object-cover hover:scale-105 transition-transform duration-300"
                         />
                       </div>
-                    </div>
-                  )}
+                    )}
+
+                    {/* After Image */}
+                    {(selectedRequest.afterImage || selectedRequest.afterPhoto) && (
+                      <div className="rounded-2xl overflow-hidden shadow-lg border-2 border-green-100">
+                        <span className="text-[10px] uppercase font-bold text-green-600 mb-1 px-4 block bg-green-50">After</span>
+                        <img
+                          src={getImageUrl(selectedRequest.afterImage || selectedRequest.afterPhoto)}
+                          alt="After"
+                          className="w-full h-48 object-cover hover:scale-105 transition-transform duration-300"
+                        />
+                      </div>
+                    )}
+                  </div>
                   <div className="flex-1">
                     <h3 className="text-2xl font-bold text-gray-900 mb-3">{selectedRequest.title}</h3>
                     <div className="flex items-center gap-4 mb-4">
@@ -1779,7 +1798,17 @@ const OverviewTab = ({
 );
 
 // Enhanced Requests Tab with Table
-const RequestsTab = ({ pendingRequests, setSelectedRequest, setShowApprovalModal }) => (
+const RequestsTab = ({
+  pendingRequests,
+  setSelectedRequest,
+  setShowApprovalModal,
+  technicians,
+  assigning,
+  assignmentData,
+  setAssignmentData,
+  handleOpenAssignment,
+  handleAssignTech
+}) => (
   <div>
     <div className="mb-6">
       <div className="flex items-center justify-between">
@@ -1826,127 +1855,144 @@ const RequestsTab = ({ pendingRequests, setSelectedRequest, setShowApprovalModal
               </tr>
             </thead>
             <tbody>
-              {pendingRequests.map((request, i) => (
-                <tr key={request._id || request.id || `pending-${i}`} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors group">
-                  <td className="py-4 px-4">
-                    <input type="checkbox" className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-                  </td>
-                  <td className="py-4 px-4">
-                    {/* Show whether this pending request is an authenticated inspection or anonymous request */}
-                    <div className="inline-flex items-center gap-2">
-                      {request.submissionType === 'inspection' ? (
-                        <span className="px-2 py-1 text-xs font-semibold text-emerald-700 bg-emerald-100 rounded-full">Inspection</span>
-                      ) : (
-                        <span className="px-2 py-1 text-xs font-semibold text-amber-700 bg-amber-100 rounded-full">Request</span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="py-4 px-4">
-                    <span className="text-xs font-bo
-                    ld text-blue-600 font-mono">
-                      {String(normalizeId(request._id || request.id)).slice(-8)}
-                    </span>
-                  </td>
-                  <td className="py-4 px-4">
-                    <div className="flex items-center gap-3">
-                      {/* Photo attachment */}
-                      {(request.beforePhoto || request.photo) && (() => {
-                        const photoPath = request.beforePhoto || request.photo;
-                        const photoUrl = getImageUrl(photoPath);
-                        const ext = photoPath.split('.').pop().toLowerCase();
-                        const browserUnsupported = ['heic', 'heif', 'tiff', 'tif', 'bmp'].includes(ext);
-                        if (browserUnsupported) {
-                          return (
-                            <a
-                              href={photoUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              download
-                              className="flex items-center gap-1 px-2 py-1 bg-blue-50 border border-blue-200 rounded-lg text-xs font-semibold text-blue-700 hover:bg-blue-100 transition-colors"
-                              title={`Download photo (.${ext})`}
-                            >
-                              <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
-                              Photo (.{ext})
-                            </a>
-                          );
-                        }
-                        return (
-                          <img
-                            src={photoUrl}
-                            alt={request.title}
-                            className="w-10 h-10 rounded-lg object-cover border border-gray-100"
-                            onError={e => { e.target.onerror = null; e.target.style.display = 'none'; }}
-                          />
-                        );
-                      })()}
-                      <div>
-                        <div className="text-sm font-bold text-gray-900">{request.title}</div>
-                        {/* File attachments (PDFs etc.) */}
-                        {Array.isArray(request.files) && request.files.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-1">
-                            {request.files.map((filePath, fi) => {
-                              const fileUrl = getImageUrl(filePath);
-                              const fileName = filePath.split('/').pop();
-                              const fileExt = fileName.split('.').pop().toLowerCase();
+              {pendingRequests.map((request, i) => {
+                const reqId = request._id || request.id;
+                return (
+                  <React.Fragment key={reqId || `pending-${i}`}>
+                    <tr className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors group">
+                      <td className="py-4 px-4">
+                        <input type="checkbox" className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                      </td>
+                      <td className="py-4 px-4">
+                        {/* Show whether this pending request is an authenticated inspection or anonymous request */}
+                        <div className="inline-flex items-center gap-2">
+                          {request.submissionType === 'inspection' ? (
+                            <span className="px-2 py-1 text-xs font-semibold text-emerald-700 bg-emerald-100 rounded-full">Inspection</span>
+                          ) : (
+                            <span className="px-2 py-1 text-xs font-semibold text-amber-700 bg-amber-100 rounded-full">Request</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-4 px-4">
+                        <span className="text-xs font-bold text-blue-600 font-mono">
+                          {String(normalizeId(request._id || request.id)).slice(-8)}
+                        </span>
+                      </td>
+                      <td className="py-4 px-4">
+                        <div className="flex items-center gap-3">
+                          {/* Photo attachment */}
+                          {(request.beforePhoto || request.photo) && (() => {
+                            const photoPath = request.beforePhoto || request.photo;
+                            const photoUrl = getImageUrl(photoPath);
+                            const ext = photoPath.split('.').pop().toLowerCase();
+                            const browserUnsupported = ['heic', 'heif', 'tiff', 'tif', 'bmp'].includes(ext);
+                            if (browserUnsupported) {
                               return (
                                 <a
-                                  key={fi}
-                                  href={fileUrl}
+                                  href={photoUrl}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   download
-                                  className="flex items-center gap-1 px-2 py-0.5 bg-gray-50 border border-gray-200 rounded text-xs font-medium text-gray-600 hover:bg-gray-100 transition-colors"
-                                  title={fileName}
+                                  className="flex items-center gap-1 px-2 py-1 bg-blue-50 border border-blue-200 rounded-lg text-xs font-semibold text-blue-700 hover:bg-blue-100 transition-colors"
+                                  title={`Download photo (.${ext})`}
                                 >
-                                  <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
-                                  .{fileExt}
+                                  <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
+                                  Photo (.{ext})
                                 </a>
                               );
-                            })}
+                            }
+                            return (
+                              <img
+                                src={photoUrl}
+                                alt={request.title}
+                                className="w-10 h-10 rounded-lg object-cover border border-gray-100"
+                                onError={e => { e.target.onerror = null; e.target.style.display = 'none'; }}
+                              />
+                            );
+                          })()}
+                          <div>
+                            <div className="text-sm font-bold text-gray-900">{request.title}</div>
+                            {/* File attachments (PDFs etc.) */}
+                            {Array.isArray(request.files) && request.files.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {request.files.map((filePath, fi) => {
+                                  const fileUrl = getImageUrl(filePath);
+                                  const fileName = filePath.split('/').pop();
+                                  const fileExt = fileName.split('.').pop().toLowerCase();
+                                  return (
+                                    <a
+                                      key={fi}
+                                      href={fileUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      download
+                                      className="flex items-center gap-1 px-2 py-0.5 bg-gray-50 border border-gray-200 rounded text-xs font-medium text-gray-600 hover:bg-gray-100 transition-colors"
+                                      title={fileName}
+                                    >
+                                      <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
+                                      .{fileExt}
+                                    </a>
+                                  );
+                                })}
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="py-4 px-4">
-                    <p className="text-sm text-gray-600 line-clamp-2 max-w-xs">{request.description}</p>
-                  </td>
-                  <td className="py-4 px-4">
-                    <div className="flex items-center gap-2">
-                      <MapPin className="w-4 h-4 text-gray-400" />
-                      <span className="text-sm font-medium text-gray-700">{request.location}</span>
-                    </div>
-                  </td>
-                  <td className="py-4 px-4">
-                    <PriorityBadge priority={request.priority || 'MEDIUM'} />
-                  </td>
-                  <td className="py-4 px-4">
-                    <div className="text-sm font-medium text-gray-700">
-                      {new Date(request.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}
-                    </div>
-                    <div className="text-xs text-gray-400 font-medium">
-                      {new Date(request.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
-                    </div>
-                  </td>
-                  <td className="py-4 px-4 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <GradientButton
-                        onClick={() => { setSelectedRequest(request); setShowApprovalModal(true); }}
-                        color="green"
-                        className="px-3 py-1.5 text-xs"
-                      >
-                        <span className="flex items-center gap-1.5">
-                          <Eye className="w-3.5 h-3.5" />
-                          Review
-                        </span>
-                      </GradientButton>
-                      <button className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
-                        <MoreHorizontal className="w-4 h-4 text-gray-400" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                        </div>
+                      </td>
+                      <td className="py-4 px-4">
+                        <p className="text-sm text-gray-600 line-clamp-2 max-w-xs">{request.description}</p>
+                      </td>
+                      <td className="py-4 px-4">
+                        <div className="flex items-center gap-2">
+                          <MapPin className="w-4 h-4 text-gray-400" />
+                          <span className="text-sm font-medium text-gray-700">{request.location}</span>
+                        </div>
+                      </td>
+                      <td className="py-4 px-4">
+                        <PriorityBadge priority={request.priority || 'MEDIUM'} />
+                      </td>
+                      <td className="py-4 px-4">
+                        <div className="text-sm font-medium text-gray-700">
+                          {new Date(request.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}
+                        </div>
+                        <div className="text-xs text-gray-400 font-medium">
+                          {new Date(request.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                      </td>
+                      <td className="py-4 px-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <GradientButton
+                            onClick={() => { setSelectedRequest(request); setShowApprovalModal(true); }}
+                            color="green"
+                            className="px-3 py-1.5 text-xs"
+                          >
+                            <span className="flex items-center gap-1.5">
+                              <Eye className="w-3.5 h-3.5" />
+                              Review
+                            </span>
+                          </GradientButton>
+                          <button className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
+                            <MoreHorizontal className="w-4 h-4 text-gray-400" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                    {assigning === normalizeId(reqId) && (
+                      <tr>
+                        <td colSpan="9" className="p-0 border-b border-gray-50">
+                          <AssignmentForm
+                            assignmentData={assignmentData}
+                            setAssignmentData={setAssignmentData}
+                            technicians={technicians}
+                            onAssign={() => handleAssignTech(normalizeId(reqId))}
+                            onCancel={() => handleOpenAssignment(null)}
+                          />
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -3421,14 +3467,12 @@ const LocationsTab = ({ locations = [], assets = [] }) => {
 };
 
 // People & Teams Tab
-const PeopleTab = ({ technicians = [] }) => {
-  const [people, setPeople] = useState([]);
+const PeopleTab = ({ technicians = [], allIssues = [], onRefresh }) => {
   const [teams, setTeams] = useState([]);
-  const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showAddPerson, setShowAddPerson] = useState(false);
   const [showAddTeam, setShowAddTeam] = useState(false);
-  const [newPerson, setNewPerson] = useState({ name: '', email: '', phone: '', role: 'Technician' });
+  const [newPerson, setNewPerson] = useState({ name: '', email: '', phone: '', role: 'Technician', password: '', specialization: '' });
   const [newTeam, setNewTeam] = useState({ name: '', members: [] });
   const [teamImageFile, setTeamImageFile] = useState(null);
   const [teamImagePreview, setTeamImagePreview] = useState(null);
@@ -3451,46 +3495,48 @@ const PeopleTab = ({ technicians = [] }) => {
   useEffect(() => {
     let mounted = true;
     setLoading(true);
-    Promise.allSettled([api.get('/api/people'), api.get('/api/teams'), api.get('/api/users')])
-      .then((results) => {
+    // Only fetch teams; technicians are passed via props
+    api.get('/api/teams')
+      .then((res) => {
         if (!mounted) return;
-        const [pRes, tRes, uRes] = results;
-        if (pRes.status === 'fulfilled') setPeople(pRes.value.data || []);
-        else console.warn('[People] fetch failed:', pRes.status, pRes.reason && pRes.reason.message);
-
-        if (tRes.status === 'fulfilled') setTeams(tRes.value.data || []);
-        else console.warn('[Teams] fetch failed:', tRes.status, tRes.reason && tRes.reason.message);
-
-        if (uRes.status === 'fulfilled') setUsers(uRes.value.data || []);
-        else console.warn('[Users] fetch failed:', uRes.status, uRes.reason && uRes.reason.message);
+        setTeams(res.data || []);
       })
       .catch(err => {
-        console.error('Unexpected error loading people/teams/users', err);
+        console.warn('[Teams] fetch failed:', err.message);
       })
       .finally(() => { if (mounted) setLoading(false); });
     return () => { mounted = false; };
   }, []);
 
   const exportCSV = () => {
-    const combined = combinePeopleUsers(people, users);
-    if (!combined || combined.length === 0) return;
+    if (!technicians || technicians.length === 0) return;
     const keys = ['id', 'name', 'email', 'phone', 'role'];
-    const rows = combined.map(t => ({ id: t._id || t.id || '', name: t.name || t.username || '', email: t.email || '', phone: t.phone || '', role: t.role || t.type || 'Technician' }));
+    const rows = technicians.map(t => ({
+      id: t._id || t.id || '',
+      name: t.name || '',
+      email: t.email || '',
+      phone: t.phone || '',
+      role: t.type || 'EXTERNAL'
+    }));
     const csv = [keys.join(',')].concat(rows.map(r => keys.map(k => (`"${String(r[k] ?? '').replace(/"/g, '""')}"`)).join(','))).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'people-export.csv'; a.click(); URL.revokeObjectURL(url);
+    const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'external-technicians-export.csv'; a.click(); URL.revokeObjectURL(url);
   };
 
   const handleCreatePerson = async (e) => {
     e.preventDefault();
     try {
-      const res = await api.post('/api/people', newPerson);
-      setPeople(prev => [res.data, ...(prev || [])]);
+      // Create external technician
+      const res = await api.post('/api/technicians', { ...newPerson, type: 'EXTERNAL' });
+      // Note: In real app, we might need to refresh parent dashboard data too
+      // for now just update local view if technicians list was local (but it's a prop)
+      alert('External Technician created successfully');
       setShowAddPerson(false);
-      setNewPerson({ name: '', email: '', phone: '', role: 'Technician' });
+      // Since technicians is a prop, we call onRefresh to tell parent to refetch
+      if (onRefresh) onRefresh();
     } catch (err) {
       console.error('Failed to create person', err);
-      alert('Failed to create person');
+      alert('Failed to create person: ' + (err.response?.data?.error || err.message));
     }
   };
 
@@ -3579,6 +3625,18 @@ const PeopleTab = ({ technicians = [] }) => {
     }
   };
 
+  const handleDeletePerson = async (id) => {
+    if (!confirm('Delete this technician?')) return;
+    try {
+      await api.delete(`/api/technicians/${id}`);
+      if (onRefresh) onRefresh();
+      alert('Technician deleted successfully');
+    } catch (err) {
+      console.error('Failed to delete technician', err);
+      alert('Failed to delete technician: ' + (err.response?.data?.error || err.message));
+    }
+  };
+
   const handleDeleteTeam = async (id) => {
     if (!confirm('Delete this team?')) return;
     try {
@@ -3595,7 +3653,7 @@ const PeopleTab = ({ technicians = [] }) => {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold text-gray-900">People & Teams</h2>
-          <p className="text-sm text-gray-500 mt-0.5">Technicians, managers and teams</p>
+          <p className="text-sm text-gray-500 mt-0.5">External Technicians and Vendor Teams</p>
         </div>
         <div className="flex items-center gap-3">
           <button onClick={exportCSV} className="px-3 py-2 bg-white border rounded-xl text-sm font-semibold hover:bg-gray-50">Export CSV</button>
@@ -3612,21 +3670,61 @@ const PeopleTab = ({ technicians = [] }) => {
                 <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Name</th>
                 <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">ID</th>
                 <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Email</th>
+                <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Rating</th>
+                <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Completed</th>
                 <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Phone</th>
                 <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {(combinePeopleUsers(people, users) || []).map((t, idx) => (
-                <tr key={t._id || t.id || `person-${idx}`} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
-                  <td className="py-4 px-4"><div className="text-sm font-bold text-gray-900">{t.name || t.username || 'Unnamed'}</div></td>
-                  <td className="py-4 px-4 text-sm text-gray-600 font-mono">{String(t._id || t.id || '').slice(-8)}</td>
-                  <td className="py-4 px-4 text-sm text-gray-600">{t.email || '-'}</td>
-                  <td className="py-4 px-4 text-sm text-gray-600">{t.phone || '-'}</td>
-                  <td className="py-4 px-4 text-right"><div className="flex items-center justify-end gap-2"><button className="p-1.5 hover:bg-gray-100 rounded-lg"><Eye className="w-4 h-4 text-blue-600" /></button></div></td>
-                </tr>
-              ))}
-              {(people || []).length === 0 && (<tr><td colSpan="5" className="py-20 text-center"><p className="text-gray-500">No people found</p></td></tr>)}
+              {(() => {
+                const externalOnly = (technicians || []).filter(t => t.type === 'EXTERNAL');
+                if (externalOnly.length === 0) {
+                  return <tr><td colSpan="7" className="py-20 text-center"><p className="text-gray-500">No external technicians found</p></td></tr>;
+                }
+                return externalOnly.map((t, idx) => (
+                  <tr key={t._id || t.id || `person-${idx}`} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+                    <td className="py-4 px-4"><div className="text-sm font-bold text-gray-900">{t.name || 'Unnamed Tech'}</div></td>
+                    <td className="py-4 px-4 text-sm text-gray-600 font-mono">{String(t._id || t.id || '').slice(-8)}</td>
+                    <td className="py-4 px-4 text-sm text-gray-600">{t.email || '-'}</td>
+                    <td className="py-4 px-4">
+                      <div className="flex items-center gap-1">
+                        <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                        <span className="text-sm font-bold text-gray-700">{t.rating || 0}</span>
+                      </div>
+                    </td>
+                    <td className="py-4 px-4">
+                      {(() => {
+                        const techId = String(t._id || t.id);
+                        const completedCount = allIssues.filter(i => {
+                          const isComplete = i.status === 'COMPLETE' || i.status === 'COMPLETED';
+                          const assignedId = String(i.assignedTo?._id || i.assignedTo?.id || i.assignedTo || '');
+                          return isComplete && assignedId === techId;
+                        }).length;
+                        return (
+                          <span className="px-2 py-1 text-xs font-bold text-blue-700 bg-blue-50 rounded-full">{completedCount > 0 ? completedCount : (t.completed || 0)} tasks</span>
+                        );
+                      })()}
+                    </td>
+                    <td className="py-4 px-4 text-sm text-gray-600">{t.phone || '-'}</td>
+                    <td className="py-4 px-4 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <button className="p-1.5 hover:bg-gray-100 rounded-lg" title="View Details">
+                          <Eye className="w-4 h-4 text-blue-600" />
+                        </button>
+                        <button
+                          onClick={() => handleDeletePerson(t._id || t.id)}
+                          className="p-1.5 hover:bg-gray-100 rounded-lg text-red-600 hover:text-red-700"
+                          title="Delete Technician"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+
+                  </tr>
+                ));
+              })()}
             </tbody>
           </table>
         </div>
@@ -3660,32 +3758,25 @@ const PeopleTab = ({ technicians = [] }) => {
                   <td className="py-3 px-4"><div className="text-sm font-bold text-gray-900">{tm.name || 'Unnamed'}</div></td>
                   <td className="py-3 px-4 text-sm text-gray-600">{
                     (() => {
-                      const allPeople = (people || []).concat(users || []);
                       if (!tm.members || tm.members.length === 0) return '-';
                       const membersArray = Array.isArray(tm.members) ? tm.members : (tm.members ? String(tm.members).split(',') : []);
                       const names = membersArray.map(entry => {
                         if (!entry && entry !== 0) return null;
-                        // If entry is an object with name/email, prefer that
-                        if (typeof entry === 'object') {
-                          return entry.name || entry.email || null;
-                        }
+                        if (typeof entry === 'object') return entry.name || entry.email || null;
                         const raw = String(entry).trim();
-                        // If it's an ID that matches a user/people, return the matched name
-                        const found = allPeople.find(p => String(p.id || p._id) === raw || String(p._id) === raw);
-                        if (found) return found.name || found.username || found.email;
-                        // If looks like JSON object string, parse and extract name/email
+                        // Match against external technicians
+                        const found = technicians.find(p => String(p.id || p._id) === raw || String(p._id) === raw);
+                        if (found) return found.name || found.email;
                         if (raw.startsWith('{') || raw.startsWith('[')) {
                           try {
                             const parsed = JSON.parse(raw);
                             if (parsed && typeof parsed === 'object') return parsed.name || parsed.email || null;
                           } catch (e) { }
                         }
-                        // If it's a CSV-like line, take first token as name
                         if (raw.includes(',') || raw.includes(';')) {
                           const first = raw.split(/[,;]+/)[0].replace(/^["']|["']$/g, '').trim();
                           if (first && first.length < 120) return first;
                         }
-                        // Fallback: if looks like an email, return that, else shorten
                         const emailMatch = raw.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
                         if (emailMatch) return emailMatch[0];
                         return raw.length > 12 ? raw.slice(0, 12) + '...' : raw;
@@ -3717,6 +3808,8 @@ const PeopleTab = ({ technicians = [] }) => {
               <input className="border p-2 rounded" placeholder="Name" value={newPerson.name} onChange={e => setNewPerson({ ...newPerson, name: e.target.value })} />
               <input className="border p-2 rounded" placeholder="Email" value={newPerson.email} onChange={e => setNewPerson({ ...newPerson, email: e.target.value })} />
               <input className="border p-2 rounded" placeholder="Phone" value={newPerson.phone} onChange={e => setNewPerson({ ...newPerson, phone: e.target.value })} />
+              <input className="border p-2 rounded" type="password" placeholder="Password" value={newPerson.password} onChange={e => setNewPerson({ ...newPerson, password: e.target.value })} />
+              <input className="border p-2 rounded" placeholder="Specialization (e.g. Plumbing, HVAC)" value={newPerson.specialization} onChange={e => setNewPerson({ ...newPerson, specialization: e.target.value })} />
               <select className="border p-2 rounded" value={newPerson.role} onChange={e => setNewPerson({ ...newPerson, role: e.target.value })}>
                 <option>Technician</option>
                 <option>Manager</option>
@@ -3741,7 +3834,7 @@ const PeopleTab = ({ technicians = [] }) => {
               <input className="border p-2 rounded" placeholder="Team Name" value={newTeam.name} onChange={e => setNewTeam({ ...newTeam, name: e.target.value })} />
               <label className="text-sm text-gray-600">Members</label>
               <select multiple className="border p-2 rounded h-32" value={newTeam.members} onChange={e => setNewTeam({ ...newTeam, members: Array.from(e.target.selectedOptions).map(o => o.value) })}>
-                {((people || []).concat(users || [])).map(p => (<option key={(p.id || p._id || p._id_str || p._id)} value={p.id || p._id}>{p.name || p.username || p.email}</option>))}
+                {(technicians || []).map(p => (<option key={(p.id || p._id)} value={p.id || p._id}>{p.name || p.email}</option>))}
               </select>
               <label className="text-sm text-gray-600 mt-2">Team Image (optional)</label>
               <input type="file" accept="image/*" onChange={e => {
@@ -3791,7 +3884,7 @@ const PeopleTab = ({ technicians = [] }) => {
               <input className="border p-2 rounded" placeholder="Team Name" value={editTeam.name || ''} onChange={e => setEditTeam({ ...editTeam, name: e.target.value })} />
               <label className="text-sm text-gray-600">Members</label>
               <select multiple className="border p-2 rounded h-32" value={editTeam.members || []} onChange={e => setEditTeam({ ...editTeam, members: Array.from(e.target.selectedOptions).map(o => o.value) })}>
-                {((people || []).concat(users || [])).map(p => (<option key={(p.id || p._id || p._id_str || p._id)} value={p.id || p._id}>{p.name || p.username || p.email}</option>))}
+                {(technicians || []).map(p => (<option key={(p.id || p._id)} value={p.id || p._id}>{p.name || p.email}</option>))}
               </select>
               <label className="text-sm text-gray-600 mt-2">Team Image (optional)</label>
               <input type="file" accept="image/*" onChange={e => {
@@ -4268,17 +4361,29 @@ const IssuesTab = ({
                   </div>
                 </td>
                 <td className="py-4 px-4">
-                  {getImageUrl(issue.photo || issue.image || issue.beforePhoto) ? (
-                    <img
-                      src={getImageUrl(issue.photo || issue.image || issue.beforePhoto)}
-                      alt={issue.title}
-                      className="w-12 h-12 rounded object-cover border border-gray-200"
-                    />
-                  ) : (
-                    <div className="w-12 h-12 bg-gray-100 rounded flex items-center justify-center text-gray-400 text-xs text-center border border-gray-200">
-                      No img
-                    </div>
-                  )}
+                  <div className="flex gap-2">
+                    {/* Before Image */}
+                    {getImageUrl(issue.beforeImage || issue.beforePhoto || issue.photo || issue.image) ? (
+                      <img
+                        src={getImageUrl(issue.beforeImage || issue.beforePhoto || issue.photo || issue.image)}
+                        alt="Before"
+                        className="w-12 h-12 rounded object-cover border border-gray-200"
+                        title="Before"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 bg-gray-100 rounded flex items-center justify-center text-gray-400 text-[10px] text-center border border-gray-200">No img</div>
+                    )}
+
+                    {/* After Image (Only if exists) */}
+                    {getImageUrl(issue.afterImage || issue.afterPhoto) && (
+                      <img
+                        src={getImageUrl(issue.afterImage || issue.afterPhoto)}
+                        alt="After"
+                        className="w-12 h-12 rounded object-cover border border-green-200"
+                        title="After"
+                      />
+                    )}
+                  </div>
                 </td>
                 <td className="py-4 px-4">
                   <p className="text-sm text-gray-500 line-clamp-1 max-w-[200px]">{issue.description}</p>
@@ -4574,17 +4679,29 @@ const AllIssuesTab = ({
                     </div>
                   </td>
                   <td className="py-4 px-4">
-                    {getImageUrl(issue.photo || issue.image || issue.beforePhoto) ? (
-                      <img
-                        src={getImageUrl(issue.photo || issue.image || issue.beforePhoto)}
-                        alt={issue.title}
-                        className="w-12 h-12 rounded object-cover border border-gray-200"
-                      />
-                    ) : (
-                      <div className="w-12 h-12 bg-gray-100 rounded flex items-center justify-center text-gray-400 text-xs text-center border border-gray-200">
-                        No img
-                      </div>
-                    )}
+                    <div className="flex gap-2">
+                      {/* Before Image */}
+                      {getImageUrl(issue.beforeImage || issue.beforePhoto || issue.photo || issue.image) ? (
+                        <img
+                          src={getImageUrl(issue.beforeImage || issue.beforePhoto || issue.photo || issue.image)}
+                          alt="Before"
+                          className="w-12 h-12 rounded object-cover border border-gray-200"
+                          title="Before"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 bg-gray-100 rounded flex items-center justify-center text-gray-400 text-[10px] text-center border border-gray-200">No img</div>
+                      )}
+
+                      {/* After Image (Only if exists) */}
+                      {getImageUrl(issue.afterImage || issue.afterPhoto) && (
+                        <img
+                          src={getImageUrl(issue.afterImage || issue.afterPhoto)}
+                          alt="After"
+                          className="w-12 h-12 rounded object-cover border border-green-200"
+                          title="After"
+                        />
+                      )}
+                    </div>
                   </td>
                   <td className="py-4 px-4">
                     <p className="text-sm text-gray-500 line-clamp-1 max-w-[200px]">{issue.description}</p>
