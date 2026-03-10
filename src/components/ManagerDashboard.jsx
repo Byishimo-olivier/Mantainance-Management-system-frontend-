@@ -7,6 +7,7 @@ import html2canvas from "html2canvas";
 import Header from "./Header";
 import SubscriptionManagement from './SubscriptionManagement';
 import TeamDetailsModal from './TeamDetailsModal';
+import { useLanguage, useTranslation } from "../i18n/LanguageContext";
 import {
   Shield,
   BarChart3,
@@ -308,6 +309,86 @@ const normalizeDate = (val) => {
   return new Date(val);
 };
 
+const useBulkSelection = (items, getId) => {
+  const [selectedIds, setSelectedIds] = useState([]);
+  const ids = (items || [])
+    .map((item) => {
+      const id = getId(item);
+      return id ? String(id) : null;
+    })
+    .filter(Boolean);
+
+  useEffect(() => {
+    setSelectedIds((prev) => prev.filter((id) => ids.includes(id)));
+  }, [items]);
+
+  const allSelected = ids.length > 0 && ids.every((id) => selectedIds.includes(id));
+  const toggleAll = (checked) => setSelectedIds(checked ? ids : []);
+  const toggleOne = (id) => {
+    if (!id) return;
+    const stringId = String(id);
+    setSelectedIds((prev) => (
+      prev.includes(stringId) ? prev.filter((val) => val !== stringId) : [...prev, stringId]
+    ));
+  };
+  const clear = () => setSelectedIds([]);
+
+  return { selectedIds, allSelected, toggleAll, toggleOne, clear };
+};
+
+const BulkActionBar = ({ count, label, onDelete }) => {
+  if (!count) return null;
+  return (
+    <div className="mb-4 flex items-center justify-between bg-rose-50 border border-rose-200 rounded-lg px-4 py-2 text-sm font-semibold text-rose-700">
+      <span>{count} {label} selected</span>
+      <button
+        onClick={onDelete}
+        className="flex items-center gap-2 px-3 py-1.5 bg-rose-600 text-white rounded-lg text-xs font-bold hover:bg-rose-700"
+      >
+        <Trash2 className="w-3.5 h-3.5" />
+        Delete
+      </button>
+    </div>
+  );
+};
+
+// Basic CSV parser that supports quoted values with commas
+const parseCsvText = (text) => {
+  if (!text) return [];
+  const lines = String(text).replace(/\r/g, '').split('\n').filter(l => l.trim().length > 0);
+  if (lines.length === 0) return [];
+  const parseLine = (line) => {
+    const out = [];
+    let cur = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i += 1) {
+      const ch = line[i];
+      if (ch === '"' && line[i + 1] === '"') {
+        cur += '"';
+        i += 1;
+      } else if (ch === '"') {
+        inQuotes = !inQuotes;
+      } else if (ch === ',' && !inQuotes) {
+        out.push(cur);
+        cur = '';
+      } else {
+        cur += ch;
+      }
+    }
+    out.push(cur);
+    return out.map(v => v.trim());
+  };
+  const headers = parseLine(lines[0]).map(h => h.toLowerCase());
+  return lines.slice(1).map(line => {
+    const cols = parseLine(line);
+    const obj = {};
+    headers.forEach((h, idx) => {
+      obj[h] = cols[idx] ?? '';
+    });
+    return obj;
+  }).filter(row => Object.values(row).some(v => String(v || '').trim().length > 0));
+};
+
 // Combine people and users arrays, deduplicating by id/_id/email
 const combinePeopleUsers = (peopleArr = [], usersArr = []) => {
   const seen = new Set();
@@ -326,6 +407,8 @@ const combinePeopleUsers = (peopleArr = [], usersArr = []) => {
 };
 
 function ManagerDashboard() {
+  const { language, setLanguage } = useLanguage();
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState('overview');
   const [issues, setIssues] = useState([]);
   const [allIssues, setAllIssues] = useState([]);
@@ -355,13 +438,14 @@ function ManagerDashboard() {
     assignedTo: 'all'
   });
   const [openPopover, setOpenPopover] = useState(null); // 'status', 'priority', 'location', etc.
-  const [selectedStatuses, setSelectedStatuses] = useState(['OPEN', 'IN PROGRESS']);
+  const [selectedStatuses, setSelectedStatuses] = useState([]);
   const [selectedPriorities, setSelectedPriorities] = useState([]);
-  const [selectedLocations, setSelectedLocations] = useState(['KIGALI HEIGHTS- HQ']);
+  const [selectedLocations, setSelectedLocations] = useState([]);
   const [selectedAssets, setSelectedAssets] = useState([]);
   const [selectedAssignedTo, setSelectedAssignedTo] = useState([]);
   const [includeSubLocations, setIncludeSubLocations] = useState(false);
   const [locationSearch, setLocationSearch] = useState('');
+  const [detailModal, setDetailModal] = useState({ open: false, type: null, item: null });
 
   const totalActiveFilters = selectedStatuses.length + selectedPriorities.length + selectedLocations.length + selectedAssets.length + selectedAssignedTo.length;
   const [feedbacks, setFeedbacks] = useState([]);
@@ -728,29 +812,58 @@ function ManagerDashboard() {
     let allIssues = [...baseList];
 
     if (searchQuery) {
+      const q = searchQuery.toLowerCase();
       allIssues = allIssues.filter(issue =>
-        issue.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        issue.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        issue.location.toLowerCase().includes(searchQuery.toLowerCase())
+        String(issue.title || '').toLowerCase().includes(q) ||
+        String(issue.description || '').toLowerCase().includes(q) ||
+        String(issue.location || issue.address || '').toLowerCase().includes(q)
       );
     }
 
     return allIssues.filter(issue => {
-      // Status filter
-      if (filters.status !== 'all') {
+      const statusVal = String(issue.status || '').toUpperCase();
+      const priorityVal = String(issue.priority || '').toUpperCase();
+      const assignedId = normalizeId(issue.assignedTo || issue.assignees?.[0]?.id || issue.assignees?.[0]?._id);
+      const locationVal = String(issue.location || issue.address || issue.locationName || '').toLowerCase();
+      const assetId = normalizeId(issue.assetId || issue.asset?.id || issue.asset?._id);
+      const assetName = String(issue.assetName || issue.asset?.name || '').toLowerCase();
+
+      // Status filter (top bar)
+      if (selectedStatuses.length > 0 && !selectedStatuses.includes(statusVal)) return false;
+      // Status filter (All Issues dropdown)
+      if (selectedStatuses.length === 0 && filters.status !== 'all') {
         if (filters.status === 'pending-approval' && issue.assignedTo) return false;
-        if (filters.status === 'pending-approval' && issue.status !== 'PENDING') return false;
-        if (filters.status === 'in-progress' && issue.status !== 'IN PROGRESS') return false;
-        if (filters.status === 'completed' && issue.status !== 'COMPLETE' && issue.status !== 'COMPLETED') return false;
+        if (filters.status === 'pending-approval' && statusVal !== 'PENDING') return false;
+        if (filters.status === 'in-progress' && statusVal !== 'IN PROGRESS') return false;
+        if (filters.status === 'completed' && statusVal !== 'COMPLETE' && statusVal !== 'COMPLETED') return false;
       }
 
-      // Priority filter
-      if (filters.priority !== 'all' && issue.priority !== filters.priority) return false;
+      // Priority filter (top bar)
+      if (selectedPriorities.length > 0 && !selectedPriorities.includes(priorityVal)) return false;
+      // Priority filter (All Issues dropdown)
+      if (selectedPriorities.length === 0 && filters.priority !== 'all' && priorityVal !== String(filters.priority).toUpperCase()) return false;
 
-      // Assigned filter
-      if (filters.assignedTo !== 'all') {
-        if (filters.assignedTo === 'unassigned' && issue.assignedTo) return false;
-        if (filters.assignedTo === 'assigned' && !issue.assignedTo) return false;
+      // Assigned filter (top bar)
+      if (selectedAssignedTo.length > 0 && !selectedAssignedTo.includes(assignedId)) return false;
+      // Assigned filter (All Issues dropdown)
+      if (selectedAssignedTo.length === 0 && filters.assignedTo !== 'all') {
+        if (filters.assignedTo === 'unassigned' && assignedId) return false;
+        if (filters.assignedTo === 'assigned' && !assignedId) return false;
+      }
+
+      // Location filter
+      if (selectedLocations.length > 0) {
+        const match = selectedLocations.some(loc => locationVal.includes(String(loc || '').toLowerCase()));
+        if (!match) return false;
+      }
+
+      // Assets filter
+      if (selectedAssets.length > 0) {
+        const match = selectedAssets.some(a => {
+          const val = String(a || '').toLowerCase();
+          return val === String(assetId || '').toLowerCase() || assetName.includes(val);
+        });
+        if (!match) return false;
       }
 
       return true;
@@ -777,16 +890,25 @@ function ManagerDashboard() {
     return tech?.name || tech?.username || 'Technician';
   };
 
+  const openDetailModal = (type, item) => {
+    if (!item) return;
+    setDetailModal({ open: true, type, item });
+  };
+
+  const closeDetailModal = () => {
+    setDetailModal({ open: false, type: null, item: null });
+  };
+
   const NavItem = ({ active, onClick, icon: Icon, label, badge, badgeColor = "bg-blue-600" }) => (
     <button
       onClick={onClick}
-      className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 group ${active
-        ? 'bg-blue-50 text-blue-700 shadow-sm'
-        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+      className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-semibold transition-all duration-200 group ${active
+        ? 'bg-white/15 text-white shadow-sm'
+        : 'text-blue-100/80 hover:bg-white/10 hover:text-white'
         }`}
     >
       <div className="flex items-center gap-3">
-        <Icon className={`w-4 h-4 transition-colors ${active ? 'text-blue-700' : 'text-gray-400 group-hover:text-gray-600'}`} />
+        <Icon className={`w-4 h-4 transition-colors ${active ? 'text-white' : 'text-blue-200 group-hover:text-white'}`} />
         <span>{label}</span>
       </div>
       {badge && (
@@ -798,25 +920,25 @@ function ManagerDashboard() {
   );
 
   const TooltipButton = ({ icon: Icon, title }) => (
-    <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all" title={title}>
+    <button className="p-2 text-blue-100/80 hover:text-white hover:bg-white/10 rounded-lg transition-all" title={title}>
       <Icon className="w-5 h-5" />
     </button>
   );
 
   const SectionLabel = ({ children }) => (
-    <div className="px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-4">
+    <div className="px-3 py-2 text-[10px] font-bold text-blue-200/80 uppercase tracking-widest mt-4">
       {children}
     </div>
   );
 
   return (
-    <div className="min-h-screen flex bg-white font-sans text-gray-900">
+    <div className="min-h-screen flex bg-white text-gray-900" style={{ fontFamily: "'Space Grotesk', 'Manrope', 'Segoe UI', sans-serif" }}>
       {/* Sidebar Redesign */}
-      <aside className="w-[260px] bg-white border-r border-gray-100 flex flex-col h-screen sticky top-0">
+      <aside className="w-[260px] bg-gradient-to-b from-blue-700 via-blue-800 to-blue-900 text-blue-50 flex flex-col h-screen sticky top-0 shadow-xl">
         {/* Sidebar Header */}
-        <div className="p-4 border-b border-gray-50 flex items-center justify-between">
-          <div className="flex items-center gap-3 text-gray-900">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white">
+        <div className="p-4 border-b border-blue-700/40 flex items-center justify-between">
+          <div className="flex items-center gap-3 text-white">
+            <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center text-white border border-white/20">
               <Shield className="w-5 h-5 font-bold" />
             </div>
             <span className="font-bold text-lg tracking-tight">MMS Core</span>
@@ -829,13 +951,13 @@ function ManagerDashboard() {
             active={activeTab === 'overview'}
             onClick={() => setActiveTab('overview')}
             icon={LayoutDashboard}
-            label="Dashboard"
+            label={t("manager.sidebar.dashboard")}
           />
           <NavItem
             active={false}
             onClick={() => { }}
             icon={Brain}
-            label="Intelligence"
+            label={t("manager.sidebar.intelligence")}
             badge="New"
             badgeColor="bg-blue-600"
           />
@@ -843,35 +965,35 @@ function ManagerDashboard() {
             active={false}
             onClick={() => { }}
             icon={Video}
-            label="Studio"
+            label={t("manager.sidebar.studio")}
             badge="New"
             badgeColor="bg-blue-600"
           />
 
-          <SectionLabel>Core</SectionLabel>
+          <SectionLabel>{t("manager.sidebar.core")}</SectionLabel>
           <NavItem
             active={activeTab === 'issues'}
             onClick={() => setActiveTab('issues')}
             icon={FileText}
-            label="Work Orders"
+            label={t("manager.sidebar.workOrders")}
           />
           <NavItem
             active={activeTab === 'preventive-maintenance'}
             onClick={() => setActiveTab('preventive-maintenance')}
             icon={CheckCircle}
-            label="Preventive Maintenance"
+            label={t("manager.sidebar.preventiveMaintenance")}
           />
           <NavItem
             active={activeTab === 'scheduler'}
             onClick={() => setActiveTab('scheduler')}
             icon={Calendar}
-            label="Scheduler"
+            label={t("manager.sidebar.scheduler")}
           />
           <NavItem
             active={activeTab === 'requests'}
             onClick={() => setActiveTab('requests')}
             icon={MessageSquare}
-            label="Requests"
+            label={t("manager.sidebar.requests")}
             badge={pendingRequests.length}
             badgeColor="bg-blue-600"
           />
@@ -879,7 +1001,7 @@ function ManagerDashboard() {
             active={activeTab === 'material-requests'}
             onClick={() => setActiveTab('material-requests')}
             icon={Package}
-            label="Material Requests"
+            label={t("manager.sidebar.materialRequests")}
             badge={materialRequests.filter(r => r.status === 'PENDING').length || undefined}
             badgeColor="bg-purple-600"
           />
@@ -887,67 +1009,67 @@ function ManagerDashboard() {
             active={activeTab === 'subscriptions'}
             onClick={() => setActiveTab('subscriptions')}
             icon={CreditCard}
-            label="Subscriptions"
+            label={t("manager.sidebar.subscriptions")}
           />
 
-          <SectionLabel>Data & Analytics</SectionLabel>
+          <SectionLabel>{t("manager.sidebar.dataAnalytics")}</SectionLabel>
           <NavItem
             active={activeTab === 'analytics'}
             onClick={() => setActiveTab('analytics')}
             icon={LineChart}
-            label="Analytics"
+            label={t("manager.sidebar.analytics")}
           />
           <NavItem
             active={activeTab === 'meters'}
             onClick={() => setActiveTab('meters')}
             icon={Gauge}
-            label="Meters"
+            label={t("manager.sidebar.meters")}
           />
           <NavItem
             active={activeTab === 'edge'}
             onClick={() => setActiveTab('edge')}
             icon={Smartphone}
-            label="Edge"
+            label={t("manager.sidebar.edge")}
           />
 
-          <SectionLabel>Resources</SectionLabel>
+          <SectionLabel>{t("manager.sidebar.resources")}</SectionLabel>
           <NavItem
             active={activeTab === 'assets'}
             onClick={() => setActiveTab('assets')}
             icon={Box}
-            label="Assets"
+            label={t("manager.sidebar.assets")}
           />
           <NavItem
             active={activeTab === 'locations'}
             onClick={() => setActiveTab('locations')}
             icon={Map}
-            label="Locations"
+            label={t("manager.sidebar.locations")}
           />
           <NavItem
             active={activeTab === 'people'}
             onClick={() => setActiveTab('people')}
             icon={Users}
-            label="People & Teams"
+            label={t("manager.sidebar.peopleTeams")}
           />
           <NavItem
             active={activeTab === 'checklists'}
             onClick={() => setActiveTab('checklists')}
             icon={ClipboardCheck}
-            label="Checklists"
+            label={t("manager.sidebar.checklists")}
           />
           <NavItem
             active={false}
             onClick={() => { }}
             icon={Database}
-            label="Files"
+            label={t("manager.sidebar.files")}
           />
 
-          <SectionLabel>Procurement</SectionLabel>
+          <SectionLabel>{t("manager.sidebar.procurement")}</SectionLabel>
           <NavItem
             active={activeTab === 'parts'}
             onClick={() => setActiveTab('parts')}
             icon={Package}
-            label="Parts & Inventory"
+            label={t("manager.sidebar.partsInventory")}
             badge="1"
             badgeColor="bg-blue-600"
           />
@@ -955,7 +1077,7 @@ function ManagerDashboard() {
             active={activeTab === 'purchase-orders'}
             onClick={() => setActiveTab('purchase-orders')}
             icon={ShoppingCart}
-            label="Purchase Orders"
+            label={t("manager.sidebar.purchaseOrders")}
             badge="1"
             badgeColor="bg-blue-600"
           />
@@ -963,31 +1085,45 @@ function ManagerDashboard() {
             active={activeTab === 'vendors'}
             onClick={() => setActiveTab('vendors')}
             icon={Contact2}
-            label="Vendors & Customers"
+            label={t("manager.sidebar.vendorsCustomers")}
           />
         </div>
 
         {/* Sidebar Footer */}
-        <div className="p-4 border-t border-gray-50">
+        <div className="p-4 border-t border-blue-700/40">
           <div className="flex items-center justify-between mb-4">
             <NavItem
               active={false}
               onClick={() => { }}
               icon={Settings}
-              label="Settings"
+              label={t("manager.sidebar.settings")}
             />
           </div>
-          <div className="flex items-center gap-3 px-3 py-2 rounded-xl bg-gray-50 border border-gray-100">
-            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-xs">
+          <div className="px-3 pb-3">
+            <label className="text-[10px] font-bold text-blue-100/80 uppercase tracking-widest">
+              {t("language.label")}
+            </label>
+            <select
+              value={language}
+              onChange={(e) => setLanguage(e.target.value)}
+              className="mt-2 w-full bg-white/10 border border-white/20 text-white text-xs rounded-lg px-2 py-1.5 focus:outline-none"
+            >
+              <option value="en">{t("language.english")}</option>
+              <option value="fr">{t("language.french")}</option>
+              <option value="rw">{t("language.kinyarwanda")}</option>
+            </select>
+          </div>
+          <div className="flex items-center gap-3 px-3 py-2 rounded-xl bg-white/10 border border-white/10">
+            <div className="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center text-white font-bold text-xs">
               {initials}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-bold text-gray-900 truncate">{userName}</p>
-              <p className="text-[10px] text-gray-500 truncate capitalize">{userRole}</p>
+              <p className="text-xs font-bold text-white truncate">{userName}</p>
+              <p className="text-[10px] text-blue-100/80 truncate capitalize">{userRole}</p>
             </div>
             <button
               onClick={handleLogout}
-              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+              className="p-1.5 text-blue-100 hover:text-white hover:bg-white/10 rounded-lg transition-all"
             >
               <LogOut className="w-4 h-4" />
             </button>
@@ -1004,19 +1140,19 @@ function ManagerDashboard() {
       {/* Main Content Area */}
       <main className="flex-1 min-w-0 flex flex-col h-screen overflow-hidden">
         {/* Results Header */}
-        <div className="h-14 border-b border-gray-100 bg-white flex items-center justify-between px-6 flex-shrink-0">
+        <div className="h-14 border-b border-blue-100 bg-gradient-to-r from-blue-50 via-white to-blue-50 flex items-center justify-between px-6 flex-shrink-0">
           <div className="flex items-center gap-3">
-            <span className="text-sm font-bold text-gray-900">{getFilteredIssues().length} Results Returned</span>
+            <span className="text-sm font-bold text-gray-900">{getFilteredIssues().length} {t("common.resultsReturned")}</span>
           </div>
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-4">
-              <button className="flex items-center gap-2 text-xs font-bold text-gray-500 hover:text-gray-900 transition-colors">
+              <button className="flex items-center gap-2 text-xs font-bold text-blue-700/70 hover:text-blue-900 hover:bg-blue-100/60 px-2 py-1 rounded-md transition-colors">
                 <ArrowUpRight className="w-4 h-4" />
-                Sort: {activeTab === 'preventive-maintenance' ? 'Name' : 'Date Created'}
+                {t("common.sort")}: {activeTab === 'preventive-maintenance' ? 'Name' : 'Date Created'}
               </button>
-              <button className="flex items-center gap-2 text-xs font-bold text-gray-500 hover:text-gray-900 transition-colors">
+              <button className="flex items-center gap-2 text-xs font-bold text-blue-700/70 hover:text-blue-900 hover:bg-blue-100/60 px-2 py-1 rounded-md transition-colors">
                 <LayoutDashboard className="w-4 h-4" />
-                Columns
+                {t("common.columns")}
               </button>
             </div>
             <div className="relative">
@@ -1026,12 +1162,12 @@ function ManagerDashboard() {
                 placeholder="Search"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-64 pl-9 pr-8 py-1.5 bg-gray-50 border-none rounded-lg text-sm focus:ring-1 focus:ring-blue-500 transition-all placeholder:text-gray-400 font-medium"
+                className="w-64 pl-9 pr-8 py-1.5 bg-blue-50/60 border border-blue-100 rounded-lg text-sm focus:ring-1 focus:ring-blue-500 transition-all placeholder:text-blue-300 font-medium"
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-blue-500/70 hover:text-blue-700"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -1338,6 +1474,7 @@ function ManagerDashboard() {
                 issues={issues}
                 technicians={technicians}
                 setActiveTab={setActiveTab}
+                onOpenDetails={openDetailModal}
                 getAssignedTechName={getAssignedTechName}
                 aiSentiment={aiSentiment}
                 loadingAI={loadingAI}
@@ -1353,17 +1490,20 @@ function ManagerDashboard() {
                 pendingRequests={pendingRequests}
                 setSelectedRequest={setSelectedRequest}
                 setShowApprovalModal={setShowApprovalModal}
+                onOpenDetails={openDetailModal}
                 technicians={technicians}
                 assigning={assigning}
                 assignmentData={assignmentData}
                 setAssignmentData={setAssignmentData}
                 handleOpenAssignment={handleOpenAssignment}
                 handleAssignTech={handleAssignTech}
+                onRefresh={fetchDashboardData}
               />
             ) : activeTab === 'material-requests' ? (
               <MaterialRequestsTab
                 materialRequests={materialRequests}
                 onRefresh={fetchMaterialRequests}
+                onOpenDetails={openDetailModal}
               />
             ) : activeTab === 'subscriptions' ? (
               <SubscriptionManagement />
@@ -1377,6 +1517,8 @@ function ManagerDashboard() {
                 handleOpenAssignment={handleOpenAssignment}
                 handleAssignTech={handleAssignTech}
                 getAssignedTechName={getAssignedTechName}
+                onOpenDetails={openDetailModal}
+                onRefresh={fetchDashboardData}
               />
             ) : activeTab === 'all-issues' ? (
               <AllIssuesTab
@@ -1386,13 +1528,22 @@ function ManagerDashboard() {
                 getAssignedTechName={getAssignedTechName}
                 searchQuery={searchQuery}
                 setSearchQuery={setSearchQuery}
+                onRefresh={fetchDashboardData}
               />
             ) : activeTab === 'preventive-maintenance' ? (
               <PreventiveMaintenanceTab
-                issues={allIssues.filter(i => i.isPreventive || i.type === 'PREVENTIVE')}
+                issues={allIssues.filter(i => (
+                  i.isPreventive ||
+                  i.type === 'PREVENTIVE' ||
+                  i.issueType === 'preventive' ||
+                  i.category === 'preventive' ||
+                  (Array.isArray(i.tags) && i.tags.includes('preventive'))
+                ))}
                 technicians={technicians}
                 locations={locations}
                 assets={assets}
+                onRefresh={fetchDashboardData}
+                onOpenDetails={openDetailModal}
               />
             ) : activeTab === 'scheduler' ? (
               <SchedulerTab
@@ -1413,9 +1564,25 @@ function ManagerDashboard() {
             ) : activeTab === 'edge' ? (
               <EdgeTab />
             ) : activeTab === 'assets' ? (
-              <AssetsTab assets={assets} />
+              <AssetsTab
+                assets={assets}
+                onAssetsUpdated={(ids) => setAssets((prev) => (prev || []).filter((asset) => !ids.includes(String(asset._id || asset.id))))}
+              />
             ) : activeTab === 'locations' ? (
-              <LocationsTab locations={locations || []} assets={assets} />
+              <LocationsTab
+                locations={locations || []}
+                assets={assets}
+                onLocationUpdated={(updated) => {
+                  if (!updated) return;
+                  const updatedId = String(updated._id || updated.id || '');
+                  setLocations((prev) => prev.map((loc) => (
+                    String(loc._id || loc.id || '') === updatedId ? { ...loc, ...updated } : loc
+                  )));
+                }}
+                onLocationDeleted={(ids) => {
+                  setLocations((prev) => (prev || []).filter((loc) => !ids.includes(String(loc._id || loc.id))));
+                }}
+              />
             ) : activeTab === 'people' ? (
               <PeopleTab technicians={technicians || []} allIssues={allIssues || []} onRefresh={fetchDashboardData} />
             ) : activeTab === 'checklists' ? (
@@ -1582,13 +1749,20 @@ function ManagerDashboard() {
           </GlassCard>
         </div>
       )}
+      <DetailsModal
+        open={detailModal.open}
+        type={detailModal.type}
+        item={detailModal.item}
+        onClose={closeDetailModal}
+        getAssignedTechName={getAssignedTechName}
+      />
     </div>
   );
 }
 
 // Enhanced Overview Tab
 // Small helper component to render top-level KPIs
-const OverviewCards = ({ summary = {}, pendingRequests = [], issues = [], technicians = [] }) => {
+const OverviewCards = ({ summary = {}, pendingRequests = [], issues = [], technicians = [], onOpenTab }) => {
   const totalIssues = summary.totalIssues ?? summary.issuesCount ?? (Array.isArray(issues) ? issues.length : 0) ?? 0;
   const completed = summary.completed ?? 0;
   const completionRate = summary.completionRate ?? (totalIssues ? Math.round((completed / Math.max(1, totalIssues)) * 100) : (completed ? Math.round(completed * 100) : 0));
@@ -1597,22 +1771,31 @@ const OverviewCards = ({ summary = {}, pendingRequests = [], issues = [], techni
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      <div className="p-4 bg-white rounded-lg border shadow-sm">
-        <div className="text-sm text-gray-500">Total Issues</div>
-        <div className="text-2xl font-bold text-gray-900">{totalIssues}</div>
-      </div>
-      <div className="p-4 bg-white rounded-lg border shadow-sm">
-        <div className="text-sm text-gray-500">Completion Rate</div>
-        <div className="text-2xl font-bold text-gray-900">{completionRate}%</div>
-      </div>
-      <div className="p-4 bg-white rounded-lg border shadow-sm">
-        <div className="text-sm text-gray-500">Pending Approvals</div>
-        <div className="text-2xl font-bold text-gray-900">{openRequests}</div>
-      </div>
-      <div className="p-4 bg-white rounded-lg border shadow-sm">
-        <div className="text-sm text-gray-500">Technicians</div>
-        <div className="text-2xl font-bold text-gray-900">{techniciansCount}</div>
-      </div>
+      {[
+        { label: 'Total Issues', value: totalIssues, tab: 'issues', tone: 'from-blue-600 to-cyan-600', border: 'border-blue-100' },
+        { label: 'Completion Rate', value: `${completionRate}%`, tab: 'issues', tone: 'from-emerald-600 to-teal-600', border: 'border-emerald-100' },
+        { label: 'Pending Approvals', value: openRequests, tab: 'requests', tone: 'from-amber-600 to-orange-600', border: 'border-amber-100' },
+        { label: 'Users', value: techniciansCount, tab: 'people', tone: 'from-slate-700 to-slate-900', border: 'border-slate-200' }
+      ].map((card) => (
+        <button
+          key={card.label}
+          onClick={() => onOpenTab && onOpenTab(card.tab)}
+          className={`group p-4 rounded-xl border ${card.border} bg-white shadow-sm hover:shadow-md transition-all text-left focus:outline-none focus:ring-2 focus:ring-blue-500`}
+        >
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{card.label}</div>
+              <div className="text-2xl font-black text-gray-900 mt-1">{card.value}</div>
+            </div>
+            <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${card.tone} text-white flex items-center justify-center text-xs font-bold shadow-sm`}>
+              {String(card.value).slice(0, 2)}
+            </div>
+          </div>
+          <div className="mt-3 text-[11px] font-semibold text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity">
+            Click to view list
+          </div>
+        </button>
+      ))}
     </div>
   );
 };
@@ -1642,6 +1825,7 @@ const OverviewTab = ({
   issues,
   technicians,
   setActiveTab,
+  onOpenDetails,
   getAssignedTechName,
   aiSentiment,
   loadingAI,
@@ -1654,7 +1838,13 @@ const OverviewTab = ({
 }) => (
   <div className="space-y-8">
     {/* Overview Cards */}
-    <OverviewCards summary={summary} pendingRequests={pendingRequests} issues={issues} technicians={technicians} />
+    <OverviewCards
+      summary={summary}
+      pendingRequests={pendingRequests}
+      issues={issues}
+      technicians={technicians}
+      onOpenTab={setActiveTab}
+    />
 
     {/* AI Insights Section */}
     <AIInsights
@@ -1687,7 +1877,11 @@ const OverviewTab = ({
         </div>
         <div className="space-y-4">
           {pendingRequests.slice(0, 4).map((request, i) => (
-            <div key={request._id || request.id || `pending-${i}`} className="group p-4 bg-gradient-to-r from-white to-orange-50 rounded-xl border border-orange-100 hover:border-orange-200 transition-all duration-300">
+            <div
+              key={request._id || request.id || `pending-${i}`}
+              onClick={() => onOpenDetails && onOpenDetails('request', request)}
+              className="group p-4 bg-gradient-to-r from-white to-orange-50 rounded-xl border border-orange-100 hover:border-orange-200 transition-all duration-300 cursor-pointer"
+            >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 bg-gradient-to-br from-orange-100 to-amber-100 rounded-lg flex items-center justify-center">
@@ -1773,7 +1967,11 @@ const OverviewTab = ({
             </thead>
             <tbody>
               {issues.slice(0, 5).map((issue, i) => (
-                <tr key={issue._id || issue.id || `issue-${i}`} className="border-b border-gray-100 hover:bg-gradient-to-r hover:from-blue-50/50 hover:to-indigo-50/50 transition-colors">
+                <tr
+                  key={issue._id || issue.id || `issue-${i}`}
+                  onClick={() => onOpenDetails && onOpenDetails('issue', issue)}
+                  className="border-b border-gray-100 hover:bg-gradient-to-r hover:from-blue-50/50 hover:to-indigo-50/50 transition-colors cursor-pointer"
+                >
                   <td className="py-4 px-4">
                     <div className="font-medium text-gray-900">{issue.title}</div>
                     <div className="text-sm text-gray-600 truncate max-w-xs">{issue.description}</div>
@@ -1807,10 +2005,10 @@ const OverviewTab = ({
                   </td>
                   <td className="py-4 px-4">
                     <div className="flex items-center gap-2">
-                      <button className="p-2 hover:bg-blue-100 rounded-lg transition-colors">
+                      <button onClick={(e) => e.stopPropagation()} className="p-2 hover:bg-blue-100 rounded-lg transition-colors">
                         <Eye className="w-4 h-4 text-blue-600" />
                       </button>
-                      <button className="p-2 hover:bg-green-100 rounded-lg transition-colors">
+                      <button onClick={(e) => e.stopPropagation()} className="p-2 hover:bg-green-100 rounded-lg transition-colors">
                         <Edit className="w-4 h-4 text-green-600" />
                       </button>
                     </div>
@@ -1830,14 +2028,32 @@ const RequestsTab = ({
   pendingRequests,
   setSelectedRequest,
   setShowApprovalModal,
+  onOpenDetails,
   technicians,
   assigning,
   assignmentData,
   setAssignmentData,
   handleOpenAssignment,
-  handleAssignTech
-}) => (
-  <div>
+  handleAssignTech,
+  onRefresh
+}) => {
+  const selection = useBulkSelection(pendingRequests, (request) => request._id || request.id);
+
+  const handleDeleteSelected = async () => {
+    if (selection.selectedIds.length === 0) return;
+    if (!window.confirm(`Delete ${selection.selectedIds.length} request(s)? This cannot be undone.`)) return;
+    try {
+      await Promise.all(selection.selectedIds.map((id) => api.delete(`/api/issues/${id}`)));
+      selection.clear();
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      console.error('Failed to delete requests', err);
+      alert('Failed to delete selected requests: ' + (err.response?.data?.error || err.message));
+    }
+  };
+
+  return (
+    <div>
     <div className="mb-6">
       <div className="flex items-center justify-between">
         <div>
@@ -1851,6 +2067,8 @@ const RequestsTab = ({
         </div>
       </div>
     </div>
+
+    <BulkActionBar count={selection.selectedIds.length} label="requests" onDelete={handleDeleteSelected} />
 
     {pendingRequests.length === 0 ? (
       <GlassCard className="p-12 text-center">
@@ -1870,7 +2088,12 @@ const RequestsTab = ({
             <thead className="bg-[#fcfcfd] border-b border-gray-100">
               <tr>
                 <th className="py-4 px-4 w-10">
-                  <input type="checkbox" className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    checked={selection.allSelected}
+                    onChange={(e) => selection.toggleAll(e.target.checked)}
+                  />
                 </th>
                 <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Request ID</th>
                 <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Title</th>
@@ -1887,9 +2110,17 @@ const RequestsTab = ({
                 const reqId = request._id || request.id;
                 return (
                   <React.Fragment key={reqId || `pending-${i}`}>
-                    <tr className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors group">
-                      <td className="py-4 px-4">
-                        <input type="checkbox" className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                    <tr
+                      onClick={() => onOpenDetails && onOpenDetails('request', request)}
+                      className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors group cursor-pointer"
+                    >
+                      <td className="py-4 px-4" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          checked={selection.selectedIds.includes(String(reqId))}
+                          onChange={() => selection.toggleOne(reqId)}
+                        />
                       </td>
                       <td className="py-4 px-4">
                         {/* Show whether this pending request is an authenticated inspection or anonymous request */}
@@ -1990,7 +2221,7 @@ const RequestsTab = ({
                       <td className="py-4 px-4 text-right">
                         <div className="flex items-center justify-end gap-2">
                           <GradientButton
-                            onClick={() => { setSelectedRequest(request); setShowApprovalModal(true); }}
+                            onClick={(e) => { e.stopPropagation(); setSelectedRequest(request); setShowApprovalModal(true); }}
                             color="green"
                             className="px-3 py-1.5 text-xs"
                           >
@@ -2027,10 +2258,11 @@ const RequestsTab = ({
       </div>
     )}
   </div>
-);
+  );
+};
 
 // ─── Material Requests Tab ────────────────────────────────────────────────────
-const MaterialRequestsTab = ({ materialRequests = [], onRefresh }) => {
+const MaterialRequestsTab = ({ materialRequests = [], onRefresh, onOpenDetails }) => {
   const [forwardModal, setForwardModal] = useState(null); // holds the request being forwarded
   const [clientEmail, setClientEmail] = useState('');
   const [forwarding, setForwarding] = useState(false);
@@ -2073,6 +2305,7 @@ const MaterialRequestsTab = ({ materialRequests = [], onRefresh }) => {
   const filtered = filterStatus === 'ALL'
     ? materialRequests
     : materialRequests.filter(r => r.status === filterStatus);
+  const selection = useBulkSelection(filtered, (req) => req.id || req._id);
 
   const counts = {
     ALL: materialRequests.length,
@@ -2080,6 +2313,19 @@ const MaterialRequestsTab = ({ materialRequests = [], onRefresh }) => {
     FORWARDED: materialRequests.filter(r => r.status === 'FORWARDED').length,
     APPROVED: materialRequests.filter(r => r.status === 'APPROVED').length,
     DECLINED: materialRequests.filter(r => r.status === 'DECLINED').length,
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selection.selectedIds.length === 0) return;
+    if (!window.confirm(`Delete ${selection.selectedIds.length} material request(s)? This cannot be undone.`)) return;
+    try {
+      await Promise.all(selection.selectedIds.map((id) => api.delete(`/api/material-requests/${id}`)));
+      selection.clear();
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      console.error('Failed to delete material requests', err);
+      showToast(err.response?.data?.error || 'Failed to delete selected requests', 'error');
+    }
   };
 
   const handleForward = async () => {
@@ -2143,6 +2389,8 @@ const MaterialRequestsTab = ({ materialRequests = [], onRefresh }) => {
         ))}
       </div>
 
+      <BulkActionBar count={selection.selectedIds.length} label="material requests" onDelete={handleDeleteSelected} />
+
       {/* Table */}
       {filtered.length === 0 ? (
         <div className="bg-white rounded-2xl border border-gray-100 p-16 text-center shadow-sm">
@@ -2160,6 +2408,14 @@ const MaterialRequestsTab = ({ materialRequests = [], onRefresh }) => {
             <table className="w-full text-left border-collapse">
               <thead className="bg-gray-50 border-b border-gray-100">
                 <tr>
+                  <th className="py-3.5 px-4 w-10">
+                    <input
+                      type="checkbox"
+                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      checked={selection.allSelected}
+                      onChange={(e) => selection.toggleAll(e.target.checked)}
+                    />
+                  </th>
                   <th className="py-3.5 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Request ID</th>
                   <th className="py-3.5 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Technician</th>
                   <th className="py-3.5 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Material</th>
@@ -2177,7 +2433,19 @@ const MaterialRequestsTab = ({ materialRequests = [], onRefresh }) => {
                   const materialTitle = req.items?.[0]?.title || req.items?.[0]?.materialId || '—';
                   const qty = req.items?.[0]?.quantity ?? '—';
                   return (
-                    <tr key={reqId || idx} className="hover:bg-gray-50/60 transition-colors group">
+                    <tr
+                      key={reqId || idx}
+                      onClick={() => onOpenDetails && onOpenDetails('material', req)}
+                      className="hover:bg-gray-50/60 transition-colors group cursor-pointer"
+                    >
+                      <td className="py-4 px-4" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          checked={selection.selectedIds.includes(String(reqId))}
+                          onChange={() => selection.toggleOne(reqId)}
+                        />
+                      </td>
                       {/* Request ID */}
                       <td className="py-4 px-4">
                         <span className="text-xs font-bold text-purple-600 font-mono bg-purple-50 px-2 py-1 rounded">
@@ -2239,7 +2507,7 @@ const MaterialRequestsTab = ({ materialRequests = [], onRefresh }) => {
                       <td className="py-4 px-4 text-right">
                         {req.status === 'PENDING' ? (
                           <button
-                            onClick={() => setForwardModal(req)}
+                            onClick={(e) => { e.stopPropagation(); setForwardModal(req); }}
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-bold rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all shadow-sm hover:shadow-md"
                           >
                             📤 Forward to Client
@@ -2639,8 +2907,10 @@ const AnalyticsTab = ({ issues, technicians, aiSentiment, aiRecommendations, loa
   const [subTab, setSubTab] = useState('team-performance');
   const [dateRange, setDateRange] = useState('Last 90 Days');
   const [showDateDropdown, setShowDateDropdown] = useState(false);
+  const [customRange, setCustomRange] = useState({ start: '', end: '' });
+  const [showCustomRange, setShowCustomRange] = useState(false);
 
-  const now = new Date("2026-02-26");
+  const now = new Date();
 
   const [loadingMetrics, setLoadingMetrics] = useState(true);
   const [metrics, setMetrics] = useState({
@@ -2767,32 +3037,75 @@ const AnalyticsTab = ({ issues, technicians, aiSentiment, aiRecommendations, loa
     return () => { mounted = false; };
   }, [issues, technicians]);
 
-  // Generate last N days labels for charts
-  const last90Days = Array.from({ length: 13 }, (_, i) => {
-    const d = new Date(now);
-    d.setDate(d.getDate() - (12 - i) * 7);
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const resolveRange = () => {
+    const end = new Date(now);
+    const start = new Date(now);
+    if (dateRange === 'Last 7 Days') start.setDate(end.getDate() - 6);
+    else if (dateRange === 'Last 30 Days') start.setDate(end.getDate() - 29);
+    else if (dateRange === 'Last 90 Days') start.setDate(end.getDate() - 89);
+    else if (dateRange === 'Last 12 Months') start.setMonth(end.getMonth() - 11);
+    else if (dateRange === 'All Time') {
+      start.setFullYear(end.getFullYear() - 5);
+    } else if (dateRange === 'Do your Own Range' && customRange.start && customRange.end) {
+      return { start: new Date(customRange.start), end: new Date(customRange.end) };
+    }
+    return { start, end };
+  };
+
+  const { start: rangeStart, end: rangeEnd } = resolveRange();
+  const rangeDays = Math.max(1, Math.round((rangeEnd - rangeStart) / 86400000) + 1);
+
+  const buildLabels = () => {
+    const labels = [];
+    let cursor = new Date(rangeStart);
+    let step = 1;
+    if (rangeDays > 120) step = 30;
+    else if (rangeDays > 30) step = 7;
+    else step = 1;
+    while (cursor <= rangeEnd) {
+      labels.push(cursor.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+      cursor.setDate(cursor.getDate() + step);
+    }
+    return labels;
+  };
+
+  const labels = buildLabels();
+
+  const toBucketKey = (d) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const inRangeIssues = (issues || []).filter(i => {
+    if (!i.createdAt) return false;
+    const dt = normalizeDate(i.createdAt);
+    return dt >= rangeStart && dt <= rangeEnd;
+  });
+  const createdMap = {};
+  const completedMap = {};
+  labels.forEach(l => { createdMap[l] = 0; completedMap[l] = 0; });
+  inRangeIssues.forEach(i => {
+    const key = toBucketKey(normalizeDate(i.createdAt));
+    if (createdMap[key] !== undefined) createdMap[key] += 1;
+    if ((i.status || '').toString().toLowerCase().includes('complete')) {
+      if (completedMap[key] !== undefined) completedMap[key] += 1;
+    }
   });
 
-  // Derive chart data from real issues
-  const created = last90Days.map((_, i) => Math.floor(Math.random() * 20) + 5);
-  const completed = last90Days.map((_, i) => Math.floor(Math.random() * 18) + 3);
-  const preventive = last90Days.map(() => Math.floor(Math.random() * 35) + 10);
-  const reactive = last90Days.map((_, i) => Math.floor(preventive[i] * 0.4));
+  const created = labels.map(l => createdMap[l] || 0);
+  const completed = labels.map(l => completedMap[l] || 0);
+  const preventive = labels.map((_, i) => Math.round((created[i] + completed[i]) * 1.6));
+  const reactive = labels.map((_, i) => Math.round(preventive[i] * 0.4));
 
-  const maxCreated = Math.max(...created, ...completed);
-  const maxBar = Math.max(...preventive);
+  const maxCreated = Math.max(1, ...created, ...completed);
+  const maxBar = Math.max(1, ...preventive);
 
   const svgW = 580, svgH = 180, pad = 30;
   const pW = svgW - pad * 2;
   const pH = svgH - pad * 2;
-  const xStep = pW / (last90Days.length - 1);
+  const xStep = pW / Math.max(1, (labels.length - 1));
 
   const makeLinePath = (data, maxV) =>
     data.map((v, i) => `${i === 0 ? 'M' : 'L'}${pad + i * xStep},${pad + pH - (v / maxV) * pH}`).join(' ');
 
-  const totalCreated = issues.length;
-  const totalCompleted = issues.filter(i => i.status === 'COMPLETE' || i.status === 'COMPLETED').length;
+  const totalCreated = inRangeIssues.length;
+  const totalCompleted = inRangeIssues.filter(i => i.status === 'COMPLETE' || i.status === 'COMPLETED').length;
 
   // Cost data (mock derived from issues)
   // Cost data derived from issue categories (approx)
@@ -2815,7 +3128,20 @@ const AnalyticsTab = ({ issues, technicians, aiSentiment, aiRecommendations, loa
     { id: 'asset-downtime', label: 'Asset Downtime and Utilization' },
   ];
 
-  const dateRanges = ['Last 7 Days', 'Last 30 Days', 'Last 90 Days', 'Last 12 Months', 'All Time'];
+  const dateRanges = ['Last 7 Days', 'Last 30 Days', 'Last 90 Days', 'Last 12 Months', 'All Time', 'Do your Own Range'];
+
+  const formatRange = (val) => {
+    if (!val) return '';
+    try {
+      return new Date(val).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    } catch (e) {
+      return val;
+    }
+  };
+
+  const dateRangeLabel = dateRange === 'Do your Own Range' && customRange.start && customRange.end
+    ? `Custom: ${formatRange(customRange.start)} - ${formatRange(customRange.end)}`
+    : dateRange;
 
   return (
     <div className="flex flex-col gap-0 bg-white min-h-screen -m-6">
@@ -2863,7 +3189,7 @@ const AnalyticsTab = ({ issues, technicians, aiSentiment, aiRecommendations, loa
                   onClick={() => setShowDateDropdown(!showDateDropdown)}
                   className="px-4 py-1.5 border border-gray-200 rounded-lg text-xs font-bold text-gray-700 hover:bg-gray-50 transition-colors shadow-sm flex items-center gap-2"
                 >
-                  {dateRange}
+                  {dateRangeLabel}
                   <ChevronDown className="w-3 h-3" />
                 </button>
                 {showDateDropdown && (
@@ -2871,7 +3197,13 @@ const AnalyticsTab = ({ issues, technicians, aiSentiment, aiRecommendations, loa
                     <div className="fixed inset-0 z-40" onClick={() => setShowDateDropdown(false)} />
                     <div className="absolute top-full mt-1 left-0 z-50 w-44 bg-white rounded-xl shadow-2xl border border-gray-100 py-1">
                       {dateRanges.map(r => (
-                        <button key={r} onClick={() => { setDateRange(r); setShowDateDropdown(false); }}
+                        <button
+                          key={r}
+                          onClick={() => {
+                            setDateRange(r);
+                            setShowDateDropdown(false);
+                            setShowCustomRange(r === 'Do your Own Range');
+                          }}
                           className={`w-full text-left px-3 py-2 text-xs font-bold transition-colors ${r === dateRange ? 'text-blue-600 bg-blue-50' : 'text-gray-600 hover:bg-gray-50'}`}
                         >{r}</button>
                       ))}
@@ -2880,6 +3212,35 @@ const AnalyticsTab = ({ issues, technicians, aiSentiment, aiRecommendations, loa
                 )}
               </div>
             </div>
+
+            {showCustomRange && (
+              <div className="flex flex-wrap items-center gap-3 mb-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold text-gray-500 uppercase">From</span>
+                  <input
+                    type="date"
+                    value={customRange.start}
+                    onChange={(e) => setCustomRange({ ...customRange, start: e.target.value })}
+                    className="px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-bold text-gray-700"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold text-gray-500 uppercase">To</span>
+                  <input
+                    type="date"
+                    value={customRange.end}
+                    onChange={(e) => setCustomRange({ ...customRange, end: e.target.value })}
+                    className="px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-bold text-gray-700"
+                  />
+                </div>
+                <button
+                  onClick={() => setShowCustomRange(false)}
+                  className="px-3 py-1.5 text-xs font-bold text-blue-600 hover:bg-blue-50 rounded-lg border border-blue-100"
+                >
+                  Apply
+                </button>
+              </div>
+            )}
 
             {subTab === 'team-performance' && (
               <div className="flex flex-col gap-6">
@@ -2906,9 +3267,9 @@ const AnalyticsTab = ({ issues, technicians, aiSentiment, aiRecommendations, loa
                   </div>
                   {/* Line chart: Created vs Completed (Recharts) */}
                   <div style={{ width: '100%', height: 220 }}>
-                    {last90Days && (
+                    {labels && (
                       <ResponsiveContainer>
-                        <ReLineChart data={last90Days.map((label, i) => ({ date: label, created: created[i], completed: completed[i] }))}>
+                        <ReLineChart data={labels.map((label, i) => ({ date: label, created: created[i], completed: completed[i] }))}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                           <XAxis dataKey="date" tick={{ fontSize: 10 }} />
                           <YAxis />
@@ -3111,7 +3472,7 @@ const AnalyticsTab = ({ issues, technicians, aiSentiment, aiRecommendations, loa
                     </div>
                   </div>
                   <div className="flex items-end gap-2 h-40">
-                    {last90Days.slice(6).map((label, i) => (
+                    {labels.slice(6).map((label, i) => (
                       <div key={label} className="flex-1 flex flex-col items-center gap-0.5">
                         <div className="w-full flex flex-col-reverse gap-0.5">
                           <div className="w-full bg-blue-600 rounded-t" style={{ height: `${(preventive[i + 6] / maxBar) * 120}px` }} />
@@ -3268,12 +3629,26 @@ const MetersTab = () => {
     (meterFilter === 'All' || m.type === meterFilter) &&
     ((m.name || '').toLowerCase().includes(meterSearch.toLowerCase()) || (m.location || '').toLowerCase().includes(meterSearch.toLowerCase()))
   );
+  const selection = useBulkSelection(filtered, (meter) => meter._id || meter.id);
 
   const getStatusConfig = (status) => ({
     'Normal': { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' },
     'Warning': { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' },
     'Alert': { bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200' },
   }[status] || { bg: 'bg-gray-50', text: 'text-gray-700', border: 'border-gray-200' });
+
+  const handleDeleteSelected = async () => {
+    if (selection.selectedIds.length === 0) return;
+    if (!window.confirm(`Delete ${selection.selectedIds.length} meter(s)? This cannot be undone.`)) return;
+    try {
+      await Promise.all(selection.selectedIds.map((id) => api.delete(`/api/meters/${id}`)));
+      setMeters((prev) => (prev || []).filter((m) => !selection.selectedIds.includes(String(m._id || m.id))));
+      selection.clear();
+    } catch (err) {
+      console.error('Failed to delete meters', err);
+      alert('Failed to delete selected meters: ' + (err.response?.data?.error || err.message));
+    }
+  };
 
   return (
     <div className="flex flex-col gap-6">
@@ -3359,13 +3734,19 @@ const MetersTab = () => {
       </div>
 
       {/* Meters Table */}
+      <BulkActionBar count={selection.selectedIds.length} label="meters" onDelete={handleDeleteSelected} />
       <div className="bg-white rounded-lg border border-gray-100 overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead className="bg-[#fcfcfd] border-b border-gray-100">
               <tr>
                 <th className="py-4 px-4 w-10">
-                  <input type="checkbox" className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    checked={selection.allSelected}
+                    onChange={(e) => selection.toggleAll(e.target.checked)}
+                  />
                 </th>
                 <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Meter</th>
                 <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">ID</th>
@@ -3384,7 +3765,12 @@ const MetersTab = () => {
                 return (
                   <tr key={m.id || `meter-${idx}`} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
                     <td className="py-4 px-4">
-                      <input type="checkbox" className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                      <input
+                        type="checkbox"
+                        className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        checked={selection.selectedIds.includes(String(m._id || m.id))}
+                        onChange={() => selection.toggleOne(m._id || m.id)}
+                      />
                     </td>
                     <td className="py-4 px-4">
                       <div className="flex items-center gap-3">
@@ -3470,10 +3856,24 @@ const EdgeTab = () => {
     (edgeFilter === 'All' || d.status === edgeFilter) &&
     ((d.name || '').toLowerCase().includes(edgeSearch.toLowerCase()) || (d.location || '').toLowerCase().includes(edgeSearch.toLowerCase()))
   );
+  const selection = useBulkSelection(filtered, (device) => device._id || device.id);
 
   const online = (devices || []).filter(d => d.status === 'Online').length;
   const [showAddDeviceModal, setShowAddDeviceModal] = useState(false);
   const [newDevice, setNewDevice] = useState({ name: '', type: 'Sensor', status: 'Online', signal: 80, firmware: 'v1.0.0', location: '', battery: null });
+
+  const handleDeleteSelected = async () => {
+    if (selection.selectedIds.length === 0) return;
+    if (!window.confirm(`Delete ${selection.selectedIds.length} device(s)? This cannot be undone.`)) return;
+    try {
+      await Promise.all(selection.selectedIds.map((id) => api.delete(`/api/devices/${id}`)));
+      setDevices((prev) => (prev || []).filter((d) => !selection.selectedIds.includes(String(d._id || d.id))));
+      selection.clear();
+    } catch (err) {
+      console.error('Failed to delete devices', err);
+      alert('Failed to delete selected devices: ' + (err.response?.data?.error || err.message));
+    }
+  };
 
   return (
     <div className="flex flex-col gap-6">
@@ -3564,6 +3964,8 @@ const EdgeTab = () => {
         </div>
       </div>
 
+      <BulkActionBar count={selection.selectedIds.length} label="devices" onDelete={handleDeleteSelected} />
+
       {/* Devices Table */}
       <div className="bg-white rounded-lg border border-gray-100 overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
@@ -3571,7 +3973,12 @@ const EdgeTab = () => {
             <thead className="bg-[#fcfcfd] border-b border-gray-100">
               <tr>
                 <th className="py-4 px-4 w-10">
-                  <input type="checkbox" className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    checked={selection.allSelected}
+                    onChange={(e) => selection.toggleAll(e.target.checked)}
+                  />
                 </th>
                 <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Device</th>
                 <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">ID</th>
@@ -3588,7 +3995,12 @@ const EdgeTab = () => {
               {filtered.map((d, idx) => (
                 <tr key={d.id || `dev-${idx}`} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
                   <td className="py-4 px-4">
-                    <input type="checkbox" className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                    <input
+                      type="checkbox"
+                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      checked={selection.selectedIds.includes(String(d._id || d.id))}
+                      onChange={() => selection.toggleOne(d._id || d.id)}
+                    />
                   </td>
                   <td className="py-4 px-4">
                     <div className="flex items-center gap-3">
@@ -3651,8 +4063,22 @@ const EdgeTab = () => {
 };
 
 // Assets Table Tab
-const AssetsTab = ({ assets = [] }) => {
+const AssetsTab = ({ assets = [], onAssetsUpdated }) => {
   const fileInputRef = React.useRef(null);
+  const selection = useBulkSelection(assets, (asset) => asset._id || asset.id);
+
+  const handleDeleteSelected = async () => {
+    if (selection.selectedIds.length === 0) return;
+    if (!window.confirm(`Delete ${selection.selectedIds.length} asset(s)? This cannot be undone.`)) return;
+    try {
+      await Promise.all(selection.selectedIds.map((id) => api.delete(`/api/assets/${id}`)));
+      if (onAssetsUpdated) onAssetsUpdated(selection.selectedIds);
+      selection.clear();
+    } catch (err) {
+      console.error('Failed to delete assets', err);
+      alert('Failed to delete selected assets: ' + (err.response?.data?.error || err.message));
+    }
+  };
 
   const exportCSV = () => {
     if (!assets || assets.length === 0) return;
@@ -3705,12 +4131,18 @@ const AssetsTab = ({ assets = [] }) => {
       </div>
 
       <div className="bg-white rounded-lg border border-gray-100 overflow-hidden shadow-sm">
+        <BulkActionBar count={selection.selectedIds.length} label="assets" onDelete={handleDeleteSelected} />
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead className="bg-[#fcfcfd] border-b border-gray-100">
               <tr>
                 <th className="py-4 px-4 w-10">
-                  <input type="checkbox" className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    checked={selection.allSelected}
+                    onChange={(e) => selection.toggleAll(e.target.checked)}
+                  />
                 </th>
                 <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Name</th>
                 <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">ID</th>
@@ -3723,7 +4155,14 @@ const AssetsTab = ({ assets = [] }) => {
             <tbody>
               {assets.map((a, idx) => (
                 <tr key={a.id || a._id || `asset-${idx}`} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
-                  <td className="py-4 px-4"><input type="checkbox" className="w-4 h-4 rounded border-gray-300 text-blue-600" /></td>
+                  <td className="py-4 px-4">
+                    <input
+                      type="checkbox"
+                      className="w-4 h-4 rounded border-gray-300 text-blue-600"
+                      checked={selection.selectedIds.includes(String(a._id || a.id))}
+                      onChange={() => selection.toggleOne(a._id || a.id)}
+                    />
+                  </td>
                   <td className="py-4 px-4"><div className="text-sm font-bold text-gray-900">{a.name || a.title || 'Unnamed'}</div></td>
                   <td className="py-4 px-4 text-sm text-gray-600 font-mono">{String(a._id || a.id || '').slice(-8)}</td>
                   <td className="py-4 px-4 text-sm text-gray-700">{a.category || a.type || '-'}</td>
@@ -3749,7 +4188,124 @@ const AssetsTab = ({ assets = [] }) => {
 };
 
 // Locations Table Tab
-const LocationsTab = ({ locations = [], assets = [] }) => {
+const LocationsTab = ({ locations = [], assets = [], onLocationUpdated, onLocationDeleted }) => {
+  const [selectedLocation, setSelectedLocation] = useState(null);
+  const [editingLocation, setEditingLocation] = useState(null);
+  const [savingLocation, setSavingLocation] = useState(false);
+  const locationStatusOptions = ['Active', 'Inactive', 'Under Maintenance', 'Closed'];
+  const [assetNameQuery, setAssetNameQuery] = useState('');
+  const selection = useBulkSelection(locations, (loc) => loc._id || loc.id);
+  const [editForm, setEditForm] = useState({
+    name: '',
+    address: '',
+    city: '',
+    country: '',
+    contactName: '',
+    phone: '',
+    email: '',
+    status: ''
+  });
+
+  const openLocation = (loc) => {
+    setSelectedLocation(loc);
+  };
+
+  const closeLocation = () => {
+    setSelectedLocation(null);
+  };
+
+  const openEdit = (loc) => {
+    setEditingLocation(loc);
+    setEditForm({
+      name: loc.name || loc.title || '',
+      address: loc.address || loc.street || '',
+      city: loc.city || '',
+      country: loc.country || '',
+      contactName: loc.contactName || loc.contact || '',
+      phone: loc.phone || loc.phoneNumber || '',
+      email: loc.email || '',
+      status: loc.status || ''
+    });
+  };
+
+  const closeEdit = () => {
+    setEditingLocation(null);
+  };
+
+  const saveEdit = async (e) => {
+    e.preventDefault();
+    if (!editingLocation) return;
+    try {
+      setSavingLocation(true);
+      const id = editingLocation._id || editingLocation.id;
+      const payload = {
+        name: editForm.name,
+        address: editForm.address,
+        city: editForm.city,
+        country: editForm.country,
+        contactName: editForm.contactName,
+        phone: editForm.phone,
+        email: editForm.email,
+        status: editForm.status
+      };
+      const res = await api.put(`/api/properties/${id}`, payload);
+      const updated = res.data;
+      if (selectedLocation && (String(selectedLocation._id || selectedLocation.id) === String(id))) {
+        setSelectedLocation(updated);
+      }
+      if (onLocationUpdated) onLocationUpdated(updated);
+      setEditingLocation(null);
+      alert('Location updated');
+    } catch (err) {
+      console.error('Failed to update location', err);
+      alert('Failed to update location: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setSavingLocation(false);
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selection.selectedIds.length === 0) return;
+    if (!window.confirm(`Delete ${selection.selectedIds.length} location(s)? This cannot be undone.`)) return;
+    try {
+      await Promise.all(selection.selectedIds.map((id) => api.delete(`/api/properties/${id}`)));
+      if (onLocationDeleted) onLocationDeleted(selection.selectedIds);
+      selection.clear();
+    } catch (err) {
+      console.error('Failed to delete locations', err);
+      alert('Failed to delete selected locations: ' + (err.response?.data?.error || err.message));
+    }
+  };
+
+  const getLocationAssets = (loc) => {
+    const locId = normalizeId(loc?._id || loc?.id);
+    return (assets || []).filter(a => {
+      const aLocId = normalizeId(a.propertyId || a.property?.id || a.property?._id);
+      return locId && aLocId && String(aLocId) === String(locId);
+    });
+  };
+
+  const getLocationAssetTotals = (loc) => {
+    const locAssets = getLocationAssets(loc);
+    const totalValue = locAssets.reduce((sum, a) => sum + Number(a.purchaseCost || 0), 0);
+    const byCategory = {};
+    locAssets.forEach(a => {
+      const key = a.category || a.type || 'Uncategorized';
+      byCategory[key] = (byCategory[key] || 0) + 1;
+    });
+    return { totalValue, byCategory, count: locAssets.length };
+  };
+
+  const findAssetByName = (loc, rawName) => {
+    if (!rawName) return null;
+    const q = String(rawName).trim().toLowerCase();
+    const locAssets = getLocationAssets(loc);
+    return locAssets.find(a => {
+      const name = String(a.name || a.title || '').toLowerCase();
+      return name.includes(q);
+    }) || null;
+  };
+
   const exportCSV = () => {
     if (!locations || locations.length === 0) return;
     const keys = ['id', 'name', 'address', 'assetCount'];
@@ -3773,32 +4329,223 @@ const LocationsTab = ({ locations = [], assets = [] }) => {
       </div>
 
       <div className="bg-white rounded-lg border border-gray-100 overflow-hidden shadow-sm">
+        <BulkActionBar count={selection.selectedIds.length} label="locations" onDelete={handleDeleteSelected} />
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead className="bg-[#fcfcfd] border-b border-gray-100">
               <tr>
+                <th className="py-4 px-4 w-10">
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    checked={selection.allSelected}
+                    onChange={(e) => selection.toggleAll(e.target.checked)}
+                  />
+                </th>
                 <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Name</th>
                 <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">ID</th>
                 <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Address</th>
                 <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Assets</th>
+                <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Contact</th>
+                <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Phone</th>
                 <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
               {locations.map((l, idx) => (
-                <tr key={l._id || l.id || `loc-${idx}`} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+                <tr
+                  key={l._id || l.id || `loc-${idx}`}
+                  onClick={() => openLocation(l)}
+                  className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors cursor-pointer"
+                >
+                  <td className="py-4 px-4" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      checked={selection.selectedIds.includes(String(l._id || l.id))}
+                      onChange={() => selection.toggleOne(l._id || l.id)}
+                    />
+                  </td>
                   <td className="py-4 px-4"><div className="text-sm font-bold text-gray-900">{l.name || l.title || 'Unnamed'}</div></td>
                   <td className="py-4 px-4 text-sm text-gray-600 font-mono">{String(l._id || l.id || '').slice(-8)}</td>
                   <td className="py-4 px-4 text-sm text-gray-600">{l.address || l.street || '-'}</td>
-                  <td className="py-4 px-4 text-sm text-gray-700">{assets.filter(a => String(a.propertyId) === String(l._id || l.id)).length}</td>
-                  <td className="py-4 px-4 text-right"><div className="flex items-center justify-end gap-2"><button className="p-1.5 hover:bg-gray-100 rounded-lg"><Eye className="w-4 h-4 text-blue-600" /></button></div></td>
+                  <td className="py-4 px-4 text-sm text-gray-700">{getLocationAssets(l).length}</td>
+                  <td className="py-4 px-4 text-sm text-gray-700">{l.contactName || l.contact || '-'}</td>
+                  <td className="py-4 px-4 text-sm text-gray-700">{l.phone || l.phoneNumber || '-'}</td>
+                  <td className="py-4 px-4 text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      <button onClick={(e) => { e.stopPropagation(); openLocation(l); }} className="p-1.5 hover:bg-gray-100 rounded-lg">
+                        <Eye className="w-4 h-4 text-blue-600" />
+                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); openEdit(l); }} className="p-1.5 hover:bg-gray-100 rounded-lg">
+                        <Edit className="w-4 h-4 text-green-600" />
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))}
-              {locations.length === 0 && (<tr><td colSpan="5" className="py-20 text-center"><p className="text-gray-500">No locations found</p></td></tr>)}
+              {locations.length === 0 && (<tr><td colSpan="8" className="py-20 text-center"><p className="text-gray-500">No locations found</p></td></tr>)}
             </tbody>
           </table>
         </div>
       </div>
+
+      {selectedLocation && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-2xl w-full max-w-3xl shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Location Details</h3>
+                <p className="text-sm text-gray-500">{selectedLocation.name || selectedLocation.title || 'Location'}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={() => openEdit(selectedLocation)} className="px-3 py-1.5 text-xs font-bold bg-green-600 text-white rounded-lg hover:bg-green-700">
+                  Edit
+                </button>
+                <button onClick={closeLocation} className="p-2 hover:bg-gray-100 rounded-lg">
+                  <X className="w-4 h-4 text-gray-400" />
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {[
+                  { label: 'Address', value: selectedLocation.address || selectedLocation.street || '-' },
+                  { label: 'City', value: selectedLocation.city || '-' },
+                  { label: 'Country', value: selectedLocation.country || '-' },
+                  { label: 'Contact', value: selectedLocation.contactName || selectedLocation.contact || '-' },
+                  { label: 'Phone', value: selectedLocation.phone || selectedLocation.phoneNumber || '-' },
+                  { label: 'Email', value: selectedLocation.email || '-' },
+                  { label: 'Status', value: selectedLocation.status || '-' },
+                  { label: 'Created', value: selectedLocation.createdAt ? new Date(selectedLocation.createdAt).toLocaleDateString() : '-' },
+                  { label: 'Assets', value: getLocationAssets(selectedLocation).length },
+                  { label: 'Asset Value Total', value: `$${getLocationAssetTotals(selectedLocation).totalValue.toLocaleString()}` }
+                ].map((item) => (
+                  <div key={item.label} className="p-4 rounded-xl border border-gray-100 bg-gray-50">
+                    <div className="text-xs text-gray-500">{item.label}</div>
+                    <div className="text-sm font-bold text-gray-900 mt-1">{item.value}</div>
+                  </div>
+                ))}
+            </div>
+
+            <div className="mt-6">
+              <h4 className="text-sm font-semibold text-gray-800 mb-2">Assets at this location</h4>
+              <div className="mb-3 flex items-center gap-2">
+                <input
+                  className="w-full max-w-xs border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                  placeholder="Enter asset name to get total/value"
+                  value={assetNameQuery}
+                  onChange={(e) => setAssetNameQuery(e.target.value)}
+                />
+                {assetNameQuery && (
+                  <button
+                    onClick={() => setAssetNameQuery('')}
+                    className="px-2 py-1 text-xs font-semibold text-gray-600 hover:text-gray-900"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+              {assetNameQuery && (
+                <div className="mb-4">
+                  {(() => {
+                    const found = findAssetByName(selectedLocation, assetNameQuery);
+                    if (!found) return <div className="text-sm text-rose-600">No asset found with that name.</div>;
+                    return (
+                      <div className="p-3 rounded-xl border border-emerald-100 bg-emerald-50 text-sm">
+                        <div className="font-semibold text-emerald-800">
+                          {found.name || found.title || 'Asset'} ({String(found._id || found.id).slice(-8)})
+                        </div>
+                        <div className="text-emerald-700">Purchase Cost: {found.purchaseCost ? `$${Number(found.purchaseCost).toLocaleString()}` : '—'}</div>
+                        <div className="text-emerald-700">Category: {found.category || found.type || '—'}</div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+              <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+                <div className="max-h-56 overflow-y-auto">
+                  <table className="w-full text-left">
+                    <thead className="bg-gray-50 border-b border-gray-100">
+                      <tr>
+                        <th className="py-2 px-3 text-xs font-bold text-gray-500 uppercase">Asset</th>
+                        <th className="py-2 px-3 text-xs font-bold text-gray-500 uppercase">Category</th>
+                        <th className="py-2 px-3 text-xs font-bold text-gray-500 uppercase">ID</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {getLocationAssets(selectedLocation).map((a, i) => (
+                        <tr key={a._id || a.id || `asset-${i}`} className="border-b border-gray-50">
+                          <td className="py-2 px-3 text-sm text-gray-800">{a.name || a.title || 'Asset'}</td>
+                          <td className="py-2 px-3 text-sm text-gray-600">{a.category || a.type || '-'}</td>
+                          <td className="py-2 px-3 text-xs font-mono text-gray-500">{String(a._id || a.id || '').slice(-8)}</td>
+                        </tr>
+                      ))}
+                      {getLocationAssets(selectedLocation).length === 0 && (
+                        <tr><td colSpan="3" className="py-6 text-center text-sm text-gray-500">No assets linked.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <h4 className="text-sm font-semibold text-gray-800 mb-2">Assets by Category</h4>
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(getLocationAssetTotals(selectedLocation).byCategory).map(([cat, count]) => (
+                  <span key={cat} className="px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-100">
+                    {cat}: {count}
+                  </span>
+                ))}
+                {Object.keys(getLocationAssetTotals(selectedLocation).byCategory).length === 0 && (
+                  <span className="text-sm text-gray-500">No assets</span>
+                )}
+              </div>
+            </div>
+          </div>
+          </div>
+        </div>
+      )}
+
+      {editingLocation && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <form onSubmit={saveEdit} className="bg-white rounded-2xl w-full max-w-xl p-6 shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-900">Edit Location</h3>
+              <button type="button" onClick={closeEdit} className="p-2 hover:bg-gray-100 rounded-lg">
+                <X className="w-4 h-4 text-gray-400" />
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <input className="border p-2 rounded text-sm" placeholder="Name" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} />
+              <select
+                className="border p-2 rounded text-sm bg-white"
+                value={editForm.status || ''}
+                onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+              >
+                <option value="">Select status</option>
+                {locationStatusOptions.map((status) => (
+                  <option key={status} value={status}>{status}</option>
+                ))}
+              </select>
+              <input className="border p-2 rounded text-sm col-span-2" placeholder="Address" value={editForm.address} onChange={(e) => setEditForm({ ...editForm, address: e.target.value })} />
+              <input className="border p-2 rounded text-sm" placeholder="City" value={editForm.city} onChange={(e) => setEditForm({ ...editForm, city: e.target.value })} />
+              <input className="border p-2 rounded text-sm" placeholder="Country" value={editForm.country} onChange={(e) => setEditForm({ ...editForm, country: e.target.value })} />
+              <input className="border p-2 rounded text-sm" placeholder="Contact Name" value={editForm.contactName} onChange={(e) => setEditForm({ ...editForm, contactName: e.target.value })} />
+              <input className="border p-2 rounded text-sm" placeholder="Phone" value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} />
+              <input className="border p-2 rounded text-sm col-span-2" placeholder="Email" value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} />
+            </div>
+            <div className="flex items-center justify-end gap-2 mt-5">
+              <button type="button" onClick={closeEdit} className="px-4 py-2 border rounded-lg text-sm">Cancel</button>
+              <button type="submit" disabled={savingLocation} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold disabled:opacity-60">
+                {savingLocation ? 'Saving...' : 'Save'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 };
@@ -3863,11 +4610,23 @@ const PeopleTab = ({ technicians = [], allIssues = [], onRefresh }) => {
   const handleCreatePerson = async (e) => {
     e.preventDefault();
     try {
-      // Create external technician
-      const res = await api.post('/api/technicians', { ...newPerson, type: 'EXTERNAL' });
-      // Note: In real app, we might need to refresh parent dashboard data too
-      // for now just update local view if technicians list was local (but it's a prop)
-      alert('External Technician created successfully');
+      const role = newPerson.role || 'Technician';
+      const isUserRole = ['Admin', 'Client', 'Requestor'].includes(role);
+
+      if (isUserRole) {
+        await api.post('/api/users/register', {
+          name: newPerson.name,
+          email: newPerson.email,
+          phone: newPerson.phone,
+          password: newPerson.password,
+          role
+        });
+        alert('User created successfully');
+      } else {
+        await api.post('/api/technicians', { ...newPerson, type: 'EXTERNAL' });
+        alert('External Technician created successfully');
+      }
+
       setShowAddPerson(false);
       // Since technicians is a prop, we call onRefresh to tell parent to refetch
       if (onRefresh) onRefresh();
@@ -4151,6 +4910,9 @@ const PeopleTab = ({ technicians = [], allIssues = [], onRefresh }) => {
                 <option>Technician</option>
                 <option>Manager</option>
                 <option>Staff</option>
+                <option>Admin</option>
+                <option>Client</option>
+                <option>Requestor</option>
               </select>
               <div className="flex items-center justify-end gap-2 mt-3">
                 <button type="button" onClick={() => setShowAddPerson(false)} className="px-3 py-2 rounded border">Cancel</button>
@@ -4334,14 +5096,26 @@ const ChecklistsTab = () => {
 const PartsInventoryTab = () => {
   const [items, setItems] = useState([]);
   const fileRef = React.useRef(null);
+  const [showAddItem, setShowAddItem] = useState(false);
+  const [creatingItem, setCreatingItem] = useState(false);
+  const selection = useBulkSelection(items, (item) => item._id || item.id);
+  const [newItem, setNewItem] = useState({
+    name: '',
+    status: 'AVAILABLE',
+    availableQty: 0,
+    allocatedQty: 0,
+    onHand: 0,
+    incomingQty: 0,
+    location: '',
+    barcode: ''
+  });
   useEffect(() => {
     (async () => {
       try {
         const res = await api.get('/api/parts');
         setItems(res.data || []);
       } catch (e) {
-        // fallback: try material-requests as sample data
-        try { const r2 = await api.get('/api/material-requests'); setItems(r2.data || []); } catch (e2) { setItems([]); }
+        setItems([]);
       }
     })();
   }, []);
@@ -4365,11 +5139,88 @@ const PartsInventoryTab = () => {
     const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'parts-inventory.csv'; a.click(); URL.revokeObjectURL(url);
   };
 
+  const downloadTemplate = () => {
+    const headers = ['name', 'status', 'available', 'allocated', 'onHand', 'incoming', 'location', 'barcode'];
+    const sample = ['HVAC Filter', 'AVAILABLE', '10', '2', '8', '5', 'Warehouse A', 'ABC-123'];
+    const csv = [headers.join(','), sample.join(',')].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'parts-template.csv'; a.click(); URL.revokeObjectURL(url);
+  };
+
   const onImport = (e) => {
     const f = e.target.files && e.target.files[0]; if (!f) return;
     const reader = new FileReader();
-    reader.onload = () => { const text = reader.result || ''; console.log('Imported parts preview:', text.slice(0, 1000)); alert('Imported file (preview in console)'); };
+    reader.onload = async () => {
+      try {
+        const text = reader.result || '';
+        const rows = parseCsvText(text);
+        if (rows.length === 0) {
+          alert('No rows found in CSV');
+          return;
+        }
+        const itemsPayload = rows.map(r => ({
+          name: r.name || r.part || r.partname || r.title || '',
+          status: r.status || r.state || 'AVAILABLE',
+          available: Number(r.available || r.availableqty || r.quantity || 0),
+          allocated: Number(r.allocated || r.allocatedqty || 0),
+          onHand: Number(r.onhand || r.on_hand || 0),
+          incoming: Number(r.incoming || r.incomingqty || 0),
+          location: r.location || r.warehouse || '',
+          barcode: r.barcode || ''
+        })).filter(it => it.name);
+        const res = await api.post('/api/parts/bulk', { items: itemsPayload });
+        setItems(prev => [...(res.data || []), ...(prev || [])]);
+        alert(`Imported ${itemsPayload.length} parts`);
+      } catch (err) {
+        console.error('Failed to import parts', err);
+        alert('Failed to import parts: ' + (err.response?.data?.error || err.message));
+      }
+    };
     reader.readAsText(f);
+  };
+
+  const handleCreateItem = async (e) => {
+    e.preventDefault();
+    if (!newItem.name.trim()) {
+      alert('Please enter a part name');
+      return;
+    }
+    try {
+      setCreatingItem(true);
+      const payload = {
+        name: newItem.name,
+        status: newItem.status,
+        available: Number(newItem.availableQty) || 0,
+        allocated: Number(newItem.allocatedQty) || 0,
+        onHand: Number(newItem.onHand) || 0,
+        incoming: Number(newItem.incomingQty) || 0,
+        location: newItem.location,
+        barcode: newItem.barcode
+      };
+      const res = await api.post('/api/parts', payload);
+      setItems(prev => [res.data, ...(prev || [])]);
+      setShowAddItem(false);
+      setNewItem({ name: '', status: 'AVAILABLE', availableQty: 0, allocatedQty: 0, onHand: 0, incomingQty: 0, location: '', barcode: '' });
+      alert('Item added successfully');
+    } catch (err) {
+      console.error('Failed to add item', err);
+      alert('Failed to add item: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setCreatingItem(false);
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selection.selectedIds.length === 0) return;
+    if (!window.confirm(`Delete ${selection.selectedIds.length} part(s)? This cannot be undone.`)) return;
+    try {
+      await Promise.all(selection.selectedIds.map((id) => api.delete(`/api/parts/${id}`)));
+      setItems((prev) => (prev || []).filter((it) => !selection.selectedIds.includes(String(it._id || it.id))));
+      selection.clear();
+    } catch (err) {
+      console.error('Failed to delete parts', err);
+      alert('Failed to delete selected parts: ' + (err.response?.data?.error || err.message));
+    }
   };
 
   return (
@@ -4381,16 +5232,27 @@ const PartsInventoryTab = () => {
         </div>
         <div className="flex items-center gap-3">
           <button onClick={exportCSV} className="px-3 py-2 bg-white border rounded-xl text-sm font-semibold hover:bg-gray-50">Export CSV</button>
-          <button onClick={() => fileRef.current && fileRef.current.click()} className="px-3 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold">Import</button>
+          <button onClick={downloadTemplate} className="px-3 py-2 bg-white border rounded-xl text-sm font-semibold hover:bg-gray-50">Download Template</button>
+          <button onClick={() => setShowAddItem(true)} className="px-3 py-2 bg-gray-900 text-white rounded-xl text-sm font-bold">Add Person</button>
+          <button onClick={() => fileRef.current && fileRef.current.click()} className="px-3 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold">Add From File</button>
           <input ref={fileRef} type="file" accept=".csv" onChange={onImport} className="hidden" />
         </div>
       </div>
 
       <div className="bg-white rounded-lg border border-gray-100 overflow-hidden shadow-sm">
+        <BulkActionBar count={selection.selectedIds.length} label="parts" onDelete={handleDeleteSelected} />
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead className="bg-[#fcfcfd] border-b border-gray-100">
               <tr>
+                <th className="py-4 px-4 w-10">
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    checked={selection.allSelected}
+                    onChange={(e) => selection.toggleAll(e.target.checked)}
+                  />
+                </th>
                 <th className="py-4 px-4">Name</th>
                 <th className="py-4 px-4">Status</th>
                 <th className="py-4 px-4">Available</th>
@@ -4404,6 +5266,14 @@ const PartsInventoryTab = () => {
             <tbody>
               {items.map((it, idx) => (
                 <tr key={it._id || it.id || `part-${idx}`} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+                  <td className="py-4 px-4">
+                    <input
+                      type="checkbox"
+                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      checked={selection.selectedIds.includes(String(it._id || it.id))}
+                      onChange={() => selection.toggleOne(it._id || it.id)}
+                    />
+                  </td>
                   <td className="py-4 px-4">{it.name || it.partName || 'Unnamed'}</td>
                   <td className="py-4 px-4">{it.status || '-'}</td>
                   <td className="py-4 px-4">{it.available || it.availableQty || it.quantity || 0}</td>
@@ -4414,11 +5284,48 @@ const PartsInventoryTab = () => {
                   <td className="py-4 px-4 text-right"><button className="p-1.5 hover:bg-gray-100 rounded-lg"><Eye className="w-4 h-4 text-blue-600" /></button></td>
                 </tr>
               ))}
-              {items.length === 0 && (<tr><td colSpan="8" className="py-20 text-center"><p className="text-gray-500">No parts or inventory found</p></td></tr>)}
+              {items.length === 0 && (<tr><td colSpan="9" className="py-20 text-center"><p className="text-gray-500">No parts or inventory found</p></td></tr>)}
             </tbody>
           </table>
         </div>
       </div>
+
+      {showAddItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <form onSubmit={handleCreateItem} className="bg-white rounded-2xl w-full max-w-lg p-6 shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-900">Add Inventory Item</h3>
+              <button type="button" onClick={() => setShowAddItem(false)} className="p-2 hover:bg-gray-100 rounded-lg">
+                <X className="w-4 h-4 text-gray-400" />
+              </button>
+            </div>
+            <div className="space-y-3">
+              <input className="w-full border border-gray-200 rounded-lg p-2 text-sm" placeholder="Part name" value={newItem.name} onChange={(e) => setNewItem({ ...newItem, name: e.target.value })} />
+              <select className="w-full border border-gray-200 rounded-lg p-2 text-sm" value={newItem.status} onChange={(e) => setNewItem({ ...newItem, status: e.target.value })}>
+                <option value="AVAILABLE">Available</option>
+                <option value="LOW">Low</option>
+                <option value="OUT_OF_STOCK">Out of Stock</option>
+              </select>
+              <div className="grid grid-cols-2 gap-3">
+                <input type="number" className="w-full border border-gray-200 rounded-lg p-2 text-sm" placeholder="Available Qty" value={newItem.availableQty} onChange={(e) => setNewItem({ ...newItem, availableQty: e.target.value })} />
+                <input type="number" className="w-full border border-gray-200 rounded-lg p-2 text-sm" placeholder="Allocated Qty" value={newItem.allocatedQty} onChange={(e) => setNewItem({ ...newItem, allocatedQty: e.target.value })} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <input type="number" className="w-full border border-gray-200 rounded-lg p-2 text-sm" placeholder="On Hand" value={newItem.onHand} onChange={(e) => setNewItem({ ...newItem, onHand: e.target.value })} />
+                <input type="number" className="w-full border border-gray-200 rounded-lg p-2 text-sm" placeholder="Incoming Qty" value={newItem.incomingQty} onChange={(e) => setNewItem({ ...newItem, incomingQty: e.target.value })} />
+              </div>
+              <input className="w-full border border-gray-200 rounded-lg p-2 text-sm" placeholder="Location" value={newItem.location} onChange={(e) => setNewItem({ ...newItem, location: e.target.value })} />
+              <input className="w-full border border-gray-200 rounded-lg p-2 text-sm" placeholder="Barcode (optional)" value={newItem.barcode} onChange={(e) => setNewItem({ ...newItem, barcode: e.target.value })} />
+            </div>
+            <div className="flex items-center justify-end gap-2 mt-5">
+              <button type="button" onClick={() => setShowAddItem(false)} className="px-4 py-2 border rounded-lg text-sm">Cancel</button>
+              <button type="submit" disabled={creatingItem} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold disabled:opacity-60">
+                {creatingItem ? 'Saving...' : 'Save Item'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 };
@@ -4488,14 +5395,165 @@ const PurchaseOrdersTab = () => {
 // Vendors & Customers Tab
 const VendorsTab = () => {
   const [vendors, setVendors] = useState([]);
-  useEffect(() => { (async () => { try { const r = await api.get('/api/vendors'); setVendors(r.data || []); } catch (e) { try { const r2 = await api.get('/api/clients'); setVendors(r2.data || []); } catch (e2) { setVendors([]); } } })(); }, []);
+  const fileRef = React.useRef(null);
+  const [showAddVendor, setShowAddVendor] = useState(false);
+  const [creatingVendor, setCreatingVendor] = useState(false);
+  const selection = useBulkSelection(vendors, (vendor) => vendor._id || vendor.id);
+  const [newVendor, setNewVendor] = useState({ name: '', address: '', phone: '', contact: '', email: '' });
+  const normalizeEntry = (item, source) => {
+    const roleLabel = item.role === 'requestor' ? 'Requestor' : item.role === 'client' ? 'Client' : '';
+    const typeLabel = source === 'vendor' ? 'Vendor' : source === 'client' ? 'Customer' : roleLabel || 'Customer';
+    return {
+      ...item,
+      __source: source,
+      __typeLabel: typeLabel,
+      name: item.name || item.company || item.fullName || item.contactName || item.email || 'Unnamed',
+    };
+  };
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const [vendorsRes, clientsRes, usersRes] = await Promise.allSettled([
+        api.get('/api/vendors'),
+        api.get('/api/clients'),
+        api.get('/api/users/clients-requestors'),
+      ]);
+      const vendorItems = vendorsRes.status === 'fulfilled' ? vendorsRes.value.data || [] : [];
+      const clientItems = clientsRes.status === 'fulfilled' ? clientsRes.value.data || [] : [];
+      const userItems = usersRes.status === 'fulfilled' ? usersRes.value.data || [] : [];
+      const merged = [
+        ...vendorItems.map((v) => normalizeEntry(v, 'vendor')),
+        ...clientItems.map((v) => normalizeEntry(v, 'client')),
+        ...userItems.map((u) => normalizeEntry(u, 'user')),
+      ];
+      if (mounted) setVendors(merged);
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const exportCSV = () => {
     if (!vendors || vendors.length === 0) return;
-    const keys = ['id', 'name', 'address', 'phone', 'contact', 'email'];
-    const rows = vendors.map(v => ({ id: v._id || v.id || '', name: v.name || v.company || '', address: v.address || v.street || '', phone: v.phone || v.phoneNumber || '', contact: v.contactName || '', email: v.email || '' }));
+    const keys = ['id', 'name', 'type', 'address', 'phone', 'contact', 'email'];
+    const rows = vendors.map(v => ({
+      id: v._id || v.id || '',
+      name: v.name || v.company || v.fullName || '',
+      type: v.__typeLabel || v.type || v.role || '',
+      address: v.address || v.street || '',
+      phone: v.phone || v.phoneNumber || '',
+      contact: v.contactName || v.contact || '',
+      email: v.email || ''
+    }));
     const csv = [keys.join(',')].concat(rows.map(r => keys.map(k => (`"${String(r[k] ?? '').replace(/"/g, '""')}"`)).join(','))).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'vendors.csv'; a.click(); URL.revokeObjectURL(url);
+  };
+
+  const downloadTemplate = () => {
+    const headers = ['name', 'address', 'phone', 'contactName', 'email', 'type'];
+    const sample = ['Acme Supplies', '123 Main St', '+1-555-0100', 'Jane Doe', 'jane@acme.com', 'vendor'];
+    const csv = [headers.join(','), sample.join(',')].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'vendors-template.csv'; a.click(); URL.revokeObjectURL(url);
+  };
+
+  const onImport = (e) => {
+    const f = e.target.files && e.target.files[0]; if (!f) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const text = reader.result || '';
+        const rows = parseCsvText(text);
+        if (rows.length === 0) {
+          alert('No rows found in CSV');
+          return;
+        }
+        const itemsPayload = rows.map(r => ({
+          name: r.name || r.company || r.vendor || '',
+          address: r.address || r.street || '',
+          phone: r.phone || r.phonenumber || '',
+          contactName: r.contact || r.contactname || '',
+          email: r.email || '',
+          type: r.type || r.category || 'vendor'
+        })).filter(it => it.name);
+        const res = await api.post('/api/vendors/bulk', { items: itemsPayload });
+        setVendors(prev => [...(res.data || []), ...(prev || [])]);
+        alert(`Imported ${itemsPayload.length} vendors/customers`);
+      } catch (err) {
+        console.error('Failed to import vendors/customers', err);
+        alert('Failed to import vendors/customers: ' + (err.response?.data?.error || err.message));
+      }
+    };
+    reader.readAsText(f);
+  };
+
+  const handleCreateVendor = async (e) => {
+    e.preventDefault();
+    if (!newVendor.name.trim()) {
+      alert('Please enter a name');
+      return;
+    }
+    try {
+      setCreatingVendor(true);
+      let created = null;
+      try {
+        const res = await api.post('/api/vendors', {
+          name: newVendor.name,
+          address: newVendor.address,
+          phone: newVendor.phone,
+          contactName: newVendor.contact,
+          email: newVendor.email
+        });
+        created = res.data;
+      } catch (err) {
+        const res = await api.post('/api/clients', {
+          name: newVendor.name,
+          address: newVendor.address,
+          phone: newVendor.phone,
+          contactName: newVendor.contact,
+          email: newVendor.email
+        });
+        created = res.data;
+      }
+      setVendors(prev => [created, ...(prev || [])]);
+      setShowAddVendor(false);
+      setNewVendor({ name: '', address: '', phone: '', contact: '', email: '' });
+      alert('Vendor/Customer added successfully');
+    } catch (err) {
+      console.error('Failed to add vendor/customer', err);
+      alert('Failed to add vendor/customer: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setCreatingVendor(false);
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selection.selectedIds.length === 0) return;
+    const selectedItems = (vendors || []).filter((v) => selection.selectedIds.includes(String(v._id || v.id)));
+    const deletableItems = selectedItems.filter((v) => v.__source !== 'user');
+    const blockedItems = selectedItems.filter((v) => v.__source === 'user');
+    if (blockedItems.length > 0) {
+      alert(`Skipping ${blockedItems.length} user account(s). Delete users from the Users module.`);
+    }
+    if (deletableItems.length === 0) return;
+    if (!window.confirm(`Delete ${deletableItems.length} vendor/customer record(s)? This cannot be undone.`)) return;
+    try {
+      for (const item of deletableItems) {
+        const id = item._id || item.id;
+        try {
+          await api.delete(`/api/vendors/${id}`);
+        } catch (err) {
+          await api.delete(`/api/clients/${id}`);
+        }
+      }
+      const removedIds = new Set(deletableItems.map((v) => String(v._id || v.id)));
+      setVendors((prev) => (prev || []).filter((v) => !removedIds.has(String(v._id || v.id))));
+      selection.clear();
+    } catch (err) {
+      console.error('Failed to delete vendors', err);
+      alert('Failed to delete selected vendors: ' + (err.response?.data?.error || err.message));
+    }
   };
 
   return (
@@ -4507,15 +5565,29 @@ const VendorsTab = () => {
         </div>
         <div className="flex items-center gap-3">
           <button onClick={exportCSV} className="px-3 py-2 bg-white border rounded-xl text-sm font-semibold hover:bg-gray-50">Export CSV</button>
+          <button onClick={downloadTemplate} className="px-3 py-2 bg-white border rounded-xl text-sm font-semibold hover:bg-gray-50">Download Template</button>
+          <button onClick={() => setShowAddVendor(true)} className="px-3 py-2 bg-gray-900 text-white rounded-xl text-sm font-bold">Add Person</button>
+          <button onClick={() => fileRef.current && fileRef.current.click()} className="px-3 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold">Import CSV</button>
+          <input ref={fileRef} type="file" accept=".csv" onChange={onImport} className="hidden" />
         </div>
       </div>
 
       <div className="bg-white rounded-lg border border-gray-100 overflow-hidden shadow-sm">
+        <BulkActionBar count={selection.selectedIds.length} label="vendors" onDelete={handleDeleteSelected} />
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead className="bg-[#fcfcfd] border-b border-gray-100">
               <tr>
+                <th className="py-4 px-4 w-10">
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    checked={selection.allSelected}
+                    onChange={(e) => selection.toggleAll(e.target.checked)}
+                  />
+                </th>
                 <th className="py-4 px-4">Name</th>
+                <th className="py-4 px-4">Type</th>
                 <th className="py-4 px-4">Address</th>
                 <th className="py-4 px-4">Phone Number</th>
                 <th className="py-4 px-4">Contact</th>
@@ -4526,7 +5598,16 @@ const VendorsTab = () => {
             <tbody>
               {vendors.map((v, idx) => (
                 <tr key={v._id || v.id || `vend-${idx}`} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+                  <td className="py-4 px-4">
+                    <input
+                      type="checkbox"
+                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      checked={selection.selectedIds.includes(String(v._id || v.id))}
+                      onChange={() => selection.toggleOne(v._id || v.id)}
+                    />
+                  </td>
                   <td className="py-4 px-4">{v.name || v.company || 'Unnamed'}</td>
+                  <td className="py-4 px-4">{v.__typeLabel || v.type || v.role || 'Customer'}</td>
                   <td className="py-4 px-4">{v.address || v.street || 'N/A'}</td>
                   <td className="py-4 px-4">{v.phone || v.phoneNumber || 'N/A'}</td>
                   <td className="py-4 px-4">{v.contactName || v.contact || 'N/A'}</td>
@@ -4534,38 +5615,156 @@ const VendorsTab = () => {
                   <td className="py-4 px-4 text-right"><button className="p-1.5 hover:bg-gray-100 rounded-lg"><Eye className="w-4 h-4 text-blue-600" /></button></td>
                 </tr>
               ))}
-              {vendors.length === 0 && (<tr><td colSpan="6" className="py-20 text-center"><p className="text-gray-500">No vendors/customers found</p></td></tr>)}
+              {vendors.length === 0 && (<tr><td colSpan="8" className="py-20 text-center"><p className="text-gray-500">No vendors/customers found</p></td></tr>)}
             </tbody>
           </table>
         </div>
       </div>
+
+      {showAddVendor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <form onSubmit={handleCreateVendor} className="bg-white rounded-2xl w-full max-w-lg p-6 shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-900">Add Vendor/Customer</h3>
+              <button type="button" onClick={() => setShowAddVendor(false)} className="p-2 hover:bg-gray-100 rounded-lg">
+                <X className="w-4 h-4 text-gray-400" />
+              </button>
+            </div>
+            <div className="space-y-3">
+              <input className="w-full border border-gray-200 rounded-lg p-2 text-sm" placeholder="Name / Company" value={newVendor.name} onChange={(e) => setNewVendor({ ...newVendor, name: e.target.value })} />
+              <input className="w-full border border-gray-200 rounded-lg p-2 text-sm" placeholder="Address" value={newVendor.address} onChange={(e) => setNewVendor({ ...newVendor, address: e.target.value })} />
+              <div className="grid grid-cols-2 gap-3">
+                <input className="w-full border border-gray-200 rounded-lg p-2 text-sm" placeholder="Phone" value={newVendor.phone} onChange={(e) => setNewVendor({ ...newVendor, phone: e.target.value })} />
+                <input className="w-full border border-gray-200 rounded-lg p-2 text-sm" placeholder="Contact Name" value={newVendor.contact} onChange={(e) => setNewVendor({ ...newVendor, contact: e.target.value })} />
+              </div>
+              <input className="w-full border border-gray-200 rounded-lg p-2 text-sm" placeholder="Email" value={newVendor.email} onChange={(e) => setNewVendor({ ...newVendor, email: e.target.value })} />
+            </div>
+            <div className="flex items-center justify-end gap-2 mt-5">
+              <button type="button" onClick={() => setShowAddVendor(false)} className="px-4 py-2 border rounded-lg text-sm">Cancel</button>
+              <button type="submit" disabled={creatingVendor} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold disabled:opacity-60">
+                {creatingVendor ? 'Saving...' : 'Save'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 };
 
 // Preventive Maintenance Tab Component
-const PreventiveMaintenanceTab = ({ issues, technicians, locations, assets }) => {
+const PreventiveMaintenanceTab = ({ issues, technicians, locations, assets, onRefresh, onOpenDetails }) => {
   const [localSearch, setLocalSearch] = useState('');
+  const [showCreate, setShowCreate] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [newTask, setNewTask] = useState({
+    title: '',
+    description: '',
+    location: '',
+    assetId: '',
+    priority: 'MEDIUM',
+    dueDate: '',
+    technicianId: ''
+  });
 
   const filtered = issues.filter(issue =>
     issue.title?.toLowerCase().includes(localSearch.toLowerCase()) ||
     issue.description?.toLowerCase().includes(localSearch.toLowerCase())
   );
+  const selection = useBulkSelection(filtered, (issue) => issue._id || issue.id);
+
+  const handleCreatePreventive = async (e) => {
+    e.preventDefault();
+    if (!newTask.title.trim()) {
+      alert('Please enter a title');
+      return;
+    }
+    try {
+      setCreating(true);
+      const payload = {
+        title: newTask.title,
+        description: newTask.description,
+        location: newTask.location,
+        assetId: newTask.assetId || undefined,
+        priority: newTask.priority || 'MEDIUM',
+        dueDate: newTask.dueDate || undefined,
+        tags: ['preventive'],
+        issueType: 'preventive',
+        category: 'preventive',
+        internalTechnicianId: newTask.technicianId || undefined
+      };
+      await api.post('/api/issues', payload);
+      setShowCreate(false);
+      setNewTask({ title: '', description: '', location: '', assetId: '', priority: 'MEDIUM', dueDate: '', technicianId: '' });
+      if (onRefresh) onRefresh();
+      alert('Preventive task created successfully');
+    } catch (err) {
+      console.error('Failed to create preventive task', err);
+      alert('Failed to create preventive task: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selection.selectedIds.length === 0) return;
+    if (!window.confirm(`Delete ${selection.selectedIds.length} preventive task(s)? This cannot be undone.`)) return;
+    try {
+      await Promise.all(selection.selectedIds.map((id) => api.delete(`/api/issues/${id}`)));
+      selection.clear();
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      console.error('Failed to delete preventive tasks', err);
+      alert('Failed to delete selected tasks: ' + (err.response?.data?.error || err.message));
+    }
+  };
 
   return (
     <div className="flex flex-col h-full bg-white">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h2 className="text-xl font-bold text-gray-900">Preventive Maintenance</h2>
+          <p className="text-sm text-gray-500 mt-0.5">Create and assign preventive tasks</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              value={localSearch}
+              onChange={(e) => setLocalSearch(e.target.value)}
+              placeholder="Search tasks"
+              className="pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm font-medium bg-white"
+            />
+          </div>
+          <button
+            onClick={() => setShowCreate(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700"
+          >
+            <Plus className="w-4 h-4" />
+            Create Task
+          </button>
+        </div>
+      </div>
+      <BulkActionBar count={selection.selectedIds.length} label="preventive tasks" onDelete={handleDeleteSelected} />
       <div className="bg-white rounded-xl border border-gray-100 overflow-hidden shadow-sm">
         <div className="overflow-x-auto min-h-[600px]">
           <table className="w-full text-left border-collapse">
             <thead className="bg-[#fcfcfd] border-b border-gray-100">
               <tr>
                 <th className="py-4 px-4 w-10">
-                  <input type="checkbox" className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    checked={selection.allSelected}
+                    onChange={(e) => selection.toggleAll(e.target.checked)}
+                  />
                 </th>
                 <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Name</th>
                 <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">ID</th>
                 <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Work Order Title</th>
                 <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Work Order Description</th>
+                <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Due Date</th>
                 <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Image</th>
                 <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Assets & Locations</th>
                 <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Category</th>
@@ -4573,10 +5772,19 @@ const PreventiveMaintenanceTab = ({ issues, technicians, locations, assets }) =>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {filtered.map((issue, idx) => (
-                <tr key={issue._id || issue.id || idx} className="hover:bg-gray-50/50 transition-colors group cursor-pointer">
+                <tr
+                  key={issue._id || issue.id || idx}
+                  onClick={() => onOpenDetails && onOpenDetails('issue', issue)}
+                  className="hover:bg-gray-50/50 transition-colors group cursor-pointer"
+                >
                   <td className="py-4 px-4" onClick={(e) => e.stopPropagation()}>
-                    <input type="checkbox" className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-                  </td>
+                    <input
+                      type="checkbox"
+                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      checked={selection.selectedIds.includes(String(issue._id || issue.id))}
+                      onChange={() => selection.toggleOne(issue._id || issue.id)}
+                    />
+                   </td>
                   <td className="py-4 px-4">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors">
@@ -4595,6 +5803,13 @@ const PreventiveMaintenanceTab = ({ issues, technicians, locations, assets }) =>
                   </td>
                   <td className="py-4 px-4">
                     <p className="text-sm text-gray-500 line-clamp-1 max-w-[250px]">{issue.description}</p>
+                  </td>
+                  <td className="py-4 px-4">
+                    <span className="text-sm font-semibold text-gray-700">
+                      {(issue.fixDeadline || issue.dueDate || issue.nextDate)
+                        ? normalizeDate(issue.fixDeadline || issue.dueDate || issue.nextDate).toLocaleDateString()
+                        : 'Not set'}
+                    </span>
                   </td>
                   <td className="py-4 px-4">
                     <div className="flex justify-center">
@@ -4622,7 +5837,7 @@ const PreventiveMaintenanceTab = ({ issues, technicians, locations, assets }) =>
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan="8" className="py-24 text-center">
+                  <td colSpan="9" className="py-24 text-center">
                     <div className="flex flex-col items-center max-w-sm mx-auto">
                       <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center mb-4">
                         <CircleDashed className="w-8 h-8 text-gray-200 animate-spin-slow" />
@@ -4637,6 +5852,119 @@ const PreventiveMaintenanceTab = ({ issues, technicians, locations, assets }) =>
           </table>
         </div>
       </div>
+
+      {showCreate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <form onSubmit={handleCreatePreventive} className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">Create Preventive Task</h3>
+                <p className="text-sm text-gray-500">Schedule and assign maintenance</p>
+              </div>
+              <button type="button" onClick={() => setShowCreate(false)} className="p-2 hover:bg-gray-100 rounded-lg">
+                <X className="w-4 h-4 text-gray-400" />
+              </button>
+            </div>
+            <div className="p-6 grid grid-cols-2 gap-4">
+              <div className="col-span-2">
+                <label className="text-xs font-bold text-gray-500 uppercase">Title</label>
+                <input
+                  className="mt-1 w-full border border-gray-200 rounded-lg p-2 text-sm"
+                  value={newTask.title}
+                  onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
+                  placeholder="Replace filters, test sensors, etc."
+                />
+              </div>
+              <div className="col-span-2">
+                <label className="text-xs font-bold text-gray-500 uppercase">Description</label>
+                <textarea
+                  className="mt-1 w-full border border-gray-200 rounded-lg p-2 text-sm h-24"
+                  value={newTask.description}
+                  onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
+                  placeholder="Describe the preventive work"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase">Location</label>
+                <select
+                  className="mt-1 w-full border border-gray-200 rounded-lg p-2 text-sm bg-white"
+                  value={newTask.location}
+                  onChange={(e) => setNewTask({ ...newTask, location: e.target.value })}
+                >
+                  <option value="">Select location</option>
+                  {locations.map((loc) => {
+                    const locName = loc.name || loc.title || loc.address || 'Location';
+                    return (
+                      <option key={loc._id || loc.id || locName} value={locName}>
+                        {locName}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase">Asset</label>
+                <select
+                  className="mt-1 w-full border border-gray-200 rounded-lg p-2 text-sm bg-white"
+                  value={newTask.assetId}
+                  onChange={(e) => setNewTask({ ...newTask, assetId: e.target.value })}
+                >
+                  <option value="">No asset</option>
+                  {assets.map((asset) => (
+                    <option key={asset._id || asset.id} value={asset._id || asset.id}>
+                      {asset.name || asset.title || 'Asset'}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase">Priority</label>
+                <select
+                  className="mt-1 w-full border border-gray-200 rounded-lg p-2 text-sm bg-white"
+                  value={newTask.priority}
+                  onChange={(e) => setNewTask({ ...newTask, priority: e.target.value })}
+                >
+                  {['LOW', 'MEDIUM', 'HIGH', 'URGENT'].map((p) => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase">Due Date</label>
+                <input
+                  type="date"
+                  className="mt-1 w-full border border-gray-200 rounded-lg p-2 text-sm"
+                  value={newTask.dueDate}
+                  onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })}
+                />
+              </div>
+              <div className="col-span-2">
+                <label className="text-xs font-bold text-gray-500 uppercase">Assign To</label>
+                <select
+                  className="mt-1 w-full border border-gray-200 rounded-lg p-2 text-sm bg-white"
+                  value={newTask.technicianId}
+                  onChange={(e) => setNewTask({ ...newTask, technicianId: e.target.value })}
+                >
+                  <option value="">Unassigned</option>
+                  {technicians.map((tech) => (
+                    <option key={tech._id || tech.id} value={tech._id || tech.id}>
+                      {tech.name || tech.fullName || tech.email || 'Technician'}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-gray-100">
+              <button type="button" onClick={() => setShowCreate(false)} className="px-4 py-2 border rounded-lg text-sm font-semibold">
+                Cancel
+              </button>
+              <button type="submit" disabled={creating} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold disabled:opacity-60">
+                {creating ? 'Creating...' : 'Create Task'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 };
@@ -4650,180 +5978,212 @@ const IssuesTab = ({
   setAssignmentData,
   handleOpenAssignment,
   handleAssignTech,
-  getAssignedTechName
-}) => (
-  <div className="bg-white rounded-lg border border-gray-100 overflow-hidden shadow-sm">
-    <div className="overflow-x-auto">
-      <table className="w-full text-left border-collapse">
-        <thead className="bg-[#fcfcfd] border-b border-gray-100">
-          <tr>
-            <th className="py-4 px-4 w-10">
-              <input type="checkbox" className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-            </th>
-            <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">WO #</th>
-            <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Work Order Title</th>
-            <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Image</th>
-            <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Description</th>
-            <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Due Date</th>
-            <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Start Date</th>
-            <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Technician</th>
-            <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
-            <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Priority</th>
-            <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {issues.map((issue, idx) => (
-            <React.Fragment key={issue._id || issue.id || `issue-row-${idx}`}>
-              <tr className="border-b border-gray-50 hover:bg-gray-50/50 transition-all duration-300 group">
-                <td className="py-4 px-4">
-                  <input type="checkbox" className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-                </td>
-                <td className="py-4 px-4">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-blue-600 hover:underline cursor-pointer">
-                      {String(normalizeId(issue._id || issue.id)).slice(-4)}
-                    </span>
-                    <div className="w-5 h-5 bg-rose-50 rounded flex items-center justify-center">
-                      <Calendar className="w-3 h-3 text-rose-500" />
-                    </div>
-                  </div>
-                </td>
-                <td className="py-4 px-4">
-                  <div className="flex items-center gap-1 group/title">
-                    <div className="text-sm font-bold text-gray-900 group-hover/title:text-blue-600 transition-colors">
-                      {issue.title}
-                    </div>
-                    <ChevronDown className="w-3.5 h-3.5 text-gray-400 opacity-0 group-hover/title:opacity-100 transition-opacity" />
-                  </div>
-                </td>
-                <td className="py-4 px-4">
-                  <div className="flex gap-2">
-                    {/* Before Image */}
-                    {getImageUrl(issue.beforeImage || issue.beforePhoto || issue.photo || issue.image) ? (
-                      <img
-                        src={getImageUrl(issue.beforeImage || issue.beforePhoto || issue.photo || issue.image)}
-                        alt="Before"
-                        className="w-12 h-12 rounded object-cover border border-gray-200"
-                        title="Before"
-                      />
-                    ) : (
-                      <div className="w-12 h-12 bg-gray-100 rounded flex items-center justify-center text-gray-400 text-[10px] text-center border border-gray-200">No img</div>
-                    )}
+  getAssignedTechName,
+  onOpenDetails,
+  onRefresh
+}) => {
+  const selection = useBulkSelection(issues, (issue) => issue._id || issue.id);
 
-                    {/* After Image (Only if exists) */}
-                    {getImageUrl(issue.afterImage || issue.afterPhoto) && (
-                      <img
-                        src={getImageUrl(issue.afterImage || issue.afterPhoto)}
-                        alt="After"
-                        className="w-12 h-12 rounded object-cover border border-green-200"
-                        title="After"
-                      />
-                    )}
-                  </div>
-                </td>
-                <td className="py-4 px-4">
-                  <p className="text-sm text-gray-500 line-clamp-1 max-w-[200px]">{issue.description}</p>
-                </td>
-                <td className="py-4 px-4">
-                  <div className="text-[11px] font-bold text-[#b45309]">
-                    {(issue.fixDeadline || issue.dueDate) ? normalizeDate(issue.fixDeadline || issue.dueDate).toLocaleString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true }) : '-'}
-                  </div>
-                </td>
-                <td className="py-4 px-4">
-                  <div className="text-[11px] font-bold text-[#b45309]">
-                    {issue.createdAt ? normalizeDate(issue.createdAt).toLocaleString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true }) : '-'}
-                  </div>
-                </td>
-                <td className="py-4 px-4">
-                  <div className="text-sm font-semibold text-gray-700">
-                    {getAssignedTechName(issue)}
-                  </div>
-                </td>
-                <td className="py-4 px-4">
-                  <div className="flex items-center gap-2">
-                    <div className="relative flex items-center justify-center w-5 h-5">
-                      <CircleDashed className={`w-5 h-5 ${issue.status === 'COMPLETE' ? 'text-green-500' : 'text-gray-300'}`} />
-                      {issue.status === 'IN PROGRESS' && (
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <div className="w-3 h-3 bg-blue-500 rounded-full flex items-center justify-center">
-                            <Play className="w-1.5 h-1.5 text-white fill-white" />
-                          </div>
-                        </div>
+  const handleDeleteSelected = async () => {
+    if (selection.selectedIds.length === 0) return;
+    if (!window.confirm(`Delete ${selection.selectedIds.length} work order(s)? This cannot be undone.`)) return;
+    try {
+      await Promise.all(selection.selectedIds.map((id) => api.delete(`/api/issues/${id}`)));
+      selection.clear();
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      console.error('Failed to delete issues', err);
+      alert('Failed to delete selected work orders: ' + (err.response?.data?.error || err.message));
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-lg border border-gray-100 overflow-hidden shadow-sm">
+      <BulkActionBar count={selection.selectedIds.length} label="work orders" onDelete={handleDeleteSelected} />
+      <div className="overflow-x-auto">
+        <table className="w-full text-left border-collapse">
+          <thead className="bg-[#fcfcfd] border-b border-gray-100">
+            <tr>
+              <th className="py-4 px-4 w-10">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  checked={selection.allSelected}
+                  onChange={(e) => selection.toggleAll(e.target.checked)}
+                />
+              </th>
+              <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">WO #</th>
+              <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Work Order Title</th>
+              <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Image</th>
+              <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Description</th>
+              <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Due Date</th>
+              <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Start Date</th>
+              <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Technician</th>
+              <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
+              <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Priority</th>
+              <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {issues.map((issue, idx) => (
+              <React.Fragment key={issue._id || issue.id || `issue-row-${idx}`}>
+                <tr
+                  onClick={() => onOpenDetails && onOpenDetails('issue', issue)}
+                  className="border-b border-gray-50 hover:bg-gray-50/50 transition-all duration-300 group cursor-pointer"
+                >
+                  <td className="py-4 px-4" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      checked={selection.selectedIds.includes(String(issue._id || issue.id))}
+                      onChange={() => selection.toggleOne(issue._id || issue.id)}
+                    />
+                  </td>
+                  <td className="py-4 px-4">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-blue-600 hover:underline cursor-pointer">
+                        {String(normalizeId(issue._id || issue.id)).slice(-4)}
+                      </span>
+                      <div className="w-5 h-5 bg-rose-50 rounded flex items-center justify-center">
+                        <Calendar className="w-3 h-3 text-rose-500" />
+                      </div>
+                    </div>
+                  </td>
+                  <td className="py-4 px-4">
+                    <div className="flex items-center gap-1 group/title">
+                      <div className="text-sm font-bold text-gray-900 group-hover/title:text-blue-600 transition-colors">
+                        {issue.title}
+                      </div>
+                      <ChevronDown className="w-3.5 h-3.5 text-gray-400 opacity-0 group-hover/title:opacity-100 transition-opacity" />
+                    </div>
+                  </td>
+                  <td className="py-4 px-4">
+                    <div className="flex gap-2">
+                      {getImageUrl(issue.beforeImage || issue.beforePhoto || issue.photo || issue.image) ? (
+                        <img
+                          src={getImageUrl(issue.beforeImage || issue.beforePhoto || issue.photo || issue.image)}
+                          alt="Before"
+                          className="w-12 h-12 rounded object-cover border border-gray-200"
+                          title="Before"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 bg-gray-100 rounded flex items-center justify-center text-gray-400 text-[10px] text-center border border-gray-200">No img</div>
                       )}
-                      {issue.status === 'COMPLETE' && (
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <CheckCircle className="w-3 h-3 text-green-500 fill-white" />
-                        </div>
+                      {getImageUrl(issue.afterImage || issue.afterPhoto) && (
+                        <img
+                          src={getImageUrl(issue.afterImage || issue.afterPhoto)}
+                          alt="After"
+                          className="w-12 h-12 rounded object-cover border border-green-200"
+                          title="After"
+                        />
                       )}
                     </div>
-                    <span className="text-sm font-bold text-gray-700 capitalize">
-                      {issue.status === 'PENDING' ? 'Open' : issue.status.toLowerCase().replace('_', ' ')}
-                    </span>
-                  </div>
-                </td>
-                <td className="py-4 px-4">
-                  <div className="flex items-center gap-2">
-                    <Flag className={`w-4 h-4 ${issue.priority === 'HIGH' ? 'text-[#e11d48] fill-[#e11d48]' : issue.priority === 'MEDIUM' ? 'text-[#f59e0b] fill-[#f59e0b]' : 'text-gray-400 fill-gray-400'}`} />
-                    <span className="text-sm font-bold text-gray-700">
-                      {issue.priority === 'HIGH' ? 'High' : issue.priority === 'MEDIUM' ? 'Medium' : issue.priority === 'LOW' ? 'Low' : 'None'}
-                    </span>
-                  </div>
-                </td>
+                  </td>
+                  <td className="py-4 px-4">
+                    <p className="text-sm text-gray-500 line-clamp-1 max-w-[200px]">{issue.description}</p>
+                  </td>
+                  <td className="py-4 px-4">
+                    <div className="text-[11px] font-bold text-[#b45309]">
+                      {(issue.fixDeadline || issue.dueDate) ? normalizeDate(issue.fixDeadline || issue.dueDate).toLocaleString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true }) : '-'}
+                    </div>
+                  </td>
+                  <td className="py-4 px-4">
+                    <div className="text-[11px] font-bold text-[#b45309]">
+                      {issue.createdAt ? normalizeDate(issue.createdAt).toLocaleString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true }) : '-'}
+                    </div>
+                  </td>
+                  <td className="py-4 px-4">
+                    <div className="text-sm font-semibold text-gray-700">
+                      {getAssignedTechName(issue)}
+                    </div>
+                  </td>
+                  <td className="py-4 px-4">
+                    <div className="flex items-center gap-2">
+                      <div className="relative flex items-center justify-center w-5 h-5">
+                        <CircleDashed className={`w-5 h-5 ${issue.status === 'COMPLETE' ? 'text-green-500' : 'text-gray-300'}`} />
+                        {issue.status === 'IN PROGRESS' && (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="w-3 h-3 bg-blue-500 rounded-full flex items-center justify-center">
+                              <Play className="w-1.5 h-1.5 text-white fill-white" />
+                            </div>
+                          </div>
+                        )}
+                        {issue.status === 'COMPLETE' && (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <CheckCircle className="w-3 h-3 text-green-500 fill-white" />
+                          </div>
+                        )}
+                      </div>
+                      <span className="text-sm font-bold text-gray-700 capitalize">
+                        {issue.status === 'PENDING' ? 'Open' : issue.status.toLowerCase().replace('_', ' ')}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="py-4 px-4">
+                    <div className="flex items-center gap-2">
+                      <Flag className={`w-4 h-4 ${issue.priority === 'HIGH' ? 'text-[#e11d48] fill-[#e11d48]' : issue.priority === 'MEDIUM' ? 'text-[#f59e0b] fill-[#f59e0b]' : 'text-gray-400 fill-gray-400'}`} />
+                      <span className="text-sm font-bold text-gray-700">
+                        {issue.priority === 'HIGH' ? 'High' : issue.priority === 'MEDIUM' ? 'Medium' : issue.priority === 'LOW' ? 'Low' : 'None'}
+                      </span>
+                    </div>
+                  </td>
                 <td className="py-4 px-4 text-right">
                   <div className="flex items-center justify-end gap-2">
                     {assigning === (issue._id || issue.id) ? (
                       <button
-                        onClick={() => handleOpenAssignment(null)}
+                        onClick={(e) => { e.stopPropagation(); handleOpenAssignment(null); }}
                         className="text-xs font-bold text-gray-400 hover:text-gray-600"
                       >
                         Cancel
                       </button>
                     ) : (
+                      !(issue.assignedTo || issue.assignedTechnicianId || (Array.isArray(issue.assignees) && issue.assignees.length > 0)) && (
                       <button
-                        onClick={() => handleOpenAssignment(issue)}
+                        onClick={(e) => { e.stopPropagation(); handleOpenAssignment(issue); }}
                         className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
                         title="Assign"
                       >
                         <Plus className="w-4 h-4 text-blue-600" />
                       </button>
+                      )
                     )}
-                    <button className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
+                    <button onClick={(e) => e.stopPropagation()} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
                       <MoreHorizontal className="w-4 h-4 text-gray-400" />
                     </button>
                   </div>
                 </td>
-              </tr>
-              {assigning === (issue._id || issue.id) && (
-                <tr>
-                  <td colSpan="10" className="p-0 border-b border-gray-50">
-                    <AssignmentForm
-                      assignmentData={assignmentData}
-                      setAssignmentData={setAssignmentData}
-                      technicians={technicians}
-                      onAssign={() => handleAssignTech(normalizeId(issue._id || issue.id))}
-                      onCancel={() => handleOpenAssignment(null)}
-                    />
-                  </td>
                 </tr>
-              )}
-            </React.Fragment>
-          ))}
-          {issues.length === 0 && (
-            <tr>
-              <td colSpan="7" className="py-20 text-center">
-                <div className="flex flex-col items-center">
-                  <Box className="w-12 h-12 text-gray-200 mb-4" />
-                  <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">No work orders found</p>
-                </div>
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+                {assigning === (issue._id || issue.id) && (
+                  <tr>
+                    <td colSpan="10" className="p-0 border-b border-gray-50">
+                      <AssignmentForm
+                        assignmentData={assignmentData}
+                        setAssignmentData={setAssignmentData}
+                        technicians={technicians}
+                        onAssign={() => handleAssignTech(normalizeId(issue._id || issue.id))}
+                        onCancel={() => handleOpenAssignment(null)}
+                      />
+                    </td>
+                  </tr>
+                )}
+              </React.Fragment>
+            ))}
+            {issues.length === 0 && (
+              <tr>
+                <td colSpan="11" className="py-20 text-center">
+                  <div className="flex flex-col items-center">
+                    <Box className="w-12 h-12 text-gray-200 mb-4" />
+                    <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">No work orders found</p>
+                  </div>
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 // Enhanced Assignment Form
 const AssignmentForm = ({ assignmentData, setAssignmentData, technicians, onAssign, onCancel }) => (
@@ -4895,9 +6255,24 @@ const AllIssuesTab = ({
   getFilteredIssues,
   getAssignedTechName,
   searchQuery,
-  setSearchQuery
+  setSearchQuery,
+  onRefresh
 }) => {
   const filteredIssues = getFilteredIssues();
+  const selection = useBulkSelection(filteredIssues, (issue) => issue._id || issue.id);
+
+  const handleDeleteSelected = async () => {
+    if (selection.selectedIds.length === 0) return;
+    if (!window.confirm(`Delete ${selection.selectedIds.length} issue(s)? This cannot be undone.`)) return;
+    try {
+      await Promise.all(selection.selectedIds.map((id) => api.delete(`/api/issues/${id}`)));
+      selection.clear();
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      console.error('Failed to delete issues', err);
+      alert('Failed to delete selected issues: ' + (err.response?.data?.error || err.message));
+    }
+  };
 
   return (
     <div>
@@ -4917,6 +6292,8 @@ const AllIssuesTab = ({
           </div>
         </div>
       </div>
+
+      <BulkActionBar count={selection.selectedIds.length} label="issues" onDelete={handleDeleteSelected} />
 
       {/* Enhanced Filters */}
       <GlassCard className="p-6 mb-6">
@@ -4995,7 +6372,12 @@ const AllIssuesTab = ({
                   className="border-b border-gray-50 hover:bg-gray-50/50 transition-all duration-300 group"
                 >
                   <td className="py-4 px-4">
-                    <input type="checkbox" className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                    <input
+                      type="checkbox"
+                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      checked={selection.selectedIds.includes(String(issue._id || issue.id))}
+                      onChange={() => selection.toggleOne(issue._id || issue.id)}
+                    />
                   </td>
                   <td className="py-4 px-4">
                     <div className="flex items-center gap-2">
@@ -5090,7 +6472,7 @@ const AllIssuesTab = ({
                   </td>
                   <td className="py-4 px-4 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      <button className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
+                      <button onClick={(e) => e.stopPropagation()} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
                         <MoreHorizontal className="w-4 h-4 text-gray-400" />
                       </button>
                     </div>
@@ -5211,6 +6593,108 @@ const FeedbackTab = ({ feedbacks, loadingFeedbacks }) => (
     )}
   </div>
 );
+
+const DetailsModal = ({ open, type, item, onClose, getAssignedTechName }) => {
+  if (!open || !item) return null;
+
+  const isMaterial = type === 'material';
+  const isRequest = type === 'request';
+  const isIssue = type === 'issue';
+
+  const title = isMaterial ? 'Material Request Details' : isRequest ? 'Request Details' : 'Work Order Details';
+  const location = item.location || item.address || item.locationName || item.propertyName || item.assetLocation || 'Not specified';
+  const dueDate = item.fixDeadline || item.dueDate || item.nextDate || item.scheduledFor || null;
+  const createdAt = item.createdAt || item.date || item.nextDate || null;
+  const priority = item.priority || item.urgency || '—';
+  const status = item.status || (item.approved ? 'APPROVED' : 'PENDING') || '—';
+  const description = item.description || item.details || 'No description provided.';
+  const assignee = isIssue ? (getAssignedTechName ? getAssignedTechName(item) : item.assignedTo) : (item.technicianName || item.assignedTo || 'Unassigned');
+
+  const formatDateTime = (val) => {
+    if (!val) return 'Not set';
+    try { return normalizeDate(val).toLocaleString(); } catch (e) { return 'Not set'; }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 max-w-3xl w-full overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <div>
+            <h3 className="text-xl font-bold text-gray-900">{title}</h3>
+            <p className="text-xs text-gray-500">Details and key metadata</p>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+            <X className="w-5 h-5 text-gray-400" />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-6">
+          <div className="flex flex-col md:flex-row gap-6">
+            <div className="flex-1">
+              <h4 className="text-lg font-bold text-gray-900">{item.title || item.name || 'Untitled'}</h4>
+              <p className="text-sm text-gray-600 mt-1">{description}</p>
+              <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-gray-600">
+                <span className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-gray-50 border border-gray-200">
+                  <MapPin className="w-3.5 h-3.5" /> {location}
+                </span>
+                <span className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-gray-50 border border-gray-200">
+                  <Calendar className="w-3.5 h-3.5" /> Due: {formatDateTime(dueDate)}
+                </span>
+                <span className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-gray-50 border border-gray-200">
+                  <Clock className="w-3.5 h-3.5" /> Created: {formatDateTime(createdAt)}
+                </span>
+              </div>
+            </div>
+            {(item.beforePhoto || item.photo || item.image || item.beforeImage || item.afterImage || item.afterPhoto) && (
+              <div className="w-full md:w-56">
+                <div className="rounded-xl overflow-hidden border border-gray-200 bg-gray-50">
+                  <img
+                    src={getImageUrl(item.afterImage || item.afterPhoto || item.beforeImage || item.beforePhoto || item.photo || item.image)}
+                    alt="Attachment"
+                    className="w-full h-40 object-cover"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="p-4 rounded-xl border border-gray-100 bg-gradient-to-br from-slate-50 to-white">
+              <div className="text-xs text-gray-500 mb-1">Status</div>
+              <div className="text-sm font-bold text-gray-900">{String(status)}</div>
+            </div>
+            <div className="p-4 rounded-xl border border-gray-100 bg-gradient-to-br from-slate-50 to-white">
+              <div className="text-xs text-gray-500 mb-1">Priority</div>
+              <div className="text-sm font-bold text-gray-900">{String(priority)}</div>
+            </div>
+            <div className="p-4 rounded-xl border border-gray-100 bg-gradient-to-br from-slate-50 to-white">
+              <div className="text-xs text-gray-500 mb-1">Assigned To</div>
+              <div className="text-sm font-bold text-gray-900">{assignee || 'Unassigned'}</div>
+            </div>
+          </div>
+
+          {isMaterial && (
+            <div className="bg-white rounded-xl border border-gray-100">
+              <div className="px-4 py-3 border-b border-gray-100 text-sm font-semibold text-gray-800">Requested Items</div>
+              <div className="p-4 space-y-2">
+                {(item.items || []).length > 0 ? (
+                  item.items.map((it, idx) => (
+                    <div key={idx} className="flex items-center justify-between text-sm">
+                      <div className="font-medium text-gray-900">{it.title || it.materialId || 'Item'}</div>
+                      <div className="text-gray-500">Qty: {it.quantity ?? it.qty ?? '—'}</div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-sm text-gray-500">No items attached.</div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const AIInsights = ({ aiSentiment, loadingAI, aiError, aiRecommendations, loadingRecs, recsError, exportToPDF, exportToExcel }) => {
   if (loadingAI || loadingRecs) return (

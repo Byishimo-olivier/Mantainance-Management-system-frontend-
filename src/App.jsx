@@ -27,6 +27,7 @@ import RequestsPage from './components/RequestsPage';
 import Feedback from './components/Feedback';
 import ManagerFeedback from './components/ManagerFeedback';
 import AIChatbot from './components/AIChatbot';
+import { LanguageProvider } from './i18n/LanguageContext';
 
 function ResetPasswordWrapper() {
   const { token } = useParams();
@@ -60,7 +61,7 @@ function App() {
   };
 
   return (
-    <>
+    <LanguageProvider>
       <Routes>
         <Route path="/" element={<WorkOrder />} />
         <Route path="/Home" element={<LandingPage />} />
@@ -96,7 +97,7 @@ function App() {
         <Route path="/manager-feedback" element={auth ? <ManagerFeedback /> : <Login onLogin={handleLogin} />} />
       </Routes>
       <AIChatbot />
-    </>
+    </LanguageProvider>
   );
 }
 

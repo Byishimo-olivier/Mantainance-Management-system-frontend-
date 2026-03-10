@@ -6,6 +6,7 @@ import NewIssue from './NewIssue';
 import SubscriptionWidget from './SubscriptionWidget';
 import SubscriptionManagement from './SubscriptionManagement';
 import { getImageUrl } from '../utils/imageUrl';
+import { useLanguage, useTranslation } from "../i18n/LanguageContext";
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 const Icon = {
@@ -265,15 +266,34 @@ function Btn({ children, variant = 'primary', size = 'md', onClick, disabled, ty
 
 // ── Sidebar nav item ──────────────────────────────────────────────────────────
 function NavItem({ label, icon, active, onClick, danger }) {
+  const baseStyle = {
+    width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10,
+    padding: '9px 12px', borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+    fontSize: 13, fontWeight: active ? 700 : 500, transition: 'all 0.15s',
+    background: active ? 'rgba(255,255,255,0.18)' : 'transparent',
+    color: danger ? '#FCA5A5' : active ? '#FFFFFF' : 'rgba(255,255,255,0.8)',
+  };
+
   return (
-    <button onClick={onClick} style={{
-      width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10,
-      padding: '9px 12px', borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-      fontSize: 13, fontWeight: active ? 700 : 500, transition: 'all 0.15s',
-      background: active ? '#EFF6FF' : 'transparent',
-      color: danger ? '#EF4444' : active ? '#1D4ED8' : '#4B5563',
-    }}>
-      <span style={{ color: active ? '#1D4ED8' : danger ? '#EF4444' : '#9CA3AF' }}>{icon}</span>
+    <button
+      onClick={onClick}
+      style={baseStyle}
+      onMouseEnter={(e) => {
+        if (active) return;
+        e.currentTarget.style.background = 'rgba(255,255,255,0.14)';
+        e.currentTarget.style.color = '#FFFFFF';
+        const iconEl = e.currentTarget.querySelector('span[data-icon]');
+        if (iconEl) iconEl.style.color = 'rgba(255,255,255,0.95)';
+      }}
+      onMouseLeave={(e) => {
+        if (active) return;
+        e.currentTarget.style.background = 'transparent';
+        e.currentTarget.style.color = danger ? '#FCA5A5' : 'rgba(255,255,255,0.8)';
+        const iconEl = e.currentTarget.querySelector('span[data-icon]');
+        if (iconEl) iconEl.style.color = danger ? '#FCA5A5' : 'rgba(255,255,255,0.65)';
+      }}
+    >
+      <span data-icon style={{ color: active ? '#FFFFFF' : danger ? '#FCA5A5' : 'rgba(255,255,255,0.65)' }}>{icon}</span>
       {label}
     </button>
   );
@@ -282,6 +302,8 @@ function NavItem({ label, icon, active, onClick, danger }) {
 // ── Main Component ────────────────────────────────────────────────────────────
 function ClientDashboard() {
   const navigate = useNavigate();
+  const { language, setLanguage } = useLanguage();
+  const { t } = useTranslation();
   const backendBase = (import.meta.env.VITE_API_URL || '') + '';
 
   const imageSrc = useCallback((path) => {
@@ -358,8 +380,83 @@ function ClientDashboard() {
     return user?.id || user?._id || null;
   }, [getCurrentUser]);
 
+  const isRestrictedRole = useCallback((role) => {
+    const r = String(role || '').toLowerCase();
+    return r === 'client' || r === 'requestor';
+  }, []);
+
+  const matchesUser = useCallback((value, userId) => {
+    if (!value || !userId) return false;
+    return String(value) === String(userId);
+  }, []);
+
+  const filterPropertiesForUser = useCallback((items, userId) => {
+    if (!Array.isArray(items) || !userId) return [];
+    return items.filter((p) => (
+      matchesUser(p.userId, userId) ||
+      matchesUser(p.clientId, userId) ||
+      matchesUser(p.ownerId, userId) ||
+      matchesUser(p.createdBy, userId) ||
+      matchesUser(p.requestorId, userId) ||
+      (Array.isArray(p.users) && p.users.some(u => matchesUser(u?.id || u?._id || u, userId)))
+    ));
+  }, [matchesUser]);
+
+  const filterAssetsForUser = useCallback((items, userId, propertyIds) => {
+    if (!Array.isArray(items)) return [];
+    return items.filter((a) => (
+      matchesUser(a.userId, userId) ||
+      matchesUser(a.clientId, userId) ||
+      matchesUser(a.ownerId, userId) ||
+      (propertyIds || []).includes(String(a.propertyId || a.property?._id || a.property?.id))
+    ));
+  }, [matchesUser]);
+
+  const filterIssuesForUser = useCallback((items, userId, propertyIds, assetIds) => {
+    if (!Array.isArray(items)) return [];
+    return items.filter((issue) => {
+      const issuePropertyId = issue.propertyId || issue.property?._id || issue.property?.id;
+      const issueAssetId = issue.assetId || issue.asset?._id || issue.asset?.id;
+      return (
+        matchesUser(issue.userId, userId) ||
+        matchesUser(issue.clientId, userId) ||
+        matchesUser(issue.requestedBy, userId) ||
+        matchesUser(issue.createdBy, userId) ||
+        matchesUser(issue.reporterId, userId) ||
+        matchesUser(issue.requestorId, userId) ||
+        (propertyIds || []).includes(String(issuePropertyId)) ||
+        (assetIds || []).includes(String(issueAssetId))
+      );
+    });
+  }, [matchesUser]);
+
+  const filterSchedulesForUser = useCallback((items, userId, propertyIds, assetIds) => {
+    if (!Array.isArray(items)) return [];
+    return items.filter((s) => {
+      const schedulePropertyId = s.propertyId || s.property?._id || s.property?.id;
+      const scheduleAssetId = s.assetId || s.asset?._id || s.asset?.id;
+      return (
+        matchesUser(s.userId, userId) ||
+        matchesUser(s.clientId, userId) ||
+        matchesUser(s.requestorId, userId) ||
+        (propertyIds || []).includes(String(schedulePropertyId)) ||
+        (assetIds || []).includes(String(scheduleAssetId))
+      );
+    });
+  }, [matchesUser]);
+
+  const filterTechsForUser = useCallback((items, userId, propertyIds) => {
+    if (!Array.isArray(items)) return [];
+    return items.filter((t) => (
+      matchesUser(t.userId, userId) ||
+      matchesUser(t.clientId, userId) ||
+      matchesUser(t.requestorId, userId) ||
+      (propertyIds || []).includes(String(t.propertyId || t.property?._id || t.property?.id))
+    ));
+  }, [matchesUser]);
+
   // ── Data fetching ──────────────────────────────────────────────────────────
-  const fetchIssues = useCallback(async () => {
+  const fetchIssues = useCallback(async (context = {}) => {
     try {
       const res = await api.get('/api/issues');
       const now = new Date();
@@ -371,11 +468,18 @@ function ClientDashboard() {
         const isOverdue = (st === 'PENDING' || st.includes('PROGRESS')) && hours > 72;
         return { ...issue, time, overdue: issue.overdue ?? isOverdue };
       }).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      const user = context.user || getCurrentUser();
+      const userId = user?.id || user?._id || null;
+      const propertyIds = (context.propertyIds || properties.map(p => p._id || p.id)).filter(Boolean).map(String);
+      const assetIds = (context.assetIds || assets.map(a => a._id || a.id)).filter(Boolean).map(String);
+      const scoped = isRestrictedRole(user?.role)
+        ? filterIssuesForUser(fetched, userId, propertyIds, assetIds)
+        : fetched;
 
-      setIssues(fetched);
-      setAllIssues(fetched);
+      setIssues(scoped);
+      setAllIssues(scoped);
       const counts = { Pending: 0, 'In Progress': 0, Completed: 0, Overdue: 0 };
-      fetched.forEach(issue => {
+      scoped.forEach(issue => {
         const st = (issue.status || '').toLowerCase().replace(/_/g, ' ');
         if (st.includes('pending')) counts.Pending++;
         else if (st.includes('progress')) counts['In Progress']++;
@@ -387,7 +491,7 @@ function ClientDashboard() {
       setIssues([]);
       setAllIssues([]);
     }
-  }, []);
+  }, [assets, filterIssuesForUser, getCurrentUser, isRestrictedRole, properties]);
 
   const refreshSchedules = useCallback(async () => {
     try {
@@ -412,6 +516,9 @@ function ClientDashboard() {
   useEffect(() => {
     const fetchData = async () => {
       let userObj = null;
+      let scopedProperties = [];
+      let scopedPropertyIds = [];
+      let scopedAssetIds = [];
       try {
         const stored = localStorage.getItem('user');
         if (stored) {
@@ -423,23 +530,29 @@ function ClientDashboard() {
         console.error('Error parsing user:', e);
       }
 
+      const isRestricted = isRestrictedRole(userObj?.role);
+      const userId = userObj?.id || userObj?._id || null;
+
       // Properties
       setLoading(l => ({ ...l, properties: true }));
       try {
         const res = await api.get('/api/properties');
         const propertiesData = res.data || [];
-        setProperties(propertiesData);
+        scopedProperties = isRestricted ? filterPropertiesForUser(propertiesData, userId) : propertiesData;
+        scopedPropertyIds = scopedProperties.map(p => p._id || p.id).filter(Boolean).map(String);
+        setProperties(scopedProperties);
 
-        if (userObj?.role === 'client') {
-          const pids = propertiesData.map(p => p._id || p.id).filter(Boolean);
+        if (isRestricted) {
           const [techResults, assetResults] = await Promise.all([
-            Promise.allSettled(pids.map(pid => api.get(`/api/internal-technicians?propertyId=${pid}`))),
-            Promise.allSettled(pids.map(pid => api.get(`/api/assets?propertyId=${pid}`))),
+            Promise.allSettled(scopedPropertyIds.map(pid => api.get(`/api/internal-technicians?propertyId=${pid}`))),
+            Promise.allSettled(scopedPropertyIds.map(pid => api.get(`/api/assets?propertyId=${pid}`))),
           ]);
           const techData = techResults.flatMap(r => r.status === 'fulfilled' && Array.isArray(r.value.data) ? r.value.data : []);
           const assetData = assetResults.flatMap(r => r.status === 'fulfilled' && Array.isArray(r.value.data) ? r.value.data : []);
-          if (techData.length) setInternalTechnicians(techData);
-          if (assetData.length) setAssets(assetData);
+          const scopedAssets = filterAssetsForUser(assetData, userId, scopedPropertyIds);
+          scopedAssetIds = scopedAssets.map(a => a._id || a.id).filter(Boolean).map(String);
+          setInternalTechnicians(filterTechsForUser(techData, userId, scopedPropertyIds));
+          setAssets(scopedAssets);
         }
       } catch (err) {
         setErrors(e => ({ ...e, properties: err?.response?.data?.message || err.message }));
@@ -448,11 +561,13 @@ function ClientDashboard() {
       }
 
       // Assets + Techs (non-client)
-      if (!(userObj?.role === 'client')) {
+      if (!isRestricted) {
         setLoading(l => ({ ...l, assets: true }));
         try {
           const r = await api.get('/api/assets');
-          setAssets(r.data || []);
+          const assetsData = r.data || [];
+          scopedAssetIds = assetsData.map(a => a._id || a.id).filter(Boolean).map(String);
+          setAssets(assetsData);
         } catch (err) {
           setErrors(e => ({ ...e, assets: err?.response?.data?.message || err.message }));
         } finally {
@@ -470,24 +585,31 @@ function ClientDashboard() {
         }
       }
 
-      // External technicians
-      try {
-        const ep = (userObj?.role === 'manager' || userObj?.role === 'admin') ? '/api/technicians/for-assignment' : '/api/technicians';
-        const r = await api.get(ep);
-        setTechnicians(r.data || []);
-      } catch {
-        // Handle error silently
+      // External technicians (managers/admins only)
+      if (userObj?.role === 'manager' || userObj?.role === 'admin') {
+        try {
+          const ep = '/api/technicians/for-assignment';
+          const r = await api.get(ep);
+          setTechnicians(r.data || []);
+        } catch {
+          // Handle error silently
+        }
+      } else {
+        setTechnicians([]);
       }
 
       // Schedules
       try {
         const r = await api.get('/api/maintenance-schedules');
-        setMaintenanceSchedules(r.data || []);
+        const scopedSchedules = isRestricted
+          ? filterSchedulesForUser(r.data || [], userId, scopedPropertyIds, scopedAssetIds)
+          : (r.data || []);
+        setMaintenanceSchedules(scopedSchedules);
         const now = new Date();
         const cutoff = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-        setReminders((r.data || []).filter(s => s?.routine && s.nextDate && new Date(s.nextDate) <= cutoff && (!s.lastReminder || new Date(s.lastReminder) < new Date(s.nextDate))));
+        setReminders(scopedSchedules.filter(s => s?.routine && s.nextDate && new Date(s.nextDate) <= cutoff && (!s.lastReminder || new Date(s.lastReminder) < new Date(s.nextDate))));
         const counts = { Preventive: 0, Routine: 0, Pending: 0, 'In Progress': 0, Completed: 0, Overdue: 0 };
-        (r.data || []).forEach(s => {
+        scopedSchedules.forEach(s => {
           if (!s) return;
           s.routine ? counts.Routine++ : counts.Preventive++;
           const st = (s.status || '').toLowerCase();
@@ -502,7 +624,7 @@ function ClientDashboard() {
       }
 
       // Issues
-      await fetchIssues();
+      await fetchIssues({ user: userObj, propertyIds: scopedPropertyIds, assetIds: scopedAssetIds });
 
       // Material Requests
       await fetchMaterialRequests();
@@ -825,7 +947,8 @@ function ClientDashboard() {
   const dayLabels = Array.from({ length: 7 }).map((_, i) => {
     const d = new Date();
     d.setDate(d.getDate() - (6 - i));
-    return d.toLocaleDateString('en', { weekday: 'short' });
+    const locale = language === 'fr' ? 'fr' : language === 'rw' ? 'rw' : 'en';
+    return d.toLocaleDateString(locale, { weekday: 'short' });
   });
 
   const combinedPending = (statusCounts.Pending || 0) + (maintenanceCounts.Pending || 0);
@@ -835,31 +958,30 @@ function ClientDashboard() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   const navItems = [
-    { key: 'dashboard', label: 'Overview', icon: <Icon.Dashboard /> },
-    { key: 'requests', label: 'Requests', icon: <Icon.Requests /> },
-    { key: 'properties', label: 'Locations', icon: <Icon.Properties /> },
-    { key: 'assets', label: 'Assets', icon: <Icon.Assets /> },
-    { key: 'internalTechnicians', label: 'Staff', icon: <Icon.Staff /> },
-    { key: 'organization', label: 'Organization', icon: <Icon.Templates /> },
-    { key: 'maintenanceTemplates', label: 'Maintenance', icon: <Icon.Templates /> },
-    { key: 'subscription', label: 'Subscriptions', icon: <Icon.Subscription /> },
+    { key: 'dashboard', label: t("client.nav.overview"), icon: <Icon.Dashboard /> },
+    { key: 'requests', label: t("client.nav.requests"), icon: <Icon.Requests /> },
+    { key: 'properties', label: t("client.nav.locations"), icon: <Icon.Properties /> },
+    { key: 'assets', label: t("client.nav.assets"), icon: <Icon.Assets /> },
+    { key: 'internalTechnicians', label: t("client.nav.staff"), icon: <Icon.Staff /> },
+    { key: 'maintenanceTemplates', label: t("client.nav.maintenance"), icon: <Icon.Templates /> },
+    { key: 'subscription', label: t("client.nav.subscriptions"), icon: <Icon.Subscription /> },
     // ── Procurement group ──
-    { key: 'parts', label: 'Parts & Inventory', icon: <Icon.Package />, group: 'Procurement' },
-    { key: 'purchaseOrders', label: 'Purchase Orders', icon: <Icon.ShoppingCart />, group: 'Procurement' },
+    { key: 'parts', label: t("client.nav.partsInventory"), icon: <Icon.Package />, group: 'Procurement' },
+    { key: 'purchaseOrders', label: t("client.nav.purchaseOrders"), icon: <Icon.ShoppingCart />, group: 'Procurement' },
     // Analytics / Meters / Edge
-    { key: 'analytics', label: 'Analytics', icon: <Icon.Analytics /> },
-    { key: 'meters', label: 'Meters', icon: <Icon.Gauge /> },
-    { key: 'edge', label: 'Edge', icon: <Icon.Edge /> },
-    { key: 'materialRequests', label: 'Material Requests', icon: <Icon.Package /> },
+    { key: 'analytics', label: t("client.nav.analytics"), icon: <Icon.Analytics /> },
+    { key: 'meters', label: t("client.nav.meters"), icon: <Icon.Gauge /> },
+    { key: 'edge', label: t("client.nav.edge"), icon: <Icon.Edge /> },
+    { key: 'materialRequests', label: t("client.nav.materialRequests"), icon: <Icon.Package /> },
   ];
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: '#F9FAFB', fontFamily: "'DM Sans', 'Segoe UI', system-ui, sans-serif" }}>
+    <div style={{ display: 'flex', minHeight: '100vh', background: '#EFF6FF', fontFamily: "'DM Sans', 'Segoe UI', system-ui, sans-serif" }}>
 
       {/* ── Sidebar ── */}
-      <aside style={{ width: 220, background: 'white', borderRight: '1px solid #E5E7EB', display: 'flex', flexDirection: 'column', position: 'sticky', top: 0, height: '100vh', overflowY: 'auto', flexShrink: 0 }}>
+      <aside style={{ width: 220, background: '#1D4ED8', borderRight: '1px solid #1E3A8A', display: 'flex', flexDirection: 'column', position: 'sticky', top: 0, height: '100vh', overflowY: 'auto', flexShrink: 0 }}>
         {/* Logo */}
-        <div style={{ padding: '24px 16px 20px', borderBottom: '1px solid #F3F4F6' }}>
+        <div style={{ padding: '24px 16px 20px', borderBottom: '1px solid rgba(255,255,255,0.12)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ width: 32, height: 32, background: 'linear-gradient(135deg,#1D4ED8,#3B82F6)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <svg width="16" height="16" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
@@ -867,8 +989,8 @@ function ClientDashboard() {
               </svg>
             </div>
             <div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#111827', lineHeight: 1.2 }}>Client Portal</div>
-              <div style={{ fontSize: 11, color: '#9CA3AF' }}>Property Management</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: 'white', lineHeight: 1.2 }}>{t("client.portalTitle")}</div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>{t("client.portalSubtitle")}</div>
             </div>
           </div>
         </div>
@@ -885,15 +1007,29 @@ function ClientDashboard() {
             </div>
           </div>
         </div>
+        <div style={{ padding: '10px 16px', borderBottom: '1px solid #F3F4F6' }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
+            {t("language.label")}
+          </div>
+          <select
+            value={language}
+            onChange={(e) => setLanguage(e.target.value)}
+            style={{ width: '100%', padding: '6px 8px', fontSize: 12, borderRadius: 8, border: '1px solid #E5E7EB', color: '#111827', background: 'white' }}
+          >
+            <option value="en">{t("language.english")}</option>
+            <option value="fr">{t("language.french")}</option>
+            <option value="rw">{t("language.kinyarwanda")}</option>
+          </select>
+        </div>
 
         {/* Nav */}
         <nav style={{ flex: 1, padding: '12px 10px' }}>
-          <div style={{ marginBottom: 4, padding: '0 6px', fontSize: 10, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Menu</div>
+          <div style={{ marginBottom: 4, padding: '0 6px', fontSize: 10, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{t("common.menu")}</div>
           {navItems.filter(n => !n.group).map(({ key, label, icon }) => (
             <NavItem key={key} label={label} icon={icon} active={activeTab === key} onClick={() => setActiveTab(key)} />
           ))}
           {/* Procurement group */}
-          <div style={{ marginTop: 12, marginBottom: 4, padding: '0 6px', fontSize: 10, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Procurement</div>
+          <div style={{ marginTop: 12, marginBottom: 4, padding: '0 6px', fontSize: 10, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{t("common.procurement")}</div>
           {navItems.filter(n => n.group === 'Procurement').map(({ key, label, icon }) => (
             <NavItem key={key} label={label} icon={icon} active={activeTab === key} onClick={() => setActiveTab(key)} />
           ))}
@@ -901,8 +1037,8 @@ function ClientDashboard() {
 
         {/* Bottom actions */}
         <div style={{ padding: '10px', borderTop: '1px solid #F3F4F6' }}>
-          <NavItem label="Export PDF" icon={<Icon.Export />} onClick={exportIssuesPDF} />
-          <NavItem label="Import CSV" icon={<Icon.Download />} onClick={() => importFileRef.current?.click()} />
+          <NavItem label={t("client.actions.exportPdf")} icon={<Icon.Export />} onClick={exportIssuesPDF} />
+          <NavItem label={t("client.actions.importCsv")} icon={<Icon.Download />} onClick={() => importFileRef.current?.click()} />
           <input type="file" ref={importFileRef} accept=".csv" onChange={(e) => {
             const f = e.target.files?.[0];
             if (!f) return;
@@ -918,7 +1054,7 @@ function ClientDashboard() {
             if (!f) return;
             handleImportAssetsFile(f);
           }} style={{ display: 'none' }} />
-          <NavItem label="Logout" icon={<Icon.Logout />} onClick={handleLogout} danger />
+          <NavItem label={t("client.actions.logout")} icon={<Icon.Logout />} onClick={handleLogout} danger />
         </div>
       </aside>
 
@@ -929,7 +1065,7 @@ function ClientDashboard() {
         <header style={{ background: 'white', borderBottom: '1px solid #E5E7EB', padding: '0 28px', height: 60, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 10 }}>
           <div>
             <h1 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#111827' }}>
-              {navItems.find(n => n.key === activeTab)?.label || 'Dashboard'}
+              {navItems.find(n => n.key === activeTab)?.label || t("client.nav.overview")}
             </h1>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -1039,7 +1175,7 @@ function ClientDashboard() {
                   <div style={{ fontSize: 13, fontWeight: 700, color: '#111827', marginBottom: 14 }}>Quick Actions</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     <Btn onClick={() => setActiveTab('requests')} variant="outline" style={{ justifyContent: 'center', width: '100%' }}>All Requests</Btn>
-                    <Btn onClick={exportIssuesPDF} variant="ghost" style={{ justifyContent: 'center', width: '100%' }}><Icon.Export /> Export PDF</Btn>
+                    <Btn onClick={exportIssuesPDF} variant="ghost" style={{ justifyContent: 'center', width: '100%' }}><Icon.Export /> {t("client.actions.exportPdf")}</Btn>
                     <Btn onClick={() => setActiveTab('maintenanceTemplates')} variant="ghost" style={{ justifyContent: 'center', width: '100%' }}>
                       <Icon.Templates /> Schedule Maintenance
                     </Btn>
@@ -1058,7 +1194,7 @@ function ClientDashboard() {
               </div>
 
               {/* Recent issues */}
-              <SectionHeader title="Recent Issues" count={issues.length}
+              <SectionHeader title={t("client.sections.recentIssues")} count={issues.length}
                 action={<button onClick={() => setActiveTab('requests')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#1D4ED8', fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>View all <Icon.ChevronRight /></button>} />
 
               {issues.length === 0 ? (
@@ -1139,7 +1275,7 @@ function ClientDashboard() {
                           )}
 
                           {/* Manager/Client internal assign */}
-                          {(currentUser?.role === 'manager' || currentUser?.role === 'admin' || currentUser?.role === 'client') && internalTechnicians.length > 0 && (
+                          {(currentUser?.role === 'manager' || currentUser?.role === 'admin' || currentUser?.role === 'client' || currentUser?.role === 'requestor') && internalTechnicians.length > 0 && (
                             <div style={{ display: 'flex', gap: 8, marginTop: 10, alignItems: 'center' }}>
                               <Select style={{ flex: 1, fontSize: 12, padding: '5px 8px' }} value={(selectedTechs[id]?.internal) || ''} onChange={e => setSelectedTechs(s => ({ ...s, [id]: { ...s[id], internal: e.target.value } }))}>
                                 <option value="">Assign internal technician…</option>
@@ -1179,11 +1315,11 @@ function ClientDashboard() {
           {/* ── Requests ── */}
           {activeTab === 'requests' && (
             <div>
-              <SectionHeader title="All Requests" count={allIssues.length}
+              <SectionHeader title={t("client.sections.allRequests")} count={allIssues.length}
                 action={
                   <>
                     <Btn onClick={handleNewRequest} variant="primary" size="sm"><Icon.Plus /> New Request</Btn>
-                    <Btn onClick={exportIssuesPDF} variant="outline" size="sm"><Icon.Export /> Export PDF</Btn>
+                    <Btn onClick={exportIssuesPDF} variant="outline" size="sm"><Icon.Export /> {t("client.actions.exportPdf")}</Btn>
                   </>
                 } />
               <Table
@@ -1325,8 +1461,8 @@ function ClientDashboard() {
           {/* ── Properties ── */}
           {activeTab === 'properties' && (
             <div>
-              <SectionHeader title="Locations" count={properties.length}
-                action={!editingProperty && <Btn onClick={() => setEditingProperty({})} variant="primary" size="sm"><Icon.Plus /> Add Locations</Btn>} />
+              <SectionHeader title={t("client.sections.locations")} count={properties.length}
+                action={!editingProperty && <Btn onClick={() => setEditingProperty({})} variant="primary" size="sm"><Icon.Plus /> {t("client.actions.addLocations")}</Btn>} />
 
               {loading.properties && <div style={{ textAlign: 'center', padding: 40, color: '#9CA3AF' }}>Loading…</div>}
               {errors.properties && <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 10, padding: 14, marginBottom: 16, color: '#991B1B', fontSize: 13 }}>Error: {errors.properties}</div>}
@@ -1334,7 +1470,7 @@ function ClientDashboard() {
               {/* Form */}
               {editingProperty !== null && (
                 <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 14, padding: 24, marginBottom: 20 }}>
-                  <div style={{ fontWeight: 700, fontSize: 15, color: '#111827', marginBottom: 16 }}>{editingProperty._id || editingProperty.id ? 'Edit Location' : 'New Location'}</div>
+                  <div style={{ fontWeight: 700, fontSize: 15, color: '#111827', marginBottom: 16 }}>{editingProperty._id || editingProperty.id ? t("client.actions.editLocation") : t("client.actions.newLocation")}</div>
                   <form onSubmit={async (e) => {
                     e.preventDefault();
                     try {
@@ -1463,7 +1599,7 @@ function ClientDashboard() {
           {/* ── Assets ── */}
           {activeTab === 'assets' && (
             <div>
-              <SectionHeader title="Assets" count={assets.length}
+              <SectionHeader title={t("client.sections.assets")} count={assets.length}
                 action={!editingAsset && <div style={{ display: 'flex', gap: 8 }}><Btn onClick={() => setEditingAsset({})} variant="primary" size="sm"><Icon.Plus /> Add Asset</Btn><Btn onClick={() => importAssetsRef.current?.click()} variant="outline" size="sm">Import Excel</Btn></div>} />
 
               {loading.assets && <div style={{ textAlign: 'center', padding: 40, color: '#9CA3AF' }}>Loading…</div>}
@@ -1654,7 +1790,7 @@ function ClientDashboard() {
           {/* ── Staff ── */}
           {activeTab === 'internalTechnicians' && (
             <div>
-              <SectionHeader title="Internal Technicians" count={internalTechnicians.length}
+              <SectionHeader title={t("client.sections.internalTechnicians")} count={internalTechnicians.length}
                 action={!editingTech && <Btn onClick={() => setEditingTech({})} variant="primary" size="sm"><Icon.Plus /> Add Technician</Btn>} />
 
               {loading.internalTechnicians && <div style={{ textAlign: 'center', padding: 40, color: '#9CA3AF' }}>Loading…</div>}
@@ -1770,61 +1906,11 @@ function ClientDashboard() {
             </div>
           )}
 
-          {/* ── Organization / Team ── */}
-          {activeTab === 'organization' && (
-            <div>
-              <SectionHeader title="Organization" />
-              <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 14, padding: 20, marginBottom: 20 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 220px', gap: 12 }}>
-                  <div>
-                    <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: 4 }}>Organization Name</label>
-                    <Input value={(localStorage.getItem('organization') && JSON.parse(localStorage.getItem('organization') || '{}').name) || ''} onChange={(e) => {
-                      const cur = localStorage.getItem('organization') ? JSON.parse(localStorage.getItem('organization') || '{}') : {};
-                      cur.name = e.target.value;
-                      localStorage.setItem('organization', JSON.stringify(cur));
-                    }} />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: 4 }}>Admin Email</label>
-                    <Input value={(localStorage.getItem('organization') && JSON.parse(localStorage.getItem('organization') || '{}').email) || ''} onChange={(e) => {
-                      const cur = localStorage.getItem('organization') ? JSON.parse(localStorage.getItem('organization') || '{}') : {};
-                      cur.email = e.target.value;
-                      localStorage.setItem('organization', JSON.stringify(cur));
-                    }} />
-                  </div>
-                </div>
-                <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: '1fr 160px 160px', gap: 12 }}>
-                  <div>
-                    <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: 4 }}>Invite technician (email)</label>
-                    <input ref={inviteEmailRef} placeholder="email@domain.com" style={{ width: '100%', padding: 8, borderRadius: 8, border: '1px solid #D1D5DB' }} />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: 4 }}>Role</label>
-                    <select ref={inviteRoleRef} style={{ width: '100%', padding: 8, borderRadius: 8, border: '1px solid #D1D5DB' }}>
-                      <option value="internal">Internal</option>
-                      <option value="external">External</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: 4 }}>Location</label>
-                    <select ref={inviteLocationRef} style={{ width: '100%', padding: 8, borderRadius: 8, border: '1px solid #D1D5DB' }}>
-                      <option value="">(optional)</option>
-                      {properties.map(p => <option key={p.id || p._id} value={p.id || p._id}>{p.name}</option>)}
-                    </select>
-                  </div>
-                </div>
-                <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
-                  <Btn onClick={handleInvite}>Invite</Btn>
-                </div>
-                <div style={{ marginTop: 8, fontSize: 12, color: '#9CA3AF' }}>Invited technicians receive an email and can set up their account without manual signup steps.</div>
-              </div>
-            </div>
-          )}
 
           {/* ── Maintenance Templates ── */}
           {activeTab === 'maintenanceTemplates' && (
             <div>
-              <SectionHeader title="Maintenance" count={maintenanceSchedules.length} />
+              <SectionHeader title={t("client.sections.maintenance")} count={maintenanceSchedules.length} />
 
               {/* Cards */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
@@ -1877,7 +1963,7 @@ function ClientDashboard() {
                 </div>
               )}
 
-              <SectionHeader title="Scheduled Maintenance" count={maintenanceSchedules.length}
+              <SectionHeader title={t("client.sections.scheduledMaintenance")} count={maintenanceSchedules.length}
                 action={<Btn onClick={() => setShowScheduleForm(true)} variant="outline" size="sm"><Icon.Plus /> New Schedule</Btn>} />
 
               <Table heads={['Name', 'Type', 'Status', 'Next Date', 'Frequency', 'Assets', 'Actions']} empty="No maintenance schedules. Create one above."
@@ -2068,7 +2154,7 @@ const ClientPartsTab = () => {
   React.useEffect(() => {
     (async () => {
       try { const res = await api.get('/api/parts'); setItems(res.data || []); }
-      catch { try { const r2 = await api.get('/api/material-requests'); setItems(r2.data || []); } catch { setItems([]); } }
+      catch { setItems([]); }
     })();
   }, []);
   const filtered = items.filter(it => (it.name || it.partName || '').toLowerCase().includes(search.toLowerCase()));
@@ -2078,6 +2164,49 @@ const ClientPartsTab = () => {
     const rows = filtered.map(it => ({ name: it.name || it.partName || '', status: it.status || '', available: it.available || it.availableQty || it.quantity || 0, allocated: it.allocated || 0, onHand: it.onHand || 0, incoming: it.incoming || 0, location: it.location || it.warehouse || '' }));
     const csv = [keys.join(',')].concat(rows.map(r => keys.map(k => `"${String(r[k] ?? '').replace(/"/g, '""')}"`).join(','))).join('\n');
     const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(new Blob([csv], { type: 'text/csv' })), download: 'parts.csv' }); a.click();
+  };
+
+  const parseCsv = (text) => {
+    if (!text) return [];
+    const lines = String(text).replace(/\r/g, '').split('\n').filter(l => l.trim().length > 0);
+    const header = (lines.shift() || '').split(',').map(h => h.trim().toLowerCase());
+    return lines.map(line => {
+      const cols = line.split(',');
+      const row = {};
+      header.forEach((h, i) => { row[h] = cols[i] || ''; });
+      return row;
+    });
+  };
+
+  const handleImport = async (file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const rows = parseCsv(reader.result || '');
+        const payload = rows.map(r => ({
+          name: r.name || r.part || r.partname || '',
+          status: r.status || 'AVAILABLE',
+          available: Number(r.available || r.availableqty || r.quantity || 0),
+          allocated: Number(r.allocated || r.allocatedqty || 0),
+          onHand: Number(r.onhand || r.on_hand || 0),
+          incoming: Number(r.incoming || r.incomingqty || 0),
+          location: r.location || r.warehouse || '',
+          barcode: r.barcode || ''
+        })).filter(p => p.name);
+        if (!payload.length) {
+          alert('No valid rows found in CSV.');
+          return;
+        }
+        const res = await api.post('/api/parts/bulk', { items: payload });
+        setItems(prev => [...(res.data || []), ...(prev || [])]);
+        alert(`Imported ${payload.length} parts`);
+      } catch (err) {
+        console.error('Import failed', err);
+        alert('Failed to import parts: ' + (err.response?.data?.error || err.message));
+      }
+    };
+    reader.readAsText(file);
   };
   return (
     <div className="flex flex-col gap-6">
@@ -2089,7 +2218,7 @@ const ClientPartsTab = () => {
         <div className="flex items-center gap-3">
           <button onClick={exportCSV} className="px-3 py-2 bg-white border rounded-xl text-sm font-semibold hover:bg-gray-50">Export CSV</button>
           <button onClick={() => fileRef.current?.click()} className="px-3 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold">Import</button>
-          <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) alert('Import preview: ' + f.name); }} />
+          <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={e => handleImport(e.target.files?.[0])} />
         </div>
       </div>
       <div className="relative max-w-xs">

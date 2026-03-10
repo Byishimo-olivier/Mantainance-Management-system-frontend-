@@ -3,6 +3,7 @@ import api from "../api/axios";
 import { getImageUrl } from '../utils/imageUrl';
 import { useNavigate } from 'react-router-dom';
 import Header from "./Header";
+import { useTranslation } from "../i18n/LanguageContext";
 
 // BEFORE EVIDENCE FORM WITH START DETAILS
 function BeforeEvidenceForm({ issueId, onSuccess, hasExistingImage }) {
@@ -163,6 +164,7 @@ function AfterEvidenceForm({ issueId, onSuccess }) {
 }
 
 const TechnicianDashboard = () => {
+  const { t } = useTranslation();
   const [jobs, setJobs] = useState([]);
   const [materialRequests, setMaterialRequests] = useState([]);
   const [user, setUser] = useState({ name: "", id: "" });
@@ -454,7 +456,7 @@ const TechnicianDashboard = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-8">
+    <div className="min-h-screen bg-slate-50 px-4 pb-16 pt-6 md:px-8">
       {/* Reminders Panel */}
       {alerts.length > 0 && (
         <div className="fixed top-20 right-4 z-50 max-w-sm w-full">
@@ -534,7 +536,7 @@ const TechnicianDashboard = () => {
                             // Scroll to the job or highlight it?
                           }}
                         >
-                          View Details
+                          {t("technician.viewDetails")}
                         </button>
                       )}
                     </div>
@@ -548,13 +550,13 @@ const TechnicianDashboard = () => {
                 className="flex-1 px-3 py-2 bg-slate-800 text-gray-300 text-xs font-bold rounded-lg hover:bg-slate-700 transition-colors border border-slate-700"
                 onClick={dismissAll}
               >
-                Dismiss All Maint.
+                {t("technician.alerts.dismissAll")}
               </button>
               <button
                 className="flex-1 px-3 py-2 bg-amber-700/50 text-amber-200 text-xs font-bold rounded-lg hover:bg-amber-700 transition-colors border border-amber-600/50"
                 onClick={() => snoozeAll(60)}
               >
-                Snooze All Maint.
+                {t("technician.alerts.snoozeAll")}
               </button>
             </div>
           </div>
@@ -563,22 +565,22 @@ const TechnicianDashboard = () => {
 
       {/* Header */}
       <Header
-        title="Technician Dashboard"
-        subtitle={`Welcome back, ${user.name}`}
+        title={t("technician.title")}
+        subtitle={t("technician.subtitle", { name: user.name || "" })}
         user={user}
         right={
-          <div className="flex gap-4">
+          <div className="flex flex-wrap items-center gap-3">
             <button
               onClick={toggleMaterialRequestForm}
-              className="px-6 py-2 bg-purple-100 text-purple-700 rounded-lg font-semibold hover:bg-purple-200 transition border border-purple-200"
+              className="px-5 py-2 bg-blue-600 text-white rounded-full font-semibold hover:bg-blue-700 transition shadow-sm"
             >
-              Ask for Material
+              {t("technician.requestMaterials")}
             </button>
             <button
               onClick={handleLogout}
-              className="px-6 py-2 bg-red-100 text-red-700 rounded-lg font-semibold hover:bg-red-200 transition border border-red-200"
+              className="px-5 py-2 bg-white text-slate-600 rounded-full font-semibold hover:bg-slate-100 transition border border-slate-200"
             >
-              Logout
+              {t("technician.logout")}
             </button>
           </div>
         }
@@ -586,39 +588,41 @@ const TechnicianDashboard = () => {
 
       {/* Material Request Form Modal */}
       {showMaterialRequestForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-md w-full">
-            <div className="p-6">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-bold">Request Materials</h2>
-                <button
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+              <div>
+                <h2 className="text-xl font-bold text-slate-900">{t("technician.modal.title")}</h2>
+                <p className="text-sm text-slate-500">{t("technician.modal.subtitle")}</p>
+              </div>
+              <button
                   onClick={toggleMaterialRequestForm}
-                  className="text-gray-500 hover:text-gray-700"
+                  className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
                 >
                   ✕
-                </button>
-              </div>
-              <form onSubmit={handleMaterialRequestSubmit}>
+              </button>
+            </div>
+            <form onSubmit={handleMaterialRequestSubmit} className="px-6 py-5">
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-gray-700 mb-1">Material Title *</label>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1">{t("technician.modal.materialTitle")} *</label>
                     <input
                       type="text"
                       name="title"
                       value={materialRequestData.title}
                       onChange={handleMaterialRequestChange}
-                      className="w-full border rounded px-3 py-2"
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
                       placeholder="e.g., Paint, Nails, Wood Panels"
                       required
                     />
                   </div>
                   <div>
-                    <label className="block text-gray-700 mb-1">Description *</label>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1">{t("technician.modal.description")} *</label>
                     <textarea
                       name="description"
                       value={materialRequestData.description}
                       onChange={handleMaterialRequestChange}
-                      className="w-full border rounded px-3 py-2"
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
                       rows="3"
                       placeholder="Describe what you need and why..."
                       required
@@ -626,24 +630,24 @@ const TechnicianDashboard = () => {
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-gray-700 mb-1">Quantity *</label>
+                      <label className="block text-sm font-semibold text-slate-700 mb-1">{t("technician.modal.quantity")} *</label>
                       <input
                         type="number"
                         name="quantity"
                         value={materialRequestData.quantity}
                         onChange={handleMaterialRequestChange}
-                        className="w-full border rounded px-3 py-2"
+                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
                         min="1"
                         required
                       />
                     </div>
                     <div>
-                      <label className="block text-gray-700 mb-1">Urgency *</label>
+                      <label className="block text-sm font-semibold text-slate-700 mb-1">{t("technician.modal.urgency")} *</label>
                       <select
                         name="urgency"
                         value={materialRequestData.urgency}
                         onChange={handleMaterialRequestChange}
-                        className="w-full border rounded px-3 py-2"
+                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
                       >
                         <option value="LOW">Low</option>
                         <option value="MEDIUM">Medium</option>
@@ -656,52 +660,53 @@ const TechnicianDashboard = () => {
                 <div className="flex gap-3 mt-6">
                   <button
                     type="submit"
-                    className="flex-1 bg-purple-600 text-white py-2 rounded font-semibold hover:bg-purple-700"
+                    className="flex-1 rounded-full bg-blue-600 py-2 text-sm font-semibold text-white hover:bg-blue-700"
                   >
-                    Submit Request
+                    {t("technician.modal.submit")}
                   </button>
                   <button
                     type="button"
                     onClick={toggleMaterialRequestForm}
-                    className="flex-1 bg-gray-300 text-gray-700 py-2 rounded font-semibold hover:bg-gray-400"
+                    className="flex-1 rounded-full border border-slate-200 bg-white py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100"
                   >
-                    Cancel
+                    {t("common.cancel")}
                   </button>
                 </div>
               </form>
             </div>
           </div>
-        </div>
       )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div className="bg-white rounded-xl shadow p-6 border-l-4 border-gray-400">
-          <h2 className="font-semibold text-lg mb-2">Assigned Issues</h2>
-          <div className="text-3xl font-bold">{jobs.filter(job => getJobStatus(job) !== 'COMPLETE' && getJobStatus(job) !== 'COMPLETED').length}</div>
-          <p className="text-sm text-gray-500 mt-2">Total jobs assigned to you</p>
+        <div className="bg-white rounded-2xl shadow-sm p-6 border border-slate-100">
+          <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">{t("technician.stats.assigned")}</div>
+          <div className="text-3xl font-black text-slate-900 mt-2">
+            {jobs.filter(job => getJobStatus(job) !== 'COMPLETE' && getJobStatus(job) !== 'COMPLETED').length}
+          </div>
+          <p className="text-sm text-slate-500 mt-2">Total jobs assigned to you</p>
         </div>
 
-        <div className="bg-white rounded-xl shadow p-6 border-l-4 border-blue-500">
-          <h2 className="font-semibold text-lg mb-2">In Progress</h2>
-          <div className="text-3xl font-bold text-blue-600">
+        <div className="bg-white rounded-2xl shadow-sm p-6 border border-blue-100">
+          <div className="text-xs font-bold text-blue-500 uppercase tracking-widest">{t("technician.stats.inProgress")}</div>
+          <div className="text-3xl font-black text-blue-600 mt-2">
             {jobs.filter(job => getJobStatus(job) === 'IN PROGRESS').length}
           </div>
-          <p className="text-sm text-gray-500 mt-2">Currently working on</p>
+          <p className="text-sm text-slate-500 mt-2">Currently working on</p>
         </div>
 
-        <div className="bg-white rounded-xl shadow p-6 border-l-4 border-green-500">
-          <h2 className="font-semibold text-lg mb-2">Completed</h2>
-          <div className="text-3xl font-bold text-green-600">
+        <div className="bg-white rounded-2xl shadow-sm p-6 border border-emerald-100">
+          <div className="text-xs font-bold text-emerald-500 uppercase tracking-widest">{t("technician.stats.completed")}</div>
+          <div className="text-3xl font-black text-emerald-600 mt-2">
             {jobs.filter(job => getJobStatus(job) === 'COMPLETE' || getJobStatus(job) === 'COMPLETED').length}
           </div>
-          <p className="text-sm text-gray-500 mt-2">Finished jobs</p>
+          <p className="text-sm text-slate-500 mt-2">{t("technician.stats.finishedJobs")}</p>
         </div>
 
-        <div className="bg-white rounded-xl shadow p-6 border-l-4 border-purple-500">
-          <h2 className="font-semibold text-lg mb-2">Material Requests</h2>
-          <div className="text-3xl font-bold text-purple-600">{materialRequests.length}</div>
-          <p className="text-sm text-gray-500 mt-2">Requests submitted</p>
+        <div className="bg-white rounded-2xl shadow-sm p-6 border border-purple-100">
+          <div className="text-xs font-bold text-purple-500 uppercase tracking-widest">{t("technician.stats.materials")}</div>
+          <div className="text-3xl font-black text-purple-600 mt-2">{materialRequests.length}</div>
+          <p className="text-sm text-slate-500 mt-2">{t("technician.stats.requestsSubmitted")}</p>
         </div>
       </div>
 
@@ -711,28 +716,28 @@ const TechnicianDashboard = () => {
         <div className="space-y-8">
           {/* Active Work Section (If any) */}
           {jobs.filter(j => getJobStatus(j) === 'IN PROGRESS').length > 0 && (
-            <div className="bg-blue-50/50 border border-blue-100 rounded-3xl p-6 shadow-sm">
-              <h2 className="text-2xl font-black text-blue-900 mb-6 flex items-center gap-3">
+            <div className="bg-white border border-blue-100 rounded-3xl p-6 shadow-sm">
+              <h2 className="text-2xl font-black text-slate-900 mb-6 flex items-center gap-3">
                 <span className="w-2 h-8 bg-blue-600 rounded-full"></span>
-                Active Work
-                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold rounded-full animate-pulse">LIVE</span>
+                {t("technician.activeWork")}
+                <span className="px-2 py-0.5 bg-blue-50 text-blue-700 text-[10px] font-bold rounded-full">LIVE</span>
               </h2>
               <div className="space-y-4">
                 {jobs.filter(j => getJobStatus(j) === 'IN PROGRESS').map(job => (
-                  <div key={`active-${job.id || job._id}`} className="bg-white border-l-4 border-blue-500 rounded-2xl p-5 shadow-sm hover:shadow-md transition cursor-pointer" onClick={() => handleViewJob(job)}>
+                  <div key={`active-${job.id || job._id}`} className="bg-slate-50 border border-slate-100 rounded-2xl p-5 hover:shadow-md transition cursor-pointer" onClick={() => handleViewJob(job)}>
                     <div className="flex justify-between items-start mb-2">
                       <span className="text-xs font-bold text-blue-600 uppercase tracking-wider">{job.location}</span>
                       {job.fixDeadline && (
-                        <span className="text-[10px] font-medium text-gray-400">Due: {new Date(job.fixDeadline).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        <span className="text-[10px] font-medium text-slate-400">Due: {new Date(job.fixDeadline).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                       )}
                     </div>
-                    <h3 className="text-lg font-bold text-gray-900 mb-4">{job.title}</h3>
+                    <h3 className="text-lg font-bold text-slate-900 mb-4">{job.title}</h3>
                     <div className="flex flex-col gap-2">
                       <button
                         onClick={(e) => { e.stopPropagation(); handleViewJob(job); }}
                         className="w-full py-2 bg-blue-600 text-white text-sm font-bold rounded-xl shadow hover:bg-blue-700 transition"
                       >
-                        View Actions
+                        {t("technician.viewActions")}
                       </button>
                       <button
                         onClick={(e) => {
@@ -740,9 +745,9 @@ const TechnicianDashboard = () => {
                           setSelectedJob(job);
                           setShowAfterForm(prev => ({ ...prev, [job.id || job._id]: true }));
                         }}
-                        className="w-full py-2 bg-green-600 text-white text-sm font-bold rounded-xl shadow hover:bg-green-700 transition flex justify-center items-center gap-2"
+                        className="w-full py-2 bg-emerald-600 text-white text-sm font-bold rounded-xl shadow hover:bg-emerald-700 transition flex justify-center items-center gap-2"
                       >
-                        <span>✓</span> Complete Task & Notify
+                        <span>✓</span> {t("technician.completeTask")}
                       </button>
                     </div>
                   </div>
@@ -752,37 +757,37 @@ const TechnicianDashboard = () => {
           )}
 
           {/* My Queue (Assigned Issues) */}
-          <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-6">
+          <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-black text-gray-900 flex items-center gap-3">
+              <h2 className="text-2xl font-black text-slate-900 flex items-center gap-3">
                 <span className="w-2 h-8 bg-purple-600 rounded-full"></span>
-                My Queue
+                {t("technician.myQueue")}
               </h2>
-              <span className="text-xs font-bold bg-gray-100 text-gray-500 px-3 py-1 rounded-full">
+              <span className="text-xs font-bold bg-slate-100 text-slate-500 px-3 py-1 rounded-full">
                 {jobs.filter(j => getJobStatus(j) !== 'IN PROGRESS' && getJobStatus(j) !== 'COMPLETE' && getJobStatus(j) !== 'COMPLETED').length} TASKS
               </span>
             </div>
 
             {jobs.filter(j => getJobStatus(j) !== 'IN PROGRESS' && getJobStatus(j) !== 'COMPLETE' && getJobStatus(j) !== 'COMPLETED').length === 0 ? (
-              <div className="text-center py-12 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
-                <p className="text-gray-400 font-medium">No pending tasks in your queue</p>
+              <div className="text-center py-12 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
+                <p className="text-slate-400 font-medium">{t("technician.noPending")}</p>
               </div>
             ) : (
               <div className="space-y-3">
                 {jobs.filter(j => getJobStatus(j) !== 'IN PROGRESS' && getJobStatus(j) !== 'COMPLETE' && getJobStatus(j) !== 'COMPLETED').map(job => (
-                  <div key={job.id || job._id} className="group bg-white border border-gray-100 rounded-2xl p-4 hover:border-purple-200 hover:shadow-lg transition-all cursor-pointer" onClick={() => handleViewJob(job)}>
+                  <div key={job.id || job._id} className="group bg-white border border-slate-100 rounded-2xl p-4 hover:border-purple-200 hover:shadow-lg transition-all cursor-pointer" onClick={() => handleViewJob(job)}>
                     <div className="flex justify-between items-center">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <span className={`w-2 h-2 rounded-full ${job.priority === 'HIGH' ? 'bg-red-500' : 'bg-amber-400'}`}></span>
-                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{job.location}</span>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{job.location}</span>
                         </div>
-                        <h3 className="text-base font-bold text-gray-900 group-hover:text-purple-600 transition-colors">{job.title}</h3>
+                        <h3 className="text-base font-bold text-slate-900 group-hover:text-purple-600 transition-colors">{job.title}</h3>
                       </div>
                       <div className="shrink-0">
                         <span className={`px-2 py-1 rounded text-[10px] font-black uppercase tracking-tighter ${getJobStatus(job) === 'OVERDUE' ? 'bg-rose-100 text-rose-700' :
                           getJobStatus(job) === 'PENDING' ? 'bg-amber-100 text-amber-700' :
-                            'bg-gray-100 text-gray-700'
+                            'bg-slate-100 text-slate-700'
                           }`}>
                           {getJobStatus(job)}
                         </span>
@@ -798,37 +803,37 @@ const TechnicianDashboard = () => {
         {/* Material Requests & Work History */}
         <div className="space-y-8">
           {/* Material Requests */}
-          <div className="bg-white rounded-xl shadow p-6">
+          <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="font-semibold text-xl">Material Requests</h2>
+              <h2 className="text-2xl font-black text-slate-900">{t("technician.materialRequests")}</h2>
               <button
                 onClick={toggleMaterialRequestForm}
-                className="px-4 py-2 bg-purple-600 text-white text-sm rounded hover:bg-purple-700"
+                className="px-4 py-2 bg-blue-600 text-white text-sm rounded-full hover:bg-blue-700"
               >
-                + New Request
+                + {t("technician.newRequest")}
               </button>
             </div>
 
             {materialRequests.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                No material requests yet
+              <div className="text-center py-8 text-slate-500">
+                {t("technician.noMaterials")}
               </div>
             ) : (
               <div className="space-y-3">
                 {materialRequests.slice(0, 5).map(req => (
-                  <div key={req.id || req._id} className="border rounded p-3">
+                  <div key={req.id || req._id} className="border border-slate-100 rounded-2xl p-4 hover:shadow-sm transition">
                     <div className="flex justify-between items-start">
                       <div>
-                        <h4 className="font-medium text-gray-800">{req.title || req.items?.[0]?.title || ''}</h4>
-                        <p className="text-sm text-gray-600 mt-1">{req.description || ''}</p>
+                        <h4 className="font-semibold text-slate-800">{req.title || req.items?.[0]?.title || ''}</h4>
+                        <p className="text-sm text-slate-500 mt-1">{req.description || ''}</p>
                         <div className="flex gap-2 mt-2">
-                          <span className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
+                          <span className="text-xs bg-slate-100 text-slate-700 px-2 py-1 rounded-full">
                             Qty: {req.quantity || req.items?.[0]?.quantity || ''}
                           </span>
-                          <span className={`text-xs px-2 py-1 rounded ${req.urgency === 'URGENT' ? 'bg-red-100 text-red-700' :
+                          <span className={`text-xs px-2 py-1 rounded-full ${req.urgency === 'URGENT' ? 'bg-red-100 text-red-700' :
                             req.urgency === 'HIGH' ? 'bg-orange-100 text-orange-700' :
                               req.urgency === 'MEDIUM' ? 'bg-yellow-100 text-yellow-700' :
-                                'bg-gray-100 text-gray-700'
+                                'bg-slate-100 text-slate-700'
                             }`}>
                             {req.urgency}
                           </span>
@@ -838,18 +843,18 @@ const TechnicianDashboard = () => {
                         {req.items && req.items.length > 0 && (
                           <div className="mt-2 flex flex-wrap gap-2">
                             {req.items.map(it => (
-                              <span key={it.id || it._id || `${it.materialId}-${it.quantity}`} className="text-xs bg-gray-50 border text-gray-700 px-2 py-1 rounded">
+                              <span key={it.id || it._id || `${it.materialId}-${it.quantity}`} className="text-xs bg-slate-50 border border-slate-200 text-slate-700 px-2 py-1 rounded-full">
                                 {it.title || it.materialId || 'Item'} x {it.quantity}
                               </span>
                             ))}
                           </div>
                         )}
                       </div>
-                      <span className={`text-xs px-2 py-1 rounded ${req.status === 'APPROVED' ? 'bg-green-100 text-green-700' :
+                      <span className={`text-xs px-2 py-1 rounded-full ${req.status === 'APPROVED' ? 'bg-green-100 text-green-700' :
                         req.status === 'PENDING' ? 'bg-yellow-100 text-yellow-700' :
                           req.status === 'REJECTED' ? 'bg-red-100 text-red-700' :
                             req.status === 'FULFILLED' ? 'bg-blue-100 text-blue-700' :
-                              'bg-gray-100 text-gray-700'
+                              'bg-slate-100 text-slate-700'
                         }`}>
                         {req.status}
                       </span>
@@ -860,7 +865,7 @@ const TechnicianDashboard = () => {
                   <div className="text-center pt-4">
                     <button
                       onClick={() => {/* Implement view all */ }}
-                      className="text-sm text-purple-600 hover:text-purple-800"
+                      className="text-sm text-blue-600 hover:text-blue-800"
                     >
                       View all {materialRequests.length} requests
                     </button>
@@ -871,23 +876,23 @@ const TechnicianDashboard = () => {
           </div>
 
           {/* Recent Work History */}
-          <div className="bg-white rounded-xl shadow p-6">
-            <h2 className="font-semibold text-xl mb-4">Recent Work History</h2>
+          <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6">
+            <h2 className="text-2xl font-black text-slate-900 mb-4">{t("technician.recentWorkHistory")}</h2>
             <div className="space-y-3">
               {jobs
                 .filter(job => getJobStatus(job) === 'COMPLETE' || getJobStatus(job) === 'COMPLETED')
                 .slice(0, 5)
                 .map(job => (
-                  <div key={job.id || job._id} className="flex items-center justify-between border-b pb-3 last:border-0">
+                  <div key={job.id || job._id} className="flex items-center justify-between border-b border-slate-100 pb-3 last:border-0">
                     <div>
-                      <h4 className="font-medium text-gray-800">{job.title}</h4>
-                      <p className="text-sm text-gray-500">{job.location}</p>
+                      <h4 className="font-semibold text-slate-800">{job.title}</h4>
+                      <p className="text-sm text-slate-500">{job.location}</p>
                     </div>
-                    <span className="text-sm text-green-600 font-medium">Completed</span>
+                    <span className="text-sm text-emerald-600 font-semibold">Completed</span>
                   </div>
                 ))}
               {jobs.filter(job => getJobStatus(job) === 'COMPLETE' || getJobStatus(job) === 'COMPLETED').length === 0 && (
-                <div className="text-center py-8 text-gray-500">
+                <div className="text-center py-8 text-slate-500">
                   No completed jobs yet
                 </div>
               )}
@@ -898,14 +903,17 @@ const TechnicianDashboard = () => {
 
       {/* Issue Details Modal */}
       {selectedJob && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
             <div className="p-6">
               <div className="flex justify-between items-start mb-4">
-                <h2 className="text-xl font-bold">Issue Details</h2>
+                <div>
+                  <h2 className="text-xl font-bold text-slate-900">{t("technician.issue.title")}</h2>
+                  <p className="text-sm text-slate-500">{t("technician.issue.subtitle")}</p>
+                </div>
                 <button
                   onClick={() => setSelectedJob(null)}
-                  className="text-gray-500 hover:text-gray-700"
+                  className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
                 >
                   ✕
                 </button>
@@ -913,34 +921,34 @@ const TechnicianDashboard = () => {
 
               <div className="space-y-4">
                 <div>
-                  <h3 className="font-semibold text-gray-700">Title</h3>
-                  <p className="text-gray-900">{selectedJob.title}</p>
+                  <h3 className="font-semibold text-slate-700">{t("technician.issue.fieldTitle")}</h3>
+                  <p className="text-slate-900">{selectedJob.title}</p>
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-700">Description</h3>
-                  <p className="text-gray-900">{selectedJob.description}</p>
+                  <h3 className="font-semibold text-slate-700">{t("technician.issue.fieldDescription")}</h3>
+                  <p className="text-slate-900">{selectedJob.description}</p>
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-700">Location</h3>
-                  <p className="text-gray-900">{selectedJob.location}</p>
+                  <h3 className="font-semibold text-slate-700">{t("technician.issue.fieldLocation")}</h3>
+                  <p className="text-slate-900">{selectedJob.location}</p>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <h3 className="font-semibold text-gray-700">Status</h3>
+                    <h3 className="font-semibold text-slate-700">{t("technician.issue.fieldStatus")}</h3>
                     <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${getJobStatus(selectedJob) === 'IN PROGRESS' ? 'bg-blue-100 text-blue-700' :
                       getJobStatus(selectedJob) === 'PENDING' ? 'bg-yellow-100 text-yellow-700' :
                         (getJobStatus(selectedJob) === 'COMPLETE' || getJobStatus(selectedJob) === 'COMPLETED') ? 'bg-green-100 text-green-700' :
                           getJobStatus(selectedJob) === 'OVERDUE' ? 'bg-red-100 text-red-700' :
-                            'bg-gray-100 text-gray-700'
+                            'bg-slate-100 text-slate-700'
                       }`}>
                       {(getJobStatus(selectedJob) === 'COMPLETE' || getJobStatus(selectedJob) === 'COMPLETED') ? 'Complete' : getJobStatus(selectedJob)?.replace('_', ' ') || 'Pending'}
                     </span>
                   </div>
                   <div>
-                    <h3 className="font-semibold text-gray-700">Priority</h3>
+                    <h3 className="font-semibold text-slate-700">{t("technician.issue.fieldPriority")}</h3>
                     <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${selectedJob.priority === 'HIGH' ? 'bg-red-100 text-red-700' :
                       selectedJob.priority === 'MEDIUM' ? 'bg-yellow-100 text-yellow-700' :
-                        selectedJob.priority === 'LOW' ? 'bg-gray-100 text-gray-700' :
+                      selectedJob.priority === 'LOW' ? 'bg-slate-100 text-slate-700' :
                           'bg-purple-100 text-purple-700'
                       }`}>
                       {selectedJob.priority || 'MEDIUM'}
@@ -950,11 +958,11 @@ const TechnicianDashboard = () => {
 
                 {/* Evidence Display */}
                 <div className="border-t pt-4">
-                  <h3 className="font-semibold text-gray-700 mb-2">Evidence</h3>
+                  <h3 className="font-semibold text-slate-700 mb-2">{t("technician.issue.evidence")}</h3>
                   <div className="space-y-3">
                     {getImageUrl(selectedJob.beforePhoto || selectedJob.photo || selectedJob.image) && (
                       <div>
-                        <h4 className="text-sm font-medium text-gray-600">Before (Client Photo)</h4>
+                        <h4 className="text-sm font-medium text-slate-600">{t("technician.issue.beforePhoto")}</h4>
                         <img
                           src={getImageUrl(selectedJob.beforePhoto || selectedJob.photo || selectedJob.image)}
                           alt="Before"
@@ -966,7 +974,7 @@ const TechnicianDashboard = () => {
                     )}
                     {getImageUrl(selectedJob.evidence?.afterImage) && (
                       <div>
-                        <h4 className="text-sm font-medium text-gray-600">After</h4>
+                        <h4 className="text-sm font-medium text-slate-600">{t("technician.issue.afterPhoto")}</h4>
                         <img
                           src={getImageUrl(selectedJob.evidence.afterImage)}
                           alt="After"
@@ -978,8 +986,8 @@ const TechnicianDashboard = () => {
                     )}
                     {selectedJob.evidence?.address && (
                       <div>
-                        <h4 className="text-sm font-medium text-gray-600">Completion Details</h4>
-                        <p className="text-sm text-gray-900">{selectedJob.evidence.address}</p>
+                        <h4 className="text-sm font-medium text-slate-600">{t("technician.issue.completionDetails")}</h4>
+                        <p className="text-sm text-slate-900">{selectedJob.evidence.address}</p>
                       </div>
                     )}
                   </div>
@@ -992,7 +1000,7 @@ const TechnicianDashboard = () => {
                       onClick={() => handleStartWork(selectedJob.id || selectedJob._id)}
                       className="w-full py-3 bg-orange-600 text-white font-bold rounded-xl hover:bg-orange-700 transition shadow-md flex items-center justify-center gap-2"
                     >
-                      Notify Start Work
+                      {t("technician.issue.notifyStart")}
                     </button>
                   )}
 
@@ -1001,7 +1009,7 @@ const TechnicianDashboard = () => {
                       onClick={() => toggleAfterForm(selectedJob.id || selectedJob._id)}
                       className="w-full py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition shadow-md flex items-center justify-center gap-2"
                     >
-                      Complete Task & Submit After evidence
+                      {t("technician.issue.completeAfter")}
                     </button>
                   )}
 
@@ -1016,7 +1024,7 @@ const TechnicianDashboard = () => {
                         }}
                         hasExistingImage={!!(selectedJob.beforePhoto || selectedJob.photo || selectedJob.image)}
                       />
-                      <button onClick={() => handleStartWork(selectedJob.id || selectedJob._id)} className="w-full mt-2 text-sm text-gray-500 hover:underline">Cancel</button>
+                      <button onClick={() => handleStartWork(selectedJob.id || selectedJob._id)} className="w-full mt-2 text-sm text-gray-500 hover:underline">{t("common.cancel")}</button>
                     </div>
                   )}
 
@@ -1029,15 +1037,15 @@ const TechnicianDashboard = () => {
                           setSelectedJob(null);
                         }}
                       />
-                      <button onClick={() => toggleAfterForm(selectedJob.id || selectedJob._id)} className="w-full mt-2 text-sm text-gray-500 hover:underline">Cancel</button>
+                      <button onClick={() => toggleAfterForm(selectedJob.id || selectedJob._id)} className="w-full mt-2 text-sm text-gray-500 hover:underline">{t("common.cancel")}</button>
                     </div>
                   )}
 
                   <button
                     onClick={() => setSelectedJob(null)}
-                    className="w-full py-2 bg-gray-100 text-gray-600 font-semibold rounded-xl hover:bg-gray-200 transition"
+                    className="w-full py-2 bg-slate-100 text-slate-600 font-semibold rounded-xl hover:bg-slate-200 transition"
                   >
-                    Close
+                    {t("common.close")}
                   </button>
                 </div>
               </div>

@@ -1,9 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api/axios";
+import { useLanguage, useTranslation } from "../i18n/LanguageContext";
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
+  const { language, setLanguage } = useLanguage();
+  const { t } = useTranslation();
   const [jobs, setJobs] = useState([]);
   const [technicians, setTechnicians] = useState([]);
   const [inventory, setInventory] = useState([]);
@@ -21,22 +24,36 @@ const AdminDashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
-      <h1 className="text-2xl font-bold mb-6">Fixnest Admin Dashboard</h1>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-6">
+        <h1 className="text-2xl font-bold">{t("admin.title")}</h1>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold text-gray-500">{t("language.label")}</span>
+          <select
+            value={language}
+            onChange={(e) => setLanguage(e.target.value)}
+            className="text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white text-gray-700"
+          >
+            <option value="en">{t("language.english")}</option>
+            <option value="fr">{t("language.french")}</option>
+            <option value="rw">{t("language.kinyarwanda")}</option>
+          </select>
+        </div>
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
         <div className="bg-white rounded-xl shadow p-6">
-          <h2 className="font-semibold text-lg mb-2">Active Jobs</h2>
+          <h2 className="font-semibold text-lg mb-2">{t("admin.activeJobs")}</h2>
           <div className="text-3xl font-bold">{jobs.length}</div>
-          <button className="mt-3 text-indigo-600 hover:underline" onClick={() => navigate("/manager-issues")}>View All Jobs</button>
+          <button className="mt-3 text-indigo-600 hover:underline" onClick={() => navigate("/manager-issues")}>{t("admin.viewAllJobs")}</button>
         </div>
         <div className="bg-white rounded-xl shadow p-6">
-          <h2 className="font-semibold text-lg mb-2">Technician Performance</h2>
+          <h2 className="font-semibold text-lg mb-2">{t("admin.technicianPerformance")}</h2>
           <div className="text-3xl font-bold">{technicians.length}</div>
-          <button className="mt-3 text-indigo-600 hover:underline" onClick={() => navigate("/technician-management")}>View Technicians</button>
+          <button className="mt-3 text-indigo-600 hover:underline" onClick={() => navigate("/technician-management")}>{t("admin.viewTechnicians")}</button>
         </div>
         <div className="bg-white rounded-xl shadow p-6">
-          <h2 className="font-semibold text-lg mb-2">Inventory Status</h2>
+          <h2 className="font-semibold text-lg mb-2">{t("admin.inventoryStatus")}</h2>
           <div className="text-3xl font-bold">{inventory.length}</div>
-          <button className="mt-3 text-indigo-600 hover:underline" onClick={() => navigate("/inventory")}>View Inventory</button>
+          <button className="mt-3 text-indigo-600 hover:underline" onClick={() => navigate("/inventory")}>{t("admin.viewInventory")}</button>
         </div>
         <div className="bg-white rounded-xl shadow p-6">
           <h2 className="font-semibold text-lg mb-2">Financial Summary</h2>

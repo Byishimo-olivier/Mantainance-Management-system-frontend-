@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Bell, Check, ExternalLink, X } from "lucide-react";
 import api from "../api/axios";
+import { useLanguage, useTranslation } from "../i18n/LanguageContext";
 
 /**
  * Enhanced Header for Maintenance Management System
@@ -12,6 +13,8 @@ import api from "../api/axios";
  * - className: Extra classes
  */
 export default function Header({ title, subtitle, right, user, className = "" }) {
+  const { language, setLanguage, languages } = useLanguage();
+  const { t } = useTranslation();
   // Role label mapping
   const roleMap = {
     admin: "Admin",
@@ -105,13 +108,13 @@ export default function Header({ title, subtitle, right, user, className = "" })
               {showNotifications && (
                 <div className="absolute right-0 mt-3 w-80 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden z-[100] animate-in slide-in-from-top-2 duration-300">
                   <div className="p-4 bg-gray-50/50 border-b border-gray-100 flex items-center justify-between">
-                    <h3 className="font-bold text-gray-900">Notifications</h3>
+                    <h3 className="font-bold text-gray-900">{t("header.notifications")}</h3>
                     {unreadCount > 0 && (
                       <button
                         onClick={markAllRead}
                         className="text-xs font-semibold text-indigo-600 hover:text-indigo-700"
                       >
-                        Mark all as read
+                        {t("header.markAllRead")}
                       </button>
                     )}
                   </div>
@@ -157,18 +160,32 @@ export default function Header({ title, subtitle, right, user, className = "" })
                         <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-3">
                           <Bell className="w-6 h-6 text-gray-300" />
                         </div>
-                        <p className="text-sm text-gray-500">No notifications yet</p>
+                        <p className="text-sm text-gray-500">{t("header.noNotifications")}</p>
                       </div>
                     )}
                   </div>
 
                   <div className="p-3 bg-gray-50/50 border-t border-gray-100 text-center">
-                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">End of alerts</span>
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{t("header.endOfAlerts")}</span>
                   </div>
                 </div>
               )}
             </div>
           )}
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-semibold text-gray-500">{t("language.label")}</span>
+            <select
+              value={language}
+              onChange={(e) => setLanguage(e.target.value)}
+              className="text-[11px] border border-gray-200 rounded-lg px-2 py-1 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+            >
+              {languages.map((lang) => (
+                <option key={lang.code} value={lang.code}>
+                  {lang.label}
+                </option>
+              ))}
+            </select>
+          </div>
           {right}
         </div>}
       </div>
