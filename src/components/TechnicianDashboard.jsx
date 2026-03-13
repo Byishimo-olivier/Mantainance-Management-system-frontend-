@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import backgroundVideo from "../assets/136906-765457769_small.mp4";
 import api from "../api/axios";
 import { getImageUrl } from '../utils/imageUrl';
 import { useNavigate } from 'react-router-dom';
@@ -44,9 +45,9 @@ function BeforeEvidenceForm({ issueId, onSuccess, hasExistingImage }) {
     setLoading(false);
   };
   return (
-    <form className="bg-white rounded-xl shadow-lg border border-orange-100 p-6 max-w-lg mx-auto" onSubmit={handleSubmit}>
-      <h2 className="font-bold text-xl mb-4 text-orange-600 flex items-center gap-2">
-        <span className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center text-sm">1</span>
+    <form className="glass-surface-strong rounded-2xl p-6 max-w-lg mx-auto" onSubmit={handleSubmit}>
+      <h2 className="font-bold text-xl mb-4 text-blue-700 flex items-center gap-2">
+        <span className="w-8 h-8 bg-blue-100/70 text-blue-700 rounded-full flex items-center justify-center text-sm">1</span>
         Start Working
       </h2>
       <div className="mb-4">
@@ -58,7 +59,7 @@ function BeforeEvidenceForm({ issueId, onSuccess, hasExistingImage }) {
           accept="image/*"
           onChange={handleFileChange}
           required={!hasExistingImage}
-          className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100 transition-colors"
+          className="w-full text-sm text-slate-600 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-100/70 file:text-blue-700 hover:file:bg-blue-200/80 transition-colors"
         />
         {hasExistingImage && <p className="text-[10px] text-gray-400 mt-1 italic">An image already exists, so this is optional.</p>}
       </div>
@@ -66,7 +67,7 @@ function BeforeEvidenceForm({ issueId, onSuccess, hasExistingImage }) {
         <label className="block text-gray-700 mb-1 font-medium">Starting Location/Notes *</label>
         <input
           type="text"
-          className="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-orange-500 outline-none"
+          className="w-full rounded-xl glass-input px-3 py-2 focus:ring-2 focus:ring-blue-300/60 focus:border-blue-400 outline-none"
           value={address}
           onChange={(e) => setAddress(e.target.value)}
           placeholder="Confirm current location or starting notes..."
@@ -77,7 +78,7 @@ function BeforeEvidenceForm({ issueId, onSuccess, hasExistingImage }) {
         <label className="block text-gray-700 mb-1 font-medium">Estimated Time (minutes) *</label>
         <input
           type="number"
-          className="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-orange-500 outline-none"
+          className="w-full rounded-xl glass-input px-3 py-2 focus:ring-2 focus:ring-blue-300/60 focus:border-blue-400 outline-none"
           value={fixTime}
           onChange={(e) => setFixTime(e.target.value)}
           placeholder="How many minutes will this take?"
@@ -87,7 +88,7 @@ function BeforeEvidenceForm({ issueId, onSuccess, hasExistingImage }) {
       </div>
       <button
         type="submit"
-        className="w-full bg-orange-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-orange-700 transition shadow-lg"
+        className="w-full glass-surface bg-blue-500/30 text-white px-6 py-3 rounded-2xl font-black uppercase tracking-widest hover:bg-blue-500/50 transition-all shadow-xl border border-blue-400/30"
         disabled={loading}
       >
         {loading ? "Starting..." : "Start Working Now"}
@@ -135,16 +136,22 @@ function AfterEvidenceForm({ issueId, onSuccess }) {
   };
 
   return (
-    <form className="bg-white rounded-xl shadow p-6 max-w-lg mx-auto" onSubmit={handleSubmit}>
-      <h2 className="font-semibold text-lg mb-4">Upload AFTER Evidence</h2>
+    <form className="glass-surface-strong rounded-2xl p-6 max-w-lg mx-auto" onSubmit={handleSubmit}>
+      <h2 className="font-semibold text-lg mb-4 text-blue-800">Upload AFTER Evidence</h2>
       <div className="mb-4">
         <label className="block text-gray-700 mb-1">Upload AFTER image</label>
-        <input type="file" accept="image/*" onChange={handleFileChange} required />
+        <input
+          type="file"
+          accept="image/*"
+          onChange={handleFileChange}
+          required
+          className="w-full text-sm text-slate-600 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-100/70 file:text-blue-700 hover:file:bg-blue-200/80 transition-colors"
+        />
       </div>
       <div className="mb-4">
         <label className="block text-gray-700 mb-1">Completion Details</label>
         <textarea
-          className="w-full border rounded px-3 py-2"
+          className="w-full rounded-xl glass-input px-3 py-2 focus:ring-2 focus:ring-blue-300/60 focus:border-blue-400 outline-none"
           rows="3"
           value={completionDetails}
           onChange={(e) => setCompletionDetails(e.target.value)}
@@ -154,7 +161,7 @@ function AfterEvidenceForm({ issueId, onSuccess }) {
       </div>
       <button
         type="submit"
-        className="bg-green-600 text-white px-6 py-2 rounded font-semibold hover:bg-green-700"
+        className="w-full glass-surface bg-emerald-500/30 text-white px-6 py-2 rounded-xl font-bold uppercase tracking-widest hover:bg-emerald-500/50 transition-all border border-emerald-400/30"
         disabled={loading}
       >
         {loading ? "Uploading..." : "Submit AFTER Evidence"}
@@ -456,19 +463,25 @@ const TechnicianDashboard = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-slate-50 px-4 pb-16 pt-6 md:px-8">
+    <div className="glass-theme-blue min-h-screen text-slate-900 overflow-hidden relative" style={{ fontFamily: "'DM Sans', 'Segoe UI', system-ui, sans-serif" }}>
+      <div className="video-background-container">
+        <video autoPlay loop muted playsInline className="video-background text-transparent">
+          <source src={backgroundVideo} type="video/mp4" />
+        </video>
+      </div>
+      <div className="relative z-10 min-h-screen px-4 pb-16 pt-6 md:px-8 overflow-y-auto">
       {/* Reminders Panel */}
       {alerts.length > 0 && (
         <div className="fixed top-20 right-4 z-50 max-w-sm w-full">
-          <div className="bg-slate-900 border-l-4 border-purple-500 text-white p-4 shadow-2xl rounded-r-xl animate-in slide-in-from-right duration-300">
+          <div className="glass-surface-strong text-white p-6 shadow-2xl rounded-2xl animate-in slide-in-from-right duration-300 border border-white/20">
             <div className="flex justify-between items-center mb-3">
               <div className="flex items-center gap-2">
                 <span className="text-xl">⏰</span>
-                <p className="font-bold text-lg text-purple-200">Task Alerts</p>
+                <p className="font-black text-xl text-white tracking-tight">Task Alerts</p>
               </div>
               <button
                 onClick={() => setAlerts([])}
-                className="text-gray-400 hover:text-white transition-colors"
+                className="text-slate-500 hover:text-slate-800 transition-colors"
                 title="Close"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -476,7 +489,7 @@ const TechnicianDashboard = () => {
                 </svg>
               </button>
             </div>
-            <p className="text-sm mb-4 text-gray-300">You have {alerts.length} {alerts.length === 1 ? 'task' : 'tasks'} requiring attention.</p>
+            <p className="text-sm mb-4 text-slate-600">You have {alerts.length} {alerts.length === 1 ? 'task' : 'tasks'} requiring attention.</p>
 
             <div className="space-y-3 max-h-80 overflow-y-auto pr-1 select-none custom-scrollbar">
               {alerts.map((a) => {
@@ -485,12 +498,12 @@ const TechnicianDashboard = () => {
                 const isOverdue = remaining?.isOverdue;
 
                 return (
-                  <div key={`${a.type}-${id}`} className={`p-3 rounded-lg border shadow-sm transition-all ${isOverdue ? 'bg-red-900/40 border-red-500/50' : 'bg-slate-800 border-slate-700'
+                  <div key={`${a.type}-${id}`} className={`p-3 rounded-lg border shadow-sm transition-all ${isOverdue ? 'bg-red-50/70 border-red-200/70' : 'glass-ghost'
                     }`}>
                     <div className="flex justify-between items-start gap-2 mb-2">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${a.type === 'MAINTENANCE' ? 'bg-purple-500/20 text-purple-300' : 'bg-blue-500/20 text-blue-300'
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${a.type === 'MAINTENANCE' ? 'bg-blue-100/70 text-blue-700' : 'bg-sky-100/70 text-sky-700'
                             }`}>
                             {a.type}
                           </span>
@@ -500,9 +513,9 @@ const TechnicianDashboard = () => {
                             </span>
                           )}
                         </div>
-                        <p className="font-semibold text-white leading-tight text-sm">{a.name}</p>
+                        <p className="font-semibold text-slate-900 leading-tight text-sm">{a.name}</p>
                       </div>
-                      <div className={`text-right ${isOverdue ? 'text-red-400' : 'text-purple-300'}`}>
+                      <div className={`text-right ${isOverdue ? 'text-red-600' : 'text-blue-700'}`}>
                         <p className="text-xs font-bold whitespace-nowrap">
                           {isOverdue ? 'LATE BY' : 'REMAINING'}
                         </p>
@@ -516,7 +529,7 @@ const TechnicianDashboard = () => {
                       {a.type === 'MAINTENANCE' ? (
                         <>
                           <button
-                            className="flex-1 px-3 py-1.5 bg-purple-600 text-white text-xs font-semibold rounded-md hover:bg-purple-500 transition-colors shadow-sm"
+                            className="flex-1 px-3 py-1.5 glass-surface bg-blue-500/30 text-white text-[10px] font-black uppercase tracking-tighter rounded-lg hover:bg-blue-500/50 transition-all border border-blue-400/20"
                             onClick={() => dismissOne(id, a.type)}
                           >
                             Dismiss
@@ -545,15 +558,15 @@ const TechnicianDashboard = () => {
               })}
             </div>
 
-            <div className="mt-4 pt-3 border-t border-slate-700 flex gap-2">
+            <div className="mt-4 pt-3 border-t border-white/40 flex gap-2">
               <button
-                className="flex-1 px-3 py-2 bg-slate-800 text-gray-300 text-xs font-bold rounded-lg hover:bg-slate-700 transition-colors border border-slate-700"
+                className="flex-1 px-3 py-2 glass-ghost text-slate-700 text-xs font-bold rounded-lg hover:bg-white/80 transition-colors"
                 onClick={dismissAll}
               >
                 {t("technician.alerts.dismissAll")}
               </button>
               <button
-                className="flex-1 px-3 py-2 bg-amber-700/50 text-amber-200 text-xs font-bold rounded-lg hover:bg-amber-700 transition-colors border border-amber-600/50"
+                className="flex-1 px-3 py-2 bg-amber-200/40 text-amber-800 text-xs font-bold rounded-lg hover:bg-amber-200/60 transition-colors border border-amber-200/60"
                 onClick={() => snoozeAll(60)}
               >
                 {t("technician.alerts.snoozeAll")}
@@ -572,13 +585,13 @@ const TechnicianDashboard = () => {
           <div className="flex flex-wrap items-center gap-3">
             <button
               onClick={toggleMaterialRequestForm}
-              className="px-5 py-2 bg-blue-600 text-white rounded-full font-semibold hover:bg-blue-700 transition shadow-sm"
+              className="px-6 py-2 glass-surface bg-blue-500/30 text-white rounded-full font-bold uppercase tracking-widest hover:bg-blue-500/50 transition-all border border-blue-400/20 shadow-lg"
             >
               {t("technician.requestMaterials")}
             </button>
             <button
               onClick={handleLogout}
-              className="px-5 py-2 bg-white text-slate-600 rounded-full font-semibold hover:bg-slate-100 transition border border-slate-200"
+              className="px-5 py-2 glass-ghost text-slate-700 rounded-full font-semibold hover:bg-white/80 transition"
             >
               {t("technician.logout")}
             </button>
@@ -588,16 +601,16 @@ const TechnicianDashboard = () => {
 
       {/* Material Request Form Modal */}
       {showMaterialRequestForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-md">
+          <div className="w-full max-w-lg rounded-2xl glass-surface-strong shadow-2xl">
+            <div className="flex items-center justify-between border-b border-white/40 px-6 py-4">
               <div>
                 <h2 className="text-xl font-bold text-slate-900">{t("technician.modal.title")}</h2>
                 <p className="text-sm text-slate-500">{t("technician.modal.subtitle")}</p>
               </div>
               <button
                   onClick={toggleMaterialRequestForm}
-                  className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                  className="rounded-full p-2 text-slate-500 hover:bg-white/70 hover:text-slate-700"
                 >
                   ✕
               </button>
@@ -611,7 +624,7 @@ const TechnicianDashboard = () => {
                       name="title"
                       value={materialRequestData.title}
                       onChange={handleMaterialRequestChange}
-                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
+                      className="w-full rounded-xl glass-input px-3 py-2 text-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-300/60 outline-none"
                       placeholder="e.g., Paint, Nails, Wood Panels"
                       required
                     />
@@ -622,7 +635,7 @@ const TechnicianDashboard = () => {
                       name="description"
                       value={materialRequestData.description}
                       onChange={handleMaterialRequestChange}
-                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
+                      className="w-full rounded-xl glass-input px-3 py-2 text-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-300/60 outline-none"
                       rows="3"
                       placeholder="Describe what you need and why..."
                       required
@@ -636,7 +649,7 @@ const TechnicianDashboard = () => {
                         name="quantity"
                         value={materialRequestData.quantity}
                         onChange={handleMaterialRequestChange}
-                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
+                        className="w-full rounded-xl glass-input px-3 py-2 text-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-300/60 outline-none"
                         min="1"
                         required
                       />
@@ -647,7 +660,7 @@ const TechnicianDashboard = () => {
                         name="urgency"
                         value={materialRequestData.urgency}
                         onChange={handleMaterialRequestChange}
-                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
+                        className="w-full rounded-xl glass-input px-3 py-2 text-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-300/60 outline-none"
                       >
                         <option value="LOW">Low</option>
                         <option value="MEDIUM">Medium</option>
@@ -667,7 +680,7 @@ const TechnicianDashboard = () => {
                   <button
                     type="button"
                     onClick={toggleMaterialRequestForm}
-                    className="flex-1 rounded-full border border-slate-200 bg-white py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100"
+                    className="flex-1 rounded-full glass-ghost py-2 text-sm font-semibold text-slate-700 hover:bg-white/80"
                   >
                     {t("common.cancel")}
                   </button>
@@ -679,7 +692,7 @@ const TechnicianDashboard = () => {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div className="bg-white rounded-2xl shadow-sm p-6 border border-slate-100">
+        <div className="glass-surface rounded-2xl shadow-lg p-6 border border-blue-100/60">
           <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">{t("technician.stats.assigned")}</div>
           <div className="text-3xl font-black text-slate-900 mt-2">
             {jobs.filter(job => getJobStatus(job) !== 'COMPLETE' && getJobStatus(job) !== 'COMPLETED').length}
@@ -687,7 +700,7 @@ const TechnicianDashboard = () => {
           <p className="text-sm text-slate-500 mt-2">Total jobs assigned to you</p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm p-6 border border-blue-100">
+        <div className="glass-surface rounded-2xl shadow-lg p-6 border border-blue-200/60">
           <div className="text-xs font-bold text-blue-500 uppercase tracking-widest">{t("technician.stats.inProgress")}</div>
           <div className="text-3xl font-black text-blue-600 mt-2">
             {jobs.filter(job => getJobStatus(job) === 'IN PROGRESS').length}
@@ -695,7 +708,7 @@ const TechnicianDashboard = () => {
           <p className="text-sm text-slate-500 mt-2">Currently working on</p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm p-6 border border-emerald-100">
+        <div className="glass-surface rounded-2xl shadow-lg p-6 border border-emerald-200/60">
           <div className="text-xs font-bold text-emerald-500 uppercase tracking-widest">{t("technician.stats.completed")}</div>
           <div className="text-3xl font-black text-emerald-600 mt-2">
             {jobs.filter(job => getJobStatus(job) === 'COMPLETE' || getJobStatus(job) === 'COMPLETED').length}
@@ -703,9 +716,9 @@ const TechnicianDashboard = () => {
           <p className="text-sm text-slate-500 mt-2">{t("technician.stats.finishedJobs")}</p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm p-6 border border-purple-100">
-          <div className="text-xs font-bold text-purple-500 uppercase tracking-widest">{t("technician.stats.materials")}</div>
-          <div className="text-3xl font-black text-purple-600 mt-2">{materialRequests.length}</div>
+        <div className="glass-surface rounded-2xl shadow-lg p-6 border border-blue-200/60">
+          <div className="text-xs font-bold text-blue-600 uppercase tracking-widest">{t("technician.stats.materials")}</div>
+          <div className="text-3xl font-black text-blue-700 mt-2">{materialRequests.length}</div>
           <p className="text-sm text-slate-500 mt-2">{t("technician.stats.requestsSubmitted")}</p>
         </div>
       </div>
@@ -716,15 +729,15 @@ const TechnicianDashboard = () => {
         <div className="space-y-8">
           {/* Active Work Section (If any) */}
           {jobs.filter(j => getJobStatus(j) === 'IN PROGRESS').length > 0 && (
-            <div className="bg-white border border-blue-100 rounded-3xl p-6 shadow-sm">
+            <div className="glass-surface border border-blue-200/60 rounded-3xl p-6 shadow-lg">
               <h2 className="text-2xl font-black text-slate-900 mb-6 flex items-center gap-3">
                 <span className="w-2 h-8 bg-blue-600 rounded-full"></span>
                 {t("technician.activeWork")}
-                <span className="px-2 py-0.5 bg-blue-50 text-blue-700 text-[10px] font-bold rounded-full">LIVE</span>
+                <span className="px-2 py-0.5 bg-blue-100/70 text-blue-700 text-[10px] font-bold rounded-full">LIVE</span>
               </h2>
               <div className="space-y-4">
                 {jobs.filter(j => getJobStatus(j) === 'IN PROGRESS').map(job => (
-                  <div key={`active-${job.id || job._id}`} className="bg-slate-50 border border-slate-100 rounded-2xl p-5 hover:shadow-md transition cursor-pointer" onClick={() => handleViewJob(job)}>
+                  <div key={`active-${job.id || job._id}`} className="glass-surface border border-white/50 rounded-2xl p-5 hover:shadow-md transition cursor-pointer" onClick={() => handleViewJob(job)}>
                     <div className="flex justify-between items-start mb-2">
                       <span className="text-xs font-bold text-blue-600 uppercase tracking-wider">{job.location}</span>
                       {job.fixDeadline && (
@@ -757,37 +770,37 @@ const TechnicianDashboard = () => {
           )}
 
           {/* My Queue (Assigned Issues) */}
-          <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6">
+          <div className="glass-surface rounded-3xl shadow-lg border border-white/50 p-6">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-black text-slate-900 flex items-center gap-3">
-                <span className="w-2 h-8 bg-purple-600 rounded-full"></span>
+                <span className="w-2 h-8 bg-blue-600 rounded-full"></span>
                 {t("technician.myQueue")}
               </h2>
-              <span className="text-xs font-bold bg-slate-100 text-slate-500 px-3 py-1 rounded-full">
+              <span className="text-xs font-bold bg-blue-100/70 text-blue-700 px-3 py-1 rounded-full">
                 {jobs.filter(j => getJobStatus(j) !== 'IN PROGRESS' && getJobStatus(j) !== 'COMPLETE' && getJobStatus(j) !== 'COMPLETED').length} TASKS
               </span>
             </div>
 
             {jobs.filter(j => getJobStatus(j) !== 'IN PROGRESS' && getJobStatus(j) !== 'COMPLETE' && getJobStatus(j) !== 'COMPLETED').length === 0 ? (
-              <div className="text-center py-12 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
+              <div className="text-center py-12 bg-white/40 backdrop-blur-md rounded-2xl border-2 border-dashed border-white/60">
                 <p className="text-slate-400 font-medium">{t("technician.noPending")}</p>
               </div>
             ) : (
               <div className="space-y-3">
                 {jobs.filter(j => getJobStatus(j) !== 'IN PROGRESS' && getJobStatus(j) !== 'COMPLETE' && getJobStatus(j) !== 'COMPLETED').map(job => (
-                  <div key={job.id || job._id} className="group bg-white border border-slate-100 rounded-2xl p-4 hover:border-purple-200 hover:shadow-lg transition-all cursor-pointer" onClick={() => handleViewJob(job)}>
+                  <div key={job.id || job._id} className="group glass-surface border border-white/50 rounded-2xl p-4 hover:border-blue-200/70 hover:shadow-lg transition-all cursor-pointer" onClick={() => handleViewJob(job)}>
                     <div className="flex justify-between items-center">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <span className={`w-2 h-2 rounded-full ${job.priority === 'HIGH' ? 'bg-red-500' : 'bg-amber-400'}`}></span>
                           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{job.location}</span>
                         </div>
-                        <h3 className="text-base font-bold text-slate-900 group-hover:text-purple-600 transition-colors">{job.title}</h3>
+                        <h3 className="text-base font-bold text-slate-900 group-hover:text-blue-700 transition-colors">{job.title}</h3>
                       </div>
                       <div className="shrink-0">
                         <span className={`px-2 py-1 rounded text-[10px] font-black uppercase tracking-tighter ${getJobStatus(job) === 'OVERDUE' ? 'bg-rose-100 text-rose-700' :
                           getJobStatus(job) === 'PENDING' ? 'bg-amber-100 text-amber-700' :
-                            'bg-slate-100 text-slate-700'
+                            'bg-blue-100/70 text-blue-700'
                           }`}>
                           {getJobStatus(job)}
                         </span>
@@ -803,7 +816,7 @@ const TechnicianDashboard = () => {
         {/* Material Requests & Work History */}
         <div className="space-y-8">
           {/* Material Requests */}
-          <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6">
+          <div className="glass-surface rounded-3xl shadow-lg border border-white/50 p-6">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-black text-slate-900">{t("technician.materialRequests")}</h2>
               <button
@@ -819,48 +832,109 @@ const TechnicianDashboard = () => {
                 {t("technician.noMaterials")}
               </div>
             ) : (
-              <div className="space-y-3">
-                {materialRequests.slice(0, 5).map(req => (
-                  <div key={req.id || req._id} className="border border-slate-100 rounded-2xl p-4 hover:shadow-sm transition">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h4 className="font-semibold text-slate-800">{req.title || req.items?.[0]?.title || ''}</h4>
-                        <p className="text-sm text-slate-500 mt-1">{req.description || ''}</p>
-                        <div className="flex gap-2 mt-2">
-                          <span className="text-xs bg-slate-100 text-slate-700 px-2 py-1 rounded-full">
-                            Qty: {req.quantity || req.items?.[0]?.quantity || ''}
-                          </span>
-                          <span className={`text-xs px-2 py-1 rounded-full ${req.urgency === 'URGENT' ? 'bg-red-100 text-red-700' :
-                            req.urgency === 'HIGH' ? 'bg-orange-100 text-orange-700' :
-                              req.urgency === 'MEDIUM' ? 'bg-yellow-100 text-yellow-700' :
-                                'bg-slate-100 text-slate-700'
-                            }`}>
-                            {req.urgency}
-                          </span>
-                        </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-[980px] w-full text-left text-sm">
+                  <thead className="text-[11px] uppercase tracking-wide text-slate-500">
+                    <tr className="border-b border-white/50">
+                      <th className="px-3 py-3 w-10">
+                        <input type="checkbox" className="w-4 h-4 rounded border-slate-300" disabled />
+                      </th>
+                      <th className="px-3 py-3">Title</th>
+                      <th className="px-3 py-3">Image</th>
+                      <th className="px-3 py-3">Asset</th>
+                      <th className="px-3 py-3">Status</th>
+                      <th className="px-3 py-3">Work Order</th>
+                      <th className="px-3 py-3">Submitted</th>
+                      <th className="px-3 py-3">Category</th>
+                      <th className="px-3 py-3">Submitted By</th>
+                      <th className="px-3 py-3 text-right">Priority</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/50">
+                    {materialRequests.slice(0, 5).map(req => {
+                      const id = req.id || req._id;
+                      const status = req.status || (req.approved ? 'APPROVED' : 'PENDING');
+                      const priority = req.urgency || req.priority || 'NORMAL';
+                      const imagePath = req.photo || req.image || req.beforePhoto || req.afterPhoto || req.file || req.files?.[0];
+                      const imageUrl = imagePath ? getImageUrl(imagePath) : '';
+                      const asset = req.assetName || req.asset?.name || req.asset || req.items?.[0]?.title || req.items?.[0]?.materialId || '—';
+                      const workOrder = req.workOrderId || req.workOrder || req.issueId || req.workOrderNumber || '—';
+                      const submittedAt = req.createdAt || req.submittedAt || req.date;
+                      const submittedBy = req.submittedBy || req.requestorName || req.userName || req.name || req.email || '—';
+                      const category = req.category || req.type || req.submissionType || '—';
+                      const statusClass =
+                        status === 'APPROVED' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' :
+                          status === 'REJECTED' ? 'bg-rose-100 text-rose-700 border-rose-200' :
+                            status === 'FULFILLED' ? 'bg-blue-100 text-blue-700 border-blue-200' :
+                              'bg-amber-100 text-amber-700 border-amber-200';
+                      const priorityClass =
+                        priority === 'URGENT' ? 'bg-rose-100 text-rose-700 border-rose-200' :
+                          priority === 'HIGH' ? 'bg-orange-100 text-orange-700 border-orange-200' :
+                            priority === 'MEDIUM' ? 'bg-amber-100 text-amber-700 border-amber-200' :
+                              'bg-blue-100 text-blue-700 border-blue-200';
 
-                        {/* If there are item records, show them explicitly */}
-                        {req.items && req.items.length > 0 && (
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            {req.items.map(it => (
-                              <span key={it.id || it._id || `${it.materialId}-${it.quantity}`} className="text-xs bg-slate-50 border border-slate-200 text-slate-700 px-2 py-1 rounded-full">
-                                {it.title || it.materialId || 'Item'} x {it.quantity}
+                      return (
+                        <tr key={id} className="hover:bg-white/40 transition-colors align-middle">
+                          <td className="px-3 py-3">
+                            <input type="checkbox" className="w-4 h-4 rounded border-slate-300" disabled />
+                          </td>
+                          <td className="px-3 py-3">
+                            <div className="font-semibold text-slate-800 line-clamp-1" title={req.title || req.items?.[0]?.title || ''}>
+                              {req.title || req.items?.[0]?.title || 'Untitled'}
+                            </div>
+                          </td>
+                          <td className="px-3 py-3">
+                            {imageUrl ? (
+                              <img
+                                src={imageUrl}
+                                alt="Request"
+                                className="h-9 w-12 rounded-lg object-cover border border-white/60"
+                                onError={e => { e.currentTarget.style.display = 'none'; }}
+                              />
+                            ) : (
+                              <div className="h-9 w-12 rounded-lg border border-white/60 bg-white/60 flex items-center justify-center text-xs text-slate-400">
+                                —
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-3 py-3 text-slate-700">{asset}</td>
+                          <td className="px-3 py-3">
+                            <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${statusClass}`}>
+                              {status}
+                            </span>
+                          </td>
+                          <td className="px-3 py-3 text-slate-700">{workOrder}</td>
+                          <td className="px-3 py-3 text-slate-600">
+                            {submittedAt ? (
+                              <div>
+                                <div className="text-xs font-semibold text-slate-700">
+                                  {new Date(submittedAt).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' })}
+                                </div>
+                                <div className="text-[10px] text-slate-400">
+                                  {new Date(submittedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                                </div>
+                              </div>
+                            ) : '—'}
+                          </td>
+                          <td className="px-3 py-3 text-slate-700">{category}</td>
+                          <td className="px-3 py-3">
+                            <div className="flex items-center gap-2">
+                              <span className="w-6 h-6 rounded-full bg-white/70 border border-white/60 text-[10px] font-bold text-slate-600 flex items-center justify-center">
+                                {String(submittedBy || '—').trim().charAt(0).toUpperCase()}
                               </span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                      <span className={`text-xs px-2 py-1 rounded-full ${req.status === 'APPROVED' ? 'bg-green-100 text-green-700' :
-                        req.status === 'PENDING' ? 'bg-yellow-100 text-yellow-700' :
-                          req.status === 'REJECTED' ? 'bg-red-100 text-red-700' :
-                            req.status === 'FULFILLED' ? 'bg-blue-100 text-blue-700' :
-                              'bg-slate-100 text-slate-700'
-                        }`}>
-                        {req.status}
-                      </span>
-                    </div>
-                  </div>
-                ))}
+                              <span className="text-slate-700 text-xs line-clamp-1" title={submittedBy}>{submittedBy}</span>
+                            </div>
+                          </td>
+                          <td className="px-3 py-3 text-right">
+                            <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${priorityClass}`}>
+                              {priority}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
                 {materialRequests.length > 5 && (
                   <div className="text-center pt-4">
                     <button
@@ -876,14 +950,14 @@ const TechnicianDashboard = () => {
           </div>
 
           {/* Recent Work History */}
-          <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6">
+          <div className="glass-surface rounded-3xl shadow-lg border border-white/50 p-6">
             <h2 className="text-2xl font-black text-slate-900 mb-4">{t("technician.recentWorkHistory")}</h2>
             <div className="space-y-3">
               {jobs
                 .filter(job => getJobStatus(job) === 'COMPLETE' || getJobStatus(job) === 'COMPLETED')
                 .slice(0, 5)
                 .map(job => (
-                  <div key={job.id || job._id} className="flex items-center justify-between border-b border-slate-100 pb-3 last:border-0">
+                  <div key={job.id || job._id} className="flex items-center justify-between border-b border-white/50 pb-3 last:border-0">
                     <div>
                       <h4 className="font-semibold text-slate-800">{job.title}</h4>
                       <p className="text-sm text-slate-500">{job.location}</p>
@@ -903,8 +977,8 @@ const TechnicianDashboard = () => {
 
       {/* Issue Details Modal */}
       {selectedJob && (
-        <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+        <div className="fixed inset-0 bg-slate-900/40 flex items-center justify-center p-4 z-50 backdrop-blur-md">
+          <div className="glass-surface-strong rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
             <div className="p-6">
               <div className="flex justify-between items-start mb-4">
                 <div>
@@ -913,7 +987,7 @@ const TechnicianDashboard = () => {
                 </div>
                 <button
                   onClick={() => setSelectedJob(null)}
-                  className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                  className="rounded-full p-2 text-slate-500 hover:bg-white/70 hover:text-slate-700"
                 >
                   ✕
                 </button>
@@ -939,7 +1013,7 @@ const TechnicianDashboard = () => {
                       getJobStatus(selectedJob) === 'PENDING' ? 'bg-yellow-100 text-yellow-700' :
                         (getJobStatus(selectedJob) === 'COMPLETE' || getJobStatus(selectedJob) === 'COMPLETED') ? 'bg-green-100 text-green-700' :
                           getJobStatus(selectedJob) === 'OVERDUE' ? 'bg-red-100 text-red-700' :
-                            'bg-slate-100 text-slate-700'
+                            'bg-blue-100/70 text-blue-700'
                       }`}>
                       {(getJobStatus(selectedJob) === 'COMPLETE' || getJobStatus(selectedJob) === 'COMPLETED') ? 'Complete' : getJobStatus(selectedJob)?.replace('_', ' ') || 'Pending'}
                     </span>
@@ -948,12 +1022,18 @@ const TechnicianDashboard = () => {
                     <h3 className="font-semibold text-slate-700">{t("technician.issue.fieldPriority")}</h3>
                     <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${selectedJob.priority === 'HIGH' ? 'bg-red-100 text-red-700' :
                       selectedJob.priority === 'MEDIUM' ? 'bg-yellow-100 text-yellow-700' :
-                      selectedJob.priority === 'LOW' ? 'bg-slate-100 text-slate-700' :
-                          'bg-purple-100 text-purple-700'
+                      selectedJob.priority === 'LOW' ? 'bg-blue-100/70 text-blue-700' :
+                          'bg-blue-100 text-blue-700'
                       }`}>
                       {selectedJob.priority || 'MEDIUM'}
                     </span>
                   </div>
+                </div>
+                <div>
+                  <h3 className="font-semibold text-slate-700">Frequency</h3>
+                  <span className="inline-block px-2 py-1 rounded text-xs font-semibold bg-blue-100/70 text-blue-700">
+                    {selectedJob.frequency || selectedJob.interval || selectedJob?.checklist?.frequency || 'Not set'}
+                  </span>
                 </div>
 
                 {/* Evidence Display */}
@@ -998,7 +1078,7 @@ const TechnicianDashboard = () => {
                   {['PENDING', 'ASSIGNED', 'OVERDUE'].includes(getJobStatus(selectedJob).toUpperCase()) && !showBeforeForm[selectedJob.id || selectedJob._id] && (
                     <button
                       onClick={() => handleStartWork(selectedJob.id || selectedJob._id)}
-                      className="w-full py-3 bg-orange-600 text-white font-bold rounded-xl hover:bg-orange-700 transition shadow-md flex items-center justify-center gap-2"
+                      className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition shadow-md flex items-center justify-center gap-2"
                     >
                       {t("technician.issue.notifyStart")}
                     </button>
@@ -1043,7 +1123,7 @@ const TechnicianDashboard = () => {
 
                   <button
                     onClick={() => setSelectedJob(null)}
-                    className="w-full py-2 bg-slate-100 text-slate-600 font-semibold rounded-xl hover:bg-slate-200 transition"
+                    className="w-full py-2 bg-white/60 text-slate-700 font-semibold rounded-xl hover:bg-white/80 transition border border-white/50"
                   >
                     {t("common.close")}
                   </button>
@@ -1053,8 +1133,27 @@ const TechnicianDashboard = () => {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 };
 
 export default TechnicianDashboard;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import backgroundVideo from "../assets/136906-765457769_small.mp4";
 import api from "../api/axios";
 import { getImageUrl } from "../utils/imageUrl";
 import { useNavigate } from "react-router-dom";
@@ -7,6 +8,7 @@ import html2canvas from "html2canvas";
 import Header from "./Header";
 import SubscriptionManagement from './SubscriptionManagement';
 import TeamDetailsModal from './TeamDetailsModal';
+import { WorkOrderForm } from './WorkOrder';
 import { useLanguage, useTranslation } from "../i18n/LanguageContext";
 import {
   Shield,
@@ -61,6 +63,7 @@ import {
   SlidersHorizontal,
   CircleDashed,
   Play,
+  Repeat,
   X,
   CreditCard
 } from 'lucide-react';
@@ -88,7 +91,7 @@ const StatusBadge = ({ status }) => {
         bg: 'bg-gradient-to-r from-amber-50 to-orange-50',
         text: 'text-amber-700',
         border: 'border-amber-200',
-        icon: '⏳',
+        icon: '⌛',
         label: 'Pending'
       },
       'APPROVED': {
@@ -137,7 +140,7 @@ const StatusBadge = ({ status }) => {
         bg: 'bg-gradient-to-r from-red-50 to-rose-50',
         text: 'text-red-700',
         border: 'border-red-200',
-        icon: '⏰',
+        icon: '🕒',
         label: 'Overdue'
       },
     };
@@ -206,45 +209,46 @@ const PriorityBadge = ({ priority }) => {
 };
 
 // Enhanced Stat Card with animations
-const StatCard = ({ title, value, change, icon, color, trend = "up" }) => {
+const StatCard = ({ title, value, change, icon: Icon, color, trend = "up" }) => {
   const colorMap = {
-    blue: { bg: 'from-blue-500 to-cyan-500', text: 'text-blue-100', iconBg: 'bg-blue-500/20' },
-    orange: { bg: 'from-orange-500 to-amber-500', text: 'text-orange-100', iconBg: 'bg-orange-500/20' },
-    green: { bg: 'from-emerald-500 to-green-500', text: 'text-emerald-100', iconBg: 'bg-emerald-500/20' },
-    purple: { bg: 'from-purple-500 to-violet-500', text: 'text-purple-100', iconBg: 'bg-purple-500/20' },
-    red: { bg: 'from-rose-500 to-pink-500', text: 'text-rose-100', iconBg: 'bg-rose-500/20' },
+    blue: { theme: 'from-blue-500/10 to-cyan-500/5', text: 'text-blue-700', iconBg: 'bg-blue-500/10', iconColor: 'text-blue-600' },
+    orange: { theme: 'from-orange-500/10 to-amber-500/5', text: 'text-orange-700', iconBg: 'bg-orange-500/10', iconColor: 'text-orange-600' },
+    green: { theme: 'from-emerald-500/10 to-green-500/5', text: 'text-emerald-700', iconBg: 'bg-emerald-500/10', iconColor: 'text-emerald-600' },
+    purple: { theme: 'from-purple-500/10 to-violet-500/5', text: 'text-purple-700', iconBg: 'bg-purple-500/10', iconColor: 'text-purple-600' },
+    red: { theme: 'from-rose-500/10 to-pink-500/5', text: 'text-rose-700', iconBg: 'bg-rose-500/10', iconColor: 'text-rose-600' },
   };
 
   const config = colorMap[color] || colorMap.blue;
 
   return (
-    <div className={`bg-gradient-to-br ${config.bg} rounded-xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300`}>
+    <div className={`glass-surface-strong bg-gradient-to-br ${config.theme} rounded-xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 group`}>
       <div className="flex items-start justify-between mb-4">
         <div>
-          <p className="text-sm font-medium opacity-90">{title}</p>
-          <p className="text-3xl font-bold mt-2">{value}</p>
+          <p className="text-sm font-bold text-gray-500 opacity-80 uppercase tracking-wider">{title}</p>
+          <p className={`text-3xl font-black mt-2 ${config.text}`}>{value}</p>
         </div>
-        <div className={`${config.iconBg} p-3 rounded-lg`}>
-          {icon && <icon className="w-6 h-6" />}
+        <div className={`${config.iconBg} ${config.iconColor} p-3 rounded-lg group-hover:scale-110 transition-transform`}>
+          {Icon && <Icon className="w-6 h-6" />}
         </div>
       </div>
       {change && (
         <div className="flex items-center gap-2 text-sm">
           {trend === "up" ? <TrendingUp className="w-4 h-4" /> : <TrendingUp className="w-4 h-4 rotate-180" />}
-          <span>{change}</span>
+          <span className="font-semibold text-gray-600">{change}</span>
         </div>
       )}
-      {/* View Team Modal */}
-      <TeamDetailsModal show={showViewTeam} team={viewTeam} people={people} users={users} onClose={() => setShowViewTeam(false)} />
     </div>
   );
 };
 
 
 // Glass Card Component
-const GlassCard = ({ children, className = "" }) => (
-  <div className={`bg-white/80 backdrop-blur-lg rounded-2xl border border-white/20 shadow-lg hover:shadow-xl transition-all duration-300 ${className}`}>
-    {children}
+const GlassCard = ({ children, className = "", mirror = true }) => (
+  <div className={`glass-surface rounded-2xl hover:shadow-xl transition-all duration-300 relative overflow-hidden ${mirror ? "glass-mirror" : ""} ${className}`}>
+    <div className="glass-reflection absolute inset-x-0 top-0 h-10 opacity-60 pointer-events-none" />
+    <div className="relative z-10">
+      {children}
+    </div>
   </div>
 );
 
@@ -277,7 +281,7 @@ const FilterPopover = ({ isOpen, onClose, title, children, className = "" }) => 
   return (
     <>
       <div className="fixed inset-0 z-40" onClick={onClose} />
-      <div className={`absolute top-full mt-2 left-0 z-50 bg-white rounded-xl shadow-2xl border border-gray-100 min-w-[240px] animate-in fade-in zoom-in duration-200 ${className}`}>
+      <div className={`absolute top-full mt-2 left-0 z-50 glass-surface-strong rounded-xl min-w-[240px] animate-in fade-in zoom-in duration-200 ${className}`}>
         <div className="flex items-center justify-between p-4 border-b border-gray-50">
           <span className="text-sm font-bold text-gray-900">{title}</span>
           <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg transition-colors">
@@ -343,7 +347,7 @@ const BulkActionBar = ({ count, label, onDelete }) => {
       <span>{count} {label} selected</span>
       <button
         onClick={onDelete}
-        className="flex items-center gap-2 px-3 py-1.5 bg-rose-600 text-white rounded-lg text-xs font-bold hover:bg-rose-700"
+        className="flex items-center gap-2 px-3 py-1.5 bg-rose-600 text-blue-600 rounded-lg text-xs font-bold hover:bg-rose-700"
       >
         <Trash2 className="w-3.5 h-3.5" />
         Delete
@@ -415,6 +419,7 @@ function ManagerDashboard() {
   const [pendingRequests, setPendingRequests] = useState([]);
   const [materialRequests, setMaterialRequests] = useState([]);
   const [technicians, setTechnicians] = useState([]);
+  const [teams, setTeams] = useState([]);
   const [locations, setLocations] = useState([]);
   const [assets, setAssets] = useState([]);
   const [summary, setSummary] = useState({
@@ -432,6 +437,8 @@ function ManagerDashboard() {
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [declineReason, setDeclineReason] = useState('');
+  const [showWorkOrderModal, setShowWorkOrderModal] = useState(false);
+  const [workOrderModalTitle, setWorkOrderModalTitle] = useState('Submit Request');
   const [filters, setFilters] = useState({
     status: 'all',
     priority: 'all',
@@ -490,15 +497,17 @@ function ManagerDashboard() {
       console.log('Token exists:', !!token, 'First 20 chars:', token?.substring(0, 20));
       // const config = { headers: { Authorization: `Bearer ${token}` } }; // handled by interceptor
 
-      const [issuesRes, techRes, summaryRes, locationsRes, assetsRes] = await Promise.all([
+      const [issuesRes, techRes, usersRes, teamsRes, summaryRes, locationsRes, assetsRes] = await Promise.all([
         api.get("/api/issues"),
         api.get("/api/technicians"),
+        api.get("/api/users"),
+        api.get("/api/teams"),
         api.get("/api/managers/dashboard/summary"),
         api.get("/api/properties"),
         api.get("/api/assets")
       ]);
 
-      const allIssuesData = issuesRes.data;
+      const allIssuesData = issuesRes.data || [];
       setAllIssues(allIssuesData);
 
       const approvedWorkOrders = allIssuesData.filter(issue => issue.approved);
@@ -506,10 +515,13 @@ function ManagerDashboard() {
 
       setIssues(approvedWorkOrders);
       setPendingRequests(pendingRequestsData);
-      setTechnicians(techRes.data || []);
+
+      const combinedTechs = combinePeopleUsers(techRes.data || [], usersRes.data || []);
+      setTechnicians(combinedTechs);
+      setTeams(teamsRes.data || []);
       setLocations(locationsRes.data || []);
       setAssets(assetsRes.data || []);
-      setSummary(summaryRes.data);
+      setSummary(summaryRes.data || {});
     } catch (err) {
       console.error('Failed to load data:', err);
       console.error('Error response:', err.response?.data);
@@ -899,16 +911,21 @@ function ManagerDashboard() {
     setDetailModal({ open: false, type: null, item: null });
   };
 
+  const openWorkOrderModal = (title) => {
+    setWorkOrderModalTitle(title || 'Submit Request');
+    setShowWorkOrderModal(true);
+  };
+
   const NavItem = ({ active, onClick, icon: Icon, label, badge, badgeColor = "bg-blue-600" }) => (
     <button
       onClick={onClick}
-      className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-semibold transition-all duration-200 group ${active
-        ? 'bg-white/15 text-white shadow-sm'
-        : 'text-blue-100/80 hover:bg-white/10 hover:text-white'
+      className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-bold transition-all duration-300 group mb-1 ${active
+        ? 'glass-surface bg-blue-600/10 text-blue-700 shadow-md translate-x-1 border-l-4 border-l-blue-600'
+        : 'text-slate-600 hover:bg-white/40 hover:text-blue-600'
         }`}
     >
       <div className="flex items-center gap-3">
-        <Icon className={`w-4 h-4 transition-colors ${active ? 'text-white' : 'text-blue-200 group-hover:text-white'}`} />
+        <Icon className={`w-4 h-4 transition-colors ${active ? 'text-blue-600' : 'text-slate-400 group-hover:text-blue-600'}`} />
         <span>{label}</span>
       </div>
       {badge && (
@@ -920,7 +937,7 @@ function ManagerDashboard() {
   );
 
   const TooltipButton = ({ icon: Icon, title }) => (
-    <button className="p-2 text-blue-100/80 hover:text-white hover:bg-white/10 rounded-lg transition-all" title={title}>
+    <button className="p-2 text-blue-100/80 hover:text-blue-600 hover:bg-white/10 rounded-lg transition-all" title={title}>
       <Icon className="w-5 h-5" />
     </button>
   );
@@ -932,16 +949,24 @@ function ManagerDashboard() {
   );
 
   return (
-    <div className="min-h-screen flex bg-white text-gray-900" style={{ fontFamily: "'Space Grotesk', 'Manrope', 'Segoe UI', sans-serif" }}>
+    <div className="min-h-screen flex text-gray-900 glass-theme-blue relative overflow-hidden bg-transparent" style={{ fontFamily: "'Space Grotesk', 'Manrope', 'Segoe UI', sans-serif" }}>
+      {/* Dynamic Background */}
+      <div className="video-background-container">
+        <video autoPlay loop muted playsInline>
+          <source src={backgroundVideo} type="video/mp4" />
+        </video>
+        <div className="video-overlay" />
+      </div>
+
       {/* Sidebar Redesign */}
-      <aside className="w-[260px] bg-gradient-to-b from-blue-700 via-blue-800 to-blue-900 text-blue-50 flex flex-col h-screen sticky top-0 shadow-xl">
+      <aside className="w-[280px] glass-surface-strong border-r border-white/20 flex flex-col h-screen sticky top-0 z-30 shadow-2xl">
         {/* Sidebar Header */}
         <div className="p-4 border-b border-blue-700/40 flex items-center justify-between">
-          <div className="flex items-center gap-3 text-white">
-            <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center text-white border border-white/20">
-              <Shield className="w-5 h-5 font-bold" />
+          <div className="flex items-center gap-3 text-blue-600">
+            <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center text-blue-600 border border-white/20">
+              <Shield className="w-6 h-6 font-bold" />
             </div>
-            <span className="font-bold text-lg tracking-tight">MMS Core</span>
+            <span className="font-bold text-lg tracking-tight">MMS CORE</span><span className="text-[10px] font-bold text-blue-600 tracking-[0.2em] uppercase mt-1">Management</span>
           </div>
         </div>
 
@@ -1106,7 +1131,7 @@ function ManagerDashboard() {
             <select
               value={language}
               onChange={(e) => setLanguage(e.target.value)}
-              className="mt-2 w-full bg-white/10 border border-white/20 text-white text-xs rounded-lg px-2 py-1.5 focus:outline-none"
+              className="mt-2 w-full bg-white/10 border border-white/20 text-blue-600 text-xs rounded-lg px-2 py-1.5 focus:outline-none"
             >
               <option value="en">{t("language.english")}</option>
               <option value="fr">{t("language.french")}</option>
@@ -1114,16 +1139,16 @@ function ManagerDashboard() {
             </select>
           </div>
           <div className="flex items-center gap-3 px-3 py-2 rounded-xl bg-white/10 border border-white/10">
-            <div className="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center text-white font-bold text-xs">
+            <div className="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center text-blue-600 font-bold text-xs">
               {initials}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-bold text-white truncate">{userName}</p>
+              <p className="text-xs font-bold text-blue-600 truncate">{userName}</p>
               <p className="text-[10px] text-blue-100/80 truncate capitalize">{userRole}</p>
             </div>
             <button
               onClick={handleLogout}
-              className="p-1.5 text-blue-100 hover:text-white hover:bg-white/10 rounded-lg transition-all"
+              className="p-1.5 text-blue-100 hover:text-blue-600 hover:bg-white/10 rounded-lg transition-all"
             >
               <LogOut className="w-4 h-4" />
             </button>
@@ -1177,7 +1202,7 @@ function ManagerDashboard() {
         </div>
 
         {/* Filters Bar */}
-        <div className="px-6 py-3 border-b border-gray-100 bg-white flex items-center justify-between flex-shrink-0">
+        <div className="px-6 py-3 border-b border-gray-100 bg-white flex items-center justify-between flex-shrink-0 relative z-40 overflow-visible">
           <div className="flex items-center gap-2">
             <button className="flex items-center gap-2 px-3 py-1.5 bg-[#edf2fe] border border-[#c0d4fb] rounded-lg text-[11px] font-bold text-[#2563eb] hover:bg-[#e0e9fe] transition-all shadow-sm h-8">
               <SlidersHorizontal className="w-3.5 h-3.5" />
@@ -1219,7 +1244,7 @@ function ManagerDashboard() {
                         />
                         <div className="relative flex items-center justify-center w-5 h-5">
                           <status.icon className={`w-5 h-5 ${status.color} ${status.fill ? `fill-${status.color.split('-')[1]}-500` : ''}`} />
-                          {status.id === 'IN PROGRESS' && <div className="absolute inset-0 flex items-center justify-center"><Play className="w-1.5 h-1.5 text-white fill-white" /></div>}
+                          {status.id === 'IN PROGRESS' && <div className="absolute inset-0 flex items-center justify-center"><Play className="w-1.5 h-1.5 text-blue-600 fill-white" /></div>}
                           {status.id === 'COMPLETE' && <div className="absolute inset-0 flex items-center justify-center"><CheckCircle className="w-3 h-3 text-green-500 fill-white" /></div>}
                         </div>
                         <span className="text-sm font-bold text-gray-700">{status.label}</span>
@@ -1460,7 +1485,7 @@ function ManagerDashboard() {
         </div>
 
         {/* Main Content Scroll Area */}
-        <div className="flex-1 overflow-y-auto p-6 bg-white relative">
+        <div className="flex-1 overflow-y-auto p-6 bg-white/30 backdrop-blur-sm relative z-0">
           <div id="dashboard-content">
             {loading ? (
               <div className="flex flex-col items-center justify-center py-20">
@@ -1491,6 +1516,7 @@ function ManagerDashboard() {
                 setSelectedRequest={setSelectedRequest}
                 setShowApprovalModal={setShowApprovalModal}
                 onOpenDetails={openDetailModal}
+                onSubmitRequest={() => openWorkOrderModal('Submit Request')}
                 technicians={technicians}
                 assigning={assigning}
                 assignmentData={assignmentData}
@@ -1518,6 +1544,7 @@ function ManagerDashboard() {
                 handleAssignTech={handleAssignTech}
                 getAssignedTechName={getAssignedTechName}
                 onOpenDetails={openDetailModal}
+                onCreateWorkOrder={() => openWorkOrderModal('Create Work Order')}
                 onRefresh={fetchDashboardData}
               />
             ) : activeTab === 'all-issues' ? (
@@ -1547,7 +1574,7 @@ function ManagerDashboard() {
               />
             ) : activeTab === 'scheduler' ? (
               <SchedulerTab
-                issues={allIssues.filter(i => !i.assignedTo && (i.status === 'OPEN' || (i.approved && i.status === 'PENDING')))}
+                issues={allIssues}
                 technicians={technicians}
               />
             ) : activeTab === 'analytics' ? (
@@ -1584,7 +1611,12 @@ function ManagerDashboard() {
                 }}
               />
             ) : activeTab === 'people' ? (
-              <PeopleTab technicians={technicians || []} allIssues={allIssues || []} onRefresh={fetchDashboardData} />
+              <PeopleTab
+                technicians={technicians}
+                teams={teams}
+                allIssues={issues}
+                onRefresh={fetchDashboardData}
+              />
             ) : activeTab === 'checklists' ? (
               <ChecklistsTab />
             ) : activeTab === 'parts' ? (
@@ -1749,12 +1781,51 @@ function ManagerDashboard() {
           </GlassCard>
         </div>
       )}
+      {showWorkOrderModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="glass-surface-strong rounded-3xl w-full max-w-5xl max-h-[92vh] overflow-hidden border border-white/40 shadow-2xl">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-white/40">
+              <div>
+                <h3 className="text-xl font-bold text-slate-900">{workOrderModalTitle}</h3>
+                <p className="text-xs text-slate-500">Provide details to create a new request or work order.</p>
+              </div>
+              <button
+                onClick={() => setShowWorkOrderModal(false)}
+                className="p-2 rounded-lg hover:bg-white/60 transition"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5 text-slate-500" />
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto max-h-[80vh]">
+              <WorkOrderForm
+                submitLabel={workOrderModalTitle === 'Create Work Order' ? 'Create Work Order' : 'Submit Request'}
+                onCancel={() => setShowWorkOrderModal(false)}
+                onSubmitted={() => {
+                  setShowWorkOrderModal(false);
+                  fetchDashboardData();
+                }}
+                showSidebar
+              />
+            </div>
+          </div>
+        </div>
+      )}
       <DetailsModal
         open={detailModal.open}
         type={detailModal.type}
         item={detailModal.item}
         onClose={closeDetailModal}
         getAssignedTechName={getAssignedTechName}
+        technicians={technicians}
+        teams={teams}
+        onRefresh={() => {
+          if (detailModal.type === 'material') {
+            fetchMaterialRequests();
+          } else {
+            fetchDashboardData();
+          }
+        }}
       />
     </div>
   );
@@ -1770,7 +1841,7 @@ const OverviewCards = ({ summary = {}, pendingRequests = [], issues = [], techni
   const techniciansCount = Array.isArray(technicians) ? technicians.length : (summary.techniciansCount ?? summary.techCount ?? 0);
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
       {[
         { label: 'Total Issues', value: totalIssues, tab: 'issues', tone: 'from-blue-600 to-cyan-600', border: 'border-blue-100' },
         { label: 'Completion Rate', value: `${completionRate}%`, tab: 'issues', tone: 'from-emerald-600 to-teal-600', border: 'border-emerald-100' },
@@ -1780,14 +1851,14 @@ const OverviewCards = ({ summary = {}, pendingRequests = [], issues = [], techni
         <button
           key={card.label}
           onClick={() => onOpenTab && onOpenTab(card.tab)}
-          className={`group p-4 rounded-xl border ${card.border} bg-white shadow-sm hover:shadow-md transition-all text-left focus:outline-none focus:ring-2 focus:ring-blue-500`}
+          className={`group p-5 rounded-2xl border ${card.border} glass-surface-strong shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all text-left focus:outline-none focus:ring-2 focus:ring-blue-500`}
         >
           <div className="flex items-start justify-between">
             <div>
-              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{card.label}</div>
-              <div className="text-2xl font-black text-gray-900 mt-1">{card.value}</div>
+              <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-widest">{card.label}</div>
+              <div className="text-2xl font-black text-gray-900 mt-2">{card.value}</div>
             </div>
-            <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${card.tone} text-white flex items-center justify-center text-xs font-bold shadow-sm`}>
+            <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${card.tone} text-white flex items-center justify-center text-xs font-bold shadow-md border border-white/30`}>
               {String(card.value).slice(0, 2)}
             </div>
           </div>
@@ -1883,10 +1954,7 @@ const OverviewTab = ({
               className="group p-4 bg-gradient-to-r from-white to-orange-50 rounded-xl border border-orange-100 hover:border-orange-200 transition-all duration-300 cursor-pointer"
             >
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-gradient-to-br from-orange-100 to-amber-100 rounded-lg flex items-center justify-center">
-                    <span className="text-2xl">📝</span>
-                  </div>
+                <div className="flex items-center">
                   <div>
                     <h4 className="font-semibold text-gray-900 group-hover:text-orange-700 transition-colors">
                       {request.title}
@@ -1926,7 +1994,7 @@ const OverviewTab = ({
           {technicians.slice(0, 3).map((tech, i) => (
             <div key={tech._id || tech.id || `tech-${i}`} className="flex items-center justify-between p-3 bg-gradient-to-r from-purple-50 to-violet-50 rounded-lg">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-violet-500 rounded-full flex items-center justify-center text-white font-bold">
+                <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-violet-500 rounded-full flex items-center justify-center text-blue-600 font-bold">
                   {tech.name?.charAt(0) || 'T'}
                 </div>
                 <div>
@@ -2029,6 +2097,7 @@ const RequestsTab = ({
   setSelectedRequest,
   setShowApprovalModal,
   onOpenDetails,
+  onSubmitRequest,
   technicians,
   assigning,
   assignmentData,
@@ -2038,6 +2107,13 @@ const RequestsTab = ({
   onRefresh
 }) => {
   const selection = useBulkSelection(pendingRequests, (request) => request._id || request.id);
+  const requestStatusColor = (status) => {
+    const s = String(status || '').toUpperCase();
+    if (s === 'APPROVED') return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+    if (s === 'DECLINED' || s === 'REJECTED') return 'bg-rose-50 text-rose-700 border-rose-200';
+    if (s === 'SUBMITTED' || s === 'PENDING') return 'bg-amber-50 text-amber-700 border-amber-200';
+    return 'bg-gray-50 text-gray-600 border-gray-200';
+  };
 
   const handleDeleteSelected = async () => {
     if (selection.selectedIds.length === 0) return;
@@ -2054,214 +2130,197 @@ const RequestsTab = ({
 
   return (
     <div>
-    <div className="mb-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Pending Approval Requests</h2>
-          <p className="text-gray-600">Review and approve client maintenance requests</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="px-4 py-2 bg-gradient-to-r from-orange-50 to-amber-50 rounded-lg border border-orange-200">
-            <span className="text-orange-700 font-semibold">{pendingRequests.length} pending</span>
+      <div className="mb-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Pending Approval Requests</h2>
+            <p className="text-gray-600">Review and approve client maintenance requests</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => onSubmitRequest && onSubmitRequest()}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold shadow-sm hover:bg-blue-700"
+            >
+              Submit Request
+            </button>
+            <div className="px-4 py-2 bg-gradient-to-r from-orange-50 to-amber-50 rounded-lg border border-orange-200">
+              <span className="text-orange-700 font-semibold">{pendingRequests.length} pending</span>
+            </div>
           </div>
         </div>
       </div>
-    </div>
 
-    <BulkActionBar count={selection.selectedIds.length} label="requests" onDelete={handleDeleteSelected} />
+      <BulkActionBar count={selection.selectedIds.length} label="requests" onDelete={handleDeleteSelected} />
 
-    {pendingRequests.length === 0 ? (
-      <GlassCard className="p-12 text-center">
-        <div className="w-24 h-24 bg-gradient-to-br from-emerald-100 to-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-          <CheckCircle className="w-12 h-12 text-emerald-600" />
-        </div>
-        <h3 className="text-2xl font-bold text-gray-900 mb-3">All Clear!</h3>
-        <p className="text-gray-600 mb-6">No pending requests to review</p>
-        <GradientButton color="green" className="px-8">
-          View Completed Requests
-        </GradientButton>
-      </GlassCard>
-    ) : (
-      <div className="bg-white rounded-lg border border-gray-100 overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead className="bg-[#fcfcfd] border-b border-gray-100">
-              <tr>
-                <th className="py-4 px-4 w-10">
-                  <input
-                    type="checkbox"
-                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    checked={selection.allSelected}
-                    onChange={(e) => selection.toggleAll(e.target.checked)}
-                  />
-                </th>
-                <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Request ID</th>
-                <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Title</th>
-                <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Description</th>
-                <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Location</th>
-                <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Priority</th>
-                <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Type</th>
-                <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Submitted</th>
-                <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pendingRequests.map((request, i) => {
-                const reqId = request._id || request.id;
-                return (
-                  <React.Fragment key={reqId || `pending-${i}`}>
-                    <tr
-                      onClick={() => onOpenDetails && onOpenDetails('request', request)}
-                      className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors group cursor-pointer"
-                    >
-                      <td className="py-4 px-4" onClick={(e) => e.stopPropagation()}>
-                        <input
-                          type="checkbox"
-                          className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                          checked={selection.selectedIds.includes(String(reqId))}
-                          onChange={() => selection.toggleOne(reqId)}
-                        />
-                      </td>
-                      <td className="py-4 px-4">
-                        {/* Show whether this pending request is an authenticated inspection or anonymous request */}
-                        <div className="inline-flex items-center gap-2">
-                          {request.submissionType === 'inspection' ? (
-                            <span className="px-2 py-1 text-xs font-semibold text-emerald-700 bg-emerald-100 rounded-full">Inspection</span>
-                          ) : (
-                            <span className="px-2 py-1 text-xs font-semibold text-amber-700 bg-amber-100 rounded-full">Request</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="py-4 px-4">
-                        <span className="text-xs font-bold text-blue-600 font-mono">
-                          {String(normalizeId(request._id || request.id)).slice(-8)}
-                        </span>
-                      </td>
-                      <td className="py-4 px-4">
-                        <div className="flex items-center gap-3">
-                          {/* Photo attachment */}
-                          {(request.beforePhoto || request.photo) && (() => {
-                            const photoPath = request.beforePhoto || request.photo;
-                            const photoUrl = getImageUrl(photoPath);
-                            const ext = photoPath.split('.').pop().toLowerCase();
-                            const browserUnsupported = ['heic', 'heif', 'tiff', 'tif', 'bmp'].includes(ext);
-                            if (browserUnsupported) {
-                              return (
-                                <a
-                                  href={photoUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  download
-                                  className="flex items-center gap-1 px-2 py-1 bg-blue-50 border border-blue-200 rounded-lg text-xs font-semibold text-blue-700 hover:bg-blue-100 transition-colors"
-                                  title={`Download photo (.${ext})`}
-                                >
-                                  <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
-                                  Photo (.{ext})
-                                </a>
-                              );
-                            }
-                            return (
-                              <img
-                                src={photoUrl}
-                                alt={request.title}
-                                className="w-10 h-10 rounded-lg object-cover border border-gray-100"
-                                onError={e => { e.target.onerror = null; e.target.style.display = 'none'; }}
-                              />
-                            );
-                          })()}
-                          <div>
-                            <div className="text-sm font-bold text-gray-900">{request.title}</div>
-                            {/* File attachments (PDFs etc.) */}
-                            {Array.isArray(request.files) && request.files.length > 0 && (
-                              <div className="flex flex-wrap gap-1 mt-1">
-                                {request.files.map((filePath, fi) => {
-                                  const fileUrl = getImageUrl(filePath);
-                                  const fileName = filePath.split('/').pop();
-                                  const fileExt = fileName.split('.').pop().toLowerCase();
-                                  return (
-                                    <a
-                                      key={fi}
-                                      href={fileUrl}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      download
-                                      className="flex items-center gap-1 px-2 py-0.5 bg-gray-50 border border-gray-200 rounded text-xs font-medium text-gray-600 hover:bg-gray-100 transition-colors"
-                                      title={fileName}
-                                    >
-                                      <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
-                                      .{fileExt}
-                                    </a>
-                                  );
-                                })}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-4 px-4">
-                        <p className="text-sm text-gray-600 line-clamp-2 max-w-xs">{request.description}</p>
-                      </td>
-                      <td className="py-4 px-4">
-                        <div className="flex items-center gap-2">
-                          <MapPin className="w-4 h-4 text-gray-400" />
-                          <span className="text-sm font-medium text-gray-700">{request.location}</span>
-                        </div>
-                      </td>
-                      <td className="py-4 px-4">
-                        <PriorityBadge priority={request.priority || 'MEDIUM'} />
-                      </td>
-                      <td className="py-4 px-4">
-                        <div className="text-sm font-medium text-gray-700">
-                          {new Date(request.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}
-                        </div>
-                        <div className="text-xs text-gray-400 font-medium">
-                          {new Date(request.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
-                        </div>
-                      </td>
-                      <td className="py-4 px-4 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <GradientButton
-                            onClick={(e) => { e.stopPropagation(); setSelectedRequest(request); setShowApprovalModal(true); }}
-                            color="green"
-                            className="px-3 py-1.5 text-xs"
-                          >
-                            <span className="flex items-center gap-1.5">
-                              <Eye className="w-3.5 h-3.5" />
-                              Review
-                            </span>
-                          </GradientButton>
-                          <button className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
-                            <MoreHorizontal className="w-4 h-4 text-gray-400" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                    {assigning === normalizeId(reqId) && (
-                      <tr>
-                        <td colSpan="9" className="p-0 border-b border-gray-50">
-                          <AssignmentForm
-                            assignmentData={assignmentData}
-                            setAssignmentData={setAssignmentData}
-                            technicians={technicians}
-                            onAssign={() => handleAssignTech(normalizeId(reqId))}
-                            onCancel={() => handleOpenAssignment(null)}
+      {pendingRequests.length === 0 ? (
+        <GlassCard className="p-12 text-center">
+          <div className="w-24 h-24 bg-gradient-to-br from-emerald-100 to-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <CheckCircle className="w-12 h-12 text-emerald-600" />
+          </div>
+          <h3 className="text-2xl font-bold text-gray-900 mb-3">All Clear!</h3>
+          <p className="text-gray-600 mb-6">No pending requests to review</p>
+          <GradientButton color="green" className="px-8">
+            View Completed Requests
+          </GradientButton>
+        </GlassCard>
+      ) : (
+        <div className="glass-surface-strong rounded-xl overflow-hidden shadow-2xl border border-white/20">
+          <div className="overflow-x-auto">
+            <table className="min-w-[1200px] w-full text-left border-collapse text-sm">
+              <thead className="glass-surface border-b border-white/10 text-[11px] uppercase tracking-wider text-gray-500">
+                <tr>
+                  <th className="py-3 px-3 w-10">
+                    <input
+                      type="checkbox"
+                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      checked={selection.allSelected}
+                      onChange={(e) => selection.toggleAll(e.target.checked)}
+                    />
+                  </th>
+                  <th className="py-3 px-3">Title</th>
+                  <th className="py-3 px-3">Image</th>
+                  <th className="py-3 px-3">Asset</th>
+                  <th className="py-3 px-3">Status</th>
+                  <th className="py-3 px-3">Work Order</th>
+                  <th className="py-3 px-3">Submitted Date</th>
+                  <th className="py-3 px-3">Category</th>
+                  <th className="py-3 px-3">Submitted By</th>
+                  <th className="py-3 px-3 text-right">Priority</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {pendingRequests.map((request, i) => {
+                  const reqId = request._id || request.id;
+                  const title = request.title || request.items?.[0]?.title || 'Untitled';
+                  const imagePath = request.beforePhoto || request.photo || request.image || request.beforeImage || request.afterImage || request.afterPhoto || (Array.isArray(request.files) ? request.files[0] : null);
+                  const imageUrl = imagePath ? getImageUrl(imagePath) : '';
+                  const asset = request.assetName || request.asset?.name || request.asset || request.location || '—';
+                  const rawStatus = String(request.status || '').toUpperCase();
+                  const isDeclined = request.rejected || rawStatus === 'DECLINED' || rawStatus === 'REJECTED';
+                  const isApproved = request.approved || rawStatus === 'APPROVED';
+                  const rawWorkOrderStatus = request.workOrderStatus || request.workOrder?.status || request.workOrderState || request.issueStatus || request.workOrderStatusLabel || '';
+                  const normalizedWorkOrder = String(rawWorkOrderStatus || '').toUpperCase();
+                  const workOrderLabel = normalizedWorkOrder.includes('PROGRESS') ? 'IN PROGRESS'
+                    : normalizedWorkOrder.includes('COMPLETE') ? 'COMPLETED'
+                      : normalizedWorkOrder.includes('OPEN') ? 'OPEN'
+                        : isApproved ? 'OPEN' : '—';
+                  const hasWorkOrderRef = !!(request.workOrderId || request.workOrderNumber || request.workOrderNo || request.workOrder);
+                  const statusLabel = isDeclined
+                    ? 'DECLINED'
+                    : (isApproved || hasWorkOrderRef || workOrderLabel !== '—')
+                      ? 'APPROVED'
+                      : 'SUBMITTED';
+                  const submittedAt = request.createdAt || request.submittedAt || request.date || null;
+                  const submittedBy = request.name || request.requestorName || request.userName || request.email || '—';
+                  const category = request.category || request.issueType || request.type || request.submissionType || '—';
+                  const priorityValue = String(request.priority || 'MEDIUM').toUpperCase();
+                  const priorityClass = priorityValue === 'URGENT' ? 'bg-rose-100 text-rose-700 border-rose-200' :
+                    priorityValue === 'HIGH' ? 'bg-orange-100 text-orange-700 border-orange-200' :
+                      priorityValue === 'MEDIUM' ? 'bg-amber-100 text-amber-700 border-amber-200' :
+                        'bg-blue-100 text-blue-700 border-blue-200';
+                  const workOrderClass = workOrderLabel === 'COMPLETED'
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    : workOrderLabel === 'IN PROGRESS'
+                      ? 'bg-blue-50 text-blue-700 border-blue-200'
+                      : workOrderLabel === 'OPEN'
+                        ? 'bg-slate-100 text-slate-700 border-slate-200'
+                        : 'bg-gray-50 text-gray-400 border-gray-200';
+
+                  return (
+                    <React.Fragment key={reqId || `pending-${i}`}>
+                      <tr
+                        onClick={() => onOpenDetails && onOpenDetails('request', request)}
+                        className="hover:bg-white/40 transition-all cursor-pointer group/row"
+                      >
+                        <td className="py-3 px-3" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            checked={selection.selectedIds.includes(String(reqId))}
+                            onChange={() => selection.toggleOne(reqId)}
                           />
                         </td>
+                        <td className="py-3 px-3">
+                          <div className="font-semibold text-gray-800 line-clamp-1" title={title}>{title}</div>
+                        </td>
+                        <td className="py-3 px-3">
+                          {imageUrl ? (
+                            <img
+                              src={imageUrl}
+                              alt="Request"
+                              className="h-9 w-12 rounded-lg object-cover border border-gray-100"
+                              onError={e => { e.currentTarget.style.display = 'none'; }}
+                            />
+                          ) : (
+                            <div className="h-9 w-12 rounded-lg border border-gray-100 bg-gray-50 flex items-center justify-center text-xs text-gray-400">
+                              —
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-3 px-3 text-gray-700">{asset}</td>
+                        <td className="py-3 px-3">
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${requestStatusColor(statusLabel)}`}>
+                            {statusLabel}
+                          </span>
+                        </td>
+                        <td className="py-3 px-3">
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${workOrderClass}`}>
+                            {workOrderLabel}
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 text-gray-600">
+                          {submittedAt && !isNaN(new Date(submittedAt).getTime()) ? (
+                            <div>
+                              <div className="text-xs font-semibold text-gray-700">
+                                {new Date(submittedAt).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' })}
+                              </div>
+                              <div className="text-[10px] text-gray-400">
+                                {new Date(submittedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                              </div>
+                            </div>
+                          ) : '—'}
+                        </td>
+                        <td className="py-3 px-3 text-gray-700">{category}</td>
+                        <td className="py-3 px-3">
+                          <div className="flex items-center gap-2">
+                            <span className="w-6 h-6 rounded-full bg-gray-100 border border-gray-200 text-[10px] font-bold text-gray-600 flex items-center justify-center">
+                              {String(submittedBy).trim().charAt(0).toUpperCase()}
+                            </span>
+                            <span className="text-gray-700 text-xs line-clamp-1" title={submittedBy}>{submittedBy}</span>
+                          </div>
+                        </td>
+                        <td className="py-3 px-3 text-right">
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${priorityClass}`}>
+                            {priorityValue}
+                          </span>
+                        </td>
                       </tr>
-                    )}
-                  </React.Fragment>
-                );
-              })}
-            </tbody>
-          </table>
+                      {assigning === normalizeId(reqId) && (
+                        <tr>
+                          <td colSpan="10" className="p-0 border-b border-gray-50">
+                            <AssignmentForm
+                              assignmentData={assignmentData}
+                              setAssignmentData={setAssignmentData}
+                              technicians={technicians}
+                              onAssign={() => handleAssignTech(normalizeId(reqId))}
+                              onCancel={() => handleOpenAssignment(null)}
+                            />
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
-    )}
-  </div>
+      )}
+    </div>
   );
 };
 
-// ─── Material Requests Tab ────────────────────────────────────────────────────
+// Material Requests Tab
 const MaterialRequestsTab = ({ materialRequests = [], onRefresh, onOpenDetails }) => {
   const [forwardModal, setForwardModal] = useState(null); // holds the request being forwarded
   const [clientEmail, setClientEmail] = useState('');
@@ -2295,11 +2354,11 @@ const MaterialRequestsTab = ({ materialRequests = [], onRefresh, onOpenDetails }
   };
 
   const statusIcon = (s) => {
-    if (s === 'PENDING') return '⏳';
-    if (s === 'FORWARDED') return '📤';
-    if (s === 'APPROVED') return '✅';
-    if (s === 'DECLINED') return '❌';
-    return '📦';
+    if (s === 'PENDING') return <Clock className="w-3.5 h-3.5" />;
+    if (s === 'FORWARDED') return <ArrowUpRight className="w-3.5 h-3.5" />;
+    if (s === 'APPROVED') return <CheckCircle className="w-3.5 h-3.5" />;
+    if (s === 'DECLINED') return <X className="w-3.5 h-3.5" />;
+    return <Package className="w-3.5 h-3.5" />;
   };
 
   const filtered = filterStatus === 'ALL'
@@ -2355,7 +2414,7 @@ const MaterialRequestsTab = ({ materialRequests = [], onRefresh, onOpenDetails }
       {/* Toast notification */}
       {toast && (
         <div className={`fixed top-6 right-6 z-[9999] px-5 py-3 rounded-xl shadow-2xl text-sm font-semibold flex items-center gap-3 animate-in slide-in-from-top-4 duration-300 border ${toast.type === 'error' ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>
-          <span>{toast.type === 'error' ? '❌' : '✅'}</span>
+          {toast.type === 'error' ? <X className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
           {toast.msg}
         </div>
       )}
@@ -2371,7 +2430,7 @@ const MaterialRequestsTab = ({ materialRequests = [], onRefresh, onOpenDetails }
             onClick={onRefresh}
             className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-all shadow-sm"
           >
-            <span className="text-base">↻</span> Refresh
+            Refresh
           </button>
         </div>
       </div>
@@ -2382,7 +2441,7 @@ const MaterialRequestsTab = ({ materialRequests = [], onRefresh, onOpenDetails }
           <button
             key={s}
             onClick={() => setFilterStatus(s)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${filterStatus === s ? 'bg-blue-600 text-white border-blue-600 shadow' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
+            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${filterStatus === s ? 'bg-blue-600 text-white border-blue-600 shadow' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
           >
             {statusIcon(s)} {s} {counts[s] > 0 && <span className="ml-1 opacity-70">({counts[s]})</span>}
           </button>
@@ -2393,7 +2452,7 @@ const MaterialRequestsTab = ({ materialRequests = [], onRefresh, onOpenDetails }
 
       {/* Table */}
       {filtered.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-gray-100 p-16 text-center shadow-sm">
+        <GlassCard className="p-16 text-center">
           <div className="w-20 h-20 bg-gradient-to-br from-purple-100 to-violet-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <Package className="w-10 h-10 text-purple-400" />
           </div>
@@ -2401,12 +2460,12 @@ const MaterialRequestsTab = ({ materialRequests = [], onRefresh, onOpenDetails }
           <p className="text-gray-500 text-sm">
             {filterStatus === 'ALL' ? 'Technicians haven\'t submitted any material requests yet.' : `No ${filterStatus.toLowerCase()} requests at this time.`}
           </p>
-        </div>
+        </GlassCard>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="glass-surface-strong rounded-2xl overflow-hidden shadow-2xl border border-white/20">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
-              <thead className="bg-gray-50 border-b border-gray-100">
+              <thead className="glass-surface border-b border-white/10">
                 <tr>
                   <th className="py-3.5 px-4 w-10">
                     <input
@@ -2430,13 +2489,13 @@ const MaterialRequestsTab = ({ materialRequests = [], onRefresh, onOpenDetails }
               <tbody className="divide-y divide-gray-50">
                 {filtered.map((req, idx) => {
                   const reqId = req.id || req._id;
-                  const materialTitle = req.items?.[0]?.title || req.items?.[0]?.materialId || '—';
-                  const qty = req.items?.[0]?.quantity ?? '—';
+                  const materialTitle = req.items?.[0]?.title || req.items?.[0]?.materialId || '—';
+                  const qty = req.items?.[0]?.quantity ?? '—';
                   return (
                     <tr
                       key={reqId || idx}
                       onClick={() => onOpenDetails && onOpenDetails('material', req)}
-                      className="hover:bg-gray-50/60 transition-colors group cursor-pointer"
+                      className="hover:bg-white/10 backdrop-blur-sm transition-all group cursor-pointer border-b border-white/5"
                     >
                       <td className="py-4 px-4" onClick={(e) => e.stopPropagation()}>
                         <input
@@ -2455,7 +2514,7 @@ const MaterialRequestsTab = ({ materialRequests = [], onRefresh, onOpenDetails }
                       {/* Technician */}
                       <td className="py-4 px-4">
                         <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-violet-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-violet-500 flex items-center justify-center text-blue-600 text-xs font-bold flex-shrink-0">
                             {(req.technicianName || 'T').charAt(0).toUpperCase()}
                           </div>
                           <div>
@@ -2471,7 +2530,7 @@ const MaterialRequestsTab = ({ materialRequests = [], onRefresh, onOpenDetails }
                       </td>
                       {/* Description */}
                       <td className="py-4 px-4 max-w-[200px]">
-                        <p className="text-sm text-gray-600 line-clamp-2">{req.description || '—'}</p>
+                        <p className="text-sm text-gray-600 line-clamp-2">{req.description || '—'}</p>
                       </td>
                       {/* Quantity */}
                       <td className="py-4 px-4">
@@ -2497,7 +2556,7 @@ const MaterialRequestsTab = ({ materialRequests = [], onRefresh, onOpenDetails }
                       {/* Date */}
                       <td className="py-4 px-4">
                         <div className="text-sm text-gray-600">
-                          {req.createdAt ? new Date(req.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
+                          {req.createdAt ? new Date(req.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
                         </div>
                         <div className="text-xs text-gray-400">
                           {req.createdAt ? new Date(req.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : ''}
@@ -2548,7 +2607,7 @@ const MaterialRequestsTab = ({ materialRequests = [], onRefresh, onOpenDetails }
               {/* Request summary */}
               <div className="bg-gradient-to-br from-purple-50 to-violet-50 rounded-xl p-4 mb-5 border border-purple-100">
                 <div className="flex items-center gap-3 mb-2">
-                  <div className="w-9 h-9 rounded-full bg-purple-600 flex items-center justify-center text-white text-sm font-bold">
+                  <div className="w-9 h-9 rounded-full bg-purple-600 flex items-center justify-center text-blue-600 text-sm font-bold">
                     {(forwardModal.technicianName || 'T').charAt(0)}
                   </div>
                   <div>
@@ -2587,7 +2646,7 @@ const MaterialRequestsTab = ({ materialRequests = [], onRefresh, onOpenDetails }
                   disabled={forwarding}
                   className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-2.5 rounded-xl font-bold text-sm hover:from-blue-700 hover:to-indigo-700 transition-all shadow-md disabled:opacity-60 disabled:pointer-events-none"
                 >
-                  {forwarding ? '⏳ Sending…' : '📤 Forward Request'}
+                  {forwarding ? 'Sending...' : 'Forward Request'}
                 </button>
                 <button
                   onClick={() => { setForwardModal(null); setClientEmail(''); }}
@@ -2607,7 +2666,7 @@ const MaterialRequestsTab = ({ materialRequests = [], onRefresh, onOpenDetails }
 // Scheduler Tab Component
 const SchedulerTab = ({ issues, technicians }) => {
 
-  const [currentDate, setCurrentDate] = useState(new Date("2026-02-24"));
+  const [currentDate, setCurrentDate] = useState(new Date());
   const [viewType, setViewType] = useState('Day');
   const [currentPage, setCurrentPage] = useState(1);
   const [showUnscheduled, setShowUnscheduled] = useState(true);
@@ -2619,10 +2678,35 @@ const SchedulerTab = ({ issues, technicians }) => {
     priority: []
   });
 
+  const getIssueDueDate = (issue) => {
+    const raw = issue?.fixDeadline || issue?.dueDate || issue?.scheduledFor || issue?.nextDate || issue?.scheduleDate;
+    if (!raw) return null;
+    try {
+      const dt = normalizeDate(raw);
+      return dt instanceof Date && !isNaN(dt.getTime()) ? dt : null;
+    } catch (e) {
+      const dt = new Date(raw);
+      return !isNaN(dt.getTime()) ? dt : null;
+    }
+  };
+
+  const isCompletedStatus = (status) => {
+    const s = String(status || '').toLowerCase();
+    return s.includes('complete') || s === 'completed' || s === 'complete';
+  };
+
+  const isScheduledIssue = (issue) => {
+    const hasAssignee = !!(issue.assignedTo || (Array.isArray(issue.assignees) && issue.assignees.length));
+    const hasDate = !!getIssueDueDate(issue);
+    return hasAssignee && hasDate && !isCompletedStatus(issue.status);
+  };
+
   const cardsPerPage = 5;
   const filteredUnscheduled = issues.filter(issue => {
+    if (isScheduledIssue(issue)) return false;
     if (unscheduledFilters.status.length > 0 && !unscheduledFilters.status.includes(issue.status)) return false;
     if (unscheduledFilters.priority.length > 0 && !unscheduledFilters.priority.includes(issue.priority)) return false;
+    if (isCompletedStatus(issue.status)) return false;
     return true;
   });
 
@@ -2634,12 +2718,62 @@ const SchedulerTab = ({ issues, technicians }) => {
     "9:00 AM", "10:00 AM", "11:00 AM", "12:00 PM", "1:00 PM", "2:00 PM", "3:00 PM", "4:00 PM"
   ];
 
+  const parseSlotHour = (slotLabel) => {
+    const [time, meridiem] = slotLabel.split(' ');
+    const [hourStr] = time.split(':');
+    let hour = Number(hourStr);
+    if (meridiem === 'PM' && hour !== 12) hour += 12;
+    if (meridiem === 'AM' && hour === 12) hour = 0;
+    return hour;
+  };
+
+  const slotHourMap = timeSlots.map(parseSlotHour);
+
+  const slotIndexForIssue = (issue) => {
+    const dt = getIssueDueDate(issue);
+    if (!dt) return 0;
+    const hr = dt.getHours();
+    let idx = slotHourMap.findIndex(h => h === hr);
+    if (idx === -1) {
+      idx = slotHourMap.findIndex(h => h > hr);
+      if (idx === -1) idx = slotHourMap.length - 1;
+    }
+    return idx;
+  };
+
+  const isSameDay = (a, b) => {
+    if (!a || !b) return false;
+    return a.toDateString() === b.toDateString();
+  };
+
+  const scheduledForTech = (tech) => {
+    const techId = String(tech?._id || tech?.id || tech?.userId || '');
+    return (issues || []).filter(issue => {
+      const assignedId = String(issue.assignedTo || (Array.isArray(issue.assignees) && issue.assignees[0]?.id) || '');
+      if (!assignedId || assignedId !== techId) return false;
+      const due = getIssueDueDate(issue);
+      if (!due) return false;
+      if (!isSameDay(due, currentDate)) return false;
+      if (isCompletedStatus(issue.status)) return false;
+      return true;
+    });
+  };
+
   const getPriorityColor = (priority) => {
     switch (priority) {
       case 'HIGH': return 'bg-red-500';
       case 'MEDIUM': return 'bg-amber-500';
       case 'LOW': return 'bg-green-500';
       default: return 'bg-gray-400';
+    }
+  };
+
+  const getPriorityPill = (priority) => {
+    switch (String(priority || '').toUpperCase()) {
+      case 'HIGH': return 'bg-rose-100 text-rose-700 border-rose-200';
+      case 'MEDIUM': return 'bg-amber-100 text-amber-700 border-amber-200';
+      case 'LOW': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+      default: return 'bg-slate-100 text-slate-600 border-slate-200';
     }
   };
 
@@ -2664,7 +2798,7 @@ const SchedulerTab = ({ issues, technicians }) => {
   };
 
   return (
-    <div className="flex flex-col gap-8 bg-white min-h-screen">
+    <div className="flex flex-col gap-8 bg-transparent min-h-screen glass-theme-blue">
       {/* Unscheduled Work Orders Section */}
       <section className="transition-all duration-300">
         <div className="flex items-center justify-between mb-4">
@@ -2807,7 +2941,7 @@ const SchedulerTab = ({ issues, technicians }) => {
             </div>
             <div className="relative">
               <AlertCircle className="w-5 h-5 text-gray-300" />
-              <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-indigo-500 text-white rounded-full flex items-center justify-center text-[10px] font-bold animate-pulse">109</span>
+              <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-indigo-500 text-blue-600 rounded-full flex items-center justify-center text-[10px] font-bold animate-pulse">109</span>
             </div>
             <button className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
               <SlidersHorizontal className="w-4 h-4 text-gray-400" />
@@ -2871,28 +3005,49 @@ const SchedulerTab = ({ issues, technicians }) => {
             )}
 
             <div className="divide-y divide-gray-50">
-              {technicians.length > 0 ? technicians.map((tech, idx) => (
-                <div key={tech._id || tech.id || idx} className="flex group">
-                  <div className="w-[280px] p-4 flex items-center justify-between border-r border-gray-50 group-hover:bg-gray-50/50 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 text-xs font-bold">
-                        {tech.name?.charAt(0) || 'T'}
+              {technicians.length > 0 ? technicians.map((tech, idx) => {
+                const techIssues = scheduledForTech(tech);
+                const slotBuckets = timeSlots.map(() => []);
+                techIssues.forEach(issue => {
+                  const slotIndex = slotIndexForIssue(issue);
+                  slotBuckets[slotIndex].push(issue);
+                });
+                return (
+                  <div key={tech._id || tech.id || idx} className="flex group">
+                    <div className="w-[280px] p-4 flex items-center justify-between border-r border-gray-50 group-hover:bg-gray-50/50 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 text-xs font-bold">
+                          {tech.name?.charAt(0) || 'T'}
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-gray-900 line-clamp-1">{tech.name}</p>
+                          <p className="text-[10px] text-gray-400 font-medium">Vendor / Customer</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-sm font-bold text-gray-900 line-clamp-1">{tech.name}</p>
-                        <p className="text-[10px] text-gray-400 font-medium">Vendor / Customer</p>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold text-orange-500">{techIssues.length ? `${techIssues.length} tasks` : '0%'}</span>
+                        <div className="w-3 h-3 rounded-full border border-gray-200" />
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-bold text-orange-500">0%</span>
-                      <div className="w-3 h-3 rounded-full border border-gray-200" />
-                    </div>
+                    {timeSlots.map((slot, slotIdx) => (
+                      <div key={slot} className="flex-1 border-l border-gray-50 p-2 group-hover:bg-gray-50/30 transition-colors">
+                        <div className="flex flex-col gap-2">
+                          {slotBuckets[slotIdx].map((issue) => (
+                            <div
+                              key={issue._id || issue.id || `${slotIdx}-${issue.title}`}
+                              className={`px-2 py-1 rounded-lg border text-[10px] font-semibold ${getPriorityPill(issue.priority)}`}
+                              title={issue.title}
+                            >
+                              <div className="line-clamp-1">{issue.title}</div>
+                              <div className="text-[9px] text-gray-500 mt-0.5">{issue.location || issue.assetName || 'Scheduled'}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  {timeSlots.map(slot => (
-                    <div key={slot} className="flex-1 border-l border-gray-50 p-2 group-hover:bg-gray-50/30 transition-colors" />
-                  ))}
-                </div>
-              )) : (
+                );
+              }) : (
                 <div className="p-8 text-center text-gray-400 text-sm italic">No technicians found</div>
               )}
             </div>
@@ -2902,7 +3057,7 @@ const SchedulerTab = ({ issues, technicians }) => {
     </div>
   );
 };
-// ── Analytics Tab ────────────────────────────────────────────────────────────
+// Analytics Tab
 const AnalyticsTab = ({ issues, technicians, aiSentiment, aiRecommendations, loadingAI, loadingRecs }) => {
   const [subTab, setSubTab] = useState('team-performance');
   const [dateRange, setDateRange] = useState('Last 90 Days');
@@ -3144,7 +3299,7 @@ const AnalyticsTab = ({ issues, technicians, aiSentiment, aiRecommendations, loa
     : dateRange;
 
   return (
-    <div className="flex flex-col gap-0 bg-white min-h-screen -m-6">
+    <div className="flex flex-col gap-0 bg-transparent min-h-screen -m-6 glass-theme-blue">
       {/* Sub-Tab Navigation */}
       <div className="flex items-center justify-between px-6 pt-4 border-b border-gray-100 bg-white sticky top-0 z-10">
         <div className="flex gap-0">
@@ -3322,7 +3477,7 @@ const AnalyticsTab = ({ issues, technicians, aiSentiment, aiRecommendations, loa
                         </ResponsiveContainer>
                         <div style={{ position: 'absolute', inset: 0 }} className="flex items-center justify-center">
                           <div className="text-center">
-                            <div className="text-lg font-bold text-gray-900">{loadingMetrics ? '—' : `${metrics.completionRate}%`}</div>
+                            <div className="text-lg font-bold text-gray-900">{loadingMetrics ? '—' : `${metrics.completionRate}%`}</div>
                             <div className="text-xs text-gray-500">of work orders</div>
                           </div>
                         </div>
@@ -3342,7 +3497,7 @@ const AnalyticsTab = ({ issues, technicians, aiSentiment, aiRecommendations, loa
                         </ReBarChart>
                       </ResponsiveContainer>
                     </div>
-                    <div className="mt-2 text-sm font-bold text-gray-800">{loadingMetrics ? '—' : `${metrics.avgResponseHrs} hrs`}</div>
+                    <div className="mt-2 text-sm font-bold text-gray-800">{loadingMetrics ? '—' : `${metrics.avgResponseHrs} hrs`}</div>
                   </div>
 
                   <div className="bg-white rounded-xl p-4 border border-gray-100">
@@ -3357,7 +3512,7 @@ const AnalyticsTab = ({ issues, technicians, aiSentiment, aiRecommendations, loa
                         </ReBarChart>
                       </ResponsiveContainer>
                     </div>
-                    <div className="mt-2 text-sm font-bold text-gray-800">{loadingMetrics ? '—' : `${metrics.avgCycleHrs} hrs`}</div>
+                    <div className="mt-2 text-sm font-bold text-gray-800">{loadingMetrics ? '—' : `${metrics.avgCycleHrs} hrs`}</div>
                   </div>
 
                   <div className="bg-white rounded-xl p-4 border border-gray-100">
@@ -3372,7 +3527,7 @@ const AnalyticsTab = ({ issues, technicians, aiSentiment, aiRecommendations, loa
                         </ReBarChart>
                       </ResponsiveContainer>
                     </div>
-                    <div className="mt-2 text-sm font-bold text-rose-600">{loadingMetrics ? '—' : metrics.backlog}</div>
+                    <div className="mt-2 text-sm font-bold text-rose-600">{loadingMetrics ? '—' : metrics.backlog}</div>
                   </div>
                 </div>
 
@@ -3526,10 +3681,10 @@ const AnalyticsTab = ({ issues, technicians, aiSentiment, aiRecommendations, loa
           <div className="bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 border border-indigo-100 rounded-2xl p-5 shadow-sm">
             <div className="flex items-center gap-2 mb-4">
               <div className="w-7 h-7 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
-                <Sparkles className="w-4 h-4 text-white" />
+                <Sparkles className="w-4 h-4 text-blue-600" />
               </div>
               <span className="text-sm font-black text-gray-900">AI Insights</span>
-              <span className="ml-auto px-2 py-0.5 bg-indigo-500 text-white text-[10px] font-bold rounded-full">LIVE</span>
+              <span className="ml-auto px-2 py-0.5 bg-indigo-500 text-blue-600 text-[10px] font-bold rounded-full">LIVE</span>
             </div>
 
             {loadingAI ? (
@@ -3603,7 +3758,7 @@ const AnalyticsTab = ({ issues, technicians, aiSentiment, aiRecommendations, loa
   );
 };
 
-// ── Meters Tab ────────────────────────────────────────────────────────────────
+// Meters Tab
 const MetersTab = () => {
   const [meterSearch, setMeterSearch] = useState('');
   const [meterFilter, setMeterFilter] = useState('All');
@@ -3672,7 +3827,7 @@ const MetersTab = () => {
             <h3 className="text-lg font-bold mb-3">Add Meter</h3>
             <div className="flex flex-col gap-2">
               <input value={newMeter.name} onChange={e => setNewMeter({ ...newMeter, name: e.target.value })} placeholder="Name" className="p-2 border rounded" />
-              <select value={newMeter.type} onChange={e => setNewMeter({ ...newMeter, type: e.target.value, unit: e.target.value === 'Water' ? 'm³' : 'kWh' })} className="p-2 border rounded">
+              <select value={newMeter.type} onChange={e => setNewMeter({ ...newMeter, type: e.target.value, unit: e.target.value === 'Water' ? 'm3' : 'kWh' })} className="p-2 border rounded">
                 <option>Electricity</option>
                 <option>Water</option>
                 <option>Gas</option>
@@ -3702,7 +3857,7 @@ const MetersTab = () => {
       <div className="grid grid-cols-3 gap-4">
         {[
           { label: 'Total Electricity', value: `${((meters || []).filter(m => m.type === 'Electricity').reduce((s, m) => s + (Number(m.reading) || 0), 0) / 1000).toFixed(1)} MWh`, icon: '⚡', color: 'from-amber-50 to-yellow-50 border-amber-100' },
-          { label: 'Total Water', value: `${((meters || []).filter(m => m.type === 'Water').reduce((s, m) => s + (Number(m.reading) || 0), 0)).toLocaleString()} m³`, icon: '💧', color: 'from-blue-50 to-cyan-50 border-blue-100' },
+          { label: 'Total Water', value: `${((meters || []).filter(m => m.type === 'Water').reduce((s, m) => s + (Number(m.reading) || 0), 0)).toLocaleString()} m3`, icon: '💧', color: 'from-blue-50 to-cyan-50 border-blue-100' },
           { label: 'Active Alerts', value: (meters || []).filter(m => m.status !== 'Normal').length, icon: '🚨', color: 'from-rose-50 to-pink-50 border-rose-100' },
         ].map(c => (
           <div key={c.label} className={`bg-gradient-to-br ${c.color} border rounded-xl p-4 flex items-center gap-4`}>
@@ -3735,10 +3890,10 @@ const MetersTab = () => {
 
       {/* Meters Table */}
       <BulkActionBar count={selection.selectedIds.length} label="meters" onDelete={handleDeleteSelected} />
-      <div className="bg-white rounded-lg border border-gray-100 overflow-hidden shadow-sm">
+      <div className="glass-surface-strong rounded-xl overflow-hidden shadow-2xl border border-white/20">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
-            <thead className="bg-[#fcfcfd] border-b border-gray-100">
+            <thead className="glass-surface border-b border-white/10">
               <tr>
                 <th className="py-4 px-4 w-10">
                   <input
@@ -3825,7 +3980,7 @@ const MetersTab = () => {
   );
 };
 
-// ── Edge Tab ──────────────────────────────────────────────────────────────────
+// Edge Tab
 const EdgeTab = () => {
   const [edgeFilter, setEdgeFilter] = useState('All');
   const [edgeSearch, setEdgeSearch] = useState('');
@@ -3834,7 +3989,7 @@ const EdgeTab = () => {
 
   const statuses = ['All', 'Online', 'Offline'];
 
-  const typeIcon = { Camera: '📷', Sensor: '📡', Network: '🌐', Lock: '🔒', Controller: '🎛️' };
+  const typeIcon = { Camera: 'CAM', Sensor: 'SNS', Network: 'NET', Lock: 'LOCK', Controller: 'CTRL' };
 
   const getSignalColor = (s) => s >= 80 ? 'bg-emerald-500' : s >= 50 ? 'bg-amber-500' : 'bg-rose-500';
 
@@ -3967,10 +4122,10 @@ const EdgeTab = () => {
       <BulkActionBar count={selection.selectedIds.length} label="devices" onDelete={handleDeleteSelected} />
 
       {/* Devices Table */}
-      <div className="bg-white rounded-lg border border-gray-100 overflow-hidden shadow-sm">
+      <div className="glass-surface-strong rounded-xl overflow-hidden shadow-2xl border border-white/20">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
-            <thead className="bg-[#fcfcfd] border-b border-gray-100">
+            <thead className="glass-surface border-b border-white/10">
               <tr>
                 <th className="py-4 px-4 w-10">
                   <input
@@ -4024,7 +4179,7 @@ const EdgeTab = () => {
                       <span className="text-sm font-bold text-gray-700">{d.signal}%</span>
                     </div>
                   </td>
-                  <td className="py-4 px-4 text-sm">{d.battery != null ? `${d.battery}%` : '—'}</td>
+                  <td className="py-4 px-4 text-sm">{d.battery != null ? `${d.battery}%` : '—'}</td>
                   <td className="py-4 px-4 text-sm text-gray-500">{d.lastPing}</td>
                   <td className="py-4 px-4 text-sm text-gray-500">{d.firmware}</td>
                   <td className="py-4 px-4 text-right">
@@ -4130,11 +4285,11 @@ const AssetsTab = ({ assets = [], onAssetsUpdated }) => {
         </div>
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-100 overflow-hidden shadow-sm">
+      <div className="glass-surface-strong rounded-xl overflow-hidden shadow-2xl border border-white/20">
         <BulkActionBar count={selection.selectedIds.length} label="assets" onDelete={handleDeleteSelected} />
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
-            <thead className="bg-[#fcfcfd] border-b border-gray-100">
+            <thead className="glass-surface border-b border-white/10">
               <tr>
                 <th className="py-4 px-4 w-10">
                   <input
@@ -4167,7 +4322,7 @@ const AssetsTab = ({ assets = [], onAssetsUpdated }) => {
                   <td className="py-4 px-4 text-sm text-gray-600 font-mono">{String(a._id || a.id || '').slice(-8)}</td>
                   <td className="py-4 px-4 text-sm text-gray-700">{a.category || a.type || '-'}</td>
                   <td className="py-4 px-4 text-sm text-gray-600">{a.property?.name || a.propertyName || (a.propertyId ? String(a.propertyId) : '-')}</td>
-                  <td className="py-4 px-4 text-sm font-black text-gray-900">{a.purchaseCost ? `$${Number(a.purchaseCost).toFixed(2)}` : '—'}</td>
+                  <td className="py-4 px-4 text-sm font-black text-gray-900">{a.purchaseCost ? `$${Number(a.purchaseCost).toFixed(2)}` : '—'}</td>
                   <td className="py-4 px-4 text-right">
                     <div className="flex items-center justify-end gap-2">
                       <button className="p-1.5 hover:bg-gray-100 rounded-lg"><Eye className="w-4 h-4 text-blue-600" /></button>
@@ -4328,11 +4483,11 @@ const LocationsTab = ({ locations = [], assets = [], onLocationUpdated, onLocati
         </div>
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-100 overflow-hidden shadow-sm">
+      <div className="glass-surface-strong rounded-xl overflow-hidden shadow-2xl border border-white/20">
         <BulkActionBar count={selection.selectedIds.length} label="locations" onDelete={handleDeleteSelected} />
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
-            <thead className="bg-[#fcfcfd] border-b border-gray-100">
+            <thead className="glass-surface border-b border-white/10">
               <tr>
                 <th className="py-4 px-4 w-10">
                   <input
@@ -4394,22 +4549,22 @@ const LocationsTab = ({ locations = [], assets = [], onLocationUpdated, onLocati
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
           <div className="bg-white rounded-2xl w-full max-w-3xl shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-xl font-bold text-gray-900">Location Details</h3>
-                <p className="text-sm text-gray-500">{selectedLocation.name || selectedLocation.title || 'Location'}</p>
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">Location Details</h3>
+                  <p className="text-sm text-gray-500">{selectedLocation.name || selectedLocation.title || 'Location'}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => openEdit(selectedLocation)} className="px-3 py-1.5 text-xs font-bold bg-green-600 text-blue-600 rounded-lg hover:bg-green-700">
+                    Edit
+                  </button>
+                  <button onClick={closeLocation} className="p-2 hover:bg-gray-100 rounded-lg">
+                    <X className="w-4 h-4 text-gray-400" />
+                  </button>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <button onClick={() => openEdit(selectedLocation)} className="px-3 py-1.5 text-xs font-bold bg-green-600 text-white rounded-lg hover:bg-green-700">
-                  Edit
-                </button>
-                <button onClick={closeLocation} className="p-2 hover:bg-gray-100 rounded-lg">
-                  <X className="w-4 h-4 text-gray-400" />
-                </button>
-              </div>
-            </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 {[
                   { label: 'Address', value: selectedLocation.address || selectedLocation.street || '-' },
                   { label: 'City', value: selectedLocation.city || '-' },
@@ -4427,84 +4582,84 @@ const LocationsTab = ({ locations = [], assets = [], onLocationUpdated, onLocati
                     <div className="text-sm font-bold text-gray-900 mt-1">{item.value}</div>
                   </div>
                 ))}
-            </div>
+              </div>
 
-            <div className="mt-6">
-              <h4 className="text-sm font-semibold text-gray-800 mb-2">Assets at this location</h4>
-              <div className="mb-3 flex items-center gap-2">
-                <input
-                  className="w-full max-w-xs border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                  placeholder="Enter asset name to get total/value"
-                  value={assetNameQuery}
-                  onChange={(e) => setAssetNameQuery(e.target.value)}
-                />
+              <div className="mt-6">
+                <h4 className="text-sm font-semibold text-gray-800 mb-2">Assets at this location</h4>
+                <div className="mb-3 flex items-center gap-2">
+                  <input
+                    className="w-full max-w-xs border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                    placeholder="Enter asset name to get total/value"
+                    value={assetNameQuery}
+                    onChange={(e) => setAssetNameQuery(e.target.value)}
+                  />
+                  {assetNameQuery && (
+                    <button
+                      onClick={() => setAssetNameQuery('')}
+                      className="px-2 py-1 text-xs font-semibold text-gray-600 hover:text-gray-900"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
                 {assetNameQuery && (
-                  <button
-                    onClick={() => setAssetNameQuery('')}
-                    className="px-2 py-1 text-xs font-semibold text-gray-600 hover:text-gray-900"
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
-              {assetNameQuery && (
-                <div className="mb-4">
-                  {(() => {
-                    const found = findAssetByName(selectedLocation, assetNameQuery);
-                    if (!found) return <div className="text-sm text-rose-600">No asset found with that name.</div>;
-                    return (
-                      <div className="p-3 rounded-xl border border-emerald-100 bg-emerald-50 text-sm">
-                        <div className="font-semibold text-emerald-800">
-                          {found.name || found.title || 'Asset'} ({String(found._id || found.id).slice(-8)})
+                  <div className="mb-4">
+                    {(() => {
+                      const found = findAssetByName(selectedLocation, assetNameQuery);
+                      if (!found) return <div className="text-sm text-rose-600">No asset found with that name.</div>;
+                      return (
+                        <div className="p-3 rounded-xl border border-emerald-100 bg-emerald-50 text-sm">
+                          <div className="font-semibold text-emerald-800">
+                            {found.name || found.title || 'Asset'} ({String(found._id || found.id).slice(-8)})
+                          </div>
+                          <div className="text-emerald-700">Purchase Cost: {found.purchaseCost ? `$${Number(found.purchaseCost).toLocaleString()}` : '—'}</div>
+                          <div className="text-emerald-700">Category: {found.category || found.type || '—'}</div>
                         </div>
-                        <div className="text-emerald-700">Purchase Cost: {found.purchaseCost ? `$${Number(found.purchaseCost).toLocaleString()}` : '—'}</div>
-                        <div className="text-emerald-700">Category: {found.category || found.type || '—'}</div>
-                      </div>
-                    );
-                  })()}
-                </div>
-              )}
-              <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-                <div className="max-h-56 overflow-y-auto">
-                  <table className="w-full text-left">
-                    <thead className="bg-gray-50 border-b border-gray-100">
-                      <tr>
-                        <th className="py-2 px-3 text-xs font-bold text-gray-500 uppercase">Asset</th>
-                        <th className="py-2 px-3 text-xs font-bold text-gray-500 uppercase">Category</th>
-                        <th className="py-2 px-3 text-xs font-bold text-gray-500 uppercase">ID</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {getLocationAssets(selectedLocation).map((a, i) => (
-                        <tr key={a._id || a.id || `asset-${i}`} className="border-b border-gray-50">
-                          <td className="py-2 px-3 text-sm text-gray-800">{a.name || a.title || 'Asset'}</td>
-                          <td className="py-2 px-3 text-sm text-gray-600">{a.category || a.type || '-'}</td>
-                          <td className="py-2 px-3 text-xs font-mono text-gray-500">{String(a._id || a.id || '').slice(-8)}</td>
-                        </tr>
-                      ))}
-                      {getLocationAssets(selectedLocation).length === 0 && (
-                        <tr><td colSpan="3" className="py-6 text-center text-sm text-gray-500">No assets linked.</td></tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-4">
-              <h4 className="text-sm font-semibold text-gray-800 mb-2">Assets by Category</h4>
-              <div className="flex flex-wrap gap-2">
-                {Object.entries(getLocationAssetTotals(selectedLocation).byCategory).map(([cat, count]) => (
-                  <span key={cat} className="px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-100">
-                    {cat}: {count}
-                  </span>
-                ))}
-                {Object.keys(getLocationAssetTotals(selectedLocation).byCategory).length === 0 && (
-                  <span className="text-sm text-gray-500">No assets</span>
+                      );
+                    })()}
+                  </div>
                 )}
+                <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+                  <div className="max-h-56 overflow-y-auto">
+                    <table className="w-full text-left">
+                      <thead className="glass-surface border-b border-white/10">
+                        <tr>
+                          <th className="py-2 px-3 text-xs font-bold text-gray-500 uppercase">Asset</th>
+                          <th className="py-2 px-3 text-xs font-bold text-gray-500 uppercase">Category</th>
+                          <th className="py-2 px-3 text-xs font-bold text-gray-500 uppercase">ID</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {getLocationAssets(selectedLocation).map((a, i) => (
+                          <tr key={a._id || a.id || `asset-${i}`} className="border-b border-gray-50">
+                            <td className="py-2 px-3 text-sm text-gray-800">{a.name || a.title || 'Asset'}</td>
+                            <td className="py-2 px-3 text-sm text-gray-600">{a.category || a.type || '-'}</td>
+                            <td className="py-2 px-3 text-xs font-mono text-gray-500">{String(a._id || a.id || '').slice(-8)}</td>
+                          </tr>
+                        ))}
+                        {getLocationAssets(selectedLocation).length === 0 && (
+                          <tr><td colSpan="3" className="py-6 text-center text-sm text-gray-500">No assets linked.</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <h4 className="text-sm font-semibold text-gray-800 mb-2">Assets by Category</h4>
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(getLocationAssetTotals(selectedLocation).byCategory).map(([cat, count]) => (
+                    <span key={cat} className="px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-100">
+                      {cat}: {count}
+                    </span>
+                  ))}
+                  {Object.keys(getLocationAssetTotals(selectedLocation).byCategory).length === 0 && (
+                    <span className="text-sm text-gray-500">No assets</span>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
           </div>
         </div>
       )}
@@ -4552,44 +4707,16 @@ const LocationsTab = ({ locations = [], assets = [], onLocationUpdated, onLocati
 
 // People & Teams Tab
 const PeopleTab = ({ technicians = [], allIssues = [], onRefresh }) => {
-  const [teams, setTeams] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showAddPerson, setShowAddPerson] = useState(false);
   const [showAddTeam, setShowAddTeam] = useState(false);
   const [newPerson, setNewPerson] = useState({ name: '', email: '', phone: '', role: 'Technician', password: '', specialization: '' });
   const [newTeam, setNewTeam] = useState({ name: '', members: [] });
-  const [teamImageFile, setTeamImageFile] = useState(null);
-  const [teamImagePreview, setTeamImagePreview] = useState(null);
-  const [teamExtractFromFiles, setTeamExtractFromFiles] = useState(false);
-  const [showEditTeam, setShowEditTeam] = useState(false);
-  const [editTeam, setEditTeam] = useState(null);
-  const [editTeamImageFile, setEditTeamImageFile] = useState(null);
-  const [editTeamImagePreview, setEditTeamImagePreview] = useState(null);
-  const [showViewTeam, setShowViewTeam] = useState(false);
-  const [viewTeam, setViewTeam] = useState(null);
-  const [showMapExtracted, setShowMapExtracted] = useState(false);
-  const [mappingState, setMappingState] = useState([]); // { idx, existingId, newName, newEmail }
-  const [teamFiles, setTeamFiles] = useState([]);
-  const [teamFilesPreview, setTeamFilesPreview] = useState([]);
-  const [editTeamFiles, setEditTeamFiles] = useState([]);
-  const [editTeamFilesPreview, setEditTeamFilesPreview] = useState([]);
-  const [editTeamExtractFromFiles, setEditTeamExtractFromFiles] = useState(false);
 
 
   useEffect(() => {
-    let mounted = true;
-    setLoading(true);
-    // Only fetch teams; technicians are passed via props
-    api.get('/api/teams')
-      .then((res) => {
-        if (!mounted) return;
-        setTeams(res.data || []);
-      })
-      .catch(err => {
-        console.warn('[Teams] fetch failed:', err.message);
-      })
-      .finally(() => { if (mounted) setLoading(false); });
-    return () => { mounted = false; };
+    // We only need to fetch technicians, which are passed via props.
+    // Parent fetchDashboardData handles this.
   }, []);
 
   const exportCSV = () => {
@@ -4611,7 +4738,11 @@ const PeopleTab = ({ technicians = [], allIssues = [], onRefresh }) => {
     e.preventDefault();
     try {
       const role = newPerson.role || 'Technician';
-      const isUserRole = ['Admin', 'Client', 'Requestor'].includes(role);
+      // Register all roles from the list as system users
+      const isUserRole = [
+        'Manager', 'limited Manager', 'Technician',
+        'limited Technician', 'Requestor'
+      ].some(r => r.toLowerCase() === role.toLowerCase());
 
       if (isUserRole) {
         await api.post('/api/users/register', {
@@ -4624,7 +4755,7 @@ const PeopleTab = ({ technicians = [], allIssues = [], onRefresh }) => {
         alert('User created successfully');
       } else {
         await api.post('/api/technicians', { ...newPerson, type: 'EXTERNAL' });
-        alert('External Technician created successfully');
+        alert('External technician created successfully');
       }
 
       setShowAddPerson(false);
@@ -4636,100 +4767,35 @@ const PeopleTab = ({ technicians = [], allIssues = [], onRefresh }) => {
     }
   };
 
+  const handleDeletePerson = async (id) => {
+    if (!confirm('Delete this person?')) return;
+    try {
+      // Try deleting as technician first, then as user if that fails
+      try {
+        await api.delete(`/api/technicians/${id}`);
+      } catch (err) {
+        await api.delete(`/api/users/${id}`);
+      }
+      if (onRefresh) onRefresh();
+      alert('Person deleted successfully');
+    } catch (err) {
+      console.error('Failed to delete person', err);
+      alert('Failed to delete person: ' + (err.response?.data?.error || err.message));
+    }
+  };
+
   const handleCreateTeam = async (e) => {
     e.preventDefault();
+    if (!newTeam.name.trim()) return alert('Please enter a team name');
     try {
-      const form = new FormData();
-      form.append('name', newTeam.name || '');
-      // append members as JSON string (if user chose extraction we still send members array but set flag)
-      form.append('members', JSON.stringify(newTeam.members || []));
-      if (teamExtractFromFiles) form.append('extractMembers', 'true');
-      if (teamImageFile) form.append('image', teamImageFile);
-      if (teamFiles && teamFiles.length) for (const f of teamFiles) form.append('files', f);
-
-      const res = await api.post('/api/teams', form, { headers: { 'Content-Type': 'multipart/form-data' } });
-      setTeams(prev => [res.data, ...(prev || [])]);
+      await api.post('/api/teams', newTeam);
       setShowAddTeam(false);
       setNewTeam({ name: '', members: [] });
-      setTeamImageFile(null);
-      setTeamImagePreview(null);
-      setTeamFiles([]);
-      setTeamFilesPreview([]);
+      if (onRefresh) onRefresh();
+      alert('Team created successfully');
     } catch (err) {
       console.error('Failed to create team', err);
-      alert('Failed to create team');
-    }
-  };
-
-  const openEditTeam = (team) => {
-    setEditTeam(team);
-    setEditTeamImagePreview(team.image ? getImageUrl(team.image) : null);
-    setEditTeamImageFile(null);
-    setEditTeamFiles([]);
-    setEditTeamFilesPreview([]);
-    setShowEditTeam(true);
-  };
-
-  const openViewTeam = (team) => {
-    (async () => {
-      try {
-        const id = team.id || team._id;
-        if (id) {
-          const res = await api.get(`/api/teams/${id}`);
-          if (res && res.data) {
-            setViewTeam(res.data);
-          } else {
-            setViewTeam(team);
-          }
-        } else {
-          setViewTeam(team);
-        }
-      } catch (e) {
-        console.warn('Failed to fetch team details, using provided object', e);
-        setViewTeam(team);
-      } finally {
-        setShowViewTeam(true);
-        setShowMapExtracted(false);
-        setMappingState([]);
-      }
-    })();
-  };
-
-  const handleUpdateTeam = async (e) => {
-    e.preventDefault();
-    if (!editTeam) return;
-    try {
-      const form = new FormData();
-      form.append('name', editTeam.name || '');
-      form.append('members', JSON.stringify(editTeam.members || []));
-      if (editTeamExtractFromFiles) form.append('extractMembers', 'true');
-      if (editTeamImageFile) form.append('image', editTeamImageFile);
-      if (editTeamFiles && editTeamFiles.length) for (const f of editTeamFiles) form.append('files', f);
-
-      const id = editTeam.id || editTeam._id;
-      const res = await api.put(`/api/teams/${id}`, form, { headers: { 'Content-Type': 'multipart/form-data' } });
-      setTeams(prev => prev.map(t => (String(t._id || t.id) === String(id) ? res.data : t)));
-      setShowEditTeam(false);
-      setEditTeam(null);
-      setEditTeamImageFile(null);
-      setEditTeamFiles([]);
-      setEditTeamImagePreview(null);
-      setEditTeamFilesPreview([]);
-    } catch (err) {
-      console.error('Failed to update team', err);
-      alert('Failed to update team');
-    }
-  };
-
-  const handleDeletePerson = async (id) => {
-    if (!confirm('Delete this technician?')) return;
-    try {
-      await api.delete(`/api/technicians/${id}`);
-      if (onRefresh) onRefresh();
-      alert('Technician deleted successfully');
-    } catch (err) {
-      console.error('Failed to delete technician', err);
-      alert('Failed to delete technician: ' + (err.response?.data?.error || err.message));
+      alert('Failed to create team: ' + (err.response?.data?.error || err.message));
     }
   };
 
@@ -4737,31 +4803,33 @@ const PeopleTab = ({ technicians = [], allIssues = [], onRefresh }) => {
     if (!confirm('Delete this team?')) return;
     try {
       await api.delete(`/api/teams/${id}`);
-      setTeams(prev => (prev || []).filter(t => String(t._id || t.id) !== String(id)));
+      if (onRefresh) onRefresh();
+      alert('Team deleted successfully');
     } catch (err) {
       console.error('Failed to delete team', err);
-      alert('Failed to delete team');
+      alert('Failed to delete team: ' + (err.response?.data?.error || err.message));
     }
   };
 
   return (
     <div className="flex flex-col gap-6">
+      {/* People Tab Content - External Technicians List */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-bold text-gray-900">People & Teams</h2>
-          <p className="text-sm text-gray-500 mt-0.5">External Technicians and Vendor Teams</p>
+          <h2 className="text-xl font-bold text-gray-900">People</h2>
+          <p className="text-sm text-gray-500 mt-0.5">External Technicians and Personnel</p>
         </div>
         <div className="flex items-center gap-3">
           <button onClick={exportCSV} className="px-3 py-2 bg-white border rounded-xl text-sm font-semibold hover:bg-gray-50">Export CSV</button>
+          <button onClick={() => setShowAddTeam(true)} className="px-3 py-2 bg-white border rounded-xl text-sm font-semibold hover:bg-gray-50">Add Team</button>
           <button onClick={() => setShowAddPerson(true)} className="px-3 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700">Add Person</button>
-          <button onClick={() => setShowAddTeam(true)} className="px-3 py-2 bg-green-600 text-white rounded-xl text-sm font-semibold hover:bg-green-700">Add Team</button>
         </div>
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-100 overflow-hidden shadow-sm">
+      <div className="glass-surface-strong rounded-xl overflow-hidden shadow-2xl border border-white/20">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
-            <thead className="bg-[#fcfcfd] border-b border-gray-100">
+            <thead className="glass-surface border-b border-white/10">
               <tr>
                 <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Name</th>
                 <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">ID</th>
@@ -4817,7 +4885,6 @@ const PeopleTab = ({ technicians = [], allIssues = [], onRefresh }) => {
                         </button>
                       </div>
                     </td>
-
                   </tr>
                 ));
               })()}
@@ -4826,199 +4893,124 @@ const PeopleTab = ({ technicians = [], allIssues = [], onRefresh }) => {
         </div>
       </div>
 
-      {/* Teams List */}
-      <div className="mt-6 bg-white rounded-lg border border-gray-100 overflow-hidden shadow-sm">
-        <div className="p-4 border-b flex items-center justify-between">
-          <div>
-            <h3 className="text-md font-bold">Teams</h3>
-            <p className="text-xs text-gray-500">Teams and members</p>
-          </div>
-        </div>
+      <div>
+        <h2 className="text-xl font-bold text-gray-900">Teams</h2>
+        <p className="text-sm text-gray-500 mt-0.5">Management teams and specialties</p>
+      </div>
+
+      <div className="glass-surface-strong rounded-xl overflow-hidden shadow-2xl border border-white/20">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
-            <thead className="bg-[#fcfcfd] border-b border-gray-100">
+            <thead className="glass-surface border-b border-white/10">
               <tr>
-                <th className="py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Image</th>
-                <th className="py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Name</th>
-                <th className="py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Members</th>
-                <th className="py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">ID</th>
-                <th className="py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Actions</th>
+                <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Team Name</th>
+                <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Members</th>
+                <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {(teams || []).map((tm, i) => (
-                <tr key={tm._id || tm.id || `team-${i}`} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
-                  <td className="py-3 px-4"><div className="w-10 h-10 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center">
-                    {tm.image ? <img src={getImageUrl(tm.image)} alt={tm.name} className="w-full h-full object-cover" /> : <div className="text-sm text-gray-600">{(tm.name || 'T').slice(0, 1)}</div>}
-                  </div></td>
-                  <td className="py-3 px-4"><div className="text-sm font-bold text-gray-900">{tm.name || 'Unnamed'}</div></td>
-                  <td className="py-3 px-4 text-sm text-gray-600">{
-                    (() => {
-                      if (!tm.members || tm.members.length === 0) return '-';
-                      const membersArray = Array.isArray(tm.members) ? tm.members : (tm.members ? String(tm.members).split(',') : []);
-                      const names = membersArray.map(entry => {
-                        if (!entry && entry !== 0) return null;
-                        if (typeof entry === 'object') return entry.name || entry.email || null;
-                        const raw = String(entry).trim();
-                        // Match against external technicians
-                        const found = technicians.find(p => String(p.id || p._id) === raw || String(p._id) === raw);
-                        if (found) return found.name || found.email;
-                        if (raw.startsWith('{') || raw.startsWith('[')) {
-                          try {
-                            const parsed = JSON.parse(raw);
-                            if (parsed && typeof parsed === 'object') return parsed.name || parsed.email || null;
-                          } catch (e) { }
-                        }
-                        if (raw.includes(',') || raw.includes(';')) {
-                          const first = raw.split(/[,;]+/)[0].replace(/^["']|["']$/g, '').trim();
-                          if (first && first.length < 120) return first;
-                        }
-                        const emailMatch = raw.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
-                        if (emailMatch) return emailMatch[0];
-                        return raw.length > 12 ? raw.slice(0, 12) + '...' : raw;
-                      }).filter(Boolean);
-                      return names.slice(0, 3).join(', ') + (names.length > 3 ? ` (+${names.length - 3})` : '');
-                    })()
-                  }</td>
-                  <td className="py-3 px-4 text-sm text-gray-600 font-mono">{String(tm._id || tm.id || '').slice(-8)}</td>
-                  <td className="py-3 px-4 text-right"><div className="flex items-center justify-end gap-2">
-                    <button onClick={() => openViewTeam(tm)} title="View team" className="p-1.5 hover:bg-gray-100 rounded-lg"><Eye className="w-4 h-4 text-blue-600" /></button>
-                    <button onClick={() => openEditTeam(tm)} className="p-1.5 hover:bg-gray-100 rounded-lg"><Edit className="w-4 h-4 text-green-600" /></button>
-                    <button onClick={() => handleDeleteTeam(tm._id || tm.id)} className="p-1.5 hover:bg-gray-100 rounded-lg"><Trash2 className="w-4 h-4 text-red-600" /></button>
-                  </div></td>
-                </tr>
-              ))}
-              {(teams || []).length === 0 && (<tr><td colSpan="5" className="py-16 text-center"><p className="text-gray-500">No teams found</p></td></tr>)}
+              {teams.length === 0 ? (
+                <tr><td colSpan="3" className="py-20 text-center"><p className="text-gray-500">No teams found</p></td></tr>
+              ) : (
+                teams.map((team, idx) => (
+                  <tr key={team._id || team.id || `team-${idx}`} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+                    <td className="py-4 px-4"><div className="text-sm font-bold text-gray-900">{team.name}</div></td>
+                    <td className="py-4 px-4">
+                      <div className="flex flex-wrap gap-1">
+                        {Array.isArray(team.members) && team.members.map((m, mIdx) => (
+                          <span key={mIdx} className="px-2 py-0.5 bg-gray-100 text-gray-600 text-[10px] font-bold rounded-full">
+                            {typeof m === 'object' ? m.name : m}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="py-4 px-4 text-right">
+                      <button onClick={() => handleDeleteTeam(team._id || team.id)} className="p-1.5 hover:bg-gray-100 rounded-lg text-red-600">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* Add Person Modal */}
-      {showAddPerson && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setShowAddPerson(false)} />
-          <form onSubmit={handleCreatePerson} className="bg-white rounded-xl p-6 z-50 w-full max-w-md">
-            <h3 className="text-lg font-bold mb-3">Add Person</h3>
-            <div className="flex flex-col gap-2">
-              <input className="border p-2 rounded" placeholder="Name" value={newPerson.name} onChange={e => setNewPerson({ ...newPerson, name: e.target.value })} />
-              <input className="border p-2 rounded" placeholder="Email" value={newPerson.email} onChange={e => setNewPerson({ ...newPerson, email: e.target.value })} />
-              <input className="border p-2 rounded" placeholder="Phone" value={newPerson.phone} onChange={e => setNewPerson({ ...newPerson, phone: e.target.value })} />
-              <input className="border p-2 rounded" type="password" placeholder="Password" value={newPerson.password} onChange={e => setNewPerson({ ...newPerson, password: e.target.value })} />
-              <input className="border p-2 rounded" placeholder="Specialization (e.g. Plumbing, HVAC)" value={newPerson.specialization} onChange={e => setNewPerson({ ...newPerson, specialization: e.target.value })} />
-              <select className="border p-2 rounded" value={newPerson.role} onChange={e => setNewPerson({ ...newPerson, role: e.target.value })}>
-                <option>Technician</option>
-                <option>Manager</option>
-                <option>Staff</option>
-                <option>Admin</option>
-                <option>Client</option>
-                <option>Requestor</option>
-              </select>
-              <div className="flex items-center justify-end gap-2 mt-3">
-                <button type="button" onClick={() => setShowAddPerson(false)} className="px-3 py-2 rounded border">Cancel</button>
-                <button type="submit" className="px-3 py-2 rounded bg-blue-600 text-white">Create</button>
+      {showAddTeam && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <form onSubmit={handleCreateTeam} className="bg-white rounded-2xl w-full max-w-lg p-6 shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-900">Add New Team</h3>
+              <button type="button" onClick={() => setShowAddTeam(false)} className="p-2 hover:bg-gray-100 rounded-lg">
+                <X className="w-4 h-4 text-gray-400" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Team Name</label>
+                <input
+                  className="w-full border border-gray-200 rounded-lg p-2.5 text-sm"
+                  placeholder="e.g. Civil Engineers, Plumbing, Electricians"
+                  value={newTeam.name}
+                  onChange={e => setNewTeam({ ...newTeam, name: e.target.value })}
+                />
               </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Select Members (Technicians)</label>
+                <div className="max-h-40 overflow-y-auto border border-gray-100 rounded-lg p-2 space-y-1">
+                  {technicians.map(t => (
+                    <label key={t._id || t.id} className="flex items-center gap-2 p-1.5 hover:bg-gray-50 rounded cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={newTeam.members.includes(t._id || t.id)}
+                        onChange={e => {
+                          const id = t._id || t.id;
+                          if (e.target.checked) setNewTeam({ ...newTeam, members: [...newTeam.members, id] });
+                          else setNewTeam({ ...newTeam, members: newTeam.members.filter(m => m !== id) });
+                        }}
+                      />
+                      <span className="text-sm font-medium">{t.name}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 mt-6">
+              <button type="button" onClick={() => setShowAddTeam(false)} className="px-4 py-2 border rounded-lg text-sm">Cancel</button>
+              <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold">Create Team</button>
             </div>
           </form>
         </div>
       )}
 
-      {/* Add Team Modal */}
-      {showAddTeam && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setShowAddTeam(false)} />
-          <form onSubmit={handleCreateTeam} className="bg-white rounded-xl p-6 z-50 w-full max-w-md">
-            <h3 className="text-lg font-bold mb-3">Add Team</h3>
-            <div className="flex flex-col gap-2">
-              <input className="border p-2 rounded" placeholder="Team Name" value={newTeam.name} onChange={e => setNewTeam({ ...newTeam, name: e.target.value })} />
-              <label className="text-sm text-gray-600">Members</label>
-              <select multiple className="border p-2 rounded h-32" value={newTeam.members} onChange={e => setNewTeam({ ...newTeam, members: Array.from(e.target.selectedOptions).map(o => o.value) })}>
-                {(technicians || []).map(p => (<option key={(p.id || p._id)} value={p.id || p._id}>{p.name || p.email}</option>))}
-              </select>
-              <label className="text-sm text-gray-600 mt-2">Team Image (optional)</label>
-              <input type="file" accept="image/*" onChange={e => {
-                const f = e.target.files && e.target.files[0];
-                setTeamImageFile(f || null);
-                setTeamImagePreview(f ? URL.createObjectURL(f) : null);
-              }} />
-              {teamImagePreview && (
-                <div className="mt-2">
-                  <p className="text-xs text-gray-500 mb-1">Preview:</p>
-                  <img src={teamImagePreview} alt="preview" className="w-24 h-24 object-cover rounded-md border" />
-                </div>
-              )}
-              <label className="text-sm text-gray-600 mt-2">Attachments (optional)</label>
-              <input type="file" multiple onChange={e => {
-                const files = e.target.files ? Array.from(e.target.files) : [];
-                setTeamFiles(files);
-                setTeamFilesPreview(files.map(f => f.name));
-              }} />
-              <div className="flex items-center gap-2 mt-2">
-                <input id="extractMembers" type="checkbox" checked={teamExtractFromFiles} onChange={e => setTeamExtractFromFiles(e.target.checked)} />
-                <label htmlFor="extractMembers" className="text-sm text-gray-600">Populate members from uploaded files (CSV, XLSX, PDF, DOCX, images)</label>
-              </div>
-              {teamFilesPreview && teamFilesPreview.length > 0 && (
-                <div className="mt-2 text-xs text-gray-600">
-                  <p className="mb-1">Files:</p>
-                  <ul className="list-disc ml-5">
-                    {teamFilesPreview.map((n, i) => <li key={i}>{n}</li>)}
-                  </ul>
-                </div>
-              )}
-              <div className="flex items-center justify-end gap-2 mt-3">
-                <button type="button" onClick={() => setShowAddTeam(false)} className="px-3 py-2 rounded border">Cancel</button>
-                <button type="submit" className="px-3 py-2 rounded bg-green-600 text-white">Create Team</button>
-              </div>
+      {/* Add Person Modal */}
+      {showAddPerson && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <form onSubmit={handleCreatePerson} className="bg-white rounded-2xl w-full max-w-lg p-6 shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-900">Add Person</h3>
+              <button type="button" onClick={() => setShowAddPerson(false)} className="p-2 hover:bg-gray-100 rounded-lg">
+                <X className="w-4 h-4 text-gray-400" />
+              </button>
             </div>
-          </form>
-        </div>
-      )}
-      {/* Edit Team Modal */}
-      {showEditTeam && editTeam && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setShowEditTeam(false)} />
-          <form onSubmit={handleUpdateTeam} className="bg-white rounded-xl p-6 z-50 w-full max-w-md">
-            <h3 className="text-lg font-bold mb-3">Edit Team</h3>
-            <div className="flex flex-col gap-2">
-              <input className="border p-2 rounded" placeholder="Team Name" value={editTeam.name || ''} onChange={e => setEditTeam({ ...editTeam, name: e.target.value })} />
-              <label className="text-sm text-gray-600">Members</label>
-              <select multiple className="border p-2 rounded h-32" value={editTeam.members || []} onChange={e => setEditTeam({ ...editTeam, members: Array.from(e.target.selectedOptions).map(o => o.value) })}>
-                {(technicians || []).map(p => (<option key={(p.id || p._id)} value={p.id || p._id}>{p.name || p.email}</option>))}
+            <div className="grid grid-cols-2 gap-3">
+              <input className="border p-2 rounded-lg text-sm" placeholder="Name" value={newPerson.name} onChange={e => setNewPerson({ ...newPerson, name: e.target.value })} />
+              <input className="border p-2 rounded-lg text-sm" placeholder="Email" value={newPerson.email} onChange={e => setNewPerson({ ...newPerson, email: e.target.value })} />
+              <input className="border p-2 rounded-lg text-sm" placeholder="Phone" value={newPerson.phone} onChange={e => setNewPerson({ ...newPerson, phone: e.target.value })} />
+              <input className="border p-2 rounded-lg text-sm" type="password" placeholder="Password" value={newPerson.password} onChange={e => setNewPerson({ ...newPerson, password: e.target.value })} />
+              <input className="border p-2 rounded-lg text-sm col-span-2" placeholder="Specialization (e.g. Plumbing, HVAC)" value={newPerson.specialization} onChange={e => setNewPerson({ ...newPerson, specialization: e.target.value })} />
+              <select className="border p-2 rounded-lg text-sm col-span-2" value={newPerson.role} onChange={e => setNewPerson({ ...newPerson, role: e.target.value })}>
+                <option>Manager</option>
+                <option>limited Manager</option>
+                <option>Technician</option>
+                <option>limited Technician</option>
+                <option>Requestor</option>
               </select>
-              <label className="text-sm text-gray-600 mt-2">Team Image (optional)</label>
-              <input type="file" accept="image/*" onChange={e => {
-                const f = e.target.files && e.target.files[0];
-                setEditTeamImageFile(f || null);
-                setEditTeamImagePreview(f ? URL.createObjectURL(f) : (editTeam.image ? getImageUrl(editTeam.image) : null));
-              }} />
-              {editTeamImagePreview && (
-                <div className="mt-2">
-                  <p className="text-xs text-gray-500 mb-1">Preview:</p>
-                  <img src={editTeamImagePreview} alt="preview" className="w-24 h-24 object-cover rounded-md border" />
-                </div>
-              )}
-              <label className="text-sm text-gray-600 mt-2">Attachments (optional)</label>
-              <input type="file" multiple onChange={e => {
-                const files = e.target.files ? Array.from(e.target.files) : [];
-                setEditTeamFiles(files);
-                setEditTeamFilesPreview(files.map(f => f.name));
-              }} />
-              <div className="flex items-center gap-2 mt-2">
-                <input id="editExtractMembers" type="checkbox" checked={editTeamExtractFromFiles} onChange={e => setEditTeamExtractFromFiles(e.target.checked)} />
-                <label htmlFor="editExtractMembers" className="text-sm text-gray-600">Populate members from uploaded files (CSV, XLSX, PDF, DOCX, images)</label>
-              </div>
-              {editTeamFilesPreview && editTeamFilesPreview.length > 0 && (
-                <div className="mt-2 text-xs text-gray-600">
-                  <p className="mb-1">Files:</p>
-                  <ul className="list-disc ml-5">
-                    {editTeamFilesPreview.map((n, i) => <li key={i}>{n}</li>)}
-                  </ul>
-                </div>
-              )}
-              <div className="flex items-center justify-end gap-2 mt-3">
-                <button type="button" onClick={() => setShowEditTeam(false)} className="px-3 py-2 rounded border">Cancel</button>
-                <button type="submit" className="px-3 py-2 rounded bg-green-600 text-white">Save</button>
-              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 mt-5">
+              <button type="button" onClick={() => setShowAddPerson(false)} className="px-4 py-2 border rounded-lg text-sm">Cancel</button>
+              <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold">Create</button>
             </div>
           </form>
         </div>
@@ -5030,25 +5022,104 @@ const PeopleTab = ({ technicians = [], allIssues = [], onRefresh }) => {
 // Checklists Tab (uses maintenance templates / checklists if available)
 const ChecklistsTab = () => {
   const [items, setItems] = React.useState([]);
-  React.useEffect(() => {
-    // try to fetch maintenance templates if API exists
-    (async () => {
+  const [loading, setLoading] = React.useState(false);
+  const [showCreate, setShowCreate] = React.useState(false);
+  const [creating, setCreating] = React.useState(false);
+  const [form, setForm] = React.useState({
+    name: '',
+    description: '',
+    frequency: 'DAILY',
+    steps: [{ text: '' }]
+  });
+
+  const fetchItems = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await api.get('/api/checklists');
+      setItems(res.data || []);
+    } catch (e) {
       try {
         const res = await api.get('/api/maintenance-templates');
         setItems(res.data || []);
-      } catch (e) {
+      } catch (err) {
         setItems([]);
       }
-    })();
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  React.useEffect(() => {
+    fetchItems();
+  }, [fetchItems]);
+
+  const stepsFromItem = (it) => {
+    if (Array.isArray(it?.steps)) return it.steps;
+    if (Array.isArray(it?.checklist)) return it.checklist;
+    return [];
+  };
+
+  const stepsCount = (it) => stepsFromItem(it).length;
 
   const exportCSV = () => {
     if (!items || items.length === 0) return;
-    const keys = ['id', 'name', 'steps'];
-    const rows = items.map(it => ({ id: it._id || it.id || '', name: it.name || it.title || '', steps: Array.isArray(it.steps) ? it.steps.length : '' }));
+    const keys = ['id', 'name', 'description', 'frequency', 'steps'];
+    const rows = items.map(it => {
+      const list = stepsFromItem(it);
+      const stepsText = (list || [])
+        .map(s => (typeof s === 'string' ? s : (s?.text || '')))
+        .filter(Boolean)
+        .join(' | ');
+      return {
+        id: it._id || it.id || '',
+        name: it.name || it.title || '',
+        description: it.description || '',
+        frequency: it.frequency || it.interval || '',
+        steps: stepsText || (Array.isArray(list) ? String(list.length) : '')
+      };
+    });
     const csv = [keys.join(',')].concat(rows.map(r => keys.map(k => (`"${String(r[k] ?? '').replace(/"/g, '""')}"`)).join(','))).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'checklists-export.csv'; a.click(); URL.revokeObjectURL(url);
+  };
+
+  const addStep = () => setForm(prev => ({ ...prev, steps: [...prev.steps, { text: '' }] }));
+  const removeStep = (idx) => setForm(prev => ({ ...prev, steps: prev.steps.filter((_, i) => i !== idx) }));
+  const updateStep = (idx, value) => setForm(prev => ({
+    ...prev,
+    steps: prev.steps.map((s, i) => (i === idx ? { ...s, text: value } : s))
+  }));
+
+  const handleCreate = async (e) => {
+    e.preventDefault();
+    const name = form.name.trim();
+    if (!name) {
+      alert('Please enter a checklist name');
+      return;
+    }
+    const cleanSteps = form.steps.map(s => (s.text || '').trim()).filter(Boolean);
+    if (cleanSteps.length === 0) {
+      alert('Please add at least one checklist step');
+      return;
+    }
+    try {
+      setCreating(true);
+      const payload = {
+        name,
+        description: form.description.trim(),
+        frequency: form.frequency,
+        steps: cleanSteps.map(text => ({ text, completed: false }))
+      };
+      const res = await api.post('/api/checklists', payload);
+      setItems(prev => [res.data, ...(prev || [])]);
+      setShowCreate(false);
+      setForm({ name: '', description: '', frequency: 'DAILY', steps: [{ text: '' }] });
+    } catch (err) {
+      console.error('Failed to create checklist:', err);
+      alert('Failed to create checklist: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setCreating(false);
+    }
   };
 
   return (
@@ -5059,17 +5130,105 @@ const ChecklistsTab = () => {
           <p className="text-sm text-gray-500 mt-0.5">Maintenance checklists and templates</p>
         </div>
         <div className="flex items-center gap-3">
+          <button onClick={() => setShowCreate(true)} className="px-3 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700">New Checklist</button>
           <button onClick={exportCSV} className="px-3 py-2 bg-white border rounded-xl text-sm font-semibold hover:bg-gray-50">Export CSV</button>
         </div>
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-100 overflow-hidden shadow-sm">
+      {showCreate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md">
+          <div className="glass-surface-strong rounded-2xl w-full max-w-2xl p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-bold">Create Checklist</h3>
+                <p className="text-sm text-slate-600">Add a new maintenance checklist template</p>
+              </div>
+              <button onClick={() => setShowCreate(false)} className="rounded-full p-2 hover:bg-white/70">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleCreate} className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Checklist Name *</label>
+                <input
+                  value={form.name}
+                  onChange={(e) => setForm(prev => ({ ...prev, name: e.target.value }))}
+                  className="w-full rounded-xl glass-input px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300/60 outline-none"
+                  placeholder="e.g., HVAC Monthly Inspection"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Description</label>
+                <textarea
+                  value={form.description}
+                  onChange={(e) => setForm(prev => ({ ...prev, description: e.target.value }))}
+                  className="w-full rounded-xl glass-input px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300/60 outline-none"
+                  rows="3"
+                  placeholder="Short description of this checklist"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Frequency *</label>
+                <select
+                  value={form.frequency}
+                  onChange={(e) => setForm(prev => ({ ...prev, frequency: e.target.value }))}
+                  className="w-full rounded-xl glass-input px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300/60 outline-none"
+                >
+                  <option value="DAILY">Daily</option>
+                  <option value="WEEKLY">Weekly</option>
+                  <option value="MONTHLY">Monthly</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Steps *</label>
+                <div className="space-y-2">
+                  {form.steps.map((s, idx) => (
+                    <div key={`step-${idx}`} className="flex gap-2">
+                      <input
+                        value={s.text}
+                        onChange={(e) => updateStep(idx, e.target.value)}
+                        className="flex-1 rounded-xl glass-input px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300/60 outline-none"
+                        placeholder={`Step ${idx + 1}`}
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeStep(idx)}
+                        className="px-3 py-2 rounded-xl glass-ghost text-sm font-semibold"
+                        disabled={form.steps.length === 1}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <button type="button" onClick={addStep} className="mt-3 px-3 py-2 rounded-xl glass-ghost text-sm font-semibold">
+                  + Add Step
+                </button>
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setShowCreate(false)} className="px-4 py-2 rounded-xl glass-ghost text-sm font-semibold">
+                  Cancel
+                </button>
+                <button type="submit" className="px-4 py-2 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700" disabled={creating}>
+                  {creating ? 'Creating...' : 'Create Checklist'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      <div className="glass-surface-strong rounded-xl overflow-hidden shadow-2xl border border-white/20">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
-            <thead className="bg-[#fcfcfd] border-b border-gray-100">
+            <thead className="glass-surface border-b border-white/10">
               <tr>
                 <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Name</th>
                 <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">ID</th>
+                <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Description</th>
+                <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Frequency</th>
                 <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Steps</th>
                 <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Actions</th>
               </tr>
@@ -5079,11 +5238,14 @@ const ChecklistsTab = () => {
                 <tr key={it._id || it.id || `chk-${idx}`} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
                   <td className="py-4 px-4"><div className="text-sm font-bold text-gray-900">{it.name || it.title || 'Unnamed'}</div></td>
                   <td className="py-4 px-4 text-sm text-gray-600 font-mono">{String(it._id || it.id || '').slice(-8)}</td>
-                  <td className="py-4 px-4 text-sm text-gray-600">{Array.isArray(it.steps) ? it.steps.length : '-'}</td>
+                  <td className="py-4 px-4 text-sm text-gray-600">{it.description || '—'}</td>
+                  <td className="py-4 px-4 text-sm text-gray-600">{it.frequency || it.interval || '—'}</td>
+                  <td className="py-4 px-4 text-sm text-gray-600">{stepsCount(it) || '-'}</td>
                   <td className="py-4 px-4 text-right"><div className="flex items-center justify-end gap-2"><button className="p-1.5 hover:bg-gray-100 rounded-lg"><Eye className="w-4 h-4 text-blue-600" /></button></div></td>
                 </tr>
               ))}
-              {items.length === 0 && (<tr><td colSpan="4" className="py-20 text-center"><p className="text-gray-500">No checklists/templates found</p></td></tr>)}
+              {items.length === 0 && !loading && (<tr><td colSpan="6" className="py-20 text-center"><p className="text-gray-500">No checklists/templates found</p></td></tr>)}
+              {loading && (<tr><td colSpan="6" className="py-20 text-center"><p className="text-gray-500">Loading checklists...</p></td></tr>)}
             </tbody>
           </table>
         </div>
@@ -5233,17 +5395,17 @@ const PartsInventoryTab = () => {
         <div className="flex items-center gap-3">
           <button onClick={exportCSV} className="px-3 py-2 bg-white border rounded-xl text-sm font-semibold hover:bg-gray-50">Export CSV</button>
           <button onClick={downloadTemplate} className="px-3 py-2 bg-white border rounded-xl text-sm font-semibold hover:bg-gray-50">Download Template</button>
-          <button onClick={() => setShowAddItem(true)} className="px-3 py-2 bg-gray-900 text-white rounded-xl text-sm font-bold">Add Person</button>
+          <button onClick={() => setShowAddItem(true)} className="px-3 py-2 bg-gray-900 text-blue-600 rounded-xl text-sm font-bold">Add Person</button>
           <button onClick={() => fileRef.current && fileRef.current.click()} className="px-3 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold">Add From File</button>
           <input ref={fileRef} type="file" accept=".csv" onChange={onImport} className="hidden" />
         </div>
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-100 overflow-hidden shadow-sm">
+      <div className="glass-surface-strong rounded-xl overflow-hidden shadow-2xl border border-white/20">
         <BulkActionBar count={selection.selectedIds.length} label="parts" onDelete={handleDeleteSelected} />
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
-            <thead className="bg-[#fcfcfd] border-b border-gray-100">
+            <thead className="glass-surface border-b border-white/10">
               <tr>
                 <th className="py-4 px-4 w-10">
                   <input
@@ -5359,10 +5521,10 @@ const PurchaseOrdersTab = () => {
         </div>
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-100 overflow-hidden shadow-sm">
+      <div className="glass-surface-strong rounded-xl overflow-hidden shadow-2xl border border-white/20">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
-            <thead className="bg-[#fcfcfd] border-b border-gray-100">
+            <thead className="glass-surface border-b border-white/10">
               <tr>
                 <th className="py-4 px-4">Title</th>
                 <th className="py-4 px-4">PO Number</th>
@@ -5566,17 +5728,17 @@ const VendorsTab = () => {
         <div className="flex items-center gap-3">
           <button onClick={exportCSV} className="px-3 py-2 bg-white border rounded-xl text-sm font-semibold hover:bg-gray-50">Export CSV</button>
           <button onClick={downloadTemplate} className="px-3 py-2 bg-white border rounded-xl text-sm font-semibold hover:bg-gray-50">Download Template</button>
-          <button onClick={() => setShowAddVendor(true)} className="px-3 py-2 bg-gray-900 text-white rounded-xl text-sm font-bold">Add Person</button>
+          <button onClick={() => setShowAddVendor(true)} className="px-3 py-2 bg-gray-900 text-blue-600 rounded-xl text-sm font-bold">Add Person</button>
           <button onClick={() => fileRef.current && fileRef.current.click()} className="px-3 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold">Import CSV</button>
           <input ref={fileRef} type="file" accept=".csv" onChange={onImport} className="hidden" />
         </div>
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-100 overflow-hidden shadow-sm">
+      <div className="glass-surface-strong rounded-xl overflow-hidden shadow-2xl border border-white/20">
         <BulkActionBar count={selection.selectedIds.length} label="vendors" onDelete={handleDeleteSelected} />
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
-            <thead className="bg-[#fcfcfd] border-b border-gray-100">
+            <thead className="glass-surface border-b border-white/10">
               <tr>
                 <th className="py-4 px-4 w-10">
                   <input
@@ -5663,6 +5825,7 @@ const PreventiveMaintenanceTab = ({ issues, technicians, locations, assets, onRe
     location: '',
     assetId: '',
     priority: 'MEDIUM',
+    frequency: 'MONTHLY',
     dueDate: '',
     technicianId: ''
   });
@@ -5672,6 +5835,16 @@ const PreventiveMaintenanceTab = ({ issues, technicians, locations, assets, onRe
     issue.description?.toLowerCase().includes(localSearch.toLowerCase())
   );
   const selection = useBulkSelection(filtered, (issue) => issue._id || issue.id);
+  const formatFrequency = (value) => {
+    if (!value) return '—';
+    const normalized = String(value).toLowerCase();
+    if (normalized === 'daily') return 'Daily';
+    if (normalized === 'weekly') return 'Weekly';
+    if (normalized === 'monthly') return 'Monthly';
+    if (normalized === 'quarterly') return 'Quarterly';
+    if (normalized === 'yearly' || normalized === 'annual') return 'Yearly';
+    return value;
+  };
 
   const handleCreatePreventive = async (e) => {
     e.preventDefault();
@@ -5687,6 +5860,7 @@ const PreventiveMaintenanceTab = ({ issues, technicians, locations, assets, onRe
         location: newTask.location,
         assetId: newTask.assetId || undefined,
         priority: newTask.priority || 'MEDIUM',
+        frequency: newTask.frequency || 'MONTHLY',
         dueDate: newTask.dueDate || undefined,
         tags: ['preventive'],
         issueType: 'preventive',
@@ -5695,7 +5869,7 @@ const PreventiveMaintenanceTab = ({ issues, technicians, locations, assets, onRe
       };
       await api.post('/api/issues', payload);
       setShowCreate(false);
-      setNewTask({ title: '', description: '', location: '', assetId: '', priority: 'MEDIUM', dueDate: '', technicianId: '' });
+      setNewTask({ title: '', description: '', location: '', assetId: '', priority: 'MEDIUM', frequency: 'MONTHLY', dueDate: '', technicianId: '' });
       if (onRefresh) onRefresh();
       alert('Preventive task created successfully');
     } catch (err) {
@@ -5750,7 +5924,7 @@ const PreventiveMaintenanceTab = ({ issues, technicians, locations, assets, onRe
       <div className="bg-white rounded-xl border border-gray-100 overflow-hidden shadow-sm">
         <div className="overflow-x-auto min-h-[600px]">
           <table className="w-full text-left border-collapse">
-            <thead className="bg-[#fcfcfd] border-b border-gray-100">
+            <thead className="glass-surface border-b border-white/10">
               <tr>
                 <th className="py-4 px-4 w-10">
                   <input
@@ -5765,6 +5939,7 @@ const PreventiveMaintenanceTab = ({ issues, technicians, locations, assets, onRe
                 <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Work Order Title</th>
                 <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Work Order Description</th>
                 <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Due Date</th>
+                <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Frequency</th>
                 <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Image</th>
                 <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Assets & Locations</th>
                 <th className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Category</th>
@@ -5784,7 +5959,7 @@ const PreventiveMaintenanceTab = ({ issues, technicians, locations, assets, onRe
                       checked={selection.selectedIds.includes(String(issue._id || issue.id))}
                       onChange={() => selection.toggleOne(issue._id || issue.id)}
                     />
-                   </td>
+                  </td>
                   <td className="py-4 px-4">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors">
@@ -5809,6 +5984,11 @@ const PreventiveMaintenanceTab = ({ issues, technicians, locations, assets, onRe
                       {(issue.fixDeadline || issue.dueDate || issue.nextDate)
                         ? normalizeDate(issue.fixDeadline || issue.dueDate || issue.nextDate).toLocaleDateString()
                         : 'Not set'}
+                    </span>
+                  </td>
+                  <td className="py-4 px-4">
+                    <span className="text-sm font-semibold text-gray-700">
+                      {formatFrequency(issue.frequency || issue.interval || issue?.checklist?.frequency)}
                     </span>
                   </td>
                   <td className="py-4 px-4">
@@ -5837,7 +6017,7 @@ const PreventiveMaintenanceTab = ({ issues, technicians, locations, assets, onRe
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan="9" className="py-24 text-center">
+                  <td colSpan="10" className="py-24 text-center">
                     <div className="flex flex-col items-center max-w-sm mx-auto">
                       <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center mb-4">
                         <CircleDashed className="w-8 h-8 text-gray-200 animate-spin-slow" />
@@ -5930,6 +6110,20 @@ const PreventiveMaintenanceTab = ({ issues, technicians, locations, assets, onRe
                 </select>
               </div>
               <div>
+                <label className="text-xs font-bold text-gray-500 uppercase">Frequency</label>
+                <select
+                  className="mt-1 w-full border border-gray-200 rounded-lg p-2 text-sm bg-white"
+                  value={newTask.frequency}
+                  onChange={(e) => setNewTask({ ...newTask, frequency: e.target.value })}
+                >
+                  <option value="DAILY">Daily</option>
+                  <option value="WEEKLY">Weekly</option>
+                  <option value="MONTHLY">Monthly</option>
+                  <option value="QUARTERLY">Quarterly</option>
+                  <option value="YEARLY">Yearly</option>
+                </select>
+              </div>
+              <div>
                 <label className="text-xs font-bold text-gray-500 uppercase">Due Date</label>
                 <input
                   type="date"
@@ -5980,7 +6174,8 @@ const IssuesTab = ({
   handleAssignTech,
   getAssignedTechName,
   onOpenDetails,
-  onRefresh
+  onRefresh,
+  onCreateWorkOrder
 }) => {
   const selection = useBulkSelection(issues, (issue) => issue._id || issue.id);
 
@@ -5998,11 +6193,23 @@ const IssuesTab = ({
   };
 
   return (
-    <div className="bg-white rounded-lg border border-gray-100 overflow-hidden shadow-sm">
+    <div className="glass-surface-strong rounded-xl overflow-hidden shadow-2xl border border-white/20">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 glass-surface">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Work Orders</h2>
+          <p className="text-sm text-gray-600">Manage and track active work orders</p>
+        </div>
+        <button
+          onClick={() => onCreateWorkOrder && onCreateWorkOrder()}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold shadow-sm hover:bg-blue-700"
+        >
+          Create Work Order
+        </button>
+      </div>
       <BulkActionBar count={selection.selectedIds.length} label="work orders" onDelete={handleDeleteSelected} />
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
-          <thead className="bg-[#fcfcfd] border-b border-gray-100">
+          <thead className="glass-surface border-b border-white/10">
             <tr>
               <th className="py-4 px-4 w-10">
                 <input
@@ -6104,7 +6311,7 @@ const IssuesTab = ({
                         {issue.status === 'IN PROGRESS' && (
                           <div className="absolute inset-0 flex items-center justify-center">
                             <div className="w-3 h-3 bg-blue-500 rounded-full flex items-center justify-center">
-                              <Play className="w-1.5 h-1.5 text-white fill-white" />
+                              <Play className="w-1.5 h-1.5 text-blue-600 fill-white" />
                             </div>
                           </div>
                         )}
@@ -6127,31 +6334,31 @@ const IssuesTab = ({
                       </span>
                     </div>
                   </td>
-                <td className="py-4 px-4 text-right">
-                  <div className="flex items-center justify-end gap-2">
-                    {assigning === (issue._id || issue.id) ? (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleOpenAssignment(null); }}
-                        className="text-xs font-bold text-gray-400 hover:text-gray-600"
-                      >
-                        Cancel
+                  <td className="py-4 px-4 text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      {assigning === (issue._id || issue.id) ? (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleOpenAssignment(null); }}
+                          className="text-xs font-bold text-gray-400 hover:text-gray-600"
+                        >
+                          Cancel
+                        </button>
+                      ) : (
+                        !(issue.assignedTo || issue.assignedTechnicianId || (Array.isArray(issue.assignees) && issue.assignees.length > 0)) && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleOpenAssignment(issue); }}
+                            className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
+                            title="Assign"
+                          >
+                            <Plus className="w-4 h-4 text-blue-600" />
+                          </button>
+                        )
+                      )}
+                      <button onClick={(e) => e.stopPropagation()} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
+                        <MoreHorizontal className="w-4 h-4 text-gray-400" />
                       </button>
-                    ) : (
-                      !(issue.assignedTo || issue.assignedTechnicianId || (Array.isArray(issue.assignees) && issue.assignees.length > 0)) && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleOpenAssignment(issue); }}
-                        className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
-                        title="Assign"
-                      >
-                        <Plus className="w-4 h-4 text-blue-600" />
-                      </button>
-                      )
-                    )}
-                    <button onClick={(e) => e.stopPropagation()} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
-                      <MoreHorizontal className="w-4 h-4 text-gray-400" />
-                    </button>
-                  </div>
-                </td>
+                    </div>
+                  </td>
                 </tr>
                 {assigning === (issue._id || issue.id) && (
                   <tr>
@@ -6200,7 +6407,7 @@ const AssignmentForm = ({ assignmentData, setAssignmentData, technicians, onAssi
           <option value="">Select technician...</option>
           {technicians.map((tech, i) => (
             <option key={normalizeId(tech._id || tech.id || tech.userId) || `tech-${i}`} value={normalizeId(tech._id || tech.id || tech.userId) || ''}>
-              {`🧑‍🔧 ${tech.name || tech.username || 'Unnamed'}`}
+              {tech.name || tech.username || 'Unnamed'}
             </option>
           ))}
         </select>
@@ -6345,10 +6552,10 @@ const AllIssuesTab = ({
         </div>
       </GlassCard>
 
-      <div className="bg-white rounded-lg border border-gray-100 overflow-hidden shadow-sm">
+      <div className="glass-surface-strong rounded-xl overflow-hidden shadow-2xl border border-white/20">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
-            <thead className="bg-[#fcfcfd] border-b border-gray-100">
+            <thead className="glass-surface border-b border-white/10">
               <tr>
                 <th className="py-4 px-4 w-10">
                   <input type="checkbox" className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
@@ -6369,7 +6576,7 @@ const AllIssuesTab = ({
               {filteredIssues.map((issue, idx) => (
                 <tr
                   key={issue._id || issue.id || `all-issue-${idx}`}
-                  className="border-b border-gray-50 hover:bg-gray-50/50 transition-all duration-300 group"
+                  className="border-b border-white/10 hover:bg-white/40 transition-all duration-300 group"
                 >
                   <td className="py-4 px-4">
                     <input
@@ -6447,7 +6654,7 @@ const AllIssuesTab = ({
                         {issue.status === 'IN PROGRESS' && (
                           <div className="absolute inset-0 flex items-center justify-center">
                             <div className="w-3 h-3 bg-blue-500 rounded-full flex items-center justify-center">
-                              <Play className="w-1.5 h-1.5 text-white fill-white" />
+                              <Play className="w-1.5 h-1.5 text-blue-600 fill-white" />
                             </div>
                           </div>
                         )}
@@ -6533,11 +6740,11 @@ const FeedbackTab = ({ feedbacks, loadingFeedbacks }) => (
               {/* Technician Header */}
               <div className="flex items-center gap-4 mb-4">
                 <div className="relative">
-                  <div className="w-14 h-14 bg-gradient-to-br from-emerald-500 to-green-500 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                  <div className="w-14 h-14 bg-gradient-to-br from-emerald-500 to-green-500 rounded-full flex items-center justify-center text-blue-600 font-bold text-lg">
                     {(fb.technicianName || 'T').charAt(0)}
                   </div>
                   <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-gradient-to-r from-amber-500 to-yellow-500 rounded-full border-2 border-white flex items-center justify-center">
-                    <Award className="w-3 h-3 text-white" />
+                    <Award className="w-3 h-3 text-blue-600" />
                   </div>
                 </div>
                 <div className="flex-1">
@@ -6557,7 +6764,6 @@ const FeedbackTab = ({ feedbacks, loadingFeedbacks }) => (
                   {fb.evidence.address || 'No completion details provided.'}
                 </p>
               </div>
-
               {/* After Image */}
               {getImageUrl(fb.evidence.afterImage) && (
                 <div className="mb-4">
@@ -6568,7 +6774,7 @@ const FeedbackTab = ({ feedbacks, loadingFeedbacks }) => (
                       className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                    <div className="absolute bottom-3 left-3 text-white text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <div className="absolute bottom-3 left-3 text-blue-600 text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                       Click to view
                     </div>
                   </div>
@@ -6594,7 +6800,46 @@ const FeedbackTab = ({ feedbacks, loadingFeedbacks }) => (
   </div>
 );
 
-const DetailsModal = ({ open, type, item, onClose, getAssignedTechName }) => {
+const DetailsModal = ({ open, type, item, onClose, getAssignedTechName, onRefresh, technicians = [], teams = [] }) => {
+  const [formData, setFormData] = useState({
+    category: item?.category || '',
+    priority: item?.priority || 'MEDIUM',
+    location: item?.location || item?.address || '',
+    assetName: item?.assetName || '',
+    assignedTo: item?.assignedTo || '',
+    team: item?.team || '',
+    estimatedTime: item?.estimatedTime || '',
+    frequency: item?.frequency || item?.interval || '',
+    fixDeadline: item?.fixDeadline ? new Date(item.fixDeadline).toISOString().split('T')[0] : '',
+    checklist: Array.isArray(item?.checklist) ? item.checklist : (item?.checklist ? [item.checklist] : []),
+    chat: Array.isArray(item?.chat) ? item.chat : []
+  });
+  const [activeTab, setActiveTab] = useState('overview');
+  const [chatInput, setChatInput] = useState('');
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const userName = user.name || user.username || 'Manager';
+  const userRole = String(user.role || user.userRole || user.type || user.accountType || '').toLowerCase();
+  const isManagerOrAdmin = userRole === 'manager' || userRole === 'admin';
+
+  useEffect(() => {
+    if (item) {
+      setFormData({
+        category: item.category || '',
+        priority: item.priority || 'MEDIUM',
+        location: item.location || item.address || '',
+        assetName: item.assetName || '',
+        assignedTo: item.assignedTo || '',
+        team: item.team || '',
+        estimatedTime: item.estimatedTime || '',
+        frequency: item.frequency || item.interval || '',
+        fixDeadline: item.fixDeadline ? new Date(item.fixDeadline).toISOString().split('T')[0] : '',
+        checklist: Array.isArray(item.checklist) ? item.checklist : [],
+        chat: Array.isArray(item.chat) ? item.chat : []
+      });
+      setActiveTab('overview');
+    }
+  }, [item]);
+
   if (!open || !item) return null;
 
   const isMaterial = type === 'material';
@@ -6602,95 +6847,893 @@ const DetailsModal = ({ open, type, item, onClose, getAssignedTechName }) => {
   const isIssue = type === 'issue';
 
   const title = isMaterial ? 'Material Request Details' : isRequest ? 'Request Details' : 'Work Order Details';
-  const location = item.location || item.address || item.locationName || item.propertyName || item.assetLocation || 'Not specified';
+  const location = formData.location || item.locationName || item.propertyName || item.assetLocation || 'Not specified';
   const dueDate = item.fixDeadline || item.dueDate || item.nextDate || item.scheduledFor || null;
   const createdAt = item.createdAt || item.date || item.nextDate || null;
-  const priority = item.priority || item.urgency || '—';
-  const status = item.status || (item.approved ? 'APPROVED' : 'PENDING') || '—';
+  const status = item.status || (item.approved ? 'APPROVED' : 'PENDING') || '—';
   const description = item.description || item.details || 'No description provided.';
   const assignee = isIssue ? (getAssignedTechName ? getAssignedTechName(item) : item.assignedTo) : (item.technicianName || item.assignedTo || 'Unassigned');
+  const workOrderRef = item.workOrderId || item.workOrder || item.workOrderNumber || item.workOrderNo || item.workOrderCode || item.workOrderRef || '';
+  const frequencyValue = formData.frequency || item.frequency || item.interval || '';
+  const normalizedStatus = String(status || '').toLowerCase();
+  const isInProgress = normalizedStatus.includes('in progress') || normalizedStatus === 'in_progress' || normalizedStatus === 'inprogress' || normalizedStatus === 'started' || normalizedStatus === 'working';
+  const isCompleted = normalizedStatus.includes('complete') || normalizedStatus === 'completed' || normalizedStatus === 'complete';
+  const isApproved = isRequest && (item.approved || normalizedStatus === 'approved' || !!workOrderRef);
+  const canEdit = !isRequest || (isManagerOrAdmin && !isInProgress && !isCompleted);
+  const isRequestReadOnly = isRequest && !canEdit;
+  const requestLockClass = isRequestReadOnly ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : '';
+  const requestFieldClass = `w-full border border-gray-300 rounded-lg p-2.5 text-sm ${requestLockClass}`;
+  const showTabs = isIssue;
+  const tabs = [
+    { id: 'overview', label: 'Overview' },
+    { id: 'tasks', label: 'Tasks' },
+    { id: 'labor', label: 'Labor' },
+    { id: 'parts', label: 'Parts' },
+    { id: 'costs', label: 'Costs' },
+    { id: 'files', label: 'Files' },
+    { id: 'activity', label: 'Activity' },
+    { id: 'links', label: 'Links' },
+    { id: 'provider', label: 'Provider Portal' }
+  ];
+  const activeTabId = showTabs ? activeTab : 'overview';
+  const tasks = Array.isArray(item?.tasks) ? item.tasks : Array.isArray(item?.taskList) ? item.taskList : Array.isArray(formData.checklist) ? formData.checklist : [];
+  const hasStructuredTasks = (Array.isArray(item?.tasks) && item.tasks.length > 0) || (Array.isArray(item?.taskList) && item.taskList.length > 0);
+  const laborEntries = Array.isArray(item?.labor) ? item.labor : Array.isArray(item?.laborEntries) ? item.laborEntries : [];
+  const partsItems = Array.isArray(item?.parts) ? item.parts : Array.isArray(item?.materials) ? item.materials : Array.isArray(item?.items) ? item.items : [];
+  const fileItems = Array.isArray(item?.files) ? item.files : Array.isArray(item?.attachments) ? item.attachments : [];
+  const activityItems = Array.isArray(item?.activity) ? item.activity : Array.isArray(item?.history) ? item.history : Array.isArray(item?.logs) ? item.logs : [];
+  const linkItems = Array.isArray(item?.links) ? item.links : Array.isArray(item?.urlLinks) ? item.urlLinks : [];
+  const provider = item?.provider || item?.vendor || item?.contractor || {};
+  const estimatedHours = Number(formData.estimatedTime || item.estimatedTime || item.laborHours || 0) || 0;
+
+  const toNumber = (val) => {
+    if (val === null || val === undefined || val === '') return 0;
+    const num = Number(String(val).replace(/[^0-9.-]/g, ''));
+    return Number.isFinite(num) ? num : 0;
+  };
+  const moneyFormatter = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
+  const formatMoney = (val) => moneyFormatter.format(Number.isFinite(val) ? val : 0);
+  const laborCost = toNumber(item?.laborCost ?? item?.laborTotal ?? item?.labor?.total ?? item?.labor?.cost);
+  const partsCost = toNumber(item?.partsCost ?? item?.materialsCost ?? item?.totalPartsCost ?? item?.parts?.total ?? item?.itemsCost);
+  const otherCost = toNumber(item?.otherCost ?? item?.miscCost ?? item?.additionalCost);
+  const totalCost = toNumber(item?.totalCost ?? item?.cost ?? laborCost + partsCost + otherCost);
 
   const formatDateTime = (val) => {
     if (!val) return 'Not set';
     try { return normalizeDate(val).toLocaleString(); } catch (e) { return 'Not set'; }
   };
 
-  return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 max-w-3xl w-full overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-          <div>
-            <h3 className="text-xl font-bold text-gray-900">{title}</h3>
-            <p className="text-xs text-gray-500">Details and key metadata</p>
-          </div>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-            <X className="w-5 h-5 text-gray-400" />
-          </button>
-        </div>
+  const handleSaveModal = async () => {
+    if (isRequestReadOnly) {
+      alert('This request is in progress and cannot be edited.');
+      return;
+    }
+    try {
+      await api.put(`/api/issues/${item.id || item._id}`, formData);
+      alert('Changes saved successfully.');
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      console.error('Failed to save issue:', err);
+      alert('Failed to save changes.');
+    }
+  };
 
-        <div className="p-6 space-y-6">
-          <div className="flex flex-col md:flex-row gap-6">
-            <div className="flex-1">
-              <h4 className="text-lg font-bold text-gray-900">{item.title || item.name || 'Untitled'}</h4>
-              <p className="text-sm text-gray-600 mt-1">{description}</p>
-              <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-gray-600">
-                <span className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-gray-50 border border-gray-200">
-                  <MapPin className="w-3.5 h-3.5" /> {location}
-                </span>
-                <span className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-gray-50 border border-gray-200">
-                  <Calendar className="w-3.5 h-3.5" /> Due: {formatDateTime(dueDate)}
-                </span>
-                <span className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-gray-50 border border-gray-200">
-                  <Clock className="w-3.5 h-3.5" /> Created: {formatDateTime(createdAt)}
-                </span>
-              </div>
+  const handleApproveModal = async () => {
+    if (isRequestReadOnly) {
+      alert('This request is in progress and cannot be edited.');
+      return;
+    }
+    try {
+      await api.put(`/api/issues/${item.id || item._id}`, { ...formData, status: 'APPROVED', approved: true });
+      alert('Request approved.');
+      if (onRefresh) onRefresh();
+      onClose();
+    } catch (err) {
+      console.error('Failed to approve issue:', err);
+      alert('Failed to approve request.');
+    }
+  };
+
+  const handleDeclineModal = async () => {
+    if (isRequestReadOnly) {
+      alert('This request is in progress and cannot be edited.');
+      return;
+    }
+    const reason = prompt('Please enter a reason for declining:');
+    if (reason === null) return;
+    try {
+      await api.put(`/api/issues/${item.id || item._id}`, {
+        ...formData,
+        status: 'DECLINED',
+        rejected: true,
+        rejectionReason: reason,
+        rejectedAt: new Date()
+      });
+      alert('Request declined.');
+      if (onRefresh) onRefresh();
+      onClose();
+    } catch (err) {
+      console.error('Failed to decline issue:', err);
+      alert('Failed to decline request.');
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!chatInput.trim()) return;
+    const newMessage = {
+      sender: userName,
+      text: chatInput,
+      timestamp: new Date().toISOString(),
+      role: 'manager'
+    };
+    const updatedChat = [...formData.chat, newMessage];
+    try {
+      await api.put(`/api/issues/${item.id || item._id}`, { chat: updatedChat });
+      setFormData(prev => ({ ...prev, chat: updatedChat }));
+      setChatInput('');
+    } catch (err) {
+      console.error('Failed to send message:', err);
+      alert('Failed to send message.');
+    }
+  };
+
+  const addChecklistItem = () => {
+    setFormData(prev => ({ ...prev, checklist: [...prev.checklist, { text: '', completed: false }] }));
+  };
+
+  const updateChecklistItem = (index, field, value) => {
+    const newList = [...formData.checklist];
+    newList[index][field] = value;
+    setFormData(prev => ({ ...prev, checklist: newList }));
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4 text-gray-900">
+      <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 w-full max-w-6xl max-h-[90vh] flex flex-col md:flex-row overflow-hidden">
+
+        {/* Left Side: Fields Form */}
+        <div className="flex-1 flex flex-col overflow-hidden border-r border-gray-100">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gray-50 flex-shrink-0">
+            <div>
+              <h3 className="text-xl font-bold text-gray-900">{title}</h3>
+              <p className="text-xs text-gray-500">Details and Approval Settings</p>
             </div>
-            {(item.beforePhoto || item.photo || item.image || item.beforeImage || item.afterImage || item.afterPhoto) && (
-              <div className="w-full md:w-56">
-                <div className="rounded-xl overflow-hidden border border-gray-200 bg-gray-50">
-                  <img
-                    src={getImageUrl(item.afterImage || item.afterPhoto || item.beforeImage || item.beforePhoto || item.photo || item.image)}
-                    alt="Attachment"
-                    className="w-full h-40 object-cover"
-                  />
+            <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-lg transition-colors md:hidden">
+              <X className="w-5 h-5 text-gray-400" />
+            </button>
+          </div>
+
+          <div className="p-6 overflow-y-auto flex-1 space-y-5">
+            {showTabs && (
+              <div className="flex flex-wrap items-center gap-2 border-b border-gray-200 pb-3">
+                {tabs.map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-full border transition-colors ${activeTabId === tab.id
+                      ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                      : 'bg-white/70 text-gray-600 border-gray-200 hover:border-blue-200 hover:text-blue-700'
+                      }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {activeTabId === 'overview' && (
+              <>
+                {isRequest && isManagerOrAdmin && isApproved && (
+                  <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-800">
+                    <CheckCircle className="w-4 h-4 mt-0.5 text-emerald-600" />
+                    <div className="text-sm">
+                      <div className="font-semibold">
+                        This request was approved{workOrderRef ? ` and turned into Work Order ${workOrderRef}` : '.'}
+                      </div>
+                      {workOrderRef && (
+                        <div className="text-xs text-emerald-700 mt-1">Work Order ID: {workOrderRef}</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {isRequest && (isInProgress || isCompleted) && (
+                  <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800">
+                    <AlertCircle className="w-4 h-4 mt-0.5 text-amber-600" />
+                    <div className="text-sm">
+                      <div className="font-semibold">
+                        This request is {isCompleted ? 'completed' : 'in progress'}.
+                      </div>
+                      <div className="text-xs text-amber-700 mt-1">Editing is disabled once work has started or completed.</div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Title & Description */}
+                <div>
+                  <h4 className="text-lg font-bold text-gray-900">{item.title || item.name || 'Untitled'}</h4>
+                  <p className="text-sm text-gray-600 mt-1">{description}</p>
                 </div>
+
+                {/* Quick Metadata */}
+                <div className="flex flex-wrap gap-2">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold border border-blue-100">
+                    Status: {String(status)}
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gray-50 text-gray-700 text-xs font-semibold border border-gray-200">
+                    <Clock className="w-3.5 h-3.5" /> Created: {formatDateTime(createdAt)}
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gray-50 text-gray-700 text-xs font-semibold border border-gray-200">
+                    <Calendar className="w-3.5 h-3.5" /> Due: {formatDateTime(formData.fixDeadline || dueDate)}
+                  </span>
+                  {isIssue && frequencyValue && (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gray-50 text-gray-700 text-xs font-semibold border border-gray-200">
+                      <Repeat className="w-3.5 h-3.5" /> Frequency: {String(frequencyValue)}
+                    </span>
+                  )}
+                </div>
+
+                {/* Editing Form Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-gray-100">
+                  {/* Category & Priority */}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-1">Category</label>
+                    <select
+                      className={requestFieldClass}
+                      value={formData.category}
+                      onChange={e => setFormData({ ...formData, category: e.target.value })}
+                      disabled={isRequestReadOnly}
+                    >
+                      <option value="">Select Category</option>
+                      <option value="Damage">Damage</option>
+                      <option value="electrical">Electrical</option>
+                      <option value="inspections">Inspections</option>
+                      <option value="Meter Reading">Meter Reading</option>
+                      <option value="None">None</option>
+                      <option value="Plumbing">Plumbing</option>
+                      <option value="preventative">Preventative</option>
+                      <option value="project">Project</option>
+                      <option value="safety">Safety</option>
+                      <option value="upgrate">Upgrade</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-1">Priority</label>
+                    <select
+                      className={requestFieldClass}
+                      value={formData.priority}
+                      onChange={e => setFormData({ ...formData, priority: e.target.value })}
+                      disabled={isRequestReadOnly}
+                    >
+                      <option value="LOW">Low</option>
+                      <option value="MEDIUM">Medium</option>
+                      <option value="HIGH">High</option>
+                      <option value="URGENT">Urgent</option>
+                    </select>
+                  </div>
+                  {isIssue && (
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-1">Frequency</label>
+                      <select
+                        className={requestFieldClass}
+                        value={formData.frequency}
+                        onChange={e => setFormData({ ...formData, frequency: e.target.value })}
+                        disabled={isRequestReadOnly}
+                      >
+                        <option value="">Select Frequency</option>
+                        <option value="DAILY">Daily</option>
+                        <option value="WEEKLY">Weekly</option>
+                        <option value="MONTHLY">Monthly</option>
+                        <option value="QUARTERLY">Quarterly</option>
+                        <option value="YEARLY">Yearly</option>
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Location & Asset */}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-1">Location</label>
+                    <input
+                      type="text"
+                      className={requestFieldClass}
+                      value={formData.location}
+                      onChange={e => setFormData({ ...formData, location: e.target.value })}
+                      disabled={isRequestReadOnly}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-1">Asset</label>
+                    <input
+                      type="text"
+                      className={requestFieldClass}
+                      placeholder="e.g. HVAC Unit 2"
+                      value={formData.assetName}
+                      onChange={e => setFormData({ ...formData, assetName: e.target.value })}
+                      disabled={isRequestReadOnly}
+                    />
+                  </div>
+
+                  {/* Responsibility */}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-1">First Responsible (Assignee)</label>
+                    <select
+                      className={requestFieldClass}
+                      value={formData.assignedTo}
+                      onChange={e => setFormData({ ...formData, assignedTo: e.target.value })}
+                      disabled={isRequestReadOnly}
+                    >
+                      <option value="">Unassigned</option>
+                      {technicians.map(t => (
+                        <option key={t._id || t.id} value={t._id || t.id}>{t.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-1">Team</label>
+                    <select
+                      className={requestFieldClass}
+                      value={formData.team}
+                      onChange={e => setFormData({ ...formData, team: e.target.value })}
+                      disabled={isRequestReadOnly}
+                    >
+                      <option value="">Select Team</option>
+                      {teams.map(team => (
+                        <option key={team._id || team.id} value={team.name}>{team.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-1">Additional Responsible Workers</label>
+                    <input
+                      type="text"
+                      className={requestFieldClass}
+                      placeholder="Search and add workers..."
+                      value={formData.additionalResponsibleWorkers || ''}
+                      onChange={e => setFormData({ ...formData, additionalResponsibleWorkers: e.target.value })}
+                      disabled={isRequestReadOnly}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-1">Estimated Time (hrs)</label>
+                    <input
+                      type="number"
+                      step="0.5"
+                      className={requestFieldClass}
+                      placeholder="e.g. 2.5"
+                      value={formData.estimatedTime}
+                      onChange={e => setFormData({ ...formData, estimatedTime: e.target.value })}
+                      disabled={isRequestReadOnly}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-1">Due Date (Deadline)</label>
+                    <input
+                      type="date"
+                      className={requestFieldClass}
+                      value={formData.fixDeadline}
+                      onChange={e => setFormData({ ...formData, fixDeadline: e.target.value })}
+                      disabled={isRequestReadOnly}
+                    />
+                  </div>
+
+                  {/* Signature & Files */}
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-1">Signature</label>
+                    <div className="border border-gray-300 border-dashed rounded-lg h-24 bg-gray-50 flex items-center justify-center text-gray-400 text-sm">
+                      {item.signature ? <img src={item.signature} className="h-full object-contain" alt="Signature" /> : 'Draw or Upload Signature'}
+                    </div>
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-1">Attachments</label>
+                    <div className="border border-gray-300 border-dashed rounded-lg p-6 bg-gray-50 flex flex-col items-center justify-center text-center gap-2">
+                      <div className="text-sm text-gray-600">Drag & drop files here</div>
+                      <div className="text-xs text-blue-600 cursor-pointer hover:underline border border-blue-600 rounded px-2 py-1 mt-1 inline-block mx-auto">Add from saved file</div>
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* Existing Image Display (if any) */}
+                {(item.beforePhoto || item.photo || item.image || item.beforeImage || item.afterImage || item.afterPhoto) && (
+                  <div className="pt-4 border-t border-gray-100">
+                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">Original Attachment</label>
+                    <div className="rounded-xl overflow-hidden border border-gray-200 bg-gray-50 w-48">
+                      <img
+                        src={getImageUrl(item.afterImage || item.afterPhoto || item.beforeImage || item.beforePhoto || item.photo || item.image)}
+                        alt="Attachment"
+                        className="w-full h-32 object-cover"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* If material request, show items */}
+                {isMaterial && (
+                  <div className="pt-4 border-t border-gray-100">
+                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">Requested Materials</label>
+                    <div className="bg-white rounded-lg border border-gray-200 divide-y divide-gray-100">
+                      {(item.items || []).length > 0 ? (
+                        item.items.map((it, idx) => (
+                          <div key={idx} className="flex items-center justify-between p-3 text-sm">
+                            <div className="font-medium text-gray-900">{it.title || it.materialId || 'Item'}</div>
+                            <div className="text-gray-500 font-semibold bg-gray-100 px-2 py-0.5 rounded">Qty: {it.quantity ?? it.qty ?? '—'}</div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="p-3 text-sm text-gray-500">No items attached.</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+            {activeTabId === 'tasks' && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-bold text-gray-900">Tasks</h4>
+                    <p className="text-xs text-gray-500">Track and update work order tasks.</p>
+                  </div>
+                  <span className="text-xs font-semibold text-gray-600 bg-gray-100 px-2.5 py-1 rounded-full">
+                    {tasks.length} total
+                  </span>
+                </div>
+
+                {hasStructuredTasks ? (
+                  tasks.length === 0 ? (
+                    <div className="border border-dashed border-gray-200 rounded-xl p-6 text-center text-sm text-gray-500 bg-white/60">
+                      No tasks added yet.
+                    </div>
+                  ) : (
+                    <div className="border border-gray-200 rounded-xl overflow-hidden bg-white/70">
+                      <table className="w-full text-sm">
+                        <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
+                          <tr>
+                            <th className="text-left px-4 py-3">Task</th>
+                            <th className="text-left px-4 py-3">Status</th>
+                            <th className="text-left px-4 py-3">Assignee</th>
+                            <th className="text-left px-4 py-3">Due</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {tasks.map((task, idx) => {
+                            const taskTitle = typeof task === 'string' ? task : (task.title || task.text || task.name || `Task ${idx + 1}`);
+                            const taskStatus = typeof task === 'string' ? 'Open' : (task.status || (task.completed ? 'Complete' : 'Open'));
+                            const taskAssignee = typeof task === 'string' ? '—' : (task.assignedTo || task.assignee || task.owner || '—');
+                            const taskDue = typeof task === 'string' ? '' : (task.dueDate || task.deadline || task.due || '');
+                            return (
+                              <tr key={idx} className="text-gray-700">
+                                <td className="px-4 py-3">
+                                  <div className="flex items-center gap-2">
+                                    <input
+                                      type="checkbox"
+                                      className="w-4 h-4 rounded border-gray-300"
+                                      checked={!!(typeof task === 'object' && task.completed)}
+                                      disabled
+                                    />
+                                    <span>{taskTitle}</span>
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3">
+                                  <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-100">
+                                    {taskStatus}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3">{taskAssignee}</td>
+                                <td className="px-4 py-3">{taskDue ? formatDateTime(taskDue) : '—'}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )
+                ) : (
+                  <div className="border border-gray-200 rounded-xl p-4 bg-gray-50/70">
+                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">Checklist Items</label>
+                    {formData.checklist.length === 0 && (
+                      <div className="text-xs text-gray-500 mb-2">No checklist items yet.</div>
+                    )}
+                    <div className="flex flex-col gap-2">
+                      {formData.checklist.map((ci, idx) => (
+                        <div key={idx} className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            className="w-4 h-4 rounded border-gray-300"
+                            checked={ci.completed}
+                            onChange={e => updateChecklistItem(idx, 'completed', e.target.checked)}
+                            disabled={isRequestReadOnly}
+                          />
+                          <input
+                            type="text"
+                            className={`flex-1 bg-transparent border-b border-gray-300 text-sm py-1 focus:outline-none focus:border-blue-500 ${isRequestReadOnly ? 'text-gray-500 cursor-not-allowed' : ''}`}
+                            placeholder={`Item ${idx + 1}`}
+                            value={ci.text}
+                            onChange={e => updateChecklistItem(idx, 'text', e.target.value)}
+                            disabled={isRequestReadOnly}
+                          />
+                        </div>
+                      ))}
+                      <button
+                        onClick={addChecklistItem}
+                        className={`text-xs font-semibold self-start mt-1 ${isRequestReadOnly ? 'text-gray-400 cursor-not-allowed' : 'text-blue-600'}`}
+                        disabled={isRequestReadOnly}
+                      >
+                        + Add Item
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTabId === 'labor' && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-bold text-gray-900">Labor</h4>
+                    <p className="text-xs text-gray-500">Track time and labor allocation.</p>
+                  </div>
+                  <span className="text-xs font-semibold text-gray-600 bg-gray-100 px-2.5 py-1 rounded-full">
+                    {estimatedHours} hrs est.
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="p-4 rounded-xl border border-gray-200 bg-white/70">
+                    <div className="text-xs text-gray-500">Assigned To</div>
+                    <div className="text-sm font-bold text-gray-900 mt-1">{assignee || 'Unassigned'}</div>
+                  </div>
+                  <div className="p-4 rounded-xl border border-gray-200 bg-white/70">
+                    <div className="text-xs text-gray-500">Estimated Hours</div>
+                    <div className="text-sm font-bold text-gray-900 mt-1">{estimatedHours || 0} hrs</div>
+                  </div>
+                  <div className="p-4 rounded-xl border border-gray-200 bg-white/70">
+                    <div className="text-xs text-gray-500">Labor Cost</div>
+                    <div className="text-sm font-bold text-gray-900 mt-1">{formatMoney(laborCost)}</div>
+                  </div>
+                </div>
+
+                {laborEntries.length === 0 ? (
+                  <div className="border border-dashed border-gray-200 rounded-xl p-6 text-center text-sm text-gray-500 bg-white/60">
+                    No labor entries yet.
+                  </div>
+                ) : (
+                  <div className="border border-gray-200 rounded-xl overflow-hidden bg-white/70">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
+                        <tr>
+                          <th className="text-left px-4 py-3">Technician</th>
+                          <th className="text-left px-4 py-3">Hours</th>
+                          <th className="text-left px-4 py-3">Rate</th>
+                          <th className="text-left px-4 py-3">Cost</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {laborEntries.map((entry, idx) => {
+                          const techName = entry.name || entry.technician || entry.assignee || `Tech ${idx + 1}`;
+                          const hours = entry.hours ?? entry.time ?? entry.duration ?? '—';
+                          const rate = entry.rate ?? entry.hourlyRate ?? '';
+                          const cost = entry.cost ?? (toNumber(rate) * toNumber(hours));
+                          return (
+                            <tr key={idx} className="text-gray-700">
+                              <td className="px-4 py-3">{techName}</td>
+                              <td className="px-4 py-3">{hours}</td>
+                              <td className="px-4 py-3">{rate ? formatMoney(toNumber(rate)) : '—'}</td>
+                              <td className="px-4 py-3">{cost ? formatMoney(toNumber(cost)) : '—'}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTabId === 'parts' && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-bold text-gray-900">Parts</h4>
+                    <p className="text-xs text-gray-500">Materials and parts used.</p>
+                  </div>
+                  <span className="text-xs font-semibold text-gray-600 bg-gray-100 px-2.5 py-1 rounded-full">
+                    {partsItems.length} items
+                  </span>
+                </div>
+
+                {partsItems.length === 0 ? (
+                  <div className="border border-dashed border-gray-200 rounded-xl p-6 text-center text-sm text-gray-500 bg-white/60">
+                    No parts recorded yet.
+                  </div>
+                ) : (
+                  <div className="border border-gray-200 rounded-xl overflow-hidden bg-white/70">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
+                        <tr>
+                          <th className="text-left px-4 py-3">Part</th>
+                          <th className="text-left px-4 py-3">Qty</th>
+                          <th className="text-left px-4 py-3">Unit Cost</th>
+                          <th className="text-left px-4 py-3">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {partsItems.map((part, idx) => {
+                          const name = typeof part === 'string' ? part : (part.name || part.title || part.materialId || `Part ${idx + 1}`);
+                          const qty = typeof part === 'string' ? '—' : (part.quantity ?? part.qty ?? 1);
+                          const unit = typeof part === 'string' ? '' : (part.unitCost ?? part.cost ?? part.price ?? '');
+                          const total = unit ? toNumber(unit) * toNumber(qty) : '';
+                          return (
+                            <tr key={idx} className="text-gray-700">
+                              <td className="px-4 py-3">{name}</td>
+                              <td className="px-4 py-3">{qty}</td>
+                              <td className="px-4 py-3">{unit ? formatMoney(toNumber(unit)) : '—'}</td>
+                              <td className="px-4 py-3">{total ? formatMoney(toNumber(total)) : '—'}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTabId === 'costs' && (
+              <div className="space-y-4">
+                <div>
+                  <h4 className="text-sm font-bold text-gray-900">Costs</h4>
+                  <p className="text-xs text-gray-500">Summary of labor and materials cost.</p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="p-4 rounded-xl border border-gray-200 bg-white/70">
+                    <div className="text-xs text-gray-500">Labor</div>
+                    <div className="text-lg font-bold text-gray-900 mt-1">{formatMoney(laborCost)}</div>
+                  </div>
+                  <div className="p-4 rounded-xl border border-gray-200 bg-white/70">
+                    <div className="text-xs text-gray-500">Parts</div>
+                    <div className="text-lg font-bold text-gray-900 mt-1">{formatMoney(partsCost)}</div>
+                  </div>
+                  <div className="p-4 rounded-xl border border-gray-200 bg-white/70">
+                    <div className="text-xs text-gray-500">Other</div>
+                    <div className="text-lg font-bold text-gray-900 mt-1">{formatMoney(otherCost)}</div>
+                  </div>
+                  <div className="p-4 rounded-xl border border-blue-200 bg-blue-50">
+                    <div className="text-xs text-blue-700">Total</div>
+                    <div className="text-lg font-bold text-blue-900 mt-1">{formatMoney(totalCost)}</div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTabId === 'files' && (
+              <div className="space-y-4">
+                <div>
+                  <h4 className="text-sm font-bold text-gray-900">Files</h4>
+                  <p className="text-xs text-gray-500">Attachments and evidence files.</p>
+                </div>
+
+                {fileItems.length === 0 && !(item.beforePhoto || item.photo || item.image || item.beforeImage || item.afterImage || item.afterPhoto) ? (
+                  <div className="border border-dashed border-gray-200 rounded-xl p-6 text-center text-sm text-gray-500 bg-white/60">
+                    No files uploaded yet.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {[
+                      item.beforePhoto && { label: 'Before Photo', url: item.beforePhoto },
+                      item.afterPhoto && { label: 'After Photo', url: item.afterPhoto },
+                      item.beforeImage && { label: 'Before Image', url: item.beforeImage },
+                      item.afterImage && { label: 'After Image', url: item.afterImage },
+                      item.photo && { label: 'Photo', url: item.photo },
+                      item.image && { label: 'Image', url: item.image }
+                    ].filter(Boolean).map((f, idx) => (
+                      <div key={`core-${idx}`} className="border border-gray-200 rounded-xl overflow-hidden bg-white/70">
+                        <div className="text-xs font-semibold text-gray-600 px-3 py-2 border-b border-gray-100">{f.label}</div>
+                        <img src={getImageUrl(f.url)} alt={f.label} className="w-full h-36 object-cover" />
+                      </div>
+                    ))}
+                    {fileItems.map((f, idx) => {
+                      const name = typeof f === 'string' ? f : (f.name || f.title || f.filename || `File ${idx + 1}`);
+                      const url = typeof f === 'string' ? '' : (f.url || f.link || f.path || '');
+                      return (
+                        <div key={`file-${idx}`} className="border border-gray-200 rounded-xl p-4 bg-white/70 flex items-center justify-between">
+                          <div className="text-sm font-semibold text-gray-800">{name}</div>
+                          {url ? (
+                            <a href={url} target="_blank" rel="noreferrer" className="text-xs text-blue-600 font-semibold">Open</a>
+                          ) : (
+                            <span className="text-xs text-gray-400">No link</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTabId === 'activity' && (
+              <div className="space-y-4">
+                <div>
+                  <h4 className="text-sm font-bold text-gray-900">Activity</h4>
+                  <p className="text-xs text-gray-500">Recent updates on this work order.</p>
+                </div>
+
+                {activityItems.length === 0 ? (
+                  <div className="border border-dashed border-gray-200 rounded-xl p-6 text-center text-sm text-gray-500 bg-white/60">
+                    No activity recorded yet.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {activityItems.map((act, idx) => {
+                      const label = typeof act === 'string' ? act : (act.title || act.type || act.action || 'Update');
+                      const detail = typeof act === 'string' ? '' : (act.description || act.note || act.details || '');
+                      const when = typeof act === 'string' ? '' : (act.timestamp || act.date || act.createdAt || '');
+                      return (
+                        <div key={idx} className="p-4 rounded-xl border border-gray-200 bg-white/70">
+                          <div className="flex items-center justify-between">
+                            <div className="text-sm font-semibold text-gray-800">{label}</div>
+                            <div className="text-xs text-gray-500">{when ? formatDateTime(when) : '—'}</div>
+                          </div>
+                          {detail && <p className="text-xs text-gray-600 mt-2">{detail}</p>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTabId === 'links' && (
+              <div className="space-y-4">
+                <div>
+                  <h4 className="text-sm font-bold text-gray-900">Links</h4>
+                  <p className="text-xs text-gray-500">Related resources and reference URLs.</p>
+                </div>
+
+                {linkItems.length === 0 ? (
+                  <div className="border border-dashed border-gray-200 rounded-xl p-6 text-center text-sm text-gray-500 bg-white/60">
+                    No links added yet.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {linkItems.map((link, idx) => {
+                      const title = typeof link === 'string' ? link : (link.title || link.label || link.name || `Link ${idx + 1}`);
+                      const url = typeof link === 'string' ? link : (link.url || link.href || link.link || '');
+                      return (
+                        <div key={idx} className="flex items-center justify-between p-3 rounded-xl border border-gray-200 bg-white/70">
+                          <div className="text-sm font-semibold text-gray-800">{title}</div>
+                          {url ? (
+                            <a href={url} target="_blank" rel="noreferrer" className="text-xs text-blue-600 font-semibold">Open</a>
+                          ) : (
+                            <span className="text-xs text-gray-400">No URL</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTabId === 'provider' && (
+              <div className="space-y-4">
+                <div>
+                  <h4 className="text-sm font-bold text-gray-900">Provider Portal</h4>
+                  <p className="text-xs text-gray-500">External provider details and handoff info.</p>
+                </div>
+
+                {!provider || Object.keys(provider).length === 0 ? (
+                  <div className="border border-dashed border-gray-200 rounded-xl p-6 text-center text-sm text-gray-500 bg-white/60">
+                    No provider linked yet.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="p-4 rounded-xl border border-gray-200 bg-white/70">
+                      <div className="text-xs text-gray-500">Provider</div>
+                      <div className="text-sm font-bold text-gray-900 mt-1">{provider.name || provider.company || provider.title || 'Provider'}</div>
+                    </div>
+                    <div className="p-4 rounded-xl border border-gray-200 bg-white/70">
+                      <div className="text-xs text-gray-500">Contact</div>
+                      <div className="text-sm font-bold text-gray-900 mt-1">{provider.email || provider.phone || provider.contact || 'Not provided'}</div>
+                    </div>
+                    <div className="p-4 rounded-xl border border-gray-200 bg-white/70 md:col-span-2">
+                      <div className="text-xs text-gray-500">Notes</div>
+                      <div className="text-sm text-gray-700 mt-1">{provider.notes || provider.description || 'No provider notes added.'}</div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="p-4 rounded-xl border border-gray-100 bg-gradient-to-br from-slate-50 to-white">
-              <div className="text-xs text-gray-500 mb-1">Status</div>
-              <div className="text-sm font-bold text-gray-900">{String(status)}</div>
-            </div>
-            <div className="p-4 rounded-xl border border-gray-100 bg-gradient-to-br from-slate-50 to-white">
-              <div className="text-xs text-gray-500 mb-1">Priority</div>
-              <div className="text-sm font-bold text-gray-900">{String(priority)}</div>
-            </div>
-            <div className="p-4 rounded-xl border border-gray-100 bg-gradient-to-br from-slate-50 to-white">
-              <div className="text-xs text-gray-500 mb-1">Assigned To</div>
-              <div className="text-sm font-bold text-gray-900">{assignee || 'Unassigned'}</div>
-            </div>
+          {/* Action Footer */}
+          <div className="p-4 border-t border-gray-200 bg-gray-50 flex flex-wrap items-center justify-end gap-3 flex-shrink-0">
+            <button
+              onClick={handleSaveModal}
+              disabled={isRequestReadOnly}
+              className="px-5 py-2.5 bg-white border border-gray-300 text-gray-700 rounded-xl text-sm font-bold shadow-sm hover:bg-gray-50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              Save (Without Appr.)
+            </button>
+            {(!isRequest || !isApproved) && (
+              <>
+                <button
+                  onClick={handleDeclineModal}
+                  disabled={isRequestReadOnly}
+                  className="px-5 py-2.5 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm font-bold shadow-sm hover:bg-red-100 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  Decline
+                </button>
+                <button
+                  onClick={handleApproveModal}
+                  disabled={isRequestReadOnly}
+                  className="px-5 py-2.5 bg-green-600 border border-transparent text-blue-600 rounded-xl text-sm font-bold shadow-sm hover:bg-green-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  Approve
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Right Side: Chat Panel */}
+        <div className="w-full md:w-80 lg:w-96 flex flex-col bg-gray-50 border-l border-gray-200 flex-shrink-0">
+          <div className="px-4 py-4 border-b border-gray-200 bg-white flex items-center justify-between">
+            <h4 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-green-500"></span>
+              Internal Chat
+            </h4>
+            <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors hidden md:block">
+              <X className="w-4 h-4 text-gray-400" />
+            </button>
           </div>
 
-          {isMaterial && (
-            <div className="bg-white rounded-xl border border-gray-100">
-              <div className="px-4 py-3 border-b border-gray-100 text-sm font-semibold text-gray-800">Requested Items</div>
-              <div className="p-4 space-y-2">
-                {(item.items || []).length > 0 ? (
-                  item.items.map((it, idx) => (
-                    <div key={idx} className="flex items-center justify-between text-sm">
-                      <div className="font-medium text-gray-900">{it.title || it.materialId || 'Item'}</div>
-                      <div className="text-gray-500">Qty: {it.quantity ?? it.qty ?? '—'}</div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="text-sm text-gray-500">No items attached.</div>
-                )}
-              </div>
+          <div className="flex-1 p-4 overflow-y-auto space-y-4">
+            <div className="text-center text-xs text-gray-400 font-semibold mt-2 mb-4">Messages</div>
+            {formData.chat.length === 0 ? (
+              <div className="text-center text-gray-400 text-xs py-10 italic">No messages yet. Start the conversation.</div>
+            ) : (
+              formData.chat.map((msg, i) => (
+                <div key={i} className={`flex flex-col gap-1 ${msg.sender === userName ? 'items-end' : 'items-start'}`}>
+                  <span className={`text-[10px] text-gray-500 ${msg.sender === userName ? 'mr-1' : 'ml-1'}`}>
+                    {msg.sender} - {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                  <div className={`${msg.sender === userName ? 'bg-blue-600 text-white rounded-tr-sm' : 'bg-white border border-gray-200 text-gray-800 rounded-tl-sm'} rounded-2xl px-4 py-2 text-sm shadow-sm max-w-[85%] break-words`}>
+                    {msg.text}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Chat Input */}
+          <div className="p-3 bg-white border-t border-gray-200">
+            <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2">
+              <input
+                type="text"
+                className="flex-1 bg-transparent border-none text-sm focus:outline-none"
+                placeholder="Type a message..."
+                value={chatInput}
+                onChange={e => setChatInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleSendMessage()}
+              />
+              <button
+                onClick={handleSendMessage}
+                className="text-blue-600 font-semibold p-1 bg-blue-50 rounded hover:bg-blue-100 transition-colors"
+              >
+                Send
+              </button>
             </div>
-          )}
+          </div>
         </div>
+
       </div>
     </div>
   );
@@ -6772,3 +7815,14 @@ const AIInsights = ({ aiSentiment, loadingAI, aiError, aiRecommendations, loadin
 };
 
 export default ManagerDashboard;
+
+
+
+
+
+
+
+
+
+
+

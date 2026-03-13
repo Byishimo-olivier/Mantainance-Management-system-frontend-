@@ -528,7 +528,7 @@ function PropertiesPage() {
           const allSelected = areAllAssetsSelected(aid);
 
           return (
-            <div key={aid} className="bg-white p-4 rounded-lg border border-gray-200">
+            <div key={aid} className="glass-surface-strong p-4 rounded-lg border border-gray-200">
               <div className="flex items-center justify-between mb-3">
                 <div>
                   <div className="font-medium text-gray-800">{asset.name}</div>
@@ -812,7 +812,7 @@ function PropertiesPage() {
 
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+        <div className="glass-surface-strong rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
           <div className="p-8">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8 items-start">
               <div className="md:col-span-1">
@@ -1015,7 +1015,7 @@ function PropertiesPage() {
                       </div>
 
                       {/* Show assets assigned to this block as selectable items */}
-                      <div className="bg-white p-6 rounded-xl mb-6 border border-gray-200">
+                      <div className="glass-surface-strong p-6 rounded-xl mb-6 border border-gray-200">
                         <div className="mb-4">
                           <h5 className="font-semibold text-gray-900 mb-2">Assets in Block {selectedBlock}</h5>
                           <div className="text-sm text-gray-600">
@@ -1389,7 +1389,13 @@ function PropertiesPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-rose-50">
+    <div className="glass-theme-blue min-h-screen text-slate-100 overflow-hidden relative" style={{ fontFamily: "'DM Sans', 'Segoe UI', system-ui, sans-serif" }}>
+      <div className="video-background-container">
+        <video autoPlay loop muted playsInline className="video-background text-transparent">
+          <source src={heroVid2} type="video/mp4" />
+        </video>
+      </div>
+      <div className="relative z-10 min-h-screen flex flex-col pt-16 overflow-y-auto">
       {/* Enhanced Hero Section with Luxury Feel */}
       <div className="relative bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white overflow-hidden">
         {/* Animated background pattern */}
@@ -1527,7 +1533,7 @@ function PropertiesPage() {
       {/* About Section with Elegant Design */}
       <div className="relative -mt-16 z-20">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="bg-white rounded-3xl shadow-2xl overflow-hidden border border-gray-100">
+          <div className="glass-surface-strong rounded-3xl shadow-2xl overflow-hidden border border-gray-100">
             <div className="p-12">
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 items-center">
                 <div className="lg:col-span-2">
@@ -1547,19 +1553,19 @@ function PropertiesPage() {
                     </p>
                   </div>
 
-                  <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-6">
-                    <div className="text-center">
-                      <div className="text-3xl font-serif font-light text-gray-900 mb-2">500+</div>
-                      <div className="text-sm text-gray-500">Properties</div>
+                  <div className="mt-12 grid grid-cols-2 md:grid-cols-4 gap-8">
+                    <div className="glass-surface p-4 rounded-2xl border border-white/10 text-center">
+                      <div className="text-3xl font-black text-white mb-2">500+</div>
+                      <div className="text-xs font-bold text-white/50 uppercase tracking-widest">Properties</div>
                     </div>
 
-                    <div className="text-center">
-                      <div className="text-3xl font-serif font-light text-gray-900 mb-2">98%</div>
-                      <div className="text-sm text-gray-500">Client Satisfaction</div>
+                    <div className="glass-surface p-4 rounded-2xl border border-white/10 text-center">
+                      <div className="text-3xl font-black text-white mb-2">98%</div>
+                      <div className="text-xs font-bold text-white/50 uppercase tracking-widest">Client Satisfaction</div>
                     </div>
-                    <div className="text-center">
-                      <div className="text-3xl font-serif font-light text-gray-900 mb-2">50+</div>
-                      <div className="text-sm text-gray-500">Awards</div>
+                    <div className="glass-surface p-4 rounded-2xl border border-white/10 text-center">
+                      <div className="text-3xl font-black text-white mb-2">50+</div>
+                      <div className="text-xs font-bold text-white/50 uppercase tracking-widest">Awards</div>
                     </div>
                   </div>
                 </div>
@@ -1588,7 +1594,7 @@ function PropertiesPage() {
         <div className="max-w-7xl mx-auto px-6">
           {/* Search and Filter Section */}
           <div className="mb-12">
-            <div className="bg-white rounded-2xl shadow-lg p-8 border border-gray-100">
+            <div className="glass-surface-strong rounded-3xl shadow-2xl p-8 border border-white/20">
               <div className="flex flex-col md:flex-row items-center justify-between gap-6">
                 <div className="flex-1 w-full">
                   <div className="relative">
@@ -1691,7 +1697,7 @@ function PropertiesPage() {
                       onClick={() => fetchPropertyDetails(property)}
                       className="group cursor-pointer"
                     >
-                      <div className="bg-white rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 border border-gray-100">
+                      <div className="glass-surface-strong rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 border border-gray-100">
                         {/* Property Image */}
                         <div className="relative h-64 overflow-hidden">
                           <img
@@ -1891,8 +1897,11 @@ function PropertiesPage() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }
 
 export default PropertiesPage;
+
+

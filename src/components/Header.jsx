@@ -95,7 +95,7 @@ export default function Header({ title, subtitle, right, user, className = "" })
             <div className="relative" ref={dropdownRef}>
               <button
                 onClick={() => setShowNotifications(!showNotifications)}
-                className="p-2.5 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all relative group shadow-sm"
+                className="p-2.5 glass-ghost rounded-xl hover:bg-white/70 transition-all relative group"
               >
                 <Bell className={`w-5 h-5 ${unreadCount > 0 ? "text-indigo-600" : "text-gray-500"}`} />
                 {unreadCount > 0 && (
@@ -106,8 +106,8 @@ export default function Header({ title, subtitle, right, user, className = "" })
               </button>
 
               {showNotifications && (
-                <div className="absolute right-0 mt-3 w-80 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden z-[100] animate-in slide-in-from-top-2 duration-300">
-                  <div className="p-4 bg-gray-50/50 border-b border-gray-100 flex items-center justify-between">
+                <div className="absolute right-0 mt-3 w-80 glass-surface-strong rounded-2xl overflow-hidden z-[100] animate-in slide-in-from-top-2 duration-300">
+                  <div className="p-4 bg-white/60 border-b border-white/40 flex items-center justify-between backdrop-blur">
                     <h3 className="font-bold text-gray-900">{t("header.notifications")}</h3>
                     {unreadCount > 0 && (
                       <button
@@ -121,11 +121,11 @@ export default function Header({ title, subtitle, right, user, className = "" })
 
                   <div className="max-h-[400px] overflow-y-auto">
                     {notifications.length > 0 ? (
-                      <div className="divide-y divide-gray-100">
+                      <div className="divide-y divide-white/40">
                         {notifications.map((n) => (
                           <div
                             key={n.id}
-                            className={`p-4 hover:bg-gray-50 transition-colors relative group ${!n.read ? "bg-indigo-50/30" : ""}`}
+                            className={`p-4 hover:bg-white/60 transition-colors relative group ${!n.read ? "bg-blue-50/40" : ""}`}
                           >
                             <div className="flex justify-between items-start gap-2">
                               <div>
@@ -165,7 +165,7 @@ export default function Header({ title, subtitle, right, user, className = "" })
                     )}
                   </div>
 
-                  <div className="p-3 bg-gray-50/50 border-t border-gray-100 text-center">
+                  <div className="p-3 bg-white/60 border-t border-white/40 text-center backdrop-blur">
                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{t("header.endOfAlerts")}</span>
                   </div>
                 </div>
@@ -177,7 +177,7 @@ export default function Header({ title, subtitle, right, user, className = "" })
             <select
               value={language}
               onChange={(e) => setLanguage(e.target.value)}
-              className="text-[11px] border border-gray-200 rounded-lg px-2 py-1 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+              className="text-[11px] glass-input rounded-lg px-2 py-1 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-300/60"
             >
               {languages.map((lang) => (
                 <option key={lang.code} value={lang.code}>
@@ -192,3 +192,4 @@ export default function Header({ title, subtitle, right, user, className = "" })
     </header>
   );
 }
+

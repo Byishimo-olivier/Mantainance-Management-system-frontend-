@@ -1,8 +1,12 @@
 import React, { useState } from 'react';
 import api from '../api/axios';
-import { getImageUrl } from '../utils/imageUrl';
 
-export default function WorkOrder() {
+export function WorkOrderForm({
+  onSubmitted,
+  onCancel,
+  submitLabel = 'Submit Work Order Request',
+  showSidebar = true
+}) {
   const [form, setForm] = useState({ name: '', phone: '', email: '', title: '', description: '', location: '' });
   const [imageFile, setImageFile] = useState(null);
   const [attachFile, setAttachFile] = useState(null);
@@ -35,6 +39,7 @@ export default function WorkOrder() {
       alert('Request submitted');
       setForm({ name: '', phone: '', email: '', title: '', description: '', location: '' });
       setImageFile(null); setAttachFile(null);
+      if (onSubmitted) onSubmitted();
     } catch (err) {
       console.error(err);
       alert('Submit failed');
@@ -42,84 +47,196 @@ export default function WorkOrder() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-10">
-      <div className="max-w-7xl mx-auto px-6">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold">Work Order Requests</h1>
-          <a href="/login" className="text-sm font-semibold text-gray-600">Go To App</a>
-        </div>
-
-        <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          <div className="bg-white rounded-lg p-6 shadow">
-            <h3 className="font-semibold mb-4">Requester Info</h3>
-            <div className="space-y-3">
-              <div>
-                <label className="text-sm font-medium">Full Name <span className="text-red-500">*</span></label>
-                <input name="name" value={form.name} onChange={handleChange} className="mt-2 w-full border rounded px-3 py-2" placeholder="Your Full Name" required />
+    <div className={`grid grid-cols-1 ${showSidebar ? 'lg:grid-cols-3' : ''} gap-6`}>
+      <form onSubmit={handleSubmit} className={`${showSidebar ? 'lg:col-span-2' : ''} space-y-6`}>
+            <div className="glass-surface rounded-3xl p-6 border border-white/50 shadow-lg">
+              <h3 className="font-bold text-lg text-slate-900 mb-4">Requester Info</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Full Name *</label>
+                  <input
+                    name="name"
+                    value={form.name}
+                    onChange={handleChange}
+                    className="mt-2 w-full rounded-xl glass-input px-3 py-2"
+                    placeholder="Your full name"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Phone Number</label>
+                  <input
+                    name="phone"
+                    value={form.phone}
+                    onChange={handleChange}
+                    className="mt-2 w-full rounded-xl glass-input px-3 py-2"
+                    placeholder="Your phone number"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Email Address *</label>
+                  <input
+                    name="email"
+                    type="email"
+                    value={form.email}
+                    onChange={handleChange}
+                    className="mt-2 w-full rounded-xl glass-input px-3 py-2"
+                    placeholder="you@email.com"
+                    required
+                  />
+                </div>
               </div>
-              <div>
-                <label className="text-sm font-medium">Phone Number</label>
-                <input name="phone" value={form.phone} onChange={handleChange} className="mt-2 w-full border rounded px-3 py-2" placeholder="Your Phone Number" />
+              <div className="mt-4 p-3 bg-blue-50/70 border border-blue-100 rounded-xl text-xs text-blue-700">
+                You can track your requests by logging in with the same email address.
               </div>
-              <div>
-                <label className="text-sm font-medium">Email Address <span className="text-red-500">*</span></label>
-                <input name="email" type="email" value={form.email} onChange={handleChange} className="mt-2 w-full border rounded px-3 py-2" placeholder="Your Email Address" required />
-              </div>
-              <div className="mt-4 p-3 bg-blue-50 border-l-4 border-blue-400 text-sm text-blue-700 rounded">You can keep track of your requests by logging in to the Portal with the same email address.</div>
             </div>
-          </div>
 
-          <div className="bg-white rounded-lg p-6 shadow">
-            <h3 className="font-semibold mb-4">Request Details</h3>
-            <div className="space-y-3">
-              <div>
-                <label className="text-sm font-medium">Title <span className="text-red-500">*</span></label>
-                <input name="title" value={form.title} onChange={handleChange} className="mt-2 w-full border rounded px-3 py-2" placeholder="Title to describe the issue" required />
-              </div>
-              <div>
-                <label className="text-sm font-medium">Description <span className="text-red-500">*</span></label>
-                <textarea name="description" value={form.description} onChange={handleChange} className="mt-2 w-full border rounded px-3 py-2 min-h-[140px]" placeholder="Provide some details for this maintenance request" required />
+            <div className="glass-surface rounded-3xl p-6 border border-white/50 shadow-lg">
+              <h3 className="font-bold text-lg text-slate-900 mb-4">Request Details</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Title *</label>
+                  <input
+                    name="title"
+                    value={form.title}
+                    onChange={handleChange}
+                    className="mt-2 w-full rounded-xl glass-input px-3 py-2"
+                    placeholder="Short summary of the issue"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Description *</label>
+                  <textarea
+                    name="description"
+                    value={form.description}
+                    onChange={handleChange}
+                    className="mt-2 w-full rounded-xl glass-input px-3 py-2 min-h-[140px]"
+                    placeholder="Provide detailed information about the issue"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Location *</label>
+                  <input
+                    name="location"
+                    value={form.location}
+                    onChange={handleChange}
+                    className="mt-2 w-full rounded-xl glass-input px-3 py-2"
+                    placeholder="Building, floor, unit, or area"
+                    required
+                  />
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="bg-white rounded-lg p-6 shadow">
-            <h3 className="font-semibold mb-4">Request Details</h3>
-            <div className="space-y-4">
-              <div className="border-dashed border-2 border-gray-200 rounded p-6 text-center">
-                <label className="cursor-pointer">
-                  <div className="mb-2 text-gray-500">Click to upload an Image</div>
+            <div className="glass-surface rounded-3xl p-6 border border-white/50 shadow-lg">
+              <h3 className="font-bold text-lg text-slate-900 mb-4">Attachments</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <label className="border-dashed border-2 border-white/60 rounded-2xl p-6 text-center cursor-pointer hover:border-blue-200 transition">
+                  <div className="text-sm font-semibold text-slate-600">Upload Image</div>
+                  <div className="text-xs text-slate-500 mt-1">JPG, PNG, HEIC</div>
                   <input name="photo" type="file" accept="image/*" onChange={handleChange} className="hidden" />
-                  {imageFile && <div className="mt-2 text-sm text-gray-700">{imageFile.name}</div>}
+                  {imageFile && <div className="mt-3 text-xs text-slate-700">{imageFile.name}</div>}
                 </label>
-              </div>
-              <div className="border-dashed border-2 border-gray-200 rounded p-6 text-center">
-                <label className="cursor-pointer">
-                  <div className="mb-2 text-gray-500">Click to upload a File</div>
+                <label className="border-dashed border-2 border-white/60 rounded-2xl p-6 text-center cursor-pointer hover:border-blue-200 transition">
+                  <div className="text-sm font-semibold text-slate-600">Upload File</div>
+                  <div className="text-xs text-slate-500 mt-1">PDF, DOCX, TXT</div>
                   <input name="file" type="file" onChange={handleChange} className="hidden" />
-                  {attachFile && <div className="mt-2 text-sm text-gray-700">{attachFile.name}</div>}
+                  {attachFile && <div className="mt-3 text-xs text-slate-700">{attachFile.name}</div>}
                 </label>
+              </div>
+            </div>
+
+            <div className="glass-surface-strong rounded-3xl p-6 border border-white/60 shadow-xl">
+              <div className={`flex flex-col ${onCancel ? 'md:flex-row md:items-center' : ''} gap-3`}>
+                {onCancel && (
+                  <button
+                    type="button"
+                    onClick={onCancel}
+                    className="w-full md:flex-1 border border-slate-200 text-slate-700 text-base font-semibold py-3 rounded-2xl hover:bg-white/60 transition"
+                  >
+                    Cancel
+                  </button>
+                )}
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="w-full md:flex-1 bg-blue-600 text-white text-lg font-bold py-3 rounded-2xl hover:bg-blue-700 transition disabled:opacity-60"
+                >
+                  {submitting ? 'Submitting…' : submitLabel}
+                </button>
+              </div>
+              <p className="text-center text-xs text-slate-500 mt-3">
+                All requests are sent directly to the property management team.
+              </p>
+            </div>
+      </form>
+
+      {showSidebar && (
+        <aside className="space-y-6">
+          <div className="glass-surface rounded-3xl p-6 border border-white/50 shadow-lg">
+            <h4 className="font-bold text-slate-900 mb-4">Request Summary</h4>
+            <div className="space-y-3 text-sm">
+              <div>
+                <p className="text-xs uppercase tracking-wider text-slate-500">Title</p>
+                <p className="font-semibold text-slate-800">{form.title || '—'}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wider text-slate-500">Requester</p>
+                <p className="font-semibold text-slate-800">{form.name || '—'}</p>
+                <p className="text-xs text-slate-500">{form.email || '—'}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wider text-slate-500">Location</p>
+                <p className="font-semibold text-slate-800">{form.location || '—'}</p>
+              </div>
+              <div className="flex items-center justify-between text-xs text-slate-500">
+                <span>Image</span>
+                <span>{imageFile ? 'Attached' : 'None'}</span>
+              </div>
+              <div className="flex items-center justify-between text-xs text-slate-500">
+                <span>File</span>
+                <span>{attachFile ? 'Attached' : 'None'}</span>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg p-6 shadow">
-            <h3 className="font-semibold mb-4">Additional Info</h3>
-            <div>
-              <label className="text-sm font-medium">Provide Location <span className="text-red-500">*</span></label>
-              <input name="location" value={form.location} onChange={handleChange} className="mt-2 w-full border rounded px-3 py-2" placeholder="Enter value" required />
-            </div>
+          <div className="glass-surface rounded-3xl p-6 border border-white/50 shadow-lg">
+            <h4 className="font-bold text-slate-900 mb-3">What happens next</h4>
+            <ul className="text-sm text-slate-600 space-y-2">
+              <li>We review and approve your request.</li>
+              <li>A work order is created and assigned.</li>
+              <li>You receive updates via chat and email.</li>
+            </ul>
           </div>
+        </aside>
+      )}
+    </div>
+  );
+}
 
-          <div className="col-span-1 lg:col-span-4">
-            <div className="mt-6 p-6 bg-blue-600 rounded text-white text-center shadow-lg">
-              <button type="submit" disabled={submitting} className="w-full text-lg font-bold py-4">
-                {submitting ? 'Submitting…' : 'Submit Work Order Request'}
-              </button>
-            </div>
-            <p className="text-center text-gray-500 mt-4">All requests are sent directly to the company admin.</p>
+export default function WorkOrder() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-sky-100 via-blue-100 to-emerald-100 px-4 py-10 text-slate-900">
+      <div className="max-w-6xl mx-auto">
+        <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+          <div>
+            <p className="text-xs uppercase tracking-[0.25em] text-blue-600 font-semibold">Maintenance Portal</p>
+            <h1 className="text-3xl md:text-4xl font-black text-slate-900 mt-2">Submit a Work Order Request</h1>
+            <p className="text-sm text-slate-600 mt-2 max-w-2xl">
+              Share the details of the issue and your team will receive it instantly.
+            </p>
           </div>
-        </form>
+          <a
+            href="/login"
+            className="glass-ghost px-4 py-2 rounded-full text-sm font-semibold text-slate-700 border border-white/60 hover:border-blue-200 hover:text-blue-700 transition"
+          >
+            Go To App
+          </a>
+        </header>
+
+        <WorkOrderForm />
       </div>
     </div>
   );

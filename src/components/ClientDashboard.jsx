@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import ScheduleMaintenanceForm from './ScheduleMaintenanceForm';
+import backgroundVideo from "../assets/136906-765457769_small.mp4";
 import api from "../api/axios";
 import { useNavigate } from "react-router-dom";
 import NewIssue from './NewIssue';
@@ -7,6 +7,7 @@ import SubscriptionWidget from './SubscriptionWidget';
 import SubscriptionManagement from './SubscriptionManagement';
 import { getImageUrl } from '../utils/imageUrl';
 import { useLanguage, useTranslation } from "../i18n/LanguageContext";
+import { Clock, Calendar, CheckCircle, X, Bell, Download, Package, ShoppingCart, Users, BarChart3, Gauge, Layout, LogOut, Plus, Shield, SlidersHorizontal, ArrowUpRight, Search, Eye, MapPin } from 'lucide-react';
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 const Icon = {
@@ -149,18 +150,18 @@ const extractId = (obj) => {
 function StatusBadge({ status }) {
   const s = (status || '').toUpperCase().replace(/_/g, ' ');
   const map = {
-    'PENDING': { bg: '#FEF3C7', text: '#92400E', dot: '#F59E0B' },
-    'IN PROGRESS': { bg: '#DBEAFE', text: '#1E40AF', dot: '#3B82F6' },
-    'COMPLETE': { bg: '#D1FAE5', text: '#065F46', dot: '#10B981' },
-    'COMPLETED': { bg: '#D1FAE5', text: '#065F46', dot: '#10B981' },
-    'APPROVED': { bg: '#D1FAE5', text: '#065F46', dot: '#10B981' },
-    'OVERDUE': { bg: '#FEE2E2', text: '#991B1B', dot: '#EF4444' },
-    'REJECTED': { bg: '#FEE2E2', text: '#991B1B', dot: '#EF4444' },
+    'PENDING': 'bg-amber-500/20 text-amber-200 border-amber-500/30',
+    'IN PROGRESS': 'bg-blue-500/20 text-blue-200 border-blue-500/30',
+    'COMPLETE': 'bg-emerald-500/20 text-emerald-200 border-emerald-500/30',
+    'COMPLETED': 'bg-emerald-500/20 text-emerald-200 border-emerald-500/30',
+    'APPROVED': 'bg-emerald-500/20 text-emerald-200 border-emerald-500/30',
+    'OVERDUE': 'bg-rose-500/20 text-rose-200 border-rose-500/30',
+    'REJECTED': 'bg-rose-500/20 text-rose-200 border-rose-500/30',
   };
-  const { bg, text, dot } = map[s] || { bg: '#F3F4F6', text: '#374151', dot: '#9CA3AF' };
+  const colorClass = map[s] || 'bg-gray-500/20 text-gray-200 border-gray-500/30';
   return (
-    <span style={{ background: bg, color: text, display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600, letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>
-      <span style={{ width: 6, height: 6, borderRadius: '50%', background: dot, flexShrink: 0 }} />
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border backdrop-blur-md ${colorClass}`}>
+      <span className="w-1.5 h-1.5 rounded-full bg-current" />
       {s}
     </span>
   );
@@ -169,22 +170,23 @@ function StatusBadge({ status }) {
 // ── Stat card ─────────────────────────────────────────────────────────────────
 function StatCard({ label, value, sub, accent, icon }) {
   const accents = {
-    blue: { bg: '#EFF6FF', border: '#BFDBFE', val: '#1D4ED8', icon: '#3B82F6' },
-    green: { bg: '#ECFDF5', border: '#A7F3D0', val: '#065F46', icon: '#10B981' },
-    red: { bg: '#FEF2F2', border: '#FECACA', val: '#991B1B', icon: '#EF4444' },
-    indigo: { bg: '#EEF2FF', border: '#C7D2FE', val: '#3730A3', icon: '#6366F1' },
-    amber: { bg: '#FFFBEB', border: '#FDE68A', val: '#92400E', icon: '#F59E0B' },
+    blue: 'from-blue-500/20 to-indigo-500/10 border-blue-500/20 text-blue-100',
+    green: 'from-emerald-500/20 to-teal-500/10 border-emerald-500/20 text-emerald-100',
+    red: 'from-rose-500/20 to-pink-500/10 border-rose-500/20 text-rose-100',
+    indigo: 'from-indigo-500/20 to-purple-500/10 border-indigo-500/20 text-indigo-100',
+    amber: 'from-amber-500/20 to-yellow-500/10 border-amber-500/20 text-amber-100',
   };
   const c = accents[accent] || accents.blue;
   return (
-    <div style={{ background: c.bg, border: `1px solid ${c.border}`, borderRadius: 14, padding: '20px 22px', display: 'flex', alignItems: 'flex-start', gap: 14 }}>
-      <div style={{ width: 40, height: 40, borderRadius: 10, background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 4px rgba(0,0,0,0.08)', color: c.icon, flexShrink: 0 }}>
+    <div className={`glass-surface-strong rounded-2xl p-6 flex items-start gap-4 border-l-4 overflow-hidden relative group transition-all hover:scale-[1.02]`}>
+      <div className={`absolute inset-0 bg-gradient-to-br ${c} opacity-50`} />
+      <div className="relative z-10 w-12 h-12 rounded-xl glass-mirror flex items-center justify-center text-white shadow-lg">
         {icon}
       </div>
-      <div>
-        <div style={{ fontSize: 26, fontWeight: 700, color: c.val, lineHeight: 1 }}>{value}</div>
-        <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginTop: 4 }}>{label}</div>
-        {sub && <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 2 }}>{sub}</div>}
+      <div className="relative z-10">
+        <div className="text-3xl font-black text-white tracking-tight">{value}</div>
+        <div className="text-sm font-bold text-white/70 uppercase tracking-wider mt-1">{label}</div>
+        {sub && <div className="text-xs text-white/50 mt-1 font-medium">{sub}</div>}
       </div>
     </div>
   );
@@ -208,57 +210,77 @@ function SectionHeader({ title, count, action }) {
 // ── Table ─────────────────────────────────────────────────────────────────────
 function Table({ heads, rows, empty = 'No data found.' }) {
   return (
-    <div style={{ border: '1px solid #E5E7EB', borderRadius: 12, overflow: 'hidden' }}>
+    <div className="glass-surface border border-white/10 rounded-xl overflow-hidden shadow-lg backdrop-blur-sm">
       {rows.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px 24px', color: '#9CA3AF', fontSize: 14 }}>{empty}</div>
+        <div className="text-center py-16 px-6 text-white/40 text-sm font-medium">{empty}</div>
       ) : (
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ background: '#F9FAFB', borderBottom: '1px solid #E5E7EB' }}>
-              {heads.map((h, i) => (
-                <th key={i} style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, i) => (
-              <tr key={i} style={{ borderBottom: i < rows.length - 1 ? '1px solid #F3F4F6' : 'none', transition: 'background 0.15s' }}
-                onMouseEnter={e => e.currentTarget.style.background = '#F9FAFB'}
-                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-              >
-                {row}
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="bg-white/5 border-b border-white/10">
+                {heads.map((h, i) => (
+                  <th key={i} className="py-4 px-6 text-left text-[10px] font-bold text-white/50 uppercase tracking-widest whitespace-nowrap">{h}</th>
+                ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {rows.map((row, i) => (
+                <tr key={i} className="hover:bg-white/10 transition-colors duration-200">
+                  {row}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );
 }
 
 const Td = ({ children, mono }) => (
-  <td style={{ padding: '12px 16px', fontSize: 13, color: '#374151', fontFamily: mono ? 'monospace' : 'inherit' }}>{children ?? '—'}</td>
+  <td className={`py-4 px-6 text-sm text-white/80 ${mono ? 'font-mono' : ''}`}>{children ?? '—'}</td>
 );
 
 // ── Input / Select ────────────────────────────────────────────────────────────
-const inputStyle = { border: '1px solid #D1D5DB', borderRadius: 8, padding: '9px 12px', fontSize: 13, color: '#111827', background: 'white', outline: 'none', width: '100%', boxSizing: 'border-box', fontFamily: 'inherit' };
-const Input = ({ style, ...props }) => <input style={{ ...inputStyle, ...style }} {...props} />;
-const Select = ({ style, children, ...props }) => <select style={{ ...inputStyle, ...style }} {...props}>{children}</select>;
+const Input = ({ className = '', ...props }) => (
+  <input
+    className={`glass-input rounded-xl px-4 py-2.5 text-sm text-white placeholder-white/30 focus:ring-2 focus:ring-white/20 border-white/10 w-full transition-all outline-none ${className}`}
+    {...props}
+  />
+);
+
+const Select = ({ className = '', children, ...props }) => (
+  <select
+    className={`glass-input rounded-xl px-4 py-2.5 text-sm text-white focus:ring-2 focus:ring-white/20 border-white/10 w-full transition-all outline-none appearance-none ${className}`}
+    {...props}
+  >
+    {children}
+  </select>
+);
 
 // ── Button ────────────────────────────────────────────────────────────────────
-function Btn({ children, variant = 'primary', size = 'md', onClick, disabled, type = 'button', style }) {
-  const base = { border: 'none', cursor: disabled ? 'not-allowed' : 'pointer', fontFamily: 'inherit', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 6, transition: 'all 0.15s', opacity: disabled ? 0.5 : 1, borderRadius: 8 };
-  const sizes = { sm: { padding: '5px 12px', fontSize: 12 }, md: { padding: '8px 16px', fontSize: 13 }, lg: { padding: '10px 20px', fontSize: 14 } };
+function Btn({ children, variant = 'primary', size = 'md', onClick, disabled, type = 'button', className = '' }) {
   const variants = {
-    primary: { background: '#1D4ED8', color: 'white' },
-    danger: { background: '#EF4444', color: 'white' },
-    ghost: { background: '#F3F4F6', color: '#374151' },
-    outline: { background: 'white', color: '#374151', border: '1px solid #D1D5DB' },
-    success: { background: '#10B981', color: 'white' },
-    teal: { background: '#0F766E', color: 'white' },
+    primary: 'bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-500/20',
+    danger: 'bg-rose-600 text-white hover:bg-rose-700 shadow-lg shadow-rose-500/20',
+    ghost: 'glass-ghost text-white hover:bg-white/10',
+    outline: 'bg-transparent border border-white/20 text-white hover:bg-white/5',
+    success: 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-lg shadow-emerald-500/20',
+    teal: 'bg-teal-600 text-white hover:bg-teal-700 shadow-lg shadow-teal-500/20',
   };
+  const sizes = {
+    sm: 'px-3 py-1.5 text-xs font-bold',
+    md: 'px-5 py-2.5 text-sm font-bold',
+    lg: 'px-8 py-3 text-base font-black uppercase tracking-wider',
+  };
+
   return (
-    <button type={type} onClick={onClick} disabled={disabled} style={{ ...base, ...sizes[size], ...variants[variant], ...style }}>
+    <button
+      type={type}
+      onClick={onClick}
+      disabled={disabled}
+      className={`inline-flex items-center gap-2 rounded-xl transition-all active:scale-95 disabled:opacity-50 disabled:pointer-events-none ${variants[variant]} ${sizes[size]} ${className}`}
+    >
       {children}
     </button>
   );
@@ -266,35 +288,21 @@ function Btn({ children, variant = 'primary', size = 'md', onClick, disabled, ty
 
 // ── Sidebar nav item ──────────────────────────────────────────────────────────
 function NavItem({ label, icon, active, onClick, danger }) {
-  const baseStyle = {
-    width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10,
-    padding: '9px 12px', borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-    fontSize: 13, fontWeight: active ? 700 : 500, transition: 'all 0.15s',
-    background: active ? 'rgba(255,255,255,0.18)' : 'transparent',
-    color: danger ? '#FCA5A5' : active ? '#FFFFFF' : 'rgba(255,255,255,0.8)',
-  };
-
   return (
     <button
       onClick={onClick}
-      style={baseStyle}
-      onMouseEnter={(e) => {
-        if (active) return;
-        e.currentTarget.style.background = 'rgba(255,255,255,0.14)';
-        e.currentTarget.style.color = '#FFFFFF';
-        const iconEl = e.currentTarget.querySelector('span[data-icon]');
-        if (iconEl) iconEl.style.color = 'rgba(255,255,255,0.95)';
-      }}
-      onMouseLeave={(e) => {
-        if (active) return;
-        e.currentTarget.style.background = 'transparent';
-        e.currentTarget.style.color = danger ? '#FCA5A5' : 'rgba(255,255,255,0.8)';
-        const iconEl = e.currentTarget.querySelector('span[data-icon]');
-        if (iconEl) iconEl.style.color = danger ? '#FCA5A5' : 'rgba(255,255,255,0.65)';
-      }}
+      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group relative ${active
+          ? 'bg-white/20 text-white shadow-lg shadow-black/5'
+          : 'text-white/60 hover:text-white hover:bg-white/10'
+        } ${danger ? 'hover:bg-rose-500/20 hover:text-rose-200' : ''}`}
     >
-      <span data-icon style={{ color: active ? '#FFFFFF' : danger ? '#FCA5A5' : 'rgba(255,255,255,0.65)' }}>{icon}</span>
-      {label}
+      {active && (
+        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-white rounded-r-full shadow-glow-white" />
+      )}
+      <span className={`transition-transform duration-200 group-hover:scale-110 ${active ? 'text-white' : 'text-white/40 group-hover:text-white/70'}`}>
+        {icon}
+      </span>
+      <span className="text-sm font-bold tracking-tight">{label}</span>
     </button>
   );
 }
@@ -364,6 +372,379 @@ function ClientDashboard() {
   const inviteEmailRef = useRef(null);
   const inviteRoleRef = useRef(null);
   const inviteLocationRef = useRef(null);
+  const [modalData, setModalData] = useState({ open: false, type: '', item: null });
+
+  // New Detail Modal Implementation
+  const DetailsModal = ({ open, type, item, onClose, getAssignedTechName }) => {
+    const [formData, setFormData] = useState({
+      category: item?.category || '',
+      priority: item?.priority || 'MEDIUM',
+      location: item?.location || item?.address || '',
+      assetName: item?.assetName || '',
+      team: item?.team || '',
+      estimatedTime: item?.estimatedTime || '',
+      checklist: Array.isArray(item?.checklist) ? item.checklist : (item?.checklist ? [item.checklist] : []),
+      chat: Array.isArray(item?.chat) ? item.chat : []
+    });
+    const [chatInput, setChatInput] = useState('');
+
+    useEffect(() => {
+      if (item) {
+        setFormData({
+          category: item.category || '',
+          priority: item.priority || 'MEDIUM',
+          location: item.location || item.address || '',
+          assetName: item.assetName || '',
+          team: item.team || '',
+          estimatedTime: item.estimatedTime || '',
+          checklist: Array.isArray(item.checklist) ? item.checklist : [],
+          chat: Array.isArray(item.chat) ? item.chat : []
+        });
+      }
+    }, [item]);
+
+    if (!open || !item) return null;
+
+    const isMaterial = type === 'material';
+    const isRequest = type === 'request';
+    const isIssue = type === 'issue';
+
+    const title = isMaterial ? 'Material Request Details' : isRequest ? 'Request Details' : 'Work Order Details';
+    const dueDate = item.fixDeadline || item.dueDate || item.nextDate || item.scheduledFor || null;
+    const createdAt = item.createdAt || item.date || item.nextDate || null;
+    const status = item.status || (item.approved ? 'APPROVED' : 'PENDING') || '—';
+    const description = item.description || item.details || 'No description provided.';
+
+    const formatDateTime = (val) => {
+      if (!val) return 'Not set';
+      try { return new Date(val).toLocaleString(); } catch (e) { return 'Not set'; }
+    };
+
+    const handleSaveModal = async () => {
+      try {
+        await api.put(`/api/issues/${item.id || item._id}`, formData);
+        alert('Changes saved successfully.');
+        fetchIssues(); // Refresh list
+      } catch (err) {
+        console.error('Failed to save issue:', err);
+        alert('Failed to save changes.');
+      }
+    };
+
+    const handleApproveModal = async () => {
+      try {
+        await api.put(`/api/issues/${item.id || item._id}`, { ...formData, status: 'APPROVED', approved: true });
+        alert('Request approved.');
+        fetchIssues();
+        onClose();
+      } catch (err) {
+        console.error('Failed to approve issue:', err);
+        alert('Failed to approve request.');
+      }
+    };
+
+    const handleDeclineModal = async () => {
+      const reason = prompt('Please enter a reason for declining:');
+      if (reason === null) return;
+      try {
+        await api.put(`/api/issues/${item.id || item._id}`, {
+          ...formData,
+          status: 'DECLINED',
+          rejected: true,
+          rejectionReason: reason,
+          rejectedAt: new Date()
+        });
+        alert('Request declined.');
+        fetchIssues();
+        onClose();
+      } catch (err) {
+        console.error('Failed to decline issue:', err);
+        alert('Failed to decline request.');
+      }
+    };
+
+    const handleSendMessage = async () => {
+      if (!chatInput.trim()) return;
+      const newMessage = {
+        sender: userName || 'User',
+        text: chatInput,
+        timestamp: new Date().toISOString(),
+        role: currentUser?.role || 'client'
+      };
+      const updatedChat = [...formData.chat, newMessage];
+      try {
+        await api.put(`/api/issues/${item.id || item._id}`, { chat: updatedChat });
+        setFormData(prev => ({ ...prev, chat: updatedChat }));
+        setChatInput('');
+      } catch (err) {
+        console.error('Failed to send message:', err);
+        alert('Failed to send message.');
+      }
+    };
+
+    const addChecklistItem = () => {
+      setFormData(prev => ({ ...prev, checklist: [...prev.checklist, { text: '', completed: false }] }));
+    };
+
+    const updateChecklistItem = (index, field, value) => {
+      const newList = [...formData.checklist];
+      newList[index][field] = value;
+      setFormData(prev => ({ ...prev, checklist: newList }));
+    };
+
+    return (
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4 text-gray-900">
+        <div className="glass-surface-strong rounded-2xl w-full max-w-6xl max-h-[90vh] flex flex-col md:flex-row overflow-hidden">
+          {/* Left Side: Fields Form */}
+          <div className="flex-1 flex flex-col overflow-hidden border-r border-gray-100">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gray-50 flex-shrink-0">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">{title}</h3>
+                <p className="text-xs text-gray-500">Details and Approval Settings</p>
+              </div>
+              <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-lg transition-colors md:hidden">
+                <Icon.X className="w-5 h-5 text-gray-400" />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto flex-1 space-y-5">
+              <div>
+                <h4 className="text-lg font-bold text-gray-900">{item.title || item.name || 'Untitled'}</h4>
+                <p className="text-sm text-gray-600 mt-1">{description}</p>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold border border-blue-100">
+                  Status: {String(status)}
+                </span>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gray-50 text-gray-700 text-xs font-semibold border border-gray-200">
+                  <Icon.Clock /> Created: {formatDateTime(createdAt)}
+                </span>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gray-50 text-gray-700 text-xs font-semibold border border-gray-200">
+                  <Icon.Calendar /> Due: {formatDateTime(dueDate)}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-gray-100">
+                {/* Category & Priority */}
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-1">Category</label>
+                  <select
+                    className="w-full border border-gray-300 rounded-lg p-2.5 text-sm"
+                    value={formData.category}
+                    onChange={e => setFormData({ ...formData, category: e.target.value })}
+                  >
+                    <option value="">Select Category</option>
+                    <option value="Damage">Damage</option>
+                    <option value="electrical">Electrical</option>
+                    <option value="inspections">Inspections</option>
+                    <option value="Meter Reading">Meter Reading</option>
+                    <option value="None">None</option>
+                    <option value="Plumbing">Plumbing</option>
+                    <option value="preventative">Preventative</option>
+                    <option value="project">Project</option>
+                    <option value="safety">Safety</option>
+                    <option value="upgrate">Upgrade</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-1">Priority</label>
+                  <select
+                    className="w-full border border-gray-300 rounded-lg p-2.5 text-sm"
+                    value={formData.priority}
+                    onChange={e => setFormData({ ...formData, priority: e.target.value })}
+                  >
+                    <option value="LOW">Low</option>
+                    <option value="MEDIUM">Medium</option>
+                    <option value="HIGH">High</option>
+                    <option value="URGENT">Urgent</option>
+                  </select>
+                </div>
+
+                {/* Location & Asset */}
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-1">Location</label>
+                  <input
+                    type="text"
+                    className="w-full border border-gray-300 rounded-lg p-2.5 text-sm"
+                    value={formData.location}
+                    onChange={e => setFormData({ ...formData, location: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-1">Asset</label>
+                  <input
+                    type="text"
+                    className="w-full border border-gray-300 rounded-lg p-2.5 text-sm"
+                    placeholder="e.g. HVAC Unit 2"
+                    value={formData.assetName}
+                    onChange={e => setFormData({ ...formData, assetName: e.target.value })}
+                  />
+                </div>
+
+                {/* Responsibility */}
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-1">First Responsible</label>
+                  <select
+                    className="w-full border border-gray-300 rounded-lg p-2.5 text-sm"
+                    value={item.assignedTo || ''}
+                    disabled
+                  >
+                    <option value="">{getAssignedTechName ? getAssignedTechName(item) : (item.assignedTo || 'Unassigned')}</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-1">Team</label>
+                  <input
+                    type="text"
+                    className="w-full border border-gray-300 rounded-lg p-2.5 text-sm"
+                    placeholder="Enter Team Name"
+                    value={formData.team}
+                    onChange={e => setFormData({ ...formData, team: e.target.value })}
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-1">Additional Responsible Workers</label>
+                  <input
+                    type="text"
+                    className="w-full border border-gray-300 rounded-lg p-2.5 text-sm"
+                    placeholder="Search and add workers..."
+                    value={formData.additionalResponsibleWorkers || ''}
+                    onChange={e => setFormData({ ...formData, additionalResponsibleWorkers: e.target.value })}
+                  />
+                </div>
+
+                {/* Work Details */}
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-1">Checklist</label>
+                  <div className="border border-gray-300 rounded-lg p-3 bg-gray-50 flex flex-col gap-2">
+                    {formData.checklist.map((ci, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          className="w-4 h-4 rounded border-gray-300"
+                          checked={ci.completed}
+                          onChange={e => updateChecklistItem(idx, 'completed', e.target.checked)}
+                        />
+                        <input
+                          type="text"
+                          className="flex-1 bg-transparent border-b border-gray-300 text-sm py-1 focus:outline-none focus:border-blue-500"
+                          placeholder={`Item ${idx + 1}`}
+                          value={ci.text}
+                          onChange={e => updateChecklistItem(idx, 'text', e.target.value)}
+                        />
+                      </div>
+                    ))}
+                    <button onClick={addChecklistItem} className="text-xs text-blue-600 font-semibold self-start mt-1">+ Add Item</button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-1">Estimated Time (hrs)</label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    className="w-full border border-gray-300 rounded-lg p-2.5 text-sm"
+                    placeholder="e.g. 2.5"
+                    value={formData.estimatedTime}
+                    onChange={e => setFormData({ ...formData, estimatedTime: e.target.value })}
+                  />
+                </div>
+
+                {/* Signature & Files */}
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-1">Signature</label>
+                  <div className="border border-gray-300 border-dashed rounded-lg h-24 bg-gray-50 flex items-center justify-center text-gray-400 text-sm">
+                    {item.signature ? <img src={item.signature} className="h-full object-contain" alt="Signature" /> : 'Draw or Upload Signature'}
+                  </div>
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-1">Attachments</label>
+                  <div className="border border-gray-300 border-dashed rounded-lg p-6 bg-gray-50 flex flex-col items-center justify-center text-center gap-2">
+                    <div className="text-sm text-gray-600">Drag & drop files here</div>
+                    <div className="text-xs text-blue-600 cursor-pointer hover:underline border border-blue-600 rounded px-2 py-1 mt-1 inline-block mx-auto">Add from saved file</div>
+                  </div>
+                </div>
+              </div>
+
+              {(item.beforePhoto || item.photo || item.image || item.beforeImage || item.afterImage || item.afterPhoto) && (
+                <div className="pt-4 border-t border-gray-100">
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">Original Attachment</label>
+                  <div className="rounded-xl overflow-hidden border border-gray-200 bg-gray-50 w-48">
+                    <img src={imageSrc(item.afterImage || item.afterPhoto || item.beforeImage || item.beforePhoto || item.photo || item.image)} alt="Attachment" className="w-full h-32 object-cover" />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 border-t border-gray-200 bg-gray-50 flex flex-wrap items-center justify-end gap-3 flex-shrink-0">
+              <button onClick={handleSaveModal} className="px-5 py-2.5 glass-ghost text-slate-700 rounded-xl text-sm font-bold shadow-sm hover:bg-white/70 transition-colors">
+                Save (Without Appr.)
+              </button>
+              <button onClick={handleDeclineModal} className="px-5 py-2.5 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm font-bold shadow-sm hover:bg-red-100 transition-colors">
+                Decline
+              </button>
+              <button onClick={handleApproveModal} className="px-5 py-2.5 bg-green-600 border border-transparent text-white rounded-xl text-sm font-bold shadow-sm hover:bg-green-700 transition-colors">
+                Approve
+              </button>
+            </div>
+          </div>
+
+          {/* Right Side: Chat Panel */}
+          <div className="w-full md:w-80 lg:w-96 flex flex-col bg-gray-50 border-l border-gray-200 flex-shrink-0">
+            <div className="px-4 py-4 border-b border-white/40 bg-white/60 backdrop-blur-md flex items-center justify-between">
+              <h4 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                Internal Chat
+              </h4>
+              <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors hidden md:block">
+                <Icon.X className="w-4 h-4 text-gray-400" />
+              </button>
+            </div>
+
+            <div className="flex-1 p-4 overflow-y-auto space-y-4">
+              <div className="text-center text-xs text-gray-400 font-semibold mt-2 mb-4">Messages</div>
+              {formData.chat.length === 0 ? (
+                <div className="text-center text-gray-400 text-xs py-10 italic">No messages yet. Start the conversation.</div>
+              ) : (
+                formData.chat.map((msg, i) => (
+                  <div key={i} className={`flex flex-col gap-1 ${msg.sender === userName ? 'items-end' : 'items-start'}`}>
+                    <span className={`text-[10px] text-gray-500 ${msg.sender === userName ? 'mr-1' : 'ml-1'}`}>
+                      {msg.sender} • {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                    <div className={`${msg.sender === userName ? 'bg-blue-600 text-white rounded-tr-sm' : 'glass-ghost text-slate-800 rounded-tl-sm'} rounded-2xl px-4 py-2 text-sm shadow-sm max-w-[85%] break-words`}>
+                      {msg.text}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="p-3 bg-white/60 backdrop-blur-md border-t border-white/40">
+              <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2">
+                <input
+                  type="text"
+                  className="flex-1 bg-transparent border-none text-sm focus:outline-none"
+                  placeholder="Type a message..."
+                  value={chatInput}
+                  onChange={e => setChatInput(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleSendMessage()}
+                />
+                <button
+                  onClick={handleSendMessage}
+                  className="text-blue-600 font-semibold p-1 bg-blue-50 rounded hover:bg-blue-100 transition-colors"
+                >
+                  Send
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   // ── Helper Functions ───────────────────────────────────────────────────────
   const getCurrentUser = useCallback(() => {
@@ -976,10 +1357,16 @@ function ClientDashboard() {
   ];
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: '#EFF6FF', fontFamily: "'DM Sans', 'Segoe UI', system-ui, sans-serif" }}>
+    <div className="glass-theme-blue min-h-screen text-slate-900 overflow-hidden relative" style={{ fontFamily: "'DM Sans', 'Segoe UI', system-ui, sans-serif" }}>
+      <div className="video-background-container">
+        <video autoPlay loop muted playsInline className="video-background text-transparent">
+          <source src={backgroundVideo} type="video/mp4" />
+        </video>
+      </div>
+      <div className="relative z-10 flex min-h-screen">
 
       {/* ── Sidebar ── */}
-      <aside style={{ width: 220, background: '#1D4ED8', borderRight: '1px solid #1E3A8A', display: 'flex', flexDirection: 'column', position: 'sticky', top: 0, height: '100vh', overflowY: 'auto', flexShrink: 0 }}>
+      <aside className="glass-surface-strong border-r border-white/20 flex flex-col sticky top-0 h-screen overflow-y-auto shrink-0" style={{ width: 220 }}>
         {/* Logo */}
         <div style={{ padding: '24px 16px 20px', borderBottom: '1px solid rgba(255,255,255,0.12)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -1062,7 +1449,7 @@ function ClientDashboard() {
       <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
 
         {/* Top bar */}
-        <header style={{ background: 'white', borderBottom: '1px solid #E5E7EB', padding: '0 28px', height: 60, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 10 }}>
+        <header className="glass-surface border-b border-white/20 px-7 h-[60px] flex items-center justify-between sticky top-0 z-10">
           <div>
             <h1 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#111827' }}>
               {navItems.find(n => n.key === activeTab)?.label || t("client.nav.overview")}
@@ -1116,7 +1503,7 @@ function ClientDashboard() {
           {activeTab === 'dashboard' && (
             <div>
               {/* Welcome */}
-              <div style={{ background: 'linear-gradient(135deg, #1E3A8A 0%, #1D4ED8 50%, #2563EB 100%)', borderRadius: 16, padding: '28px 32px', marginBottom: 24, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'space-between', overflow: 'hidden', position: 'relative' }}>
+              <div className="glass-surface-strong rounded-2xl p-8 mb-6 text-white flex items-center justify-between overflow-hidden relative shadow-2xl border border-white/20">
                 <div style={{ position: 'absolute', right: -30, top: -30, width: 180, height: 180, borderRadius: '50%', background: 'rgba(255,255,255,0.05)' }} />
                 <div style={{ position: 'absolute', right: 40, bottom: -50, width: 220, height: 220, borderRadius: '50%', background: 'rgba(255,255,255,0.05)' }} />
                 <div style={{ position: 'relative' }}>
@@ -1144,7 +1531,7 @@ function ClientDashboard() {
               {/* Charts + Quick Actions */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 240px', gap: 16, marginBottom: 28 }}>
                 {/* Issues chart */}
-                <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 14, padding: '20px 24px' }}>
+                <div className="glass-surface rounded-2xl border border-white/10 p-6 shadow-lg">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
                     <div>
                       <div style={{ fontSize: 13, color: '#6B7280', fontWeight: 500 }}>Issues — Last 7 Days</div>
@@ -1171,7 +1558,7 @@ function ClientDashboard() {
                 </div>
 
                 {/* Quick actions */}
-                <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 14, padding: '20px' }}>
+                <div className="glass-surface-strong rounded-2xl border border-white/20 p-5 shadow-xl">
                   <div style={{ fontSize: 13, fontWeight: 700, color: '#111827', marginBottom: 14 }}>Quick Actions</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     <Btn onClick={() => setActiveTab('requests')} variant="outline" style={{ justifyContent: 'center', width: '100%' }}>All Requests</Btn>
@@ -1198,28 +1585,28 @@ function ClientDashboard() {
                 action={<button onClick={() => setActiveTab('requests')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#1D4ED8', fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>View all <Icon.ChevronRight /></button>} />
 
               {issues.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '48px 24px', background: 'white', border: '1px solid #E5E7EB', borderRadius: 14, color: '#9CA3AF' }}>
-                  <div style={{ fontSize: 40, marginBottom: 8 }}>📋</div>
-                  <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>No issues found</div>
-                  <div style={{ fontSize: 13 }}>Submit a new request to get started</div>
+                <div className="text-center py-20 bg-white/5 border border-white/10 rounded-2xl text-white/40 shadow-inner">
+                  <div className="text-5xl mb-4 grayscale opacity-50">📋</div>
+                  <div className="text-lg font-bold mb-1 text-white/50">No issues found</div>
+                  <div className="text-sm">Submit a new request to get started</div>
                 </div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div className="flex flex-col gap-4">
                   {issues.slice(0, 5).map(issue => {
                     const id = issue.id || issue._id;
                     return (
-                      <div key={id} style={{ background: 'white', border: issue.overdue ? '1px solid #FECACA' : '1px solid #E5E7EB', borderRadius: 12, padding: '16px 20px', display: 'flex', gap: 14 }}>
+                      <div key={id} className={`glass-surface border ${issue.overdue ? 'border-rose-500/30 bg-rose-500/5' : 'border-white/10'} rounded-2xl p-5 flex gap-5 transition-all hover:scale-[1.01] hover:shadow-xl group`}>
                         {/* Left accent */}
-                        <div style={{ width: 3, borderRadius: 4, background: issue.overdue ? '#EF4444' : issue.status?.includes('PROGRESS') ? '#3B82F6' : issue.status?.includes('COMPLETE') || issue.status === 'APPROVED' ? '#10B981' : '#F59E0B', flexShrink: 0 }} />
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 6 }}>
-                            <div style={{ fontWeight: 600, fontSize: 14, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{issue.title}</div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                        <div className={`w-1.5 rounded-full shadow-lg ${issue.overdue ? 'bg-rose-500 shadow-rose-500/40' : issue.status?.includes('PROGRESS') ? 'bg-blue-500 shadow-blue-500/40' : issue.status?.includes('COMPLETE') || issue.status === 'APPROVED' ? 'bg-emerald-500 shadow-emerald-500/40' : 'bg-amber-500 shadow-amber-500/40'} shrink-0`} />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-4 mb-3">
+                            <div className="font-extrabold text-base text-white truncate group-hover:text-blue-300 transition-colors">{issue.title}</div>
+                            <div className="flex items-center gap-3 shrink-0">
                               <StatusBadge status={issue.status} />
-                              {issue.overdue && <span style={{ fontSize: 11, fontWeight: 600, color: '#EF4444', background: '#FEF2F2', padding: '2px 7px', borderRadius: 20, border: '1px solid #FECACA' }}>Overdue</span>}
+                              {issue.overdue && <span className="text-[10px] font-black uppercase tracking-tighter text-rose-300 bg-rose-500/20 px-2 py-0.5 rounded-full border border-rose-500/30 animate-pulse">Overdue</span>}
                             </div>
                           </div>
-                          {issue.location && <div style={{ fontSize: 12, color: '#9CA3AF', marginBottom: 8 }}>{issue.location}</div>}
+                          {issue.location && <div className="text-xs font-bold text-white/40 uppercase tracking-widest mb-3 flex items-center gap-1.5"><MapPin className="w-3 h-3" /> {issue.location}</div>}
 
                           {/* Project images */}
                           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 10 }}>
@@ -1329,9 +1716,9 @@ function ClientDashboard() {
                   <Td key="n">{idx + 1}</Td>,
                   <Td key="t"><span style={{ fontWeight: 600, color: '#111827' }}>{issue.title || issue.summary || '—'}</span></Td>,
                   <Td key="img">
-                    {getImageUrl(issue.photo || issue.image || issue.beforePhoto) ? (
+                    {imageSrc(issue.photo || issue.image || issue.beforePhoto) ? (
                       <img
-                        src={getImageUrl(issue.photo || issue.image || issue.beforePhoto)}
+                        src={imageSrc(issue.photo || issue.image || issue.beforePhoto)}
                         alt={issue.title}
                         style={{ width: 48, height: 48, borderRadius: 6, objectFit: 'cover', border: '1px solid #E5E7EB' }}
                       />
@@ -1347,7 +1734,7 @@ function ClientDashboard() {
                   <Td key="c">{issue.createdAt ? new Date(issue.createdAt).toLocaleDateString() : '—'}</Td>,
                   <Td key="x">
                     <div style={{ display: 'flex', gap: 6 }}>
-                      <Btn size="sm" variant="outline" onClick={() => navigate(`/issues/${issue.id || issue._id}`)}>View</Btn>
+                      <Btn size="sm" variant="outline" onClick={() => setModalData({ open: true, type: 'issue', item: issue })}>View</Btn>
                       {currentUser?.role === 'client' && (
                         <Btn size="sm" variant="success" onClick={() => openIssueAssignModal(issue)}>Assign</Btn>
                       )}
@@ -1390,7 +1777,7 @@ function ClientDashboard() {
                     const firstItem = items[0] || {};
                     const isPending = req.status === 'FORWARDED' || req.status === 'PENDING';
                     return (
-                      <div key={reqId || idx} className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all overflow-hidden flex flex-col">
+                      <div key={reqId || idx} className="glass-surface rounded-2xl hover:shadow-md transition-all overflow-hidden flex flex-col">
                         <div className="p-5 flex-1">
                           <div className="flex justify-between items-start mb-4">
                             <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-full uppercase tracking-wider">
@@ -1414,7 +1801,7 @@ function ClientDashboard() {
                           <div className="bg-gray-50 rounded-xl p-3 mb-4">
                             <div className="flex justify-between items-center mb-2">
                               <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Details</span>
-                              <span className="text-[10px] font-black bg-white border border-gray-200 px-2 py-0.5 rounded shadow-sm">
+                              <span className="text-[10px] font-black glass-ghost px-2 py-0.5 rounded shadow-sm">
                                 Qty: {firstItem.quantity || req.quantity || 1}
                               </span>
                             </div>
@@ -1436,7 +1823,7 @@ function ClientDashboard() {
                         {isPending && (
                           <div className="p-3 bg-gray-50/50 border-t border-gray-50 flex gap-2">
                             <button onClick={() => handleApproveMaterial(reqId)} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-xl text-xs font-bold transition-colors shadow-sm">Approve</button>
-                            <button onClick={() => handleDeclineMaterial(reqId)} className="flex-1 bg-white hover:bg-rose-50 border border-gray-200 text-gray-600 hover:text-rose-600 py-2 rounded-xl text-xs font-bold transition-all">Decline</button>
+                            <button onClick={() => handleDeclineMaterial(reqId)} className="flex-1 glass-ghost hover:bg-rose-50 text-slate-700 hover:text-rose-600 py-2 rounded-xl text-xs font-bold transition-all">Decline</button>
                           </div>
                         )}
                       </div>
@@ -2141,6 +2528,16 @@ function ClientDashboard() {
           </div>
         </div>
       )}
+
+      {/* Details Modal */}
+      <DetailsModal
+        open={modalData.open}
+        type={modalData.type}
+        item={modalData.item}
+        onClose={() => setModalData({ open: false, type: '', item: null })}
+        getAssignedTechName={getAssignedName}
+      />
+      </div>
     </div>
   );
 }
@@ -2216,7 +2613,7 @@ const ClientPartsTab = () => {
           <p className="text-sm text-gray-500 mt-0.5">Manage parts, stock levels and locations</p>
         </div>
         <div className="flex items-center gap-3">
-          <button onClick={exportCSV} className="px-3 py-2 bg-white border rounded-xl text-sm font-semibold hover:bg-gray-50">Export CSV</button>
+          <button onClick={exportCSV} className="px-3 py-2 glass-ghost rounded-xl text-sm font-semibold hover:bg-white/70">Export CSV</button>
           <button onClick={() => fileRef.current?.click()} className="px-3 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold">Import</button>
           <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={e => handleImport(e.target.files?.[0])} />
         </div>
@@ -2225,7 +2622,7 @@ const ClientPartsTab = () => {
         <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" /></svg>
         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search parts..." className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
       </div>
-      <div className="bg-white rounded-lg border border-gray-100 overflow-hidden shadow-sm">
+      <div className="glass-surface rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead className="bg-[#fcfcfd] border-b border-gray-100">
@@ -2272,9 +2669,9 @@ const ClientPurchaseOrdersTab = () => {
           <h2 className="text-xl font-bold text-gray-900">Purchase Orders</h2>
           <p className="text-sm text-gray-500 mt-0.5">Create, view and export purchase orders</p>
         </div>
-        <button onClick={exportCSV} className="px-3 py-2 bg-white border rounded-xl text-sm font-semibold hover:bg-gray-50">Export CSV</button>
+        <button onClick={exportCSV} className="px-3 py-2 glass-ghost rounded-xl text-sm font-semibold hover:bg-white/70">Export CSV</button>
       </div>
-      <div className="bg-white rounded-lg border border-gray-100 overflow-hidden shadow-sm">
+      <div className="glass-surface rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead className="bg-[#fcfcfd] border-b border-gray-100">
@@ -2329,7 +2726,7 @@ const ClientAnalyticsTab = ({ allIssues = [] }) => {
           </div>
         ))}
       </div>
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+      <div className="glass-surface rounded-xl p-5">
         <p className="text-sm font-bold text-gray-900 mb-4">Issues — Last 7 Days</p>
         <div className="flex items-end gap-2" style={{ height: 80 }}>
           {bars.map((b, i) => (
@@ -2340,7 +2737,7 @@ const ClientAnalyticsTab = ({ allIssues = [] }) => {
           ))}
         </div>
       </div>
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+      <div className="glass-surface rounded-xl p-5">
         <p className="text-sm font-bold text-gray-900 mb-4">Status Breakdown</p>
         <div className="flex flex-col gap-3">
           {[
@@ -2386,7 +2783,7 @@ const ClientMetersTab = () => {
       {showAdd && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={() => setShowAdd(false)} />
-          <div className="relative bg-white rounded-xl p-6 w-full max-w-md shadow-xl z-10">
+          <div className="relative glass-surface-strong rounded-xl p-6 w-full max-w-md z-10">
             <h3 className="text-lg font-bold mb-3">Add Meter</h3>
             <div className="flex flex-col gap-2">
               <input value={newMeter.name} onChange={e => setNewMeter({ ...newMeter, name: e.target.value })} placeholder="Name" className="p-2 border rounded" />
@@ -2399,7 +2796,7 @@ const ClientMetersTab = () => {
                 <input value={newMeter.unit} onChange={e => setNewMeter({ ...newMeter, unit: e.target.value })} className="p-2 border rounded w-24" />
               </div>
               <div className="flex justify-end gap-2 mt-3">
-                <button onClick={() => setShowAdd(false)} className="px-3 py-2 bg-white border rounded">Cancel</button>
+                <button onClick={() => setShowAdd(false)} className="px-3 py-2 glass-ghost rounded">Cancel</button>
                 <button onClick={async () => { try { const res = await api.post('/api/meters', newMeter); setMeters(p => [res.data, ...p]); setShowAdd(false); setNewMeter({ name: '', type: 'Electricity', reading: 0, unit: 'kWh', status: 'Normal', location: '' }); } catch { alert('Failed to add meter'); } }} className="px-3 py-2 bg-blue-600 text-white rounded">Create</button>
               </div>
             </div>
@@ -2424,10 +2821,10 @@ const ClientMetersTab = () => {
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search meters..." className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
         </div>
         <div className="flex bg-gray-100 rounded-xl p-1">
-          {types.map(t => <button key={t} onClick={() => setFilter(t)} className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors ${filter === t ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>{t}</button>)}
+          {types.map(t => <button key={t} onClick={() => setFilter(t)} className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors ${filter === t ? 'bg-white/70 shadow-sm text-gray-900 backdrop-blur' : 'text-gray-500 hover:text-gray-700'}`}>{t}</button>)}
         </div>
       </div>
-      <div className="bg-white rounded-lg border border-gray-100 overflow-hidden shadow-sm">
+      <div className="glass-surface rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead className="bg-[#fcfcfd] border-b border-gray-100">
@@ -2479,7 +2876,7 @@ const ClientEdgeTab = () => {
       {showAdd && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={() => setShowAdd(false)} />
-          <div className="relative bg-white rounded-xl p-6 w-full max-w-md shadow-xl z-10">
+          <div className="relative glass-surface-strong rounded-xl p-6 w-full max-w-md z-10">
             <h3 className="text-lg font-bold mb-3">Add Device</h3>
             <div className="flex flex-col gap-2">
               <input value={newDevice.name} onChange={e => setNewDevice({ ...newDevice, name: e.target.value })} placeholder="Device name" className="p-2 border rounded" />
@@ -2488,7 +2885,7 @@ const ClientEdgeTab = () => {
               </select>
               <input value={newDevice.location} onChange={e => setNewDevice({ ...newDevice, location: e.target.value })} placeholder="Location" className="p-2 border rounded" />
               <div className="flex justify-end gap-2 mt-3">
-                <button onClick={() => setShowAdd(false)} className="px-3 py-2 bg-white border rounded">Cancel</button>
+                <button onClick={() => setShowAdd(false)} className="px-3 py-2 glass-ghost rounded">Cancel</button>
                 <button onClick={async () => { try { const res = await api.post('/api/devices', newDevice); setDevices(p => [res.data, ...p]); setShowAdd(false); } catch { alert('Failed to add device'); } }} className="px-3 py-2 bg-blue-600 text-white rounded">Create</button>
               </div>
             </div>
@@ -2513,10 +2910,10 @@ const ClientEdgeTab = () => {
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search devices..." className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
         </div>
         <div className="flex bg-gray-100 rounded-xl p-1">
-          {statuses.map(s => <button key={s} onClick={() => setFilter(s)} className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 ${filter === s ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>{s !== 'All' && <span className={`w-1.5 h-1.5 rounded-full ${s === 'Online' ? 'bg-emerald-500' : 'bg-gray-400'}`} />}{s}</button>)}
+          {statuses.map(s => <button key={s} onClick={() => setFilter(s)} className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 ${filter === s ? 'bg-white/70 shadow-sm text-gray-900 backdrop-blur' : 'text-gray-500 hover:text-gray-700'}`}>{s !== 'All' && <span className={`w-1.5 h-1.5 rounded-full ${s === 'Online' ? 'bg-emerald-500' : 'bg-gray-400'}`} />}{s}</button>)}
         </div>
       </div>
-      <div className="bg-white rounded-lg border border-gray-100 overflow-hidden shadow-sm">
+      <div className="glass-surface rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead className="bg-[#fcfcfd] border-b border-gray-100">
@@ -2544,3 +2941,8 @@ const ClientEdgeTab = () => {
 };
 
 export default ClientDashboard;
+
+
+
+
+
