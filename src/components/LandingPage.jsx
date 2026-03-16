@@ -1,93 +1,293 @@
+import React from 'react';
+import AuthHeader from './auth/AuthHeader';
 
-
-const roles = [
+const products = [
   {
-    icon: (
-      <svg width="56" height="56" viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="28" cy="28" r="28" fill="#F1F6FF"/>
-        <circle cx="28" cy="22" r="8" fill="#2563eb"/>
-        <rect x="14" y="34" width="28" height="10" rx="5" fill="#dbeafe"/>
-        <rect x="18" y="38" width="20" height="4" rx="2" fill="#2563eb"/>
-      </svg>
-    ),
-    title: "Tenant",
-    description: "Report and track maintenance issues",
+    name: 'CMMS',
+    label: 'CMMS',
+    description:
+      'Mobile-first maintenance management that turns reactive firefighting into proactive operations. Create work orders in seconds, automate PMs, and give your team real-time visibility from any device.'
   },
   {
-    icon: (
-      <svg width="56" height="56" viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="28" cy="28" r="28" fill="#F5F1FF"/>
-        <rect x="16" y="28" width="24" height="14" rx="4" fill="#a78bfa"/>
-        <rect x="20" y="20" width="16" height="8" rx="2" fill="#ede9fe"/>
-        <rect x="24" y="12" width="8" height="8" rx="2" fill="#8b5cf6"/>
-        <rect x="22" y="36" width="12" height="4" rx="2" fill="#8b5cf6"/>
-      </svg>
-    ),
-    title: "Property Owner/Manager",
-    description: "Manage properties and oversee maintenance",
+    name: 'UpKeep Intelligence',
+    label: 'Intelligence',
+    description:
+      'Embedded AI tools that eliminate busywork and surface insights your team would never find manually. From smart scheduling to predictive recommendations, Intelligence helps you work faster and smarter without extra setup.'
   },
   {
-    icon: (
-      <svg width="56" height="56" viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="28" cy="28" r="28" fill="#ECFDF5"/>
-        <circle cx="28" cy="28" r="12" fill="#6ee7b7"/>
-        <g>
-          <circle cx="28" cy="28" r="6" fill="#059669"/>
-          <rect x="27" y="18" width="2" height="6" rx="1" fill="#059669"/>
-          <rect x="27" y="32" width="2" height="6" rx="1" fill="#059669"/>
-          <rect x="18" y="27" width="6" height="2" rx="1" fill="#059669"/>
-          <rect x="32" y="27" width="6" height="2" rx="1" fill="#059669"/>
-        </g>
-        <circle cx="28" cy="28" r="3" fill="#ECFDF5"/>
-      </svg>
-    ),
-    title: "Technician",
-    description: "Handle and complete maintenance tasks",
+    name: 'Studio',
+    label: 'Studio',
+    description:
+      'Custom app platform that lets anyone on your team build exactly the tools they need or install from 30+ ready-made apps, all running on your existing data, permissions, and security. No code. No IT. No limits.'
   },
+  {
+    name: 'EHS',
+    label: 'Environment, Health, & Safety Software',
+    description:
+      'Capture safety events in seconds with voice-to-text reporting that works in any language. Automated OSHA logs, AI-powered CAPAs, and instant audit trails help you reduce incidents and stay compliant.'
+  },
+  {
+    name: 'UpKeep Edge',
+    label: 'Edge',
+    description:
+      'Wireless IoT sensors that monitor your assets 24/7 and automatically create work orders when conditions change. Install in hours, not months, and avoid hardwiring or data science overhead.'
+  },
+  {
+    name: 'UpKeep Fleet',
+    label: 'Fleet',
+    description:
+      'Vehicle maintenance management that connects telematics data to work orders through real-time integrations and automated PM scheduling. Instant VIN lookup, digital inspections, and complete vehicle history in one system.'
+  },
+  {
+    name: 'UpKeep LMS',
+    label: 'Learning Management Software',
+    description:
+      'Enable your frontline team to access job-relevant training, track certifications, and prove compliance. No more spreadsheets, delays, or one-size-fits-all courses.'
+  }
 ];
 
+const pricingPlans = [
+  {
+    name: 'Essential',
+    price: '$20',
+    period: '/user/mo',
+    description: 'Small teams or single-site operations getting off spreadsheets and paper for the first time.',
+    features: ['Unlimited work orders', 'Unlimited locations', 'Nova AI'],
+    cta: 'Try for free'
+  },
+  {
+    name: 'Premium',
+    price: '$55',
+    period: '/user/mo',
+    description: 'Growing maintenance teams ready to move from reactive to preventive maintenance.',
+    features: [
+      'UpKeep Studio',
+      'PM scheduling',
+      'Custom checklists',
+      'Parts & inventory with costing',
+      'Time & labor tracking',
+      '30-day analytics history'
+    ],
+    cta: 'Try for free'
+  },
+  {
+    name: 'Professional',
+    price: 'Request a Quote',
+    badge: 'Most Popular',
+    description: 'Departments managing multiple asset types, needing field mobility and deeper analytics.',
+    features: [
+      'Mobile offline mode',
+      'External request portal',
+      'Full analytics history',
+      'Asset lifecycle tracking',
+      'Signature capture for compliance'
+    ],
+    cta: 'Schedule a Demo'
+  },
+  {
+    name: 'Enterprise',
+    price: 'Request a Quote',
+    description: 'Multi-site organizations needing automation, integrations, and governance controls.',
+    features: [
+      'Multi-site module support',
+      'Workflow automation',
+      'Reliability & downtime tracking',
+      'PO management',
+      'API & custom integrations',
+      'SSO & custom roles',
+      'Custom dashboards'
+    ],
+    cta: 'Schedule a Demo'
+  }
+];
 
 const LandingPage = () => {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-indigo-50">
-      {/* Navbar */}
-      <nav className="flex items-center justify-between bg-white shadow px-8 h-16">
-        <div className="flex items-center gap-3">
-          <span className="text-3xl text-indigo-600">🏢</span>
-          <span className="text-lg font-semibold text-gray-900">Define MVP Features</span>
+    <div className="landing-page">
+      <AuthHeader />
+
+      <section className="landing-hero">
+        <div className="landing-hero-content">
+          <div className="landing-kicker">CONNECTED. INTELLIGENT. ADAPTABLE.</div>
+          <h1 className="landing-title">The modern platform for asset operations</h1>
+          <p className="landing-subtitle">
+            Fixnest brings maintenance, safety, and asset data into one platform. Your teams see what
+            matters. AI helps them act on it. Everything works together, and nothing falls through the cracks.
+          </p>
+          <div className="landing-cta-row">
+            <a className="landing-cta" href="/register">Start a Free Trial</a>
+            <a className="landing-cta landing-cta--ghost" href="/pricing">Request a Demo</a>
+          </div>
         </div>
-        <div className="flex gap-3">
-          <a href="/login" className="px-4 py-2 rounded-lg bg-white border border-indigo-200 text-indigo-700 font-semibold hover:bg-indigo-50">Login</a>
-          <a href="/register" className="px-4 py-2 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-700">Sign Up</a>
-        </div>
-      </nav>
-      {/* Header */}
-      <header className="text-center mt-12 mb-6">
-        <h1 className="text-4xl font-bold flex items-center justify-center gap-3">
-          <span className="text-indigo-600 text-4xl">🏢</span>
-          Property Maintenance System
-        </h1>
-        <p className="text-lg text-gray-600 mt-3">Ensuring issues are fixed on time</p>
-        <button className="mt-4 bg-white border border-indigo-100 rounded-xl px-6 py-2 text-base font-medium shadow inline-flex items-center gap-2 hover:bg-indigo-50">
-          <span role="img" aria-label="globe">🌐</span> Kinyarwanda
-        </button>
-      </header>
-      {/* Main */}
-      <main className="max-w-4xl mx-auto text-center mt-8">
-        <h2 className="text-2xl font-semibold mb-8">Select your role to continue</h2>
-        <div className="flex flex-row justify-center gap-8 flex-nowrap overflow-x-auto pb-4">
-          {roles.map((role) => (
-            <div
-              className="bg-white border border-indigo-100 rounded-2xl px-10 py-12 min-w-[240px] max-w-xs shadow hover:shadow-lg transition flex flex-col items-center cursor-pointer"
-              key={role.title}
-            >
-              <div className="mb-4">{role.icon}</div>
-              <div className="font-semibold text-lg mb-2">{role.title}</div>
-              <div className="text-gray-600 text-base">{role.description}</div>
+        <div className="landing-hero-media">
+          <div className="hero-photo">
+            <div className="hero-card hero-card--task">
+              <div className="hero-card-title">Seasonal Electrical Connection Audit</div>
+              <div className="hero-card-meta">Open · 1 hour</div>
             </div>
+            <div className="hero-card hero-card--metrics">
+              <div className="hero-card-title">Completion Rate</div>
+              <div className="hero-card-metric">84% Completed</div>
+              <div className="hero-card-graph" />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="landing-logos">
+        <div className="landing-logos-title">TRUSTED BY 4,000+ BUSINESSES</div>
+        {/* <div className="landing-logos-row">
+          <div className="logo-pill">Unilever</div>
+          <div className="logo-pill">Pepsi</div>
+          <div className="logo-pill">Chevron</div>
+          <div className="logo-pill">Caterpillar</div>
+          <div className="logo-pill">Shell</div>
+          <div className="logo-pill">Yamaha</div>
+          <div className="logo-pill">Stratasys</div>
+        </div> */}
+      </section>
+
+      <section className="landing-section landing-products">
+        <div className="landing-section-header">
+          <div className="landing-section-title">Our Products</div>
+          <a className="landing-section-cta" href="/pricing">Request a Demo</a>
+        </div>
+        <div className="product-grid">
+          {products.map((product) => (
+            <article key={product.name} className="product-card">
+              <div className="product-label">{product.label}</div>
+              <h3 className="product-title">{product.name}</h3>
+              <p className="product-description">{product.description}</p>
+              <button className="product-link" type="button">Learn More</button>
+            </article>
           ))}
         </div>
-      </main>
+      </section>
+
+      <section className="landing-section landing-pricing">
+        <div className="landing-section-header">
+          <div>
+            <div className="landing-kicker">UPKEEP PRICING</div>
+            <div className="landing-section-title">Plans for Every Team</div>
+          </div>
+        </div>
+        <div className="pricing-grid">
+          {pricingPlans.map((plan) => (
+            <article
+              key={plan.name}
+              className={`pricing-card${plan.badge ? ' pricing-card--featured' : ''}`}
+            >
+              {plan.badge ? <div className="pricing-badge">{plan.badge}</div> : null}
+              <div className="pricing-name">{plan.name}</div>
+              <div className="pricing-price">
+                {plan.price}
+                {plan.period ? <span className="pricing-period">{plan.period}</span> : null}
+              </div>
+              <p className="pricing-description">{plan.description}</p>
+              <div className="pricing-feature-list">
+                {plan.features.map((feature) => (
+                  <div key={feature} className="pricing-feature">
+                    <span className="pricing-check" aria-hidden="true" />
+                    <span>{feature}</span>
+                  </div>
+                ))}
+              </div>
+              <button className="pricing-cta" type="button">{plan.cta}</button>
+              <div className="pricing-note">No Credit Card Required.</div>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="landing-section landing-integrations">
+        <div className="integration-card">
+          <div className="integration-text">
+            <div className="landing-kicker">INTEGRATIONS</div>
+            <h2>Connects to what you already use.</h2>
+            <p>
+              Plug into your ERP, sensors, and other systems without disruption. One data foundation
+              across everything.
+            </p>
+          </div>
+          <div className="integration-visual">
+            <div className="integration-node">CMMS</div>
+            <div className="integration-node">Fleet</div>
+            <div className="integration-node">Edge</div>
+            <div className="integration-node">EHS</div>
+            <div className="integration-node">LMS</div>
+            <div className="integration-core">Nova Agent</div>
+          </div>
+        </div>
+      </section>
+
+      <section className="landing-section landing-ai">
+        <div className="ai-panel">
+          <div className="ai-text">
+            <h2>Automate the tedious. Accelerate the complex.</h2>
+            <p>
+              Give your team AI that does real work. Nova handles routine tasks and surfaces insights
+              that used to take hours.
+            </p>
+            <div className="ai-cta-row">
+              <a className="landing-cta" href="/register">Start a Free Trial</a>
+              <a className="landing-cta landing-cta--ghost" href="/pricing">Request a Demo</a>
+            </div>
+          </div>
+          <div className="ai-visual">
+            <div className="ai-orb">Hi</div>
+            <div className="ai-chat">
+              <div className="ai-chat-title">How can I help?</div>
+              <div className="ai-input">Create a dashboard to display analytics...</div>
+              <div className="ai-actions">
+                <span className="ai-chip" />
+                <span className="ai-chip" />
+                <span className="ai-chip ai-chip--send" />
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="ai-cards">
+          <div className="ai-card">
+            <h3>Easily Complete Work Orders from Anywhere</h3>
+            <p>
+              Create work orders in seconds with photos, checklists, and real-time updates from any device.
+              Technicians close work on the spot, reducing admin time and improving response speed.
+            </p>
+          </div>
+          <div className="ai-card">
+            <h3>Stay Ahead of Breakdowns with Automated PMs</h3>
+            <p>
+              Shift from reactive firefighting to proactive planning with automated schedules based on actual usage.
+              Smart scheduling keeps assets running longer and minimizes downtime.
+            </p>
+          </div>
+          <div className="ai-card">
+            <h3>Turn Safety Events into Preventive Action</h3>
+            <p>
+              Report safety events from any device - just scan a QR code, no downloads or logins needed.
+              AI turns incidents into preventive actions so small issues do not become big problems.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="landing-section landing-proof">
+        <div className="landing-proof-content">
+          <div className="landing-section-title">Leading the Way to a Better Future for Maintenance and Reliability</div>
+          <p>
+            Your asset and equipment data does not belong in a silo. Fixnest makes it simple to see where everything
+            stands, all in one place. That means less guesswork and more time to focus on what matters.
+          </p>
+          <div className="landing-cta-row">
+            <a className="landing-cta" href="/register">Start a Free Trial</a>
+            <a className="landing-cta landing-cta--ghost" href="/pricing">Request a Demo</a>
+          </div>
+          <div className="landing-badges">
+            <span className="badge-pill">IDC CMMS Leader 2021</span>
+            <span className="badge-pill">Gartner Peer Insights</span>
+          </div>
+        </div>
+      </section>
     </div>
   );
 };

@@ -185,6 +185,8 @@ const TechnicianDashboard = () => {
     quantity: 1,
     urgency: "MEDIUM"
   });
+  const [chatInput, setChatInput] = useState('');
+  const [chatSending, setChatSending] = useState(false);
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -196,11 +198,13 @@ const TechnicianDashboard = () => {
   const handleAfterSuccess = (jobId) => {
     setShowAfterForm((prev) => ({ ...prev, [jobId]: false }));
     fetchAssignedIssues();
+    window.dispatchEvent(new CustomEvent('issueStatusUpdated', { detail: { id: jobId, status: 'COMPLETE' } }));
   };
 
   const handleBeforeSuccess = (jobId) => {
     setShowBeforeForm((prev) => ({ ...prev, [jobId]: false }));
     fetchAssignedIssues();
+    window.dispatchEvent(new CustomEvent('issueStatusUpdated', { detail: { id: jobId, status: 'IN_PROGRESS' } }));
   };
 
   const handleStartWork = (jobId) => {
@@ -384,6 +388,51 @@ const TechnicianDashboard = () => {
       setReminders(upcomingSchedules); // Maintain for any components still using it
     } catch (err) {
       console.warn('Failed to fetch alerts:', err);
+    }
+  };
+
+  const updateJobStatus = async (job, status) => {
+    if (!job) return;
+    const id = job._id || job.id;
+    try {
+      const baseChat = Array.isArray(job.chat) ? job.chat : [];
+      const statusMsg = `Status changed to ${status.replace('_', ' ')}`;
+      const message = { text: statusMsg, sender: user.name || 'Technician', role: user.role || 'technician', timestamp: new Date().toISOString() };
+      const chat = [...baseChat, message];
+      setJobs(prev => prev.map(j => (String(j._id || j.id) === String(id) ? { ...j, status, chat } : j)));
+      if (selectedJob && String(selectedJob._id || selectedJob.id) === String(id)) {
+        setSelectedJob({ ...selectedJob, status, chat });
+      }
+      await api.put(`/api/issues/${id}`, { status, chat });
+      window.dispatchEvent(new CustomEvent('issueStatusUpdated', { detail: { id, status, chat } }));
+    } catch (err) {
+      console.error('Failed to update status', err);
+      alert('Could not update status');
+    }
+  };
+
+  const sendChatMessage = async () => {
+    if (!selectedJob || !chatInput.trim()) return;
+    const id = selectedJob._id || selectedJob.id;
+    const newMessage = {
+      text: chatInput.trim(),
+      sender: user.name || 'Technician',
+      role: user.role || 'technician',
+      timestamp: new Date().toISOString()
+    };
+    const updatedChat = [...(selectedJob.chat || []), newMessage];
+    setChatSending(true);
+    setChatInput('');
+    setSelectedJob({ ...selectedJob, chat: updatedChat });
+    setJobs(prev => prev.map(j => (String(j._id || j.id) === String(id) ? { ...j, chat: updatedChat } : j)));
+    try {
+      await api.put(`/api/issues/${id}`, { chat: updatedChat });
+      window.dispatchEvent(new CustomEvent('issueStatusUpdated', { detail: { id, chat: updatedChat } }));
+    } catch (err) {
+      console.error('Failed to send chat', err);
+      alert('Could not send chat message');
+    } finally {
+      setChatSending(false);
     }
   };
 
@@ -1070,6 +1119,40 @@ const TechnicianDashboard = () => {
                         <p className="text-sm text-slate-900">{selectedJob.evidence.address}</p>
                       </div>
                     )}
+                  </div>
+                </div>
+
+                {/* Side chat with client/requestor */}
+                <div className="border-t pt-4">
+                  <h3 className="font-semibold text-slate-700 mb-2">Chat with client</h3>
+                  <div className="max-h-52 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                    {(selectedJob.chat || []).length === 0 && (
+                      <div className="text-sm text-slate-400">No messages yet. Start the conversation.</div>
+                    )}
+                    {(selectedJob.chat || []).map((m, idx) => (
+                      <div key={idx} className="p-2 rounded-lg border border-slate-100 bg-white/80">
+                        <div className="flex items-center justify-between text-[11px] text-slate-500 mb-1">
+                          <span className="font-semibold text-slate-700">{m.sender || 'User'}{m.role ? ` · ${m.role}` : ''}</span>
+                          <span>{m.timestamp ? new Date(m.timestamp).toLocaleString() : ''}</span>
+                        </div>
+                        <div className="text-sm text-slate-800 whitespace-pre-wrap">{m.text}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2 mt-3">
+                    <input
+                      value={chatInput}
+                      onChange={e => setChatInput(e.target.value)}
+                      placeholder="Type a message for the client…"
+                      className="flex-1 px-3 py-2 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-blue-500/50 outline-none"
+                    />
+                    <button
+                      onClick={sendChatMessage}
+                      disabled={chatSending || !chatInput.trim()}
+                      className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold shadow-sm disabled:opacity-50"
+                    >
+                      {chatSending ? 'Sending…' : 'Send'}
+                    </button>
                   </div>
                 </div>
 

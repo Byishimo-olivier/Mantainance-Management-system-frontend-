@@ -2,9 +2,12 @@ import React, { useState } from 'react'; // Deployment trigger commit
 import { Routes, Route, useParams, useNavigate, Navigate } from 'react-router-dom';
 import Login from './components/auth/Login';
 import Register from './components/auth/Register';
+import SsoLogin from './components/auth/SsoLogin';
 import ForgotPassword from './components/auth/ForgotPassword';
 import ResetPassword from './components/auth/ResetPassword';
+import AcceptInvite from './components/auth/AcceptInvite';
 import Dashboard from './Dashboard';
+import Pricing from './components/Pricing';
 import LandingPage from './components/LandingPage';
 import AllIssues from './components/AllIssues';
 import NewIssue from './components/NewIssue';
@@ -64,11 +67,13 @@ function App() {
     <LanguageProvider>
       <div className="glass-app glass-theme-blue">
         <Routes>
-          <Route path="/" element={<Navigate to="/login" replace />} />
-          <Route path="/Home" element={<LandingPage />} />
+          <Route path="/" element={<LandingPage />} />
           <Route path="/dashboard" element={<Dashboard user={auth?.user} />} />
           <Route path="/login" element={<Login onLogin={handleLogin} />} />
+          <Route path="/sso-login" element={<SsoLogin />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/accept-invite" element={<AcceptInvite />} />
+          <Route path="/pricing" element={<Pricing />} />
           <Route path="/dashboard" element={auth ? (
             auth.user?.role === 'admin' ? (
               <Navigate to="/admin-dashboard" replace />

@@ -14,6 +14,6 @@ export default function Dashboard({ user }) {
     return <Navigate to="/technician-dashboard" replace />;
   } else if (user?.role === 'client') {
     return <ClientDashboard user={user} />;
-  }
+  } 
   return <ClientDashboard user={user} />;
 }

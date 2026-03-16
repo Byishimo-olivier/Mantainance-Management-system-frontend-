@@ -1,19 +1,22 @@
-
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import api from '../../api/axios';
 import backgroundVideo from '../../assets/136906-765457769_small.mp4';
-
+import AuthHeader from './AuthHeader';
 
 export default function Login({ onLogin }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
+  const isSubmitDisabled = isSubmitting || !email || !password;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isSubmitting) return;
     setError('');
+    setIsSubmitting(true);
     try {
       const res = await api.post('/api/auth/login', { email, password });
       const data = res.data;
@@ -37,57 +40,77 @@ export default function Login({ onLogin }) {
     } catch (err) {
       console.error(err);
       setError(err.response?.data?.error || 'Login failed');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center glass-theme-blue relative overflow-hidden">
+    <div className="auth-shell auth-shell--with-header">
+      <AuthHeader />
       <div className="video-background-container">
-        <video autoPlay loop muted playsInline>
+        <video autoPlay loop muted playsInline className="video-background">
           <source src={backgroundVideo} type="video/mp4" />
         </video>
         <div className="video-overlay" />
       </div>
       <form
         onSubmit={handleSubmit}
-        className="glass-surface-strong p-8 rounded-2xl shadow-2xl border border-white/30 min-w-[320px] max-w-[380px] w-full relative z-10"
+        className="auth-card auth-card--narrow"
       >
-        <h2 className="text-center mb-6 text-gray-900 font-black text-2xl">Sign In</h2>
-        <div className="mb-4">
-          <label htmlFor="email" className="block mb-2 text-gray-600 font-semibold">Email</label>
+        <div className="auth-header auth-header--left">
+          <h1 className="auth-title auth-title--left">Log In</h1>
+          <p className="auth-subtitle auth-subtitle--left">Continue to Fixnest</p>
+        </div>
+
+        <div className="auth-field">
+          <label htmlFor="email" className="auth-label">Email</label>
           <input
             id="email"
             type="email"
             value={email}
             onChange={e => setEmail(e.target.value)}
             placeholder="Enter your email"
+            autoComplete="email"
             required
-            className="w-full rounded-xl glass-input px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-300/60 focus:border-blue-400 outline-none"
+            className="auth-input"
           />
         </div>
-        <div className="mb-6">
-          <label htmlFor="password" className="block mb-2 text-gray-600 font-semibold">Password</label>
+
+        <div className="auth-field">
+          <div className="auth-label-row">
+            <label htmlFor="password" className="auth-label">Password</label>
+            <Link to="/forgot-password" className="auth-link auth-link--sm">Forgot Password?</Link>
+          </div>
           <input
             id="password"
             type="password"
             value={password}
             onChange={e => setPassword(e.target.value)}
             placeholder="Enter your password"
+            autoComplete="current-password"
             required
-            className="w-full rounded-xl glass-input px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-300/60 focus:border-blue-400 outline-none"
+            className="auth-input"
           />
         </div>
-        <div className="text-right mt-4 mb-6">
-          <a href="/forgot-password" className="text-blue-600 font-semibold mr-4 hover:underline">Forgot password?</a>
-        </div>
+
         <button
           type="submit"
-          className="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-bold text-base cursor-pointer mb-2 shadow-lg hover:from-blue-700 hover:to-indigo-700 transition-colors"
-        >Login</button>
-        {error && <div className="text-rose-500 text-center mt-2 font-semibold">{error}</div>}
-        {/* <div className="text-center mt-4">
-          <a href="/register" className="text-indigo-500 font-medium hover:underline text-sm italic">If you don't have an account, Sign up</a>
-        </div> */}
+          className="auth-primary-btn"
+          disabled={isSubmitDisabled}
+        >
+          {isSubmitting ? 'Logging in...' : 'Log in'}
+        </button>
+
+        {error && <div className="auth-error">{error}</div>}
+
+        <div className="auth-divider-with-text"><span>or</span></div>
+
+        <Link to="/sso-login" className="auth-ghost-btn auth-ghost-link">Continue with SSO</Link>
+
+        <div className="auth-footer">
+          New to Fixnest? <Link to="/register" className="auth-link">Sign up</Link>
+        </div>
       </form>
     </div>
   );
