@@ -1,0 +1,41 @@
+ 7766:           <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg> Add Device
+ 7767:         </button>
+ 7768:       </div>
+ 7769:       {showAdd && (
+ 7770:         <div className="relative glass-surface-strong rounded-xl p-6 w-full max-w-md z-10">
+ 7771:           <h3 className="text-lg font-bold mb-3">Add Device</h3>
+ 7772:           <div className="flex flex-col gap-2">
+ 7773:             <input value={newDevice.name} onChange={e => setNewDevice({ ...newDevice, name: e.target.value })} placeholder="Device name" className="p-2 border rounded" />
+ 7774:             <select value={newDevice.type} onChange={e => setNewDevice({ ...newDevice, type: e.target.value })} className="p-2 border rounded">
+ 7775:               {Object.keys(typeIcon).map(t => <option key={t}>{t}</option>)}
+ 7776:             </select>
+ 7777:             <input value={newDevice.location} onChange={e => setNewDevice({ ...newDevice, location: e.target.value })} placeholder="Location" className="p-2 border rounded" />
+ 7778:             <div className="flex justify-end gap-2 mt-3">
+ 7779:               <button onClick={() => setShowAdd(false)} className="px-3 py-2 glass-ghost rounded">Cancel</button>
+ 7780:               <button onClick={async () => { try { const res = await api.post("/api/devices", newDevice); setDevices(p => [res.data, ...p]); setShowAdd(false); } catch { alert("Failed to add device"); } }} className="px-3 py-2 bg-blue-600 text-white rounded">Create</button>
+ 7781:             </div>
+ 7782:           </div>
+ 7783:         </div>
+ 7784:       )}
+ 7785:       )}
+ 7786:       <div className="grid grid-cols-3 gap-4">
+ 7787:         {[
+ 7788:           { label: 'Total Devices', value: devices.length, icon: 'ð¥ï¸', color: 'from-blue-50 to-indigo-50 border-blue-100' },
+ 7789:           { label: 'Online', value: online, icon: 'ð¢', color: 'from-emerald-50 to-green-50 border-emerald-100' },
+ 7790:           { label: 'Offline', value: devices.length - online, icon: 'ð´', color: 'from-rose-50 to-pink-50 border-rose-100' },
+ 7791:         ].map(c => (
+ 7792:           <div key={c.label} className={`bg-gradient-to-br ${c.color} border rounded-xl p-4 flex items-center gap-4`}>
+ 7793:             <span className="text-3xl">{c.icon}</span>
+ 7794:             <div><p className="text-xs font-bold text-gray-500 uppercase tracking-wider">{c.label}</p><p className="text-2xl font-black text-gray-900 mt-0.5">{c.value}</p></div>
+ 7795:           </div>
+ 7796:         ))}
+ 7797:       </div>
+ 7798:       <div className="flex items-center gap-3">
+ 7799:         <div className="relative flex-1 max-w-xs">
+ 7800:           <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" /></svg>
+ 7801:           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search devices..." className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+ 7802:         </div>
+ 7803:         <div className="flex bg-gray-100 rounded-xl p-1">
+ 7804:           {statuses.map(s => <button key={s} onClick={() => setFilter(s)} className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 ${filter === s ? 'bg-white/70 shadow-sm text-gray-900 backdrop-blur' : 'text-gray-500 hover:text-gray-700'}`}>{s !== 'All' && <span className={`w-1.5 h-1.5 rounded-full ${s === 'Online' ? 'bg-emerald-500' : 'bg-gray-400'}`} />}{s}</button>)}
+ 7805:         </div>
+ 7806:       </div>

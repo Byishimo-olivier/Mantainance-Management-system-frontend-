@@ -1,10 +1,36 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import backgroundVideo from "../assets/136906-765457769_small.mp4";
 import api from "../api/axios";
 import { getImageUrl } from '../utils/imageUrl';
 import { useNavigate } from 'react-router-dom';
 import Header from "./Header";
 import { useTranslation } from "../i18n/LanguageContext";
+
+const buildMentionHandle = (person) => {
+  const emailLocal = String(person?.email || '').split('@')[0].trim().toLowerCase();
+  const compactName = String(person?.name || '').replace(/\s+/g, '').toLowerCase();
+  return emailLocal || compactName || '';
+};
+
+const getMentionContext = (value, cursorPosition = value.length) => {
+  const text = String(value || '');
+  const safeCursor = typeof cursorPosition === 'number' ? cursorPosition : text.length;
+  const beforeCursor = text.slice(0, safeCursor);
+  const match = beforeCursor.match(/(^|\\s)@([a-zA-Z0-9._-]*)$/);
+  if (!match) return null;
+  const rawQuery = match[2] || '';
+  const atIndex = beforeCursor.lastIndexOf(`@${rawQuery}`);
+  if (atIndex < 0) return null;
+  return { query: rawQuery.toLowerCase(), start: atIndex, end: safeCursor };
+};
+
+const applyMentionToText = (value, context, person) => {
+  if (!context) return String(value || '');
+  const handle = buildMentionHandle(person);
+  if (!handle) return String(value || '');
+  const text = String(value || '');
+  return `${text.slice(0, context.start)}@${handle} ${text.slice(context.end)}`;
+};
 
 // BEFORE EVIDENCE FORM WITH START DETAILS
 function BeforeEvidenceForm({ issueId, onSuccess, hasExistingImage }) {
@@ -187,6 +213,12 @@ const TechnicianDashboard = () => {
   });
   const [chatInput, setChatInput] = useState('');
   const [chatSending, setChatSending] = useState(false);
+  const [privateNote, setPrivateNote] = useState('');
+  const [mentionNotifications, setMentionNotifications] = useState([]);
+  const [noteReady, setNoteReady] = useState(false);
+  const [companyPeople, setCompanyPeople] = useState([]);
+  const [mentionCandidates, setMentionCandidates] = useState([]);
+  const [mentionContext, setMentionContext] = useState(null);
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -423,6 +455,8 @@ const TechnicianDashboard = () => {
     const updatedChat = [...(selectedJob.chat || []), newMessage];
     setChatSending(true);
     setChatInput('');
+    setMentionCandidates([]);
+    setMentionContext(null);
     setSelectedJob({ ...selectedJob, chat: updatedChat });
     setJobs(prev => prev.map(j => (String(j._id || j.id) === String(id) ? { ...j, chat: updatedChat } : j)));
     try {
@@ -434,6 +468,38 @@ const TechnicianDashboard = () => {
     } finally {
       setChatSending(false);
     }
+  };
+
+  const updateMentionSuggestions = (value, cursorPosition) => {
+    const context = getMentionContext(value, cursorPosition);
+    setMentionContext(context);
+    if (!context) {
+      setMentionCandidates([]);
+      return;
+    }
+    const currentUserId = String(user?._id || user?.id || '');
+    const filtered = (companyPeople || [])
+      .filter((person) => {
+        const id = String(person?._id || person?.id || '');
+        if (!id || id === currentUserId) return false;
+        const haystack = `${person?.name || ''} ${person?.email || ''} ${buildMentionHandle(person)}`.toLowerCase();
+        return !context.query || haystack.includes(context.query);
+      })
+      .slice(0, 6);
+    setMentionCandidates(filtered);
+  };
+
+  const handleChatInputChange = (e) => {
+    const value = e.target.value;
+    setChatInput(value);
+    updateMentionSuggestions(value, e.target.selectionStart);
+  };
+
+  const insertMention = (person) => {
+    const nextValue = applyMentionToText(chatInput, mentionContext, person);
+    setChatInput(nextValue);
+    setMentionCandidates([]);
+    setMentionContext(null);
   };
 
   const dismissOne = async (id, type) => {
@@ -495,6 +561,58 @@ const TechnicianDashboard = () => {
     }
   }, []);
 
+  useEffect(() => {
+    const userId = user?._id || user?.id;
+    if (!userId) return;
+    let cancelled = false;
+
+    const fetchDashboardSideData = async () => {
+      try {
+        const [noteRes, mentionsRes] = await Promise.all([
+          api.get('/api/private-notes/me', { params: { scope: 'technician-dashboard' } }),
+          api.get('/api/notifications', { params: { type: 'mention', limit: 6 } })
+        ]);
+        if (cancelled) return;
+        setPrivateNote(noteRes?.data?.content || '');
+        setMentionNotifications(Array.isArray(mentionsRes?.data) ? mentionsRes.data : []);
+      } catch (err) {
+        console.error('Failed to load technician dashboard side data', err);
+      } finally {
+        if (!cancelled) setNoteReady(true);
+      }
+    };
+
+    fetchDashboardSideData();
+    return () => { cancelled = true; };
+  }, [user]);
+
+  useEffect(() => {
+    const userId = user?._id || user?.id;
+    if (!userId) return;
+    api.get('/api/users')
+      .then((res) => setCompanyPeople(Array.isArray(res.data) ? res.data : []))
+      .catch((err) => {
+        console.error('Failed to load people for mentions', err);
+        setCompanyPeople([]);
+      });
+  }, [user]);
+
+  useEffect(() => {
+    if (!noteReady) return;
+    const timer = setTimeout(async () => {
+      try {
+        await api.put('/api/private-notes/me', {
+          scope: 'technician-dashboard',
+          content: privateNote
+        });
+      } catch (err) {
+        console.error('Failed to save technician private note', err);
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [privateNote, noteReady]);
+
   // Sync reminders/alerts when jobs are loaded or periodically
   useEffect(() => {
     if (user.id || user._id) {
@@ -510,6 +628,47 @@ const TechnicianDashboard = () => {
     }, 60000); // Every minute
     return () => clearInterval(timer);
   }, []);
+
+  const openJobs = useMemo(
+    () => jobs.filter(job => !['COMPLETE', 'COMPLETED'].includes(getJobStatus(job))),
+    [jobs]
+  );
+
+  const myTasks = useMemo(() => {
+    return jobs.flatMap((job) => {
+      const rawTasks = Array.isArray(job?.tasks) && job.tasks.length
+        ? job.tasks
+        : Array.isArray(job?.taskList) && job.taskList.length
+          ? job.taskList
+          : Array.isArray(job?.checklist)
+            ? job.checklist
+            : [];
+
+      return rawTasks.map((task, idx) => {
+        const normalized = typeof task === 'string' ? { title: task } : (task || {});
+        const status = String(
+          normalized.status ||
+          (normalized.completed ? 'COMPLETED' : normalized.done ? 'COMPLETED' : 'OPEN')
+        ).toUpperCase();
+        const dueDate = normalized.dueDate || normalized.deadline || normalized.due || job.fixDeadline || job.dueDate || null;
+        return {
+          id: normalized.id || normalized._id || `${job._id || job.id}-task-${idx}`,
+          jobId: job._id || job.id,
+          jobTitle: job.title || 'Work order',
+          title: normalized.title || normalized.text || normalized.name || `Task ${idx + 1}`,
+          status,
+          dueDate,
+          location: job.location || '',
+          completed: status.includes('COMPLETE'),
+          overdue: dueDate ? new Date(dueDate) < new Date() && !status.includes('COMPLETE') : false
+        };
+      });
+    });
+  }, [jobs]);
+
+  const mentionItems = useMemo(() => (
+    Array.isArray(mentionNotifications) ? mentionNotifications : []
+  ), [mentionNotifications]);
 
   return (
     <div className="glass-theme-blue min-h-screen text-slate-900 overflow-hidden relative" style={{ fontFamily: "'DM Sans', 'Segoe UI', system-ui, sans-serif" }}>
@@ -769,6 +928,140 @@ const TechnicianDashboard = () => {
           <div className="text-xs font-bold text-blue-600 uppercase tracking-widest">{t("technician.stats.materials")}</div>
           <div className="text-3xl font-black text-blue-700 mt-2">{materialRequests.length}</div>
           <p className="text-sm text-slate-500 mt-2">{t("technician.stats.requestsSubmitted")}</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 mb-8">
+        <div className="glass-surface rounded-3xl shadow-lg border border-white/50 p-6">
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <h2 className="text-2xl font-black text-slate-900">My Work Orders</h2>
+              <p className="text-sm text-slate-500 mt-1">Open, active, and recently completed jobs assigned to you.</p>
+            </div>
+            <span className="px-3 py-1 rounded-full bg-blue-100/70 text-blue-700 text-xs font-black uppercase">
+              {openJobs.length} Open
+            </span>
+          </div>
+          <div className="space-y-3">
+            {jobs.slice(0, 5).map((job) => (
+              <button
+                key={`summary-${job._id || job.id}`}
+                onClick={() => handleViewJob(job)}
+                className="w-full text-left rounded-2xl border border-white/60 bg-white/50 px-4 py-3 hover:border-blue-200 hover:shadow-md transition"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-slate-900 truncate">{job.title || 'Untitled job'}</p>
+                    <p className="text-xs text-slate-500 mt-1 truncate">{job.location || 'No location yet'}</p>
+                  </div>
+                  <span className={`shrink-0 px-2 py-1 rounded-full text-[10px] font-black uppercase ${
+                    getJobStatus(job) === 'IN PROGRESS'
+                      ? 'bg-blue-100 text-blue-700'
+                      : getJobStatus(job) === 'OVERDUE'
+                        ? 'bg-rose-100 text-rose-700'
+                        : getJobStatus(job).includes('COMPLETE')
+                          ? 'bg-emerald-100 text-emerald-700'
+                          : 'bg-amber-100 text-amber-700'
+                  }`}>
+                    {getJobStatus(job).replace(/_/g, ' ')}
+                  </span>
+                </div>
+              </button>
+            ))}
+            {jobs.length === 0 && (
+              <div className="rounded-2xl border-2 border-dashed border-white/70 bg-white/30 px-4 py-8 text-center text-slate-500">
+                No assigned work orders yet.
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="glass-surface rounded-3xl shadow-lg border border-white/50 p-6">
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <h2 className="text-2xl font-black text-slate-900">My Tasks</h2>
+              <p className="text-sm text-slate-500 mt-1">Checklist items and tasks from your assigned work orders.</p>
+            </div>
+            <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-black uppercase">
+              {myTasks.filter((task) => !task.completed).length} Active
+            </span>
+          </div>
+          <div className="space-y-3">
+            {myTasks.slice(0, 6).map((task) => (
+              <div key={task.id} className="rounded-2xl border border-white/60 bg-white/50 px-4 py-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-slate-900 truncate">{task.title}</p>
+                    <p className="text-xs text-slate-500 mt-1 truncate">{task.jobTitle}{task.location ? ` • ${task.location}` : ''}</p>
+                  </div>
+                  <span className={`shrink-0 px-2 py-1 rounded-full text-[10px] font-black uppercase ${
+                    task.completed
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : task.overdue
+                        ? 'bg-rose-100 text-rose-700'
+                        : 'bg-blue-100 text-blue-700'
+                  }`}>
+                    {task.completed ? 'Completed' : task.overdue ? 'Overdue' : 'Open'}
+                  </span>
+                </div>
+              </div>
+            ))}
+            {myTasks.length === 0 && (
+              <div className="rounded-2xl border-2 border-dashed border-white/70 bg-white/30 px-4 py-8 text-center text-slate-500">
+                No checklist tasks yet.
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="glass-surface rounded-3xl shadow-lg border border-white/50 p-6">
+          <div className="mb-5">
+            <h2 className="text-2xl font-black text-slate-900">Private Notepad</h2>
+            <p className="text-sm text-slate-500 mt-1">Personal reminders visible only on this technician account in this browser.</p>
+          </div>
+          <textarea
+            value={privateNote}
+            onChange={(e) => setPrivateNote(e.target.value)}
+            placeholder="Write your to-do list, follow-ups, or personal reminders here..."
+            className="w-full min-h-[220px] rounded-2xl border border-white/60 bg-white/55 px-4 py-4 text-sm text-slate-700 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-200/60"
+          />
+        </div>
+
+        <div className="glass-surface rounded-3xl shadow-lg border border-white/50 p-6">
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <h2 className="text-2xl font-black text-slate-900">Comments Mentioning Me</h2>
+              <p className="text-sm text-slate-500 mt-1">First pass using existing chat messages that include your name or email.</p>
+            </div>
+            <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-black uppercase">
+              {mentionItems.length} Recent
+            </span>
+          </div>
+          <div className="space-y-3">
+            {mentionItems.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => {
+                  if (item.link) {
+                    window.location.href = item.link;
+                  }
+                }}
+                className="w-full text-left rounded-2xl border border-white/60 bg-white/50 px-4 py-3 hover:border-blue-200 hover:shadow-md transition"
+              >
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-400">{item.title}</p>
+                <p className="text-sm text-slate-800 mt-1 line-clamp-2">{item.message}</p>
+                <p className="text-xs text-slate-500 mt-2">
+                  {item.type || 'mention'}
+                  {item.createdAt ? ` • ${new Date(item.createdAt).toLocaleString()}` : ''}
+                </p>
+              </button>
+            ))}
+            {mentionItems.length === 0 && (
+              <div className="rounded-2xl border-2 border-dashed border-white/70 bg-white/30 px-4 py-8 text-center text-slate-500">
+                No mentions found yet.
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -1124,36 +1417,85 @@ const TechnicianDashboard = () => {
 
                 {/* Side chat with client/requestor */}
                 <div className="border-t pt-4">
-                  <h3 className="font-semibold text-slate-700 mb-2">Chat with client</h3>
-                  <div className="max-h-52 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                  <div className="mb-3 flex items-center justify-between">
+                    <div>
+                      <h3 className="font-semibold text-slate-700">Comments</h3>
+                      <p className="mt-1 text-xs text-slate-500">Shared work-order discussion visible to the people involved.</p>
+                    </div>
+                    <div className="rounded-full bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500 shadow-sm">
+                      {(selectedJob.chat || []).length} comments
+                    </div>
+                  </div>
+                  <div className="max-h-64 overflow-y-auto space-y-3 pr-1 custom-scrollbar rounded-2xl bg-slate-50/80 p-3">
                     {(selectedJob.chat || []).length === 0 && (
-                      <div className="text-sm text-slate-400">No messages yet. Start the conversation.</div>
+                      <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-8 text-center">
+                        <div className="text-sm font-semibold text-slate-700">No comments yet</div>
+                        <div className="mt-1 text-xs text-slate-500">Share progress, ask questions, or tag someone with @.</div>
+                      </div>
                     )}
                     {(selectedJob.chat || []).map((m, idx) => (
-                      <div key={idx} className="p-2 rounded-lg border border-slate-100 bg-white/80">
-                        <div className="flex items-center justify-between text-[11px] text-slate-500 mb-1">
+                      <div key={idx} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                        <div className="flex items-start gap-3">
                           <span className="font-semibold text-slate-700">{m.sender || 'User'}{m.role ? ` · ${m.role}` : ''}</span>
-                          <span>{m.timestamp ? new Date(m.timestamp).toLocaleString() : ''}</span>
+                          <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xs font-bold ${String(m.sender || m.user || '').trim() === userName ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'}`}>
+                            {String(m.sender || m.user || 'U').trim().split(' ').map(part => part?.[0] || '').join('').slice(0, 2).toUpperCase() || 'U'}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                              <span className="font-semibold text-sm text-slate-800">{m.sender || m.user || 'User'}</span>
+                              {m.role && (
+                                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
+                                  {String(m.role).replace(/_/g, ' ')}
+                                </span>
+                              )}
+                              <span className="text-[11px] text-slate-400">
+                                {m.timestamp ? new Date(m.timestamp).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}
+                              </span>
+                            </div>
+                            <div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">{m.text}</div>
+                          </div>
                         </div>
-                        <div className="text-sm text-slate-800 whitespace-pre-wrap">{m.text}</div>
                       </div>
                     ))}
                   </div>
-                  <div className="flex items-center gap-2 mt-3">
-                    <input
+                  <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50/80 p-4 shadow-sm">
+                    <div className="mb-3">
+                      <div className="text-sm font-bold text-slate-900">Add a public comment</div>
+                      <div className="text-xs text-slate-500">This update is shared on the work order thread.</div>
+                    </div>
+                  <div className="relative">
+                    {mentionCandidates.length > 0 && (
+                      <div className="absolute bottom-full left-0 right-0 mb-2 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl z-20">
+                        {mentionCandidates.map((person) => (
+                          <button
+                            key={person._id || person.id}
+                            type="button"
+                            onClick={() => insertMention(person)}
+                            className="w-full border-b border-slate-100 px-3 py-2 text-left hover:bg-slate-50 last:border-b-0"
+                          >
+                            <div className="text-sm font-semibold text-slate-900">{person.name}</div>
+                            <div className="text-xs text-slate-500">@{buildMentionHandle(person)}{person.email ? ` • ${person.email}` : ''}</div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <div className="flex items-end gap-2 rounded-2xl border border-white bg-white px-3 py-3 ring-1 ring-slate-100">
+                    <textarea
                       value={chatInput}
-                      onChange={e => setChatInput(e.target.value)}
+                      onChange={handleChatInputChange}
                       placeholder="Type a message for the client…"
-                      className="flex-1 px-3 py-2 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-blue-500/50 outline-none"
-                    />
+                      className="min-h-[88px] flex-1 resize-none bg-transparent text-sm text-slate-800 focus:outline-none"
+                    ></textarea>
                     <button
                       onClick={sendChatMessage}
                       disabled={chatSending || !chatInput.trim()}
-                      className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold shadow-sm disabled:opacity-50"
+                      className="rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm disabled:opacity-50"
                     >
                       {chatSending ? 'Sending…' : 'Send'}
                     </button>
+                    </div>
                   </div>
+                </div>
                 </div>
 
                 <div className="flex flex-col gap-4 pt-6 border-t mt-6">

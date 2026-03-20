@@ -1,0 +1,11 @@
+ 7794:       </div>
+ 7795:       <div className="grid grid-cols-3 gap-4">
+ 7796:         {[
+ 7797:           { label: 'Total Devices', value: devices.length, icon: '🖧', color: 'from-blue-50 to-indigo-50 border-blue-100' },
+ 7798:           { label: 'Online', value: online, icon: '🟢', color: 'from-emerald-50 to-green-50 border-emerald-100' },
+ 7799:           { label: 'Offline', value: devices.length - online, icon: '🔴', color: 'from-rose-50 to-pink-50 border-rose-100' },
+ 7800:         ].map(c => (
+ 7801:           <div key={c.label} className={"bg-gradient-to-br " + c.color + " border rounded-xl p-4 flex items-center gap-4"}>
+ 7802:             <span className="text-3xl">{c.icon}</span>
+ 7803:             <div><p className="text-xs font-bold text-gray-500 uppercase tracking-wider">{c.label}</p><p className="text-2xl font-black text-gray-900 mt-0.5">{c.value}</p></div>
+ 7804:           </div>

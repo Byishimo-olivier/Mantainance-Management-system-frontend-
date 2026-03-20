@@ -1,0 +1,66 @@
+ 6860:         billingAddress: '',
+ 6861:         billingCity: '',
+ 6862:         billingState: '',
+ 6863:         billingZip: '',
+ 6864:         billingPhone: '',
+ 6865:         billingFax: '',
+ 6866:         showLogoOnPdf: false,
+ 6867:         hideLogoOnPdf: false,
+ 6868:         shippingSameAsBilling: true,
+ 6869:         shippingName: '',
+ 6870:         shippingAddress: '',
+ 6871:         shippingCity: '',
+ 6872:         shippingState: '',
+ 6873:         shippingZip: ''
+ 6874:       });
+ 6875:       setShowAdd(false);
+ 6876:     } catch (err) {
+ 6877:       alert(err.response?.data?.error || err.message);
+ 6878:     } finally {
+ 6879:       setSaving(false);
+ 6880:     }
+ 6881:   };
+ 6882: 
+ 6883:   return (
+ 6884:     <div className="flex flex-col gap-6">
+ 6885:       <div className="flex items-center justify-between">
+ 6886:         <div>
+ 6887:           <h2 className="text-xl font-bold text-gray-900">Purchase Orders</h2>
+ 6888:           <p className="text-sm text-gray-500 mt-0.5">Create, view and export purchase orders</p>
+ 6889:         </div>
+ 6890:         <div className="flex items-center gap-3">
+ 6891:           <button onClick={() => setShowAdd(s => !s)} className="px-3 py-2 bg-white border rounded-xl text-sm font-semibold hover:bg-gray-50">
+ 6892:             {showAdd ? 'Close' : 'New PO'}
+ 6893:           </button>
+ 6894:           <button onClick={exportCSV} className="px-3 py-2 glass-ghost rounded-xl text-sm font-semibold hover:bg-white/70">Export CSV</button>
+ 6895:         </div>
+ 6896:       </div>
+ 6897:             {showAdd && (
+ 6898:         <form onSubmit={savePo} className="glass-surface rounded-lg border border-white/10 p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+ 6899:           <div className="md:col-span-2 flex items-center justify-between">
+ 6900:             <h3 className="text-lg font-bold text-gray-900">New Purchase Order</h3>
+ 6901:             <div className="flex items-center gap-2">
+ 6902:               <button type="button" onClick={() => setShowAdd(false)} className="px-3 py-2 text-sm border rounded-lg">Cancel</button>
+ 6903:               <button type="submit" disabled={saving} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold disabled:opacity-60">
+ 6904:                 {saving ? 'Saving...' : 'Create Purchase Order'}
+ 6905:               </button>
+ 6906:             </div>
+ 6907:           </div>
+ 6908: 
+ 6909:           <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+ 6910:             <div className="flex flex-col gap-1">
+ 6911:               <label className="text-xs font-semibold text-gray-600">Title *</label>
+ 6912:               <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" required />
+ 6913:             </div>
+ 6914:             <div className="flex flex-col gap-1">
+ 6915:               <label className="text-xs font-semibold text-gray-600">PO Number</label>
+ 6916:               <input value={form.poNumber} onChange={e => setForm(f => ({ ...f, poNumber: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" placeholder="Auto-generates if blank" />
+ 6917:               <span className="text-[11px] text-gray-400">This auto-generates unless a custom one is entered</span>
+ 6918:             </div>
+ 6919:             <div className="flex flex-col gap-1">
+ 6920:               <label className="text-xs font-semibold text-gray-600">Vendor</label>
+ 6921:               <select
+ 6922:                 value={form.vendorId}
+ 6923:                 onChange={e => setForm(f => ({ ...f, vendorId: e.target.value, vendor: '' }))}
+ 6924:                 className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white"
+ 6925:               >

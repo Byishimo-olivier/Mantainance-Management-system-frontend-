@@ -1,0 +1,19 @@
+  722:             Cancel
+  723:           </button>
+  724:           <button
+  725:             type="button"
+  726:             onClick={submit}
+  727:             disabled={!String(name || '').trim() || busy}
+  728:             className="px-6 py-2.5 rounded-lg bg-blue-600 text-white font-bold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+  729:           >
+  730:             {busy ? 'Creating
+  731: ' : 'Create Team'}
+  732:           </button>
+  733:         </div>
+  734:       </div>
+  735:     </div>
+  736:   );
+  737: }
+  738: 
+  739: // ââ Sidebar nav item ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+  740: function NavItem({ label, icon, active, onClick, danger }) {

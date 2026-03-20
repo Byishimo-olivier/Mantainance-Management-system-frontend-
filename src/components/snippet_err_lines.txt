@@ -1,0 +1,6 @@
+7798: "          { label: 'Online', value: online, icon: '\U0001f7e2', color: 'from-emerald-50 to-green-50 border-emerald-100' },"
+7799: "          { label: 'Offline', value: devices.length - online, icon: '\U0001f534', color: 'from-rose-50 to-pink-50 border-rose-100' },"
+7800: '        ].map(c => ('
+7801: '          <div key={c.label} className={\x08g-gradient-to-br  border rounded-xl p-4 flex items-center gap-4}><span className="text-3xl">{c.icon}</span><div><p className="text-xs font-bold text-gray-500 uppercase tracking-wider">{c.label}</p><p className="text-2xl font-black text-gray-900 mt-0.5">{c.value}</p></div></div>'
+7802: '        ))}'
+7803: '      </div>'

@@ -9,6 +9,7 @@ import Header from "./Header";
 import SubscriptionManagement from './SubscriptionManagement';
 import TeamDetailsModal from './TeamDetailsModal';
 import { WorkOrderForm } from './WorkOrder';
+import PreventiveMaintenanceDetail from './PreventiveMaintenanceDetail';
 import { useLanguage, useTranslation } from "../i18n/LanguageContext";
 import {
   Shield,
@@ -65,7 +66,8 @@ import {
   Play,
   Repeat,
   X,
-  CreditCard
+  CreditCard,
+  Send
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -82,6 +84,249 @@ import {
   Bar,
   Legend
 } from 'recharts';
+
+const buildMentionHandle = (person) => {
+  const emailLocal = String(person?.email || '').split('@')[0].trim().toLowerCase();
+  const compactName = String(person?.name || '').replace(/\s+/g, '').toLowerCase();
+  return emailLocal || compactName || '';
+};
+
+const getMentionContext = (value, cursorPosition = value.length) => {
+  const text = String(value || '');
+  const safeCursor = typeof cursorPosition === 'number' ? cursorPosition : text.length;
+  const beforeCursor = text.slice(0, safeCursor);
+  const match = beforeCursor.match(/(^|\s)@([a-zA-Z0-9._-]*)$/);
+  if (!match) return null;
+  const rawQuery = match[2] || '';
+  const atIndex = beforeCursor.lastIndexOf(`@${rawQuery}`);
+  if (atIndex < 0) return null;
+  return { query: rawQuery.toLowerCase(), start: atIndex, end: safeCursor };
+};
+
+const applyMentionToText = (value, context, person) => {
+  if (!context) return String(value || '');
+  const handle = buildMentionHandle(person);
+  if (!handle) return String(value || '');
+  const text = String(value || '');
+  return `${text.slice(0, context.start)}@${handle} ${text.slice(context.end)}`;
+};
+
+const DirectMessageModal = ({ open, recipientName, message, sending, onChange, onClose, onSend }) => {
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl border border-gray-200 overflow-hidden">
+        <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5">
+          <div>
+            <h3 className="text-lg font-bold text-gray-900">Private Message</h3>
+            <p className="mt-1 text-sm text-gray-500">
+              This goes only to {recipientName || 'the selected person'}. Team-wide discussion should stay in the shared work order comments.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="px-6 py-5 space-y-4">
+          <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-emerald-700">To</div>
+            <div className="mt-1 text-sm font-semibold text-emerald-900">{recipientName || 'Assigned person'}</div>
+          </div>
+          <div>
+            <label className="mb-2 block text-sm font-semibold text-gray-700">Message</label>
+            <textarea
+              value={message}
+              onChange={(e) => onChange(e.target.value)}
+              rows={6}
+              placeholder="Write a private message about this work order..."
+              className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+            />
+          </div>
+        </div>
+        <div className="flex items-center justify-end gap-3 border-t border-gray-100 bg-gray-50 px-6 py-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onSend}
+            disabled={sending || !String(message || '').trim()}
+            className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <Send className="w-4 h-4" />
+            {sending ? 'Sending...' : 'Send message'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const CommentModal = ({ open, item, userName, people = [], onClose, onPosted }) => {
+  const [messages, setMessages] = useState(Array.isArray(item?.chat) ? item.chat : []);
+  const [commentText, setCommentText] = useState('');
+  const [sending, setSending] = useState(false);
+  const [mentionCandidates, setMentionCandidates] = useState([]);
+  const [mentionContext, setMentionContext] = useState(null);
+
+  useEffect(() => {
+    setMessages(Array.isArray(item?.chat) ? item.chat : []);
+    setCommentText('');
+    setSending(false);
+    setMentionCandidates([]);
+    setMentionContext(null);
+  }, [item, open]);
+
+  if (!open || !item) return null;
+
+  const updateMentionSuggestions = (value, cursorPosition) => {
+    const context = getMentionContext(value, cursorPosition);
+    setMentionContext(context);
+    if (!context) {
+      setMentionCandidates([]);
+      return;
+    }
+    const filtered = (people || [])
+      .filter((person) => {
+        const haystack = `${person?.name || ''} ${person?.email || ''} ${buildMentionHandle(person)}`.toLowerCase();
+        return !context.query || haystack.includes(context.query);
+      })
+      .slice(0, 6);
+    setMentionCandidates(filtered);
+  };
+
+  const handleInputChange = (e) => {
+    const value = e.target.value;
+    setCommentText(value);
+    updateMentionSuggestions(value, e.target.selectionStart);
+  };
+
+  const insertMention = (person) => {
+    const nextValue = applyMentionToText(commentText, mentionContext, person);
+    setCommentText(nextValue);
+    setMentionCandidates([]);
+    setMentionContext(null);
+  };
+
+  const handlePost = async () => {
+    const text = String(commentText || '').trim();
+    if (!text || sending) return;
+    const newMessage = {
+      sender: userName || 'Manager',
+      text,
+      timestamp: new Date().toISOString(),
+      role: 'comment'
+    };
+    const updatedChat = [...messages, newMessage];
+    setSending(true);
+    try {
+      await api.put(`/api/issues/${item.id || item._id}`, { chat: updatedChat });
+      setMessages(updatedChat);
+      setCommentText('');
+      setMentionCandidates([]);
+      setMentionContext(null);
+      if (onPosted) onPosted(updatedChat);
+    } catch (err) {
+      alert('Failed to post comment: ' + (err?.response?.data?.message || err.message));
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div className="w-full max-w-2xl overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-2xl">
+        <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5">
+          <div>
+            <h3 className="text-lg font-bold text-gray-900">Comments</h3>
+            <p className="mt-1 text-sm text-gray-500">{item.title || 'Work order'} discussion thread.</p>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="max-h-[55vh] space-y-4 overflow-y-auto bg-gradient-to-b from-slate-50 via-white to-white px-6 py-5">
+          {messages.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-gray-200 bg-white px-5 py-10 text-center">
+              <div className="text-sm font-semibold text-gray-700">No comments yet</div>
+              <div className="mt-1 text-xs text-gray-500">Write the first comment for this work order.</div>
+            </div>
+          ) : (
+            messages.map((msg, idx) => (
+              <div key={idx} className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                <div className="flex items-start gap-3">
+                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xs font-bold ${String(msg.sender || msg.user || '').trim() === userName ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'}`}>
+                    {String(msg.sender || msg.user || 'U').trim().split(' ').map(part => part?.[0] || '').join('').slice(0, 2).toUpperCase() || 'U'}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <span className="text-sm font-bold text-gray-900">{msg.sender || msg.user || 'Unknown'}</span>
+                      <span className="text-[11px] text-gray-400">
+                        {new Date(msg.timestamp || msg.createdAt || Date.now()).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                    <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-gray-700">{msg.text}</p>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+        <div className="border-t border-gray-100 bg-white px-6 py-5">
+          <div className="mb-3">
+            <div className="text-sm font-bold text-gray-900">Add a comment</div>
+            <div className="text-xs text-gray-500">This will post directly to the work order thread.</div>
+          </div>
+          <div className="relative">
+            {mentionCandidates.length > 0 && (
+              <div className="absolute bottom-full left-0 right-0 mb-2 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl z-20">
+                {mentionCandidates.map((person) => (
+                  <button
+                    key={person._id || person.id || person.email}
+                    type="button"
+                    onClick={() => insertMention(person)}
+                    className="w-full border-b border-gray-100 px-3 py-2 text-left hover:bg-gray-50 last:border-b-0"
+                  >
+                    <div className="text-sm font-semibold text-gray-900">{person.name}</div>
+                    <div className="text-xs text-gray-500">@{buildMentionHandle(person)}{person.email ? ` • ${person.email}` : ''}</div>
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="rounded-2xl border border-gray-200 bg-slate-50/80 p-4">
+              <textarea
+                value={commentText}
+                onChange={handleInputChange}
+                placeholder="Write a comment..."
+                className="min-h-[120px] w-full resize-none rounded-2xl border border-white bg-white px-4 py-3 text-sm text-gray-800 outline-none ring-1 ring-slate-100 transition focus:ring-2 focus:ring-blue-100"
+              />
+              <div className="mt-3 flex justify-end">
+                <button
+                  type="button"
+                  onClick={handlePost}
+                  disabled={sending || !String(commentText || '').trim()}
+                  className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <MessageSquare className="h-4 w-4" />
+                  {sending ? 'Posting...' : 'Post comment'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 // Enhanced Status badge with icons and gradients
 const StatusBadge = ({ status }) => {
@@ -313,6 +558,14 @@ const normalizeDate = (val) => {
   return new Date(val);
 };
 
+const formatDateForInput = (val) => {
+  if (!val) return '';
+  if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(val)) return val;
+  const d = new Date(val);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toISOString().slice(0, 10);
+};
+
 const useBulkSelection = (items, getId) => {
   const [selectedIds, setSelectedIds] = useState([]);
   const ids = (items || [])
@@ -453,6 +706,16 @@ function ManagerDashboard() {
   const [includeSubLocations, setIncludeSubLocations] = useState(false);
   const [locationSearch, setLocationSearch] = useState('');
   const [detailModal, setDetailModal] = useState({ open: false, type: null, item: null });
+  const [commentModal, setCommentModal] = useState({ open: false, item: null });
+  const [directMessageModal, setDirectMessageModal] = useState({
+    open: false,
+    recipientUserId: '',
+    recipientName: '',
+    link: '/manager-dashboard',
+    message: '',
+    sending: false
+  });
+  const [selectedPreventive, setSelectedPreventive] = useState(null);
 
   const totalActiveFilters = selectedStatuses.length + selectedPriorities.length + selectedLocations.length + selectedAssets.length + selectedAssignedTo.length;
   const [feedbacks, setFeedbacks] = useState([]);
@@ -479,6 +742,78 @@ function ManagerDashboard() {
   const userName = loggedUser?.name || loggedUser?.username || 'Manager';
   const initials = (userName.split(' ').map(n => n?.[0] || '').slice(0, 2).join('') || 'M').toUpperCase();
   const userRole = loggedUser?.role || (loggedUser?.isManager ? 'Manager' : 'User');
+
+  const openDirectMessageComposer = ({ recipientUserId, recipientName, link }) => {
+    if (!recipientUserId) {
+      alert('No recipient is available for private message.');
+      return;
+    }
+    setDirectMessageModal({
+      open: true,
+      recipientUserId: String(recipientUserId),
+      recipientName: recipientName || 'Assigned person',
+      link: link || '/manager-dashboard',
+      message: '',
+      sending: false
+    });
+  };
+
+  const closeDirectMessageModal = () => {
+    setDirectMessageModal({
+      open: false,
+      recipientUserId: '',
+      recipientName: '',
+      link: '/manager-dashboard',
+      message: '',
+      sending: false
+    });
+  };
+
+  const openCommentModal = (item) => {
+    setCommentModal({ open: true, item });
+  };
+
+  const closeCommentModal = () => {
+    setCommentModal({ open: false, item: null });
+  };
+
+  const handleCommentPosted = (updatedChat) => {
+    const issueId = commentModal.item?._id || commentModal.item?.id;
+    if (!issueId) return;
+    const applyChat = (list) => (Array.isArray(list) ? list.map((entry) => (
+      String(entry?._id || entry?.id) === String(issueId) ? { ...entry, chat: updatedChat } : entry
+    )) : list);
+    setIssues(prev => applyChat(prev));
+    setAllIssues(prev => applyChat(prev));
+    setPendingRequests(prev => applyChat(prev));
+    setCommentModal(prev => ({
+      ...prev,
+      item: prev.item ? { ...prev.item, chat: updatedChat } : prev.item
+    }));
+  };
+
+  const handleSendDirectMessage = async () => {
+    const text = String(directMessageModal.message || '').trim();
+    if (!directMessageModal.recipientUserId) {
+      alert('No recipient is available for private message.');
+      return;
+    }
+    if (!text) return;
+    setDirectMessageModal(prev => ({ ...prev, sending: true }));
+    try {
+      await api.post('/api/notifications/direct-message', {
+        recipientUserId: directMessageModal.recipientUserId,
+        message: text,
+        title: `Private message from ${userName}`,
+        link: directMessageModal.link || '/manager-dashboard'
+      });
+      alert('Private message sent.');
+      closeDirectMessageModal();
+    } catch (err) {
+      setDirectMessageModal(prev => ({ ...prev, sending: false }));
+      alert('Failed to send private message: ' + (err?.response?.data?.message || err.message));
+    }
+  };
 
   // Fetch all dashboard data
   const fetchDashboardData = async () => {
@@ -919,14 +1254,19 @@ function ManagerDashboard() {
   const NavItem = ({ active, onClick, icon: Icon, label, badge, badgeColor = "bg-blue-600" }) => (
     <button
       onClick={onClick}
-      className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-bold transition-all duration-300 group mb-1 ${active
-        ? 'glass-surface bg-blue-600/10 text-blue-700 shadow-md translate-x-1 border-l-4 border-l-blue-600'
-        : 'text-slate-600 hover:bg-white/40 hover:text-blue-600'
+      className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 group relative mb-1 ${active
+        ? 'bg-white/20 text-white shadow-lg shadow-black/5'
+        : 'text-white/60 hover:text-white hover:bg-white/10'
         }`}
     >
+      {active && (
+        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-white rounded-r-full shadow-glow-white" />
+      )}
       <div className="flex items-center gap-3">
-        <Icon className={`w-4 h-4 transition-colors ${active ? 'text-blue-600' : 'text-slate-400 group-hover:text-blue-600'}`} />
-        <span>{label}</span>
+        <span className={`transition-transform duration-200 group-hover:scale-110 ${active ? 'text-white' : 'text-white/40 group-hover:text-white/70'}`}>
+          <Icon className="w-4 h-4" />
+        </span>
+        <span className="text-sm font-bold tracking-tight">{label}</span>
       </div>
       {badge && (
         <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold text-white min-w-[18px] text-center ${badgeColor}`}>
@@ -937,19 +1277,19 @@ function ManagerDashboard() {
   );
 
   const TooltipButton = ({ icon: Icon, title }) => (
-    <button className="p-2 text-blue-100/80 hover:text-blue-600 hover:bg-white/10 rounded-lg transition-all" title={title}>
+    <button className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-all" title={title}>
       <Icon className="w-5 h-5" />
     </button>
   );
 
   const SectionLabel = ({ children }) => (
-    <div className="px-3 py-2 text-[10px] font-bold text-blue-200/80 uppercase tracking-widest mt-4">
+    <div className="px-3 py-2 text-[10px] font-bold text-white/50 uppercase tracking-widest mt-4">
       {children}
     </div>
   );
 
   return (
-    <div className="min-h-screen flex text-gray-900 glass-theme-blue relative overflow-hidden bg-transparent" style={{ fontFamily: "'Space Grotesk', 'Manrope', 'Segoe UI', sans-serif" }}>
+    <div className="glass-theme-blue min-h-screen text-slate-900 overflow-hidden relative" style={{ fontFamily: "'Space Grotesk', 'Manrope', 'Segoe UI', sans-serif" }}>
       {/* Dynamic Background */}
       <div className="video-background-container">
         <video autoPlay loop muted playsInline>
@@ -958,20 +1298,59 @@ function ManagerDashboard() {
         <div className="video-overlay" />
       </div>
 
-      {/* Sidebar Redesign */}
-      <aside className="w-[280px] glass-surface-strong border-r border-white/20 flex flex-col h-screen sticky top-0 z-30 shadow-2xl">
-        {/* Sidebar Header */}
-        <div className="p-4 border-b border-blue-700/40 flex items-center justify-between">
-          <div className="flex items-center gap-3 text-blue-600">
-            <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center text-blue-600 border border-white/20">
-              <Shield className="w-6 h-6 font-bold" />
+      <div className="relative z-10 flex min-h-screen">
+        {/* Sidebar Redesign */}
+        <aside className="glass-surface-strong border-r border-white/20 flex flex-col sticky top-0 h-screen overflow-y-auto shrink-0" style={{ width: 220 }}>
+          {/* Sidebar Header */}
+          <div style={{ padding: '24px 16px 20px', borderBottom: '1px solid rgba(255,255,255,0.12)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 32, height: 32, background: 'linear-gradient(135deg,#1D4ED8,#3B82F6)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Shield className="w-4 h-4 text-white" />
+              </div>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: 'white', lineHeight: 1.2 }}>MMS CORE</div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>Management</div>
+              </div>
             </div>
-            <span className="font-bold text-lg tracking-tight">MMS CORE</span><span className="text-[10px] font-bold text-blue-600 tracking-[0.2em] uppercase mt-1">Management</span>
           </div>
-        </div>
 
-        {/* Scrollable Navigation */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-1">
+          {/* User */}
+          <div style={{ padding: '12px 16px', borderBottom: '1px solid #F3F4F6' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 34, height: 34, borderRadius: '50%', background: 'linear-gradient(135deg,#EFF6FF,#DBEAFE)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#1D4ED8', flexShrink: 0 }}>
+                {initials}
+              </div>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{userName}</div>
+                <div style={{ fontSize: 11, color: '#9CA3AF', textTransform: 'capitalize' }}>{userRole}</div>
+              </div>
+              <button
+                onClick={handleLogout}
+                className="p-1.5 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-all"
+                title={t("client.actions.logout")}
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          <div style={{ padding: '10px 16px', borderBottom: '1px solid #F3F4F6' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
+              {t("language.label")}
+            </div>
+            <select
+              value={language}
+              onChange={(e) => setLanguage(e.target.value)}
+              style={{ width: '100%', padding: '6px 8px', fontSize: 12, borderRadius: 8, border: '1px solid #E5E7EB', color: '#111827', background: 'white' }}
+            >
+              <option value="en">{t("language.english")}</option>
+              <option value="fr">{t("language.french")}</option>
+              <option value="rw">{t("language.kinyarwanda")}</option>
+            </select>
+          </div>
+
+          {/* Scrollable Navigation */}
+          <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-1">
           <NavItem
             active={activeTab === 'overview'}
             onClick={() => setActiveTab('overview')}
@@ -1110,12 +1489,18 @@ function ManagerDashboard() {
             active={activeTab === 'vendors'}
             onClick={() => setActiveTab('vendors')}
             icon={Contact2}
-            label={t("manager.sidebar.vendorsCustomers")}
+            label="Vendors"
+          />
+          <NavItem
+            active={activeTab === 'customers'}
+            onClick={() => setActiveTab('customers')}
+            icon={Users}
+            label="Customers"
           />
         </div>
 
         {/* Sidebar Footer */}
-        <div className="p-4 border-t border-blue-700/40">
+        <div className="p-4 border-t border-white/10">
           <div className="flex items-center justify-between mb-4">
             <NavItem
               active={false}
@@ -1123,35 +1508,6 @@ function ManagerDashboard() {
               icon={Settings}
               label={t("manager.sidebar.settings")}
             />
-          </div>
-          <div className="px-3 pb-3">
-            <label className="text-[10px] font-bold text-blue-100/80 uppercase tracking-widest">
-              {t("language.label")}
-            </label>
-            <select
-              value={language}
-              onChange={(e) => setLanguage(e.target.value)}
-              className="mt-2 w-full bg-white/10 border border-white/20 text-blue-600 text-xs rounded-lg px-2 py-1.5 focus:outline-none"
-            >
-              <option value="en">{t("language.english")}</option>
-              <option value="fr">{t("language.french")}</option>
-              <option value="rw">{t("language.kinyarwanda")}</option>
-            </select>
-          </div>
-          <div className="flex items-center gap-3 px-3 py-2 rounded-xl bg-white/10 border border-white/10">
-            <div className="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center text-blue-600 font-bold text-xs">
-              {initials}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-bold text-blue-600 truncate">{userName}</p>
-              <p className="text-[10px] text-blue-100/80 truncate capitalize">{userRole}</p>
-            </div>
-            <button
-              onClick={handleLogout}
-              className="p-1.5 text-blue-100 hover:text-blue-600 hover:bg-white/10 rounded-lg transition-all"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
           </div>
           <div className="flex items-center justify-center gap-4 mt-4">
             <TooltipButton icon={HelpCircle} title="Help" />
@@ -1165,34 +1521,34 @@ function ManagerDashboard() {
       {/* Main Content Area */}
       <main className="flex-1 min-w-0 flex flex-col h-screen overflow-hidden">
         {/* Results Header */}
-        <div className="h-14 border-b border-blue-100 bg-gradient-to-r from-blue-50 via-white to-blue-50 flex items-center justify-between px-6 flex-shrink-0">
+        <div className="h-14 border-b border-white/20 bg-white/10 flex items-center justify-between px-6 flex-shrink-0">
           <div className="flex items-center gap-3">
-            <span className="text-sm font-bold text-gray-900">{getFilteredIssues().length} {t("common.resultsReturned")}</span>
+            <span className="text-sm font-bold text-white">{getFilteredIssues().length} {t("common.resultsReturned")}</span>
           </div>
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-4">
-              <button className="flex items-center gap-2 text-xs font-bold text-blue-700/70 hover:text-blue-900 hover:bg-blue-100/60 px-2 py-1 rounded-md transition-colors">
+              <button className="flex items-center gap-2 text-xs font-bold text-white/70 hover:text-white hover:bg-white/10 px-2 py-1 rounded-md transition-colors">
                 <ArrowUpRight className="w-4 h-4" />
                 {t("common.sort")}: {activeTab === 'preventive-maintenance' ? 'Name' : 'Date Created'}
               </button>
-              <button className="flex items-center gap-2 text-xs font-bold text-blue-700/70 hover:text-blue-900 hover:bg-blue-100/60 px-2 py-1 rounded-md transition-colors">
+              <button className="flex items-center gap-2 text-xs font-bold text-white/70 hover:text-white hover:bg-white/10 px-2 py-1 rounded-md transition-colors">
                 <LayoutDashboard className="w-4 h-4" />
                 {t("common.columns")}
               </button>
             </div>
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/50" />
               <input
                 type="text"
                 placeholder="Search"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-64 pl-9 pr-8 py-1.5 bg-blue-50/60 border border-blue-100 rounded-lg text-sm focus:ring-1 focus:ring-blue-500 transition-all placeholder:text-blue-300 font-medium"
+                className="w-64 pl-9 pr-8 py-1.5 bg-white/10 border border-white/20 rounded-lg text-sm text-white focus:ring-1 focus:ring-white/40 transition-all placeholder:text-white/40 font-medium"
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-blue-500/70 hover:text-blue-700"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-white/60 hover:text-white"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -1558,20 +1914,36 @@ function ManagerDashboard() {
                 onRefresh={fetchDashboardData}
               />
             ) : activeTab === 'preventive-maintenance' ? (
-              <PreventiveMaintenanceTab
-                issues={allIssues.filter(i => (
-                  i.isPreventive ||
-                  i.type === 'PREVENTIVE' ||
-                  i.issueType === 'preventive' ||
-                  i.category === 'preventive' ||
-                  (Array.isArray(i.tags) && i.tags.includes('preventive'))
-                ))}
-                technicians={technicians}
-                locations={locations}
-                assets={assets}
-                onRefresh={fetchDashboardData}
-                onOpenDetails={openDetailModal}
-              />
+              selectedPreventive ? (
+                <PreventiveMaintenanceDetail
+                  schedule={selectedPreventive}
+                  onBack={() => setSelectedPreventive(null)}
+                  onEdit={(item) => {
+                    setDetailModal({ open: true, type: 'issue', item });
+                  }}
+                  onAddAsset={(item) => {
+                    alert('Add Asset functionality for ' + (item.title || item.name));
+                  }}
+                  technicians={technicians}
+                  locations={locations}
+                  assets={assets}
+                />
+              ) : (
+                <PreventiveMaintenanceTab
+                  issues={allIssues.filter(i => (
+                    i.isPreventive ||
+                    i.type === 'PREVENTIVE' ||
+                    i.issueType === 'preventive' ||
+                    i.category === 'preventive' ||
+                    (Array.isArray(i.tags) && i.tags.includes('preventive'))
+                  ))}
+                  technicians={technicians}
+                  locations={locations}
+                  assets={assets}
+                  onRefresh={fetchDashboardData}
+                  onOpenDetails={(type, item) => setSelectedPreventive(item)}
+                />
+              )
             ) : activeTab === 'scheduler' ? (
               <SchedulerTab
                 issues={allIssues}
@@ -1610,6 +1982,7 @@ function ManagerDashboard() {
                   setLocations((prev) => (prev || []).filter((loc) => !ids.includes(String(loc._id || loc.id))));
                 }}
               />
+
             ) : activeTab === 'people' ? (
               <PeopleTab
                 technicians={technicians}
@@ -1624,7 +1997,9 @@ function ManagerDashboard() {
             ) : activeTab === 'purchase-orders' ? (
               <PurchaseOrdersTab />
             ) : activeTab === 'vendors' ? (
-              <VendorsTab />
+              <VendorsTab type="vendor" />
+            ) : activeTab === 'customers' ? (
+              <VendorsTab type="customer" />
             ) : (
               <FeedbackTab
                 feedbacks={feedbacks}
@@ -1634,7 +2009,7 @@ function ManagerDashboard() {
           </div>
         </div>
       </main>
-
+   
       {/* Enhanced Approval Modal */}
       {showApprovalModal && selectedRequest && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
@@ -1819,6 +2194,7 @@ function ManagerDashboard() {
         getAssignedTechName={getAssignedTechName}
         technicians={technicians}
         teams={teams}
+        onPrivateMessage={openDirectMessageComposer}
         onRefresh={() => {
           if (detailModal.type === 'material') {
             fetchMaterialRequests();
@@ -1827,12 +2203,29 @@ function ManagerDashboard() {
           }
         }}
       />
+      <CommentModal
+        open={commentModal.open}
+        item={commentModal.item}
+        userName={userName}
+        people={technicians}
+        onClose={closeCommentModal}
+        onPosted={handleCommentPosted}
+      />
+      <DirectMessageModal
+        open={directMessageModal.open}
+        recipientName={directMessageModal.recipientName}
+        message={directMessageModal.message}
+        sending={directMessageModal.sending}
+        onChange={(value) => setDirectMessageModal(prev => ({ ...prev, message: value }))}
+        onClose={closeDirectMessageModal}
+        onSend={handleSendDirectMessage}
+      />
+    </div>
     </div>
   );
 }
 
-// Enhanced Overview Tab
-// Small helper component to render top-level KPIs
+
 const OverviewCards = ({ summary = {}, pendingRequests = [], issues = [], technicians = [], onOpenTab }) => {
   const totalIssues = summary.totalIssues ?? summary.issuesCount ?? (Array.isArray(issues) ? issues.length : 0) ?? 0;
   const completed = summary.completed ?? 0;
@@ -1906,7 +2299,78 @@ const OverviewTab = ({
   recsError,
   exportToPDF,
   exportToExcel
-}) => (
+}) => {
+  const [privateNote, setPrivateNote] = useState('');
+  const [mentionNotifications, setMentionNotifications] = useState([]);
+  const [noteReady, setNoteReady] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadSideData = async () => {
+      try {
+        const [noteRes, mentionsRes] = await Promise.all([
+          api.get('/api/private-notes/me', { params: { scope: 'manager-dashboard' } }),
+          api.get('/api/notifications', { params: { type: 'mention', limit: 6 } })
+        ]);
+        if (cancelled) return;
+        setPrivateNote(noteRes?.data?.content || '');
+        setMentionNotifications(Array.isArray(mentionsRes?.data) ? mentionsRes.data : []);
+      } catch (err) {
+        console.error('Failed to load manager overview side data', err);
+      } finally {
+        if (!cancelled) setNoteReady(true);
+      }
+    };
+    loadSideData();
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (!noteReady) return;
+    const timer = setTimeout(async () => {
+      try {
+        await api.put('/api/private-notes/me', {
+          scope: 'manager-dashboard',
+          content: privateNote
+        });
+      } catch (err) {
+        console.error('Failed to save manager private note', err);
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [noteReady, privateNote]);
+
+  const combinedItems = [...(Array.isArray(pendingRequests) ? pendingRequests : []), ...(Array.isArray(issues) ? issues : [])]
+    .filter((item, index, arr) => index === arr.findIndex((other) => String(other?._id || other?.id) === String(item?._id || item?.id)));
+
+  const managerTasks = combinedItems
+    .flatMap((item) => {
+      const rawTasks = Array.isArray(item?.tasks) && item.tasks.length
+        ? item.tasks
+        : Array.isArray(item?.taskList) && item.taskList.length
+          ? item.taskList
+          : Array.isArray(item?.checklist)
+            ? item.checklist
+            : [];
+
+      return rawTasks.map((task, idx) => {
+        const normalized = typeof task === 'string' ? { title: task } : (task || {});
+        const status = String(normalized.status || (normalized.completed ? 'COMPLETED' : 'OPEN')).toUpperCase();
+        const dueDate = normalized.dueDate || normalized.deadline || normalized.due || item.fixDeadline || item.dueDate || null;
+        return {
+          id: normalized.id || normalized._id || `${item._id || item.id}-task-${idx}`,
+          title: normalized.title || normalized.text || normalized.name || `Task ${idx + 1}`,
+          parentTitle: item.title || 'Work order',
+          completed: status.includes('COMPLETE'),
+          overdue: dueDate ? new Date(dueDate) < new Date() && !status.includes('COMPLETE') : false
+        };
+      });
+    })
+    .slice(0, 6);
+
+  const mentionItems = Array.isArray(mentionNotifications) ? mentionNotifications : [];
+
+  return (
   <div className="space-y-8">
     {/* Overview Cards */}
     <OverviewCards
@@ -1916,6 +2380,124 @@ const OverviewTab = ({
       technicians={technicians}
       onOpenTab={setActiveTab}
     />
+
+    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+      <GlassCard className="p-6">
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <h3 className="text-xl font-bold text-gray-900">Team Work Orders</h3>
+            <p className="text-sm text-gray-500 mt-1">Recent requests and work orders your team is handling.</p>
+          </div>
+          <GradientButton onClick={() => setActiveTab('issues')} color="blue" className="px-3 py-2 text-sm">Open List</GradientButton>
+        </div>
+        <div className="space-y-3">
+          {combinedItems.slice(0, 5).map((item) => (
+            <button
+              key={`overview-item-${item._id || item.id}`}
+              onClick={() => onOpenDetails && onOpenDetails(item)}
+              className="w-full rounded-2xl border border-gray-100 bg-white/70 px-4 py-3 text-left hover:border-blue-200 hover:shadow-sm transition"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-gray-900 truncate">{item.title || 'Untitled work order'}</p>
+                  <p className="text-xs text-gray-500 mt-1 truncate">{item.location || item.address || 'No location yet'}</p>
+                </div>
+                <span className="shrink-0 rounded-full bg-blue-50 px-2 py-1 text-[10px] font-bold uppercase text-blue-700">
+                  {String(item.status || 'Pending').replace(/_/g, ' ')}
+                </span>
+              </div>
+            </button>
+          ))}
+          {combinedItems.length === 0 && (
+            <div className="rounded-2xl border-2 border-dashed border-gray-200 px-4 py-8 text-center text-sm text-gray-500">
+              No team work orders yet.
+            </div>
+          )}
+        </div>
+      </GlassCard>
+
+      <GlassCard className="p-6">
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <h3 className="text-xl font-bold text-gray-900">Team Tasks</h3>
+            <p className="text-sm text-gray-500 mt-1">Checklist and task items across current work orders.</p>
+          </div>
+          <span className="rounded-full bg-amber-50 px-3 py-1 text-[10px] font-bold uppercase text-amber-700">
+            {managerTasks.filter((task) => !task.completed).length} Active
+          </span>
+        </div>
+        <div className="space-y-3">
+          {managerTasks.map((task) => (
+            <div key={task.id} className="rounded-2xl border border-gray-100 bg-white/70 px-4 py-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-gray-900 truncate">{task.title}</p>
+                  <p className="text-xs text-gray-500 mt-1 truncate">{task.parentTitle}</p>
+                </div>
+                <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold uppercase ${
+                  task.completed ? 'bg-emerald-50 text-emerald-700' : task.overdue ? 'bg-rose-50 text-rose-700' : 'bg-blue-50 text-blue-700'
+                }`}>
+                  {task.completed ? 'Completed' : task.overdue ? 'Overdue' : 'Open'}
+                </span>
+              </div>
+            </div>
+          ))}
+          {managerTasks.length === 0 && (
+            <div className="rounded-2xl border-2 border-dashed border-gray-200 px-4 py-8 text-center text-sm text-gray-500">
+              No task items found yet.
+            </div>
+          )}
+        </div>
+      </GlassCard>
+
+      <GlassCard className="p-6">
+        <div className="mb-5">
+          <h3 className="text-xl font-bold text-gray-900">Private Notepad</h3>
+          <p className="text-sm text-gray-500 mt-1">Personal follow-ups and reminders for this manager account on this browser.</p>
+        </div>
+        <textarea
+          value={privateNote}
+          onChange={(e) => setPrivateNote(e.target.value)}
+          placeholder="Capture calls to make, approvals to review, or anything you want to remember..."
+          className="min-h-[220px] w-full rounded-2xl border border-gray-200 bg-white/70 px-4 py-4 text-sm text-gray-700 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+        />
+      </GlassCard>
+
+      <GlassCard className="p-6">
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <h3 className="text-xl font-bold text-gray-900">Comments Mentioning Me</h3>
+            <p className="text-sm text-gray-500 mt-1">Messages that currently include your name or email.</p>
+          </div>
+          <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold uppercase text-slate-700">
+            {mentionItems.length} Recent
+          </span>
+        </div>
+        <div className="space-y-3">
+            {mentionItems.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => {
+                  if (item.link) window.location.href = item.link;
+                }}
+                className="w-full rounded-2xl border border-gray-100 bg-white/70 px-4 py-3 text-left hover:border-blue-200 hover:shadow-sm transition"
+              >
+                <p className="text-xs font-bold uppercase tracking-wide text-gray-400">{item.title}</p>
+                <p className="mt-1 text-sm text-gray-800 line-clamp-2">{item.message}</p>
+                <p className="mt-2 text-xs text-gray-500">
+                  {item.type || 'mention'}
+                  {item.createdAt ? ` • ${new Date(item.createdAt).toLocaleString()}` : ''}
+                </p>
+              </button>
+            ))}
+          {mentionItems.length === 0 && (
+            <div className="rounded-2xl border-2 border-dashed border-gray-200 px-4 py-8 text-center text-sm text-gray-500">
+              No mentions found yet.
+            </div>
+          )}
+        </div>
+      </GlassCard>
+    </div>
 
     {/* AI Insights Section */}
     <AIInsights
@@ -2071,16 +2653,19 @@ const OverviewTab = ({
                   <td className="py-4 px-4">
                     <PriorityBadge priority={issue.priority || 'MEDIUM'} />
                   </td>
-                  <td className="py-4 px-4">
-                    <div className="flex items-center gap-2">
-                      <button onClick={(e) => e.stopPropagation()} className="p-2 hover:bg-blue-100 rounded-lg transition-colors">
-                        <Eye className="w-4 h-4 text-blue-600" />
-                      </button>
-                      <button onClick={(e) => e.stopPropagation()} className="p-2 hover:bg-green-100 rounded-lg transition-colors">
-                        <Edit className="w-4 h-4 text-green-600" />
-                      </button>
-                    </div>
-                  </td>
+                      <td className="py-4 px-4">
+                        <div className="flex items-center gap-2">
+                          <button onClick={(e) => { e.stopPropagation(); onOpenDetails && onOpenDetails('issue', issue); }} className="p-2 hover:bg-blue-100 rounded-lg transition-colors" title="Open details">
+                            <Eye className="w-4 h-4 text-blue-600" />
+                          </button>
+                          <button onClick={(e) => { e.stopPropagation(); openCommentModal(issue); }} className="p-2 hover:bg-indigo-100 rounded-lg transition-colors" title="Open comments">
+                            <MessageSquare className="w-4 h-4 text-indigo-600" />
+                          </button>
+                          <button onClick={(e) => e.stopPropagation()} className="p-2 hover:bg-green-100 rounded-lg transition-colors" title="Edit">
+                            <Edit className="w-4 h-4 text-green-600" />
+                          </button>
+                        </div>
+                      </td>
                 </tr>
               ))}
             </tbody>
@@ -2089,7 +2674,8 @@ const OverviewTab = ({
       </GlassCard>
     </div>
   </div>
-);
+  );
+};
 
 // Enhanced Requests Tab with Table
 const RequestsTab = ({
@@ -5495,9 +6081,64 @@ const PartsInventoryTab = () => {
 // Purchase Orders Tab
 const PurchaseOrdersTab = () => {
   const [orders, setOrders] = useState([]);
+  const [vendors, setVendors] = useState([]);
+  const [showAdd, setShowAdd] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [selectedPo, setSelectedPo] = useState(null);
+  const [editingId, setEditingId] = useState(null);
+  const [form, setForm] = useState({
+    title: '',
+    poNumber: '',
+    vendor: '',
+    vendorId: '',
+    dueDate: '',
+    category: '',
+    tags: '',
+    additionalDetails: '',
+    lineItems: [],
+    files: [],
+    purchaseDate: '',
+    terms: '',
+    shippingMethod: '',
+    fobShippingPoint: '',
+    requisitioner: '',
+    notes: '',
+    billingUseCompanyProfile: true,
+    billingCompanyName: '',
+    billingAddress: '',
+    billingCity: '',
+    billingState: '',
+    billingZip: '',
+    billingPhone: '',
+    billingFax: '',
+    showLogoOnPdf: false,
+    hideLogoOnPdf: false,
+    shippingSameAsBilling: true,
+    shippingName: '',
+    shippingAddress: '',
+    shippingCity: '',
+    shippingState: '',
+    shippingZip: ''
+  });
+
+  useEffect(() => {
+    if (selectedPo) setShowDetails(true);
+  }, [selectedPo]);
+
   useEffect(() => {
     (async () => {
-      try { const res = await api.get('/api/purchase-orders'); setOrders(res.data || []); } catch (e) { setOrders([]); }
+      try {
+        const [poRes, venRes] = await Promise.all([
+          api.get('/api/purchase-orders'),
+          api.get('/api/vendors'),
+        ]);
+        setOrders(poRes.data || []);
+        setVendors(venRes.data || []);
+      } catch (e) {
+        setOrders([]);
+        setVendors([]);
+      }
     })();
   }, []);
 
@@ -5509,6 +6150,181 @@ const PurchaseOrdersTab = () => {
     const blob = new Blob([csv], { type: 'text/csv' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'purchase-orders.csv'; a.click(); URL.revokeObjectURL(url);
   };
 
+  const formatDate = (val) => {
+    if (!val) return '—';
+    const d = new Date(val);
+    return Number.isNaN(d.getTime()) ? val : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  const getPoRouteId = (po) => po?._id || po?.id || po?.poNumber || po?.number;
+
+  const getPoTotal = (po) => {
+    const explicitTotal = Number(po?.totalCost || po?.cost);
+    if (explicitTotal) return explicitTotal;
+    if (!Array.isArray(po?.items)) return 0;
+    return po.items.reduce((sum, item) => sum + ((Number(item?.quantity) || 0) * (Number(item?.unitCost || item?.cost) || 0)), 0);
+  };
+
+  const resetPoForm = () => setForm({
+    title: '',
+    poNumber: '',
+    vendor: '',
+    vendorId: '',
+    dueDate: '',
+    category: '',
+    tags: '',
+    additionalDetails: '',
+    lineItems: [],
+    files: [],
+    purchaseDate: '',
+    terms: '',
+    shippingMethod: '',
+    fobShippingPoint: '',
+    requisitioner: '',
+    notes: '',
+    billingUseCompanyProfile: true,
+    billingCompanyName: '',
+    billingAddress: '',
+    billingCity: '',
+    billingState: '',
+    billingZip: '',
+    billingPhone: '',
+    billingFax: '',
+    showLogoOnPdf: false,
+    hideLogoOnPdf: false,
+    shippingSameAsBilling: true,
+    shippingName: '',
+    shippingAddress: '',
+    shippingCity: '',
+    shippingState: '',
+    shippingZip: ''
+  });
+
+  const openPoEditor = (po) => {
+    setForm({
+      title: po?.title || '',
+      poNumber: po?.poNumber || po?.number || '',
+      vendor: po?.vendor?.name || po?.vendor || po?.vendorDetails?.name || '',
+      vendorId: po?.vendorId?._id || po?.vendorId || '',
+      dueDate: formatDateForInput(po?.expectedDate || po?.dueDate),
+      category: po?.category || '',
+      tags: Array.isArray(po?.tags) ? po.tags.join(', ') : (po?.tags || ''),
+      additionalDetails: po?.additionalDetails || po?.notes || '',
+      lineItems: Array.isArray(po?.items) && po.items.length ? po.items.map((it) => ({
+        name: it?.name || '',
+        quantity: Number(it?.quantity) || 1,
+        unitCost: Number(it?.unitCost || it?.cost) || 0
+      })) : [],
+      files: po?.files || [],
+      purchaseDate: formatDateForInput(po?.purchaseDate || po?.createdAt),
+      terms: po?.terms || '',
+      shippingMethod: po?.shippingMethod || '',
+      fobShippingPoint: po?.fobShippingPoint || '',
+      requisitioner: po?.requisitioner || '',
+      notes: po?.notes || po?.additionalDetails || '',
+      billingUseCompanyProfile: !(po?.billing?.companyName || po?.billing?.address || po?.billing?.phone || po?.billing?.fax),
+      billingCompanyName: po?.billing?.companyName || '',
+      billingAddress: po?.billing?.address || '',
+      billingCity: po?.billing?.city || '',
+      billingState: po?.billing?.state || '',
+      billingZip: po?.billing?.zip || '',
+      billingPhone: po?.billing?.phone || '',
+      billingFax: po?.billing?.fax || '',
+      showLogoOnPdf: Boolean(po?.billing?.showLogoOnPdf),
+      hideLogoOnPdf: Boolean(po?.billing?.hideLogoOnPdf),
+      shippingSameAsBilling: !(po?.shipping?.name || po?.shipping?.address || po?.shipping?.city || po?.shipping?.state || po?.shipping?.zip),
+      shippingName: po?.shipping?.name || '',
+      shippingAddress: po?.shipping?.address || '',
+      shippingCity: po?.shipping?.city || '',
+      shippingState: po?.shipping?.state || '',
+      shippingZip: po?.shipping?.zip || ''
+    });
+    setEditingId(getPoRouteId(po));
+    setShowAdd(true);
+    setShowDetails(false);
+  };
+
+  const updatePoStatus = async (po, status) => {
+    const id = getPoRouteId(po);
+    if (!id) {
+      alert('Purchase order id not found');
+      return;
+    }
+    try {
+      const res = await api.put(`/api/purchase-orders/${id}`, { status });
+      setOrders(prev => prev.map(o => (getPoRouteId(o) === id ? res.data : o)));
+      setSelectedPo(res.data);
+    } catch (err) {
+      alert(err.response?.data?.error || err.message);
+    }
+  };
+
+  const savePo = async (e) => {
+    e.preventDefault();
+    if (!form.title.trim()) { alert('Title required'); return; }
+    setSaving(true);
+    try {
+      const payload = {
+        title: form.title,
+        poNumber: form.poNumber || `PO-${Date.now()}`,
+        vendor: form.vendor || vendors.find(v => String(v._id || v.id) === String(form.vendorId))?.name,
+        vendorId: form.vendorId || undefined,
+        expectedDate: form.dueDate || undefined,
+        dueDate: form.dueDate || undefined,
+        category: form.category || undefined,
+        tags: form.tags || undefined,
+        additionalDetails: form.additionalDetails || undefined,
+        purchaseDate: form.purchaseDate || undefined,
+        terms: form.terms || undefined,
+        shippingMethod: form.shippingMethod || undefined,
+        fobShippingPoint: form.fobShippingPoint || undefined,
+        requisitioner: form.requisitioner || undefined,
+        notes: form.notes || undefined,
+        billing: {
+          useCompanyProfile: form.billingUseCompanyProfile,
+          companyName: form.billingCompanyName,
+          address: form.billingAddress,
+          city: form.billingCity,
+          state: form.billingState,
+          zip: form.billingZip,
+          phone: form.billingPhone,
+          fax: form.billingFax,
+          showLogoOnPdf: form.showLogoOnPdf,
+          hideLogoOnPdf: form.hideLogoOnPdf
+        },
+        shipping: {
+          sameAsBilling: form.shippingSameAsBilling,
+          name: form.shippingName,
+          address: form.shippingAddress,
+          city: form.shippingCity,
+          state: form.shippingState,
+          zip: form.shippingZip
+        },
+        items: (form.lineItems || []).map(it => ({
+          name: it.name,
+          quantity: Number(it.quantity) || 1,
+          unitCost: Number(it.unitCost) || 0
+        }))
+      };
+      let res;
+      if (editingId) {
+        res = await api.put(`/api/purchase-orders/${editingId}`, payload);
+        setOrders(prev => prev.map(o => (getPoRouteId(o) === editingId ? res.data : o)));
+      } else {
+        res = await api.post('/api/purchase-orders', payload);
+        setOrders(prev => [res.data, ...(prev || [])]);
+      }
+      setSelectedPo(res.data);
+      resetPoForm();
+      setShowAdd(false);
+      setEditingId(null);
+    } catch (err) {
+      alert(err.response?.data?.error || err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
@@ -5517,9 +6333,243 @@ const PurchaseOrdersTab = () => {
           <p className="text-sm text-gray-500 mt-0.5">Create, view and export purchase orders</p>
         </div>
         <div className="flex items-center gap-3">
+          <button onClick={() => setShowAdd(s => !s)} className="px-3 py-2 bg-white border rounded-xl text-sm font-semibold hover:bg-gray-50">
+            {showAdd ? 'Close' : 'New PO'}
+          </button>
           <button onClick={exportCSV} className="px-3 py-2 bg-white border rounded-xl text-sm font-semibold hover:bg-gray-50">Export CSV</button>
         </div>
       </div>
+
+      {showAdd && (
+        <form onSubmit={savePo} className="glass-surface rounded-lg border border-white/10 p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="md:col-span-2 flex items-center justify-between">
+              <h3 className="text-lg font-bold text-gray-900">{editingId ? 'Edit Purchase Order' : 'New Purchase Order'}</h3>
+              <div className="flex items-center gap-2">
+                <button type="button" onClick={() => { setShowAdd(false); setEditingId(null); resetPoForm(); }} className="px-3 py-2 text-sm border rounded-lg">Cancel</button>
+                <button type="submit" disabled={saving} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold disabled:opacity-60">
+                  {saving ? 'Saving...' : editingId ? 'Update Purchase Order' : 'Create Purchase Order'}
+                </button>
+              </div>
+            </div>
+
+          <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-gray-600">Title *</label>
+              <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" required />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-gray-600">PO Number</label>
+              <input value={form.poNumber} onChange={e => setForm(f => ({ ...f, poNumber: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" placeholder="Auto-generates if blank" />
+              <span className="text-[11px] text-gray-400">This auto-generates unless a custom one is entered</span>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-gray-600">Vendor</label>
+              <select
+                value={form.vendorId}
+                onChange={e => setForm(f => ({ ...f, vendorId: e.target.value, vendor: '' }))}
+                className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white"
+              >
+                <option value="">Select vendor…</option>
+                {vendors.map(v => <option key={v._id || v.id} value={v._id || v.id}>{v.name}</option>)}
+              </select>
+              <input
+                value={form.vendor}
+                onChange={e => setForm(f => ({ ...f, vendor: e.target.value, vendorId: '' }))}
+                className="px-3 py-2 border border-gray-200 rounded-lg text-sm mt-2"
+                placeholder="Or enter new vendor name"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-gray-600">Due Date</label>
+              <input type="date" value={form.dueDate} onChange={e => setForm(f => ({ ...f, dueDate: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-gray-600">Category</label>
+              <input value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-gray-600">Tags</label>
+              <input value={form.tags} onChange={e => setForm(f => ({ ...f, tags: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" placeholder="Comma separated" />
+            </div>
+            <div className="md:col-span-2 flex flex-col gap-1">
+              <label className="text-xs font-semibold text-gray-600">Additional Details</label>
+              <textarea value={form.additionalDetails} onChange={e => setForm(f => ({ ...f, additionalDetails: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm min-h-[90px]" />
+            </div>
+          </div>
+
+          <div className="md:col-span-2 border-t border-gray-100 pt-4">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-sm font-bold text-gray-900">Line Items *</h4>
+              <div className="flex items-center gap-2">
+                <button type="button" onClick={() => setForm(f => ({ ...f, lineItems: [...(f.lineItems || []), { name: '', quantity: 1, unitCost: 0 }] }))} className="px-3 py-2 border rounded-lg text-sm">Add Parts</button>
+                <button type="button" className="px-3 py-2 border rounded-lg text-sm">More Actions</button>
+              </div>
+            </div>
+            {(!form.lineItems || form.lineItems.length === 0) ? (
+              <div className="text-sm text-gray-400 py-6 text-center border border-dashed border-gray-200 rounded-lg">No line items have been added yet</div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {(form.lineItems || []).map((item, idx) => (
+                  <div key={`li-${idx}`} className="grid grid-cols-1 md:grid-cols-4 gap-3 items-center">
+                    <input
+                      value={item.name}
+                      onChange={e => setForm(f => ({ ...f, lineItems: f.lineItems.map((it, i) => i === idx ? { ...it, name: e.target.value } : it) }))}
+                      className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                      placeholder="Item name"
+                    />
+                    <input
+                      type="number"
+                      min="1"
+                      value={item.quantity}
+                      onChange={e => setForm(f => ({ ...f, lineItems: f.lineItems.map((it, i) => i === idx ? { ...it, quantity: Number(e.target.value) || 1 } : it) }))}
+                      className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                      placeholder="Qty"
+                    />
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={item.unitCost}
+                      onChange={e => setForm(f => ({ ...f, lineItems: f.lineItems.map((it, i) => i === idx ? { ...it, unitCost: Number(e.target.value) || 0 } : it) }))}
+                      className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                      placeholder="Unit Cost"
+                    />
+                    <button type="button" onClick={() => setForm(f => ({ ...f, lineItems: f.lineItems.filter((_, i) => i !== idx) }))} className="px-3 py-2 text-sm border rounded-lg">Remove</button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="md:col-span-2 border-t border-gray-100 pt-4">
+            <h4 className="text-sm font-bold text-gray-900 mb-2">Files</h4>
+            <div className="border border-dashed border-gray-200 rounded-lg p-6 text-center text-sm text-gray-500">Upload or drop files</div>
+            <button type="button" className="mt-2 text-sm text-blue-600 hover:underline">Add from Saved Files</button>
+          </div>
+
+          <div className="md:col-span-2 border-t border-gray-100 pt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="md:col-span-2">
+              <h4 className="text-sm font-bold text-gray-900 mb-2">Billing Address</h4>
+              <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
+                <label className="flex items-center gap-2">
+                  <input type="radio" checked={form.billingUseCompanyProfile} onChange={() => setForm(f => ({ ...f, billingUseCompanyProfile: true }))} />
+                  Use address from Company profile
+                </label>
+                <label className="flex items-center gap-2">
+                  <input type="radio" checked={!form.billingUseCompanyProfile} onChange={() => setForm(f => ({ ...f, billingUseCompanyProfile: false }))} />
+                  Use a different address
+                </label>
+              </div>
+              <label className="flex items-center gap-2 text-sm text-gray-600 mt-2">
+                <input type="checkbox" checked={form.showLogoOnPdf} onChange={e => setForm(f => ({ ...f, showLogoOnPdf: e.target.checked }))} />
+                Show company logo on PDF
+              </label>
+            </div>
+            {!form.billingUseCompanyProfile && (
+              <>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-semibold text-gray-600">Company Name</label>
+                  <input value={form.billingCompanyName} onChange={e => setForm(f => ({ ...f, billingCompanyName: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-semibold text-gray-600">Address</label>
+                  <input value={form.billingAddress} onChange={e => setForm(f => ({ ...f, billingAddress: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-semibold text-gray-600">City</label>
+                  <input value={form.billingCity} onChange={e => setForm(f => ({ ...f, billingCity: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-semibold text-gray-600">State</label>
+                  <input value={form.billingState} onChange={e => setForm(f => ({ ...f, billingState: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-semibold text-gray-600">Zip Code</label>
+                  <input value={form.billingZip} onChange={e => setForm(f => ({ ...f, billingZip: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-semibold text-gray-600">Phone Number</label>
+                  <input value={form.billingPhone} onChange={e => setForm(f => ({ ...f, billingPhone: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-semibold text-gray-600">Fax Number</label>
+                  <input value={form.billingFax} onChange={e => setForm(f => ({ ...f, billingFax: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+                </div>
+              </>
+            )}
+          </div>
+
+          <div className="md:col-span-2 border-t border-gray-100 pt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="md:col-span-2">
+              <h4 className="text-sm font-bold text-gray-900 mb-2">Shipping Address</h4>
+              <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
+                <label className="flex items-center gap-2">
+                  <input type="radio" checked={form.shippingSameAsBilling} onChange={() => setForm(f => ({ ...f, shippingSameAsBilling: true }))} />
+                  Same as billing address
+                </label>
+                <label className="flex items-center gap-2">
+                  <input type="radio" checked={!form.shippingSameAsBilling} onChange={() => setForm(f => ({ ...f, shippingSameAsBilling: false }))} />
+                  Use a different address
+                </label>
+              </div>
+            </div>
+            {!form.shippingSameAsBilling && (
+              <>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-semibold text-gray-600">Ship To Name</label>
+                  <input value={form.shippingName} onChange={e => setForm(f => ({ ...f, shippingName: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-semibold text-gray-600">Address</label>
+                  <input value={form.shippingAddress} onChange={e => setForm(f => ({ ...f, shippingAddress: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-semibold text-gray-600">City</label>
+                  <input value={form.shippingCity} onChange={e => setForm(f => ({ ...f, shippingCity: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-semibold text-gray-600">State</label>
+                  <input value={form.shippingState} onChange={e => setForm(f => ({ ...f, shippingState: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-semibold text-gray-600">Zip Code</label>
+                  <input value={form.shippingZip} onChange={e => setForm(f => ({ ...f, shippingZip: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+                </div>
+              </>
+            )}
+          </div>
+
+          <div className="md:col-span-2 border-t border-gray-100 pt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-gray-600">Purchase Date</label>
+              <input type="date" value={form.purchaseDate} onChange={e => setForm(f => ({ ...f, purchaseDate: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-gray-600">Terms</label>
+              <input value={form.terms} onChange={e => setForm(f => ({ ...f, terms: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-gray-600">Shipping Method</label>
+              <input value={form.shippingMethod} onChange={e => setForm(f => ({ ...f, shippingMethod: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-gray-600">F.O.B. Shipping Point</label>
+              <input value={form.fobShippingPoint} onChange={e => setForm(f => ({ ...f, fobShippingPoint: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+            </div>
+            <div className="md:col-span-2 flex flex-col gap-1">
+              <label className="text-xs font-semibold text-gray-600">Requisitioner</label>
+              <input value={form.requisitioner} onChange={e => setForm(f => ({ ...f, requisitioner: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+            </div>
+            <div className="md:col-span-2 flex flex-col gap-1">
+              <label className="text-xs font-semibold text-gray-600">Notes</label>
+              <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm min-h-[90px]" />
+            </div>
+            <label className="md:col-span-2 flex items-center gap-2 text-sm text-gray-600">
+              <input type="checkbox" checked={form.hideLogoOnPdf} onChange={e => setForm(f => ({ ...f, hideLogoOnPdf: e.target.checked }))} />
+              Hide logo on PDF
+            </label>
+          </div>
+        </form>
+      )}
 
       <div className="glass-surface-strong rounded-xl overflow-hidden shadow-2xl border border-white/20">
         <div className="overflow-x-auto">
@@ -5536,13 +6586,13 @@ const PurchaseOrdersTab = () => {
             </thead>
             <tbody>
               {orders.map((o, idx) => (
-                <tr key={o._id || o.id || `po-${idx}`} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+                <tr key={o._id || o.id || `po-${idx}`} className={`border-b border-gray-50 hover:bg-gray-50/50 transition-colors cursor-pointer ${selectedPo && getPoRouteId(selectedPo) === getPoRouteId(o) ? 'bg-blue-50/60' : ''}`} onClick={() => { setSelectedPo(o); setShowDetails(true); }}>
                   <td className="py-4 px-4">{o.title || o.name || 'PO'}</td>
                   <td className="py-4 px-4">{o.poNumber || o.number || '-'}</td>
                   <td className="py-4 px-4">{Array.isArray(o.items) ? o.items.length : (o.itemsCount || '-')}</td>
                   <td className="py-4 px-4">{o.totalCost ? `$${Number(o.totalCost).toFixed(2)}` : '-'}</td>
                   <td className="py-4 px-4">{o.vendor?.name || o.vendor || '-'}</td>
-                  <td className="py-4 px-4 text-right"><button className="p-1.5 hover:bg-gray-100 rounded-lg"><Eye className="w-4 h-4 text-blue-600" /></button></td>
+                  <td className="py-4 px-4 text-right"><button type="button" className="p-1.5 hover:bg-gray-100 rounded-lg" onClick={(e) => { e.stopPropagation(); setSelectedPo(o); setShowDetails(true); }}><Eye className="w-4 h-4 text-blue-600" /></button></td>
                 </tr>
               ))}
               {orders.length === 0 && (<tr><td colSpan="6" className="py-20 text-center"><p className="text-gray-500">No purchase orders found</p></td></tr>)}
@@ -5550,18 +6600,151 @@ const PurchaseOrdersTab = () => {
           </table>
         </div>
       </div>
+
+      {selectedPo && showDetails && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={() => setShowDetails(false)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-5xl max-h-[90vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <div>
+                <p className="text-xs uppercase font-bold text-gray-400">Purchase Order</p>
+                <h3 className="text-lg font-bold text-gray-900">#{selectedPo.poNumber || selectedPo.number || '—'} / {selectedPo.title || 'Untitled PO'}</h3>
+                <p className="text-sm text-gray-500">Status: {selectedPo.status || 'Pending'}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button className="px-3 py-2 text-sm border rounded-lg" onClick={() => setShowDetails(false)}>Close</button>
+                <button className="px-3 py-2 text-sm border rounded-lg" onClick={() => openPoEditor(selectedPo)}>Edit</button>
+                <button className="px-3 py-2 text-sm bg-rose-500 text-white rounded-lg" onClick={() => updatePoStatus(selectedPo, 'DECLINED')}>Decline</button>
+                <button className="px-3 py-2 text-sm bg-blue-600 text-white rounded-lg" onClick={() => updatePoStatus(selectedPo, 'APPROVED')}>Approve</button>
+              </div>
+            </div>
+            <div className="border-b border-gray-100 px-6">
+              <div className="flex items-center gap-8 text-sm font-semibold text-gray-500">
+                <button type="button" className="py-4 border-b-2 border-blue-600 text-gray-900">Details</button>
+                <button type="button" className="py-4">Activity</button>
+                <button type="button" className="py-4">Files</button>
+              </div>
+            </div>
+            <div className="p-6 grid grid-cols-1 xl:grid-cols-[minmax(0,2fr)_320px] gap-6">
+              <div className="space-y-6">
+                <div className="rounded-2xl border border-gray-200 overflow-hidden">
+                  <div className="px-6 py-4 bg-gray-50 text-lg font-bold text-gray-900">Shipping Information</div>
+                  <div className="divide-y divide-gray-100 text-sm">
+                    <div className="grid grid-cols-2 gap-4 px-6 py-5"><span className="text-gray-500">Company Name</span><span className="font-medium text-gray-900">{selectedPo.shipping?.name || selectedPo.billing?.companyName || selectedPo.vendorDetails?.name || selectedPo.vendor?.name || selectedPo.vendor || '—'}</span></div>
+                    <div className="grid grid-cols-2 gap-4 px-6 py-5"><span className="text-gray-500">Address</span><span className="font-medium text-gray-900">{selectedPo.shipping?.address || selectedPo.billing?.address || '—'}</span></div>
+                    <div className="grid grid-cols-2 gap-4 px-6 py-5"><span className="text-gray-500">Phone Number</span><span className="font-medium text-gray-900">{selectedPo.shipping?.phone || selectedPo.billing?.phone || selectedPo.vendorDetails?.phone || '—'}</span></div>
+                    <div className="grid grid-cols-2 gap-4 px-6 py-5"><span className="text-gray-500">Fax</span><span className="font-medium text-gray-900">{selectedPo.billing?.fax || 'None'}</span></div>
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-gray-200 overflow-hidden">
+                  <div className="px-6 py-4 bg-gray-50 text-lg font-bold text-gray-900">Line Items</div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                      <thead className="bg-gray-50 text-xs font-bold text-gray-600">
+                        <tr>
+                          <th className="py-3 px-4">Item</th>
+                          <th className="py-3 px-4">Cost</th>
+                          <th className="py-3 px-4">Qty</th>
+                          <th className="py-3 px-4 text-right">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody className="text-sm">
+                        {(selectedPo.items || []).map((item, idx) => {
+                          const qty = Number(item.quantity) || 0;
+                          const cost = Number(item.unitCost || item.cost) || 0;
+                          return (
+                            <tr key={idx} className="border-t border-gray-100">
+                              <td className="py-3 px-4">
+                                <div className="font-semibold text-gray-900">{item.name || 'Item'}</div>
+                                {item.description && <div className="text-xs text-gray-500 mt-1">{item.description}</div>}
+                              </td>
+                              <td className="py-3 px-4 text-gray-700">${cost.toFixed(2)}</td>
+                              <td className="py-3 px-4 text-gray-700">{qty}</td>
+                              <td className="py-3 px-4 text-right font-bold text-gray-900">${(qty * cost).toFixed(2)}</td>
+                            </tr>
+                          );
+                        })}
+                        {(selectedPo.items || []).length === 0 && (
+                          <tr><td colSpan={4} className="py-8 text-center text-gray-400">No items</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-gray-200 overflow-hidden">
+                  <div className="px-6 py-4 bg-gray-50 text-lg font-bold text-gray-900">Additional Details</div>
+                  <div className="divide-y divide-gray-100 text-sm">
+                    <div className="grid grid-cols-2 gap-4 px-6 py-5"><span className="text-gray-500">Purchase Date</span><span className="font-medium text-gray-900">{formatDate(selectedPo.purchaseDate || selectedPo.createdAt)}</span></div>
+                    <div className="grid grid-cols-2 gap-4 px-6 py-5"><span className="text-gray-500">Shipping Method</span><span className="font-medium text-gray-900">{selectedPo.shippingMethod || 'None'}</span></div>
+                    <div className="grid grid-cols-2 gap-4 px-6 py-5"><span className="text-gray-500">Terms</span><span className="font-medium text-gray-900">{selectedPo.terms || 'None'}</span></div>
+                    <div className="grid grid-cols-2 gap-4 px-6 py-5"><span className="text-gray-500">F.O.B. Shipping Point</span><span className="font-medium text-gray-900">{selectedPo.fobShippingPoint || 'None'}</span></div>
+                    <div className="grid grid-cols-2 gap-4 px-6 py-5"><span className="text-gray-500">Notes</span><span className="font-medium text-gray-900">{selectedPo.notes || selectedPo.additionalDetails || 'None'}</span></div>
+                  </div>
+                </div>
+              </div>
+              <div className="rounded-2xl border border-gray-200 bg-white">
+                <div className="p-6 space-y-5">
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-gray-500">Status</span>
+                    <span className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold ${requestStatusColor(selectedPo.status || 'PENDING')}`}>
+                      {String(selectedPo.status || 'Pending').replace(/_/g, ' ')}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4"><span className="text-gray-500">Vendor</span><span className="font-medium text-gray-900 text-right">{selectedPo.vendor?.name || selectedPo.vendorDetails?.name || selectedPo.vendor || '—'}</span></div>
+                  <div className="flex items-center justify-between gap-4"><span className="text-gray-500">Due Date</span><span className="font-medium text-gray-900 text-right">{formatDate(selectedPo.expectedDate || selectedPo.dueDate)}</span></div>
+                  <div className="flex items-center justify-between gap-4"><span className="text-gray-500">Added By</span><span className="font-medium text-gray-900 text-right">{selectedPo.createdBy?.name || selectedPo.createdBy?.email || '—'}</span></div>
+                  <div className="flex items-center justify-between gap-4"><span className="text-gray-500">Date Added</span><span className="font-medium text-gray-900 text-right">{formatDate(selectedPo.createdAt)}</span></div>
+                  <div className="flex items-center justify-between gap-4"><span className="text-gray-500">Cost</span><span className="font-medium text-gray-900 text-right">${getPoTotal(selectedPo).toFixed(2)}</span></div>
+                  <div className="flex items-center justify-between gap-4"><span className="text-gray-500">Category</span><span className="font-medium text-gray-900 text-right">{selectedPo.category || 'None'}</span></div>
+                  <div className="border-t border-gray-100 pt-5">
+                    <div className="grid grid-cols-[96px_minmax(0,1fr)] gap-4 text-sm">
+                      <span className="text-gray-500">Additional Details</span>
+                      <span className="font-medium text-gray-900">{selectedPo.notes || selectedPo.additionalDetails || 'None'}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="border-t border-gray-100 p-6">
+                  <h4 className="text-lg font-bold text-gray-900 mb-5">Requester Information</h4>
+                  <div className="space-y-5 text-sm">
+                    <div className="flex items-start justify-between gap-4"><span className="text-gray-500">Requisitioner</span><span className="font-medium text-gray-900 text-right">{selectedPo.requisitioner || selectedPo.createdBy?.name || 'Requisitioner'}</span></div>
+                    <div className="flex items-start justify-between gap-4"><span className="text-gray-500">Company Name</span><span className="font-medium text-gray-900 text-right">{selectedPo.billing?.companyName || selectedPo.shipping?.name || '—'}</span></div>
+                    <div className="flex items-start justify-between gap-4"><span className="text-gray-500">Address</span><span className="font-medium text-gray-900 text-right">{selectedPo.billing?.address || selectedPo.shipping?.address || '—'}</span></div>
+                    <div className="flex items-start justify-between gap-4"><span className="text-gray-500">Phone Number</span><span className="font-medium text-gray-900 text-right">{selectedPo.billing?.phone || selectedPo.shipping?.phone || '—'}</span></div>
+                    <div className="flex items-start justify-between gap-4"><span className="text-gray-500">Fax</span><span className="font-medium text-gray-900 text-right">{selectedPo.billing?.fax || '—'}</span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
-// Vendors & Customers Tab
-const VendorsTab = () => {
+// Vendors or Customers Tab
+const VendorsTab = ({ type = 'vendor' }) => {
   const [vendors, setVendors] = useState([]);
   const fileRef = React.useRef(null);
   const [showAddVendor, setShowAddVendor] = useState(false);
   const [creatingVendor, setCreatingVendor] = useState(false);
-  const selection = useBulkSelection(vendors, (vendor) => vendor._id || vendor.id);
-  const [newVendor, setNewVendor] = useState({ name: '', address: '', phone: '', contact: '', email: '' });
+  const [newVendor, setNewVendor] = useState({
+    name: '',
+    address: '',
+    phone: '',
+    contact: '',
+    email: '',
+    type: '',
+    description: '',
+    website: '',
+    hourlyRate: '',
+    isLocationBased: false,
+    billingName: '',
+    billingAddress1: '',
+    billingAddress2: '',
+    billingAddress3: '',
+    currency: 'USD',
+    customFields: [{ name: '', value: '' }]
+  });
   const normalizeEntry = (item, source) => {
     const roleLabel = item.role === 'requestor' ? 'Requestor' : item.role === 'client' ? 'Client' : '';
     const typeLabel = source === 'vendor' ? 'Vendor' : source === 'client' ? 'Customer' : roleLabel || 'Customer';
@@ -5596,10 +6779,17 @@ const VendorsTab = () => {
     };
   }, []);
 
+  const filteredEntries = (vendors || []).filter((v) => {
+    const label = (v.__typeLabel || v.type || v.role || '').toLowerCase();
+    if (type === 'vendor') return label.includes('vendor');
+    return label.includes('customer') || label.includes('client') || label.includes('requestor');
+  });
+  const selection = useBulkSelection(filteredEntries, (vendor) => vendor._id || vendor.id);
+
   const exportCSV = () => {
-    if (!vendors || vendors.length === 0) return;
+    if (!filteredEntries || filteredEntries.length === 0) return;
     const keys = ['id', 'name', 'type', 'address', 'phone', 'contact', 'email'];
-    const rows = vendors.map(v => ({
+    const rows = filteredEntries.map(v => ({
       id: v._id || v.id || '',
       name: v.name || v.company || v.fullName || '',
       type: v.__typeLabel || v.type || v.role || '',
@@ -5639,9 +6829,10 @@ const VendorsTab = () => {
           email: r.email || '',
           type: r.type || r.category || 'vendor'
         })).filter(it => it.name);
-        const res = await api.post('/api/vendors/bulk', { items: itemsPayload });
+        const endpoint = type === 'vendor' ? '/api/vendors/bulk' : '/api/clients/bulk';
+        const res = await api.post(endpoint, { items: itemsPayload });
         setVendors(prev => [...(res.data || []), ...(prev || [])]);
-        alert(`Imported ${itemsPayload.length} vendors/customers`);
+        alert(`Imported ${itemsPayload.length} ${type === 'vendor' ? 'vendors' : 'customers'}`);
       } catch (err) {
         console.error('Failed to import vendors/customers', err);
         alert('Failed to import vendors/customers: ' + (err.response?.data?.error || err.message));
@@ -5660,28 +6851,75 @@ const VendorsTab = () => {
       setCreatingVendor(true);
       let created = null;
       try {
-        const res = await api.post('/api/vendors', {
+        const res = await api.post(type === 'vendor' ? '/api/vendors' : '/api/clients', {
           name: newVendor.name,
           address: newVendor.address,
           phone: newVendor.phone,
           contactName: newVendor.contact,
-          email: newVendor.email
+          email: newVendor.email,
+          type: newVendor.type,
+          description: newVendor.description,
+          website: newVendor.website,
+          hourlyRate: newVendor.hourlyRate,
+          isLocationBased: newVendor.isLocationBased,
+          billing: type === 'customer' ? {
+            name: newVendor.billingName,
+            address1: newVendor.billingAddress1,
+            address2: newVendor.billingAddress2,
+            address3: newVendor.billingAddress3,
+            currency: newVendor.currency
+          } : undefined,
+          customFields: type === 'customer'
+            ? (newVendor.customFields || []).filter(f => f.name || f.value)
+            : undefined
         });
         created = res.data;
       } catch (err) {
-        const res = await api.post('/api/clients', {
+        const res = await api.post(type === 'vendor' ? '/api/clients' : '/api/vendors', {
           name: newVendor.name,
           address: newVendor.address,
           phone: newVendor.phone,
           contactName: newVendor.contact,
-          email: newVendor.email
+          email: newVendor.email,
+          type: newVendor.type,
+          description: newVendor.description,
+          website: newVendor.website,
+          hourlyRate: newVendor.hourlyRate,
+          isLocationBased: newVendor.isLocationBased,
+          billing: type === 'customer' ? {
+            name: newVendor.billingName,
+            address1: newVendor.billingAddress1,
+            address2: newVendor.billingAddress2,
+            address3: newVendor.billingAddress3,
+            currency: newVendor.currency
+          } : undefined,
+          customFields: type === 'customer'
+            ? (newVendor.customFields || []).filter(f => f.name || f.value)
+            : undefined
         });
         created = res.data;
       }
       setVendors(prev => [created, ...(prev || [])]);
       setShowAddVendor(false);
-      setNewVendor({ name: '', address: '', phone: '', contact: '', email: '' });
-      alert('Vendor/Customer added successfully');
+      setNewVendor({
+        name: '',
+        address: '',
+        phone: '',
+        contact: '',
+        email: '',
+        type: '',
+        description: '',
+        website: '',
+        hourlyRate: '',
+        isLocationBased: false,
+        billingName: '',
+        billingAddress1: '',
+        billingAddress2: '',
+        billingAddress3: '',
+        currency: 'USD',
+        customFields: [{ name: '', value: '' }]
+      });
+      alert(`${type === 'vendor' ? 'Vendor' : 'Customer'} added successfully`);
     } catch (err) {
       console.error('Failed to add vendor/customer', err);
       alert('Failed to add vendor/customer: ' + (err.response?.data?.error || err.message));
@@ -5692,7 +6930,7 @@ const VendorsTab = () => {
 
   const handleDeleteSelected = async () => {
     if (selection.selectedIds.length === 0) return;
-    const selectedItems = (vendors || []).filter((v) => selection.selectedIds.includes(String(v._id || v.id)));
+    const selectedItems = (filteredEntries || []).filter((v) => selection.selectedIds.includes(String(v._id || v.id)));
     const deletableItems = selectedItems.filter((v) => v.__source !== 'user');
     const blockedItems = selectedItems.filter((v) => v.__source === 'user');
     if (blockedItems.length > 0) {
@@ -5714,7 +6952,7 @@ const VendorsTab = () => {
       selection.clear();
     } catch (err) {
       console.error('Failed to delete vendors', err);
-      alert('Failed to delete selected vendors: ' + (err.response?.data?.error || err.message));
+      alert(`Failed to delete selected ${type === 'vendor' ? 'vendors' : 'customers'}: ` + (err.response?.data?.error || err.message));
     }
   };
 
@@ -5722,20 +6960,22 @@ const VendorsTab = () => {
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-bold text-gray-900">Vendors & Customers</h2>
-          <p className="text-sm text-gray-500 mt-0.5">Suppliers and customer contacts</p>
+          <h2 className="text-xl font-bold text-gray-900">{type === 'vendor' ? 'Vendors' : 'Customers'}</h2>
+          <p className="text-sm text-gray-500 mt-0.5">{type === 'vendor' ? 'Suppliers and service partners' : 'Customer contacts'}</p>
         </div>
         <div className="flex items-center gap-3">
           <button onClick={exportCSV} className="px-3 py-2 bg-white border rounded-xl text-sm font-semibold hover:bg-gray-50">Export CSV</button>
           <button onClick={downloadTemplate} className="px-3 py-2 bg-white border rounded-xl text-sm font-semibold hover:bg-gray-50">Download Template</button>
-          <button onClick={() => setShowAddVendor(true)} className="px-3 py-2 bg-gray-900 text-blue-600 rounded-xl text-sm font-bold">Add Person</button>
+          <button onClick={() => setShowAddVendor(true)} className="px-3 py-2 bg-gray-900 text-blue-600 rounded-xl text-sm font-bold">
+            {type === 'vendor' ? 'Create Vendor' : 'Create Customer'}
+          </button>
           <button onClick={() => fileRef.current && fileRef.current.click()} className="px-3 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold">Import CSV</button>
           <input ref={fileRef} type="file" accept=".csv" onChange={onImport} className="hidden" />
         </div>
       </div>
 
       <div className="glass-surface-strong rounded-xl overflow-hidden shadow-2xl border border-white/20">
-        <BulkActionBar count={selection.selectedIds.length} label="vendors" onDelete={handleDeleteSelected} />
+        <BulkActionBar count={selection.selectedIds.length} label={type === 'vendor' ? 'vendors' : 'customers'} onDelete={handleDeleteSelected} />
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead className="glass-surface border-b border-white/10">
@@ -5749,7 +6989,6 @@ const VendorsTab = () => {
                   />
                 </th>
                 <th className="py-4 px-4">Name</th>
-                <th className="py-4 px-4">Type</th>
                 <th className="py-4 px-4">Address</th>
                 <th className="py-4 px-4">Phone Number</th>
                 <th className="py-4 px-4">Contact</th>
@@ -5758,7 +6997,7 @@ const VendorsTab = () => {
               </tr>
             </thead>
             <tbody>
-              {vendors.map((v, idx) => (
+              {filteredEntries.map((v, idx) => (
                 <tr key={v._id || v.id || `vend-${idx}`} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
                   <td className="py-4 px-4">
                     <input
@@ -5769,7 +7008,6 @@ const VendorsTab = () => {
                     />
                   </td>
                   <td className="py-4 px-4">{v.name || v.company || 'Unnamed'}</td>
-                  <td className="py-4 px-4">{v.__typeLabel || v.type || v.role || 'Customer'}</td>
                   <td className="py-4 px-4">{v.address || v.street || 'N/A'}</td>
                   <td className="py-4 px-4">{v.phone || v.phoneNumber || 'N/A'}</td>
                   <td className="py-4 px-4">{v.contactName || v.contact || 'N/A'}</td>
@@ -5777,7 +7015,7 @@ const VendorsTab = () => {
                   <td className="py-4 px-4 text-right"><button className="p-1.5 hover:bg-gray-100 rounded-lg"><Eye className="w-4 h-4 text-blue-600" /></button></td>
                 </tr>
               ))}
-              {vendors.length === 0 && (<tr><td colSpan="8" className="py-20 text-center"><p className="text-gray-500">No vendors/customers found</p></td></tr>)}
+              {filteredEntries.length === 0 && (<tr><td colSpan="7" className="py-20 text-center"><p className="text-gray-500">No {type === 'vendor' ? 'vendors' : 'customers'} found</p></td></tr>)}
             </tbody>
           </table>
         </div>
@@ -5787,7 +7025,7 @@ const VendorsTab = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
           <form onSubmit={handleCreateVendor} className="bg-white rounded-2xl w-full max-w-lg p-6 shadow-2xl">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-gray-900">Add Vendor/Customer</h3>
+              <h3 className="text-lg font-bold text-gray-900">{type === 'vendor' ? 'Create Vendor' : 'Create Customer'}</h3>
               <button type="button" onClick={() => setShowAddVendor(false)} className="p-2 hover:bg-gray-100 rounded-lg">
                 <X className="w-4 h-4 text-gray-400" />
               </button>
@@ -5800,6 +7038,103 @@ const VendorsTab = () => {
                 <input className="w-full border border-gray-200 rounded-lg p-2 text-sm" placeholder="Contact Name" value={newVendor.contact} onChange={(e) => setNewVendor({ ...newVendor, contact: e.target.value })} />
               </div>
               <input className="w-full border border-gray-200 rounded-lg p-2 text-sm" placeholder="Email" value={newVendor.email} onChange={(e) => setNewVendor({ ...newVendor, email: e.target.value })} />
+              <div className="grid grid-cols-2 gap-3">
+                <input className="w-full border border-gray-200 rounded-lg p-2 text-sm" placeholder="Type" value={newVendor.type} onChange={(e) => setNewVendor({ ...newVendor, type: e.target.value })} />
+                <input className="w-full border border-gray-200 rounded-lg p-2 text-sm" placeholder="Website" value={newVendor.website} onChange={(e) => setNewVendor({ ...newVendor, website: e.target.value })} />
+              </div>
+              <textarea className="w-full border border-gray-200 rounded-lg p-2 text-sm min-h-[90px]" placeholder="Description" value={newVendor.description} onChange={(e) => setNewVendor({ ...newVendor, description: e.target.value })} />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
+                  <span className="px-3 text-sm text-gray-500">$</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    className="flex-1 p-2 text-sm outline-none"
+                    placeholder="Hourly Rate"
+                    value={newVendor.hourlyRate}
+                    onChange={(e) => setNewVendor({ ...newVendor, hourlyRate: e.target.value })}
+                  />
+                </div>
+                <label className="flex items-center gap-2 text-sm text-gray-600">
+                  <input
+                    type="checkbox"
+                    checked={newVendor.isLocationBased}
+                    onChange={(e) => setNewVendor({ ...newVendor, isLocationBased: e.target.checked })}
+                  />
+                  Is Location Based
+                </label>
+              </div>
+
+              {type === 'customer' && (
+                <div className="mt-4 space-y-4">
+                  <div className="text-sm font-semibold text-gray-800">Billing Information</div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <input className="w-full border border-gray-200 rounded-lg p-2 text-sm" placeholder="Billing Name" value={newVendor.billingName} onChange={(e) => setNewVendor({ ...newVendor, billingName: e.target.value })} />
+                    <input className="w-full border border-gray-200 rounded-lg p-2 text-sm" placeholder="Address" value={newVendor.billingAddress1} onChange={(e) => setNewVendor({ ...newVendor, billingAddress1: e.target.value })} />
+                    <input className="w-full border border-gray-200 rounded-lg p-2 text-sm" placeholder="Address Line 2" value={newVendor.billingAddress2} onChange={(e) => setNewVendor({ ...newVendor, billingAddress2: e.target.value })} />
+                    <input className="w-full border border-gray-200 rounded-lg p-2 text-sm" placeholder="Address Line 3" value={newVendor.billingAddress3} onChange={(e) => setNewVendor({ ...newVendor, billingAddress3: e.target.value })} />
+                    <select className="w-full border border-gray-200 rounded-lg p-2 text-sm" value={newVendor.currency} onChange={(e) => setNewVendor({ ...newVendor, currency: e.target.value })}>
+                      <option value="USD">USD - United States Dollar - $</option>
+                      <option value="EUR">EUR - Euro - €</option>
+                      <option value="GBP">GBP - British Pound - £</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm font-semibold text-gray-800">Custom Data</div>
+                      <button
+                        type="button"
+                        onClick={() => setNewVendor(v => ({ ...v, customFields: [...(v.customFields || []), { name: '', value: '' }] }))}
+                        className="text-blue-600 text-sm font-semibold"
+                      >
+                        Add Custom Field
+                      </button>
+                    </div>
+                    <div className="space-y-2">
+                      {(newVendor.customFields || []).map((cf, idx) => (
+                        <div key={idx} className="grid grid-cols-1 md:grid-cols-3 gap-3 items-center">
+                          <div className="flex flex-col gap-1">
+                            <label className="text-xs font-semibold text-gray-600">Field Name</label>
+                            <input
+                              value={cf.name}
+                              onChange={e => setNewVendor(v => {
+                                const next = [...(v.customFields || [])];
+                                next[idx] = { ...next[idx], name: e.target.value };
+                                return { ...v, customFields: next };
+                              })}
+                              className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                            />
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <label className="text-xs font-semibold text-gray-600">Value</label>
+                            <input
+                              value={cf.value}
+                              onChange={e => setNewVendor(v => {
+                                const next = [...(v.customFields || [])];
+                                next[idx] = { ...next[idx], value: e.target.value };
+                                return { ...v, customFields: next };
+                              })}
+                              className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                            />
+                          </div>
+                          <div className="text-right">
+                            {(newVendor.customFields || []).length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => setNewVendor(v => ({ ...v, customFields: v.customFields.filter((_, i) => i !== idx) }))}
+                                className="text-rose-600 text-sm font-semibold"
+                              >
+                                Remove
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
             <div className="flex items-center justify-end gap-2 mt-5">
               <button type="button" onClick={() => setShowAddVendor(false)} className="px-4 py-2 border rounded-lg text-sm">Cancel</button>
@@ -6178,6 +7513,123 @@ const IssuesTab = ({
   onCreateWorkOrder
 }) => {
   const selection = useBulkSelection(issues, (issue) => issue._id || issue.id);
+  const [viewMode, setViewMode] = useState('table');
+  const [expandedGroups, setExpandedGroups] = useState({});
+  const [calendarFilterOpen, setCalendarFilterOpen] = useState(null);
+  const [calendarStatusFilters, setCalendarStatusFilters] = useState(['OPEN', 'IN PROGRESS', 'ON HOLD', 'COMPLETE']);
+  const [calendarPriorityFilters, setCalendarPriorityFilters] = useState(['HIGH', 'MEDIUM', 'LOW', 'NONE']);
+  const [calendarAssigneeFilter, setCalendarAssigneeFilter] = useState('all');
+  const [calendarDayFilter, setCalendarDayFilter] = useState('any');
+  const [calendarLocationFilters, setCalendarLocationFilters] = useState([]);
+
+  const getIssueDate = (issue) => normalizeDate(issue.fixDeadline || issue.dueDate || issue.createdAt || issue.date);
+
+  const normalizeStatus = (issue) => {
+    const status = String(issue.status || '').toUpperCase();
+    return status.includes('PROGRESS')
+      ? 'IN PROGRESS'
+      : status.includes('HOLD')
+        ? 'ON HOLD'
+        : status.includes('COMPLETE')
+          ? 'COMPLETE'
+          : status.includes('OPEN') || status.includes('PENDING')
+            ? 'OPEN'
+            : 'OPEN';
+  };
+
+  const getAssigneeLabel = (issue) => {
+    const name = getAssignedTechName(issue);
+    return name && name !== 'Unassigned' ? name : 'No Assignee';
+  };
+
+  const getInitials = (name) => {
+    if (!name) return 'N/A';
+    const parts = String(name).trim().split(/\s+/);
+    const first = parts[0]?.[0] || '';
+    const last = parts[parts.length - 1]?.[0] || '';
+    return (first + last).toUpperCase() || 'N/A';
+  };
+
+  const toggleGroup = (key) => {
+    setExpandedGroups((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const buildCalendarDays = () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = today.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const startOffset = firstDay.getDay();
+    const totalDays = lastDay.getDate();
+    const days = [];
+    for (let i = 0; i < startOffset; i += 1) days.push(null);
+    for (let d = 1; d <= totalDays; d += 1) days.push(new Date(year, month, d));
+    return { days, monthLabel: firstDay.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) };
+  };
+
+  const { days: calendarDays, monthLabel } = buildCalendarDays();
+  const issuesByDay = issues.reduce((acc, issue) => {
+    const date = getIssueDate(issue);
+    if (!date || Number.isNaN(date.getTime())) return acc;
+    const key = date.toISOString().slice(0, 10);
+    acc[key] = acc[key] || [];
+    acc[key].push(issue);
+    return acc;
+  }, {});
+  const statusCounts = issues.reduce((acc, issue) => {
+    const normalized = normalizeStatus(issue);
+    acc[normalized] = (acc[normalized] || 0) + 1;
+    return acc;
+  }, {});
+
+  const allLocations = Array.from(new Set(issues.map((issue) => issue.location || issue.assetName).filter(Boolean)));
+  const calendarIssues = issues.filter((issue) => {
+    const statusOk = calendarStatusFilters.includes(normalizeStatus(issue));
+    const priority = String(issue.priority || 'NONE').toUpperCase();
+    const priorityOk = calendarPriorityFilters.includes(priority);
+    const assignee = getAssignedTechName(issue);
+    const assigneeOk = calendarAssigneeFilter === 'all'
+      ? true
+      : calendarAssigneeFilter === 'assigned'
+        ? assignee !== 'Unassigned'
+        : assignee === 'Unassigned';
+    const locationVal = String(issue.location || issue.assetName || '');
+    const locationOk = calendarLocationFilters.length === 0 || calendarLocationFilters.includes(locationVal);
+    const date = getIssueDate(issue);
+    let dayOk = true;
+    if (calendarDayFilter !== 'any' && date && !Number.isNaN(date.getTime())) {
+      const now = new Date();
+      if (calendarDayFilter === 'today') {
+        dayOk = date.toDateString() === now.toDateString();
+      } else if (calendarDayFilter === 'week') {
+        const start = new Date(now);
+        start.setDate(now.getDate() - now.getDay());
+        const end = new Date(start);
+        end.setDate(start.getDate() + 6);
+        dayOk = date >= start && date <= end;
+      } else if (calendarDayFilter === 'month') {
+        dayOk = date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+      }
+    }
+    return statusOk && priorityOk && assigneeOk && locationOk && dayOk;
+  });
+  const calendarIssuesByDay = calendarIssues.reduce((acc, issue) => {
+    const date = getIssueDate(issue);
+    if (!date || Number.isNaN(date.getTime())) return acc;
+    const key = date.toISOString().slice(0, 10);
+    acc[key] = acc[key] || [];
+    acc[key].push(issue);
+    return acc;
+  }, {});
+
+  const groups = issues.reduce((acc, issue) => {
+    const label = getAssigneeLabel(issue);
+    if (!acc[label]) acc[label] = [];
+    acc[label].push(issue);
+    return acc;
+  }, {});
+  const groupEntries = Object.entries(groups);
 
   const handleDeleteSelected = async () => {
     if (selection.selectedIds.length === 0) return;
@@ -6199,14 +7651,37 @@ const IssuesTab = ({
           <h2 className="text-2xl font-bold text-gray-900">Work Orders</h2>
           <p className="text-sm text-gray-600">Manage and track active work orders</p>
         </div>
-        <button
-          onClick={() => onCreateWorkOrder && onCreateWorkOrder()}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold shadow-sm hover:bg-blue-700"
-        >
-          Create Work Order
-        </button>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 rounded-lg border border-gray-200 bg-white/70 p-1">
+            <button
+              onClick={() => setViewMode('table')}
+              className={`px-3 py-1.5 text-xs font-bold rounded-md transition ${viewMode === 'table' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+            >
+              Table
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              className={`px-3 py-1.5 text-xs font-bold rounded-md transition ${viewMode === 'list' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+            >
+              List
+            </button>
+            <button
+              onClick={() => setViewMode('calendar')}
+              className={`px-3 py-1.5 text-xs font-bold rounded-md transition ${viewMode === 'calendar' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+            >
+              Calendar
+            </button>
+          </div>
+          <button
+            onClick={() => onCreateWorkOrder && onCreateWorkOrder()}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold shadow-sm hover:bg-blue-700"
+          >
+            Create Work Order
+          </button>
+        </div>
       </div>
       <BulkActionBar count={selection.selectedIds.length} label="work orders" onDelete={handleDeleteSelected} />
+      {viewMode === 'table' && (
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
           <thead className="glass-surface border-b border-white/10">
@@ -6336,6 +7811,13 @@ const IssuesTab = ({
                   </td>
                   <td className="py-4 px-4 text-right">
                     <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); openCommentModal(issue); }}
+                        className="p-1.5 hover:bg-indigo-100 rounded-lg transition-colors"
+                        title="Open comments"
+                      >
+                        <MessageSquare className="w-4 h-4 text-indigo-600" />
+                      </button>
                       {assigning === (issue._id || issue.id) ? (
                         <button
                           onClick={(e) => { e.stopPropagation(); handleOpenAssignment(null); }}
@@ -6388,6 +7870,329 @@ const IssuesTab = ({
           </tbody>
         </table>
       </div>
+      )}
+
+      {viewMode === 'list' && (
+        <div className="p-6 space-y-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {[
+              { label: 'Open', key: 'OPEN', color: 'border-l-4 border-rose-500' },
+              { label: 'In Progress', key: 'IN PROGRESS', color: 'border-l-4 border-emerald-500' },
+              { label: 'On Hold', key: 'ON HOLD', color: 'border-l-4 border-amber-500' },
+              { label: 'Complete', key: 'COMPLETE', color: 'border-l-4 border-slate-400' }
+            ].map((item) => (
+              <div key={item.key} className={`bg-white/80 rounded-xl p-4 border border-gray-100 ${item.color} shadow-sm`}>
+                <div className="text-sm font-bold text-gray-600">{item.label}</div>
+                <div className="text-2xl font-black text-gray-900 mt-1">{statusCounts[item.key] || 0}</div>
+              </div>
+            ))}
+          </div>
+
+          <div className="space-y-3">
+            {groupEntries.map(([assignee, items]) => {
+              const expanded = expandedGroups[assignee] !== false;
+              return (
+                <div key={assignee} className="bg-white/70 rounded-2xl border border-gray-100 shadow-sm">
+                  <button
+                    onClick={() => toggleGroup(assignee)}
+                    className="w-full flex items-center justify-between gap-4 px-4 py-3"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-gray-200 text-gray-700 flex items-center justify-center text-xs font-bold">
+                        {getInitials(assignee)}
+                      </div>
+                      <div className="text-left">
+                        <div className="text-sm font-bold text-gray-900">{assignee}</div>
+                        <div className="text-xs text-gray-500">{items.length} work orders</div>
+                      </div>
+                    </div>
+                    <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+                  </button>
+                  {expanded && (
+                    <div className="px-4 pb-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                        {items.map((issue, idx) => (
+                          <div
+                            key={issue._id || issue.id || `list-card-${idx}`}
+                            onClick={() => onOpenDetails && onOpenDetails('issue', issue)}
+                            className="p-4 rounded-2xl border border-gray-100 bg-white hover:shadow-md transition cursor-pointer"
+                          >
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-2">
+                                <span className="text-[11px] font-bold text-gray-400 bg-gray-100 rounded px-2 py-0.5">
+                                  #{String(normalizeId(issue._id || issue.id)).slice(-4)}
+                                </span>
+                                <span className={`text-[11px] font-bold rounded px-2 py-0.5 ${
+                                  issue.priority === 'HIGH' ? 'bg-rose-100 text-rose-700'
+                                    : issue.priority === 'MEDIUM' ? 'bg-amber-100 text-amber-700'
+                                      : issue.priority === 'LOW' ? 'bg-emerald-100 text-emerald-700'
+                                        : 'bg-gray-100 text-gray-600'
+                                }`}>
+                                  {issue.priority || 'None'}
+                                </span>
+                              </div>
+                              <MoreHorizontal className="w-4 h-4 text-gray-400" />
+                            </div>
+                            <div className="text-sm font-bold text-gray-900 mb-2 line-clamp-2">{issue.title}</div>
+                            <div className="flex items-center gap-2 text-xs text-gray-500">
+                              <Calendar className="w-3.5 h-3.5" />
+                              {(issue.fixDeadline || issue.dueDate)
+                                ? normalizeDate(issue.fixDeadline || issue.dueDate).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
+                                : 'No due date'}
+                            </div>
+                            <div className="flex items-center gap-2 text-xs text-gray-500 mt-1">
+                              <MapPin className="w-3.5 h-3.5" />
+                              {issue.location || issue.assetName || 'Unknown location'}
+                            </div>
+                          </div>
+                        ))}
+                        {items.length === 0 && (
+                          <div className="col-span-full text-sm text-gray-400 italic py-6 text-center">No work order found for the status</div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {groupEntries.length === 0 && (
+              <div className="py-16 text-center">
+                <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">No work orders found</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {viewMode === 'calendar' && (
+        <div className="p-6">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <button className="p-2 rounded-lg border border-gray-200 bg-white text-gray-500">
+                <Filter className="w-4 h-4" />
+              </button>
+              {[
+                { label: calendarAssigneeFilter === 'all' ? 'Everyone' : calendarAssigneeFilter === 'assigned' ? 'Assigned' : 'Unassigned', icon: Users, key: 'assignee' },
+                { label: calendarLocationFilters.length > 0 ? `${calendarLocationFilters.length} Location(s)` : 'Anywhere', icon: MapPin, key: 'location' },
+                { label: calendarDayFilter === 'any' ? 'Any Day' : calendarDayFilter === 'today' ? 'Today' : calendarDayFilter === 'week' ? 'This Week' : 'This Month', icon: Calendar, key: 'day' },
+                { label: calendarStatusFilters.length === 4 ? 'Open, On Hold, In Progress' : `${calendarStatusFilters.length} Status`, icon: CircleDashed, key: 'status' },
+                { label: calendarPriorityFilters.length === 4 ? 'Any Priority' : `${calendarPriorityFilters.length} Priority`, icon: Flag, key: 'priority' },
+                { label: 'Bookmarked', icon: Star }
+              ].map((chip) => (
+                <button
+                  key={chip.label}
+                  onClick={() => chip.key && setCalendarFilterOpen((prev) => (prev === chip.key ? null : chip.key))}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-xs font-semibold text-gray-600 hover:bg-gray-50"
+                >
+                  <chip.icon className="w-4 h-4 text-gray-400" />
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-3 text-xs font-semibold text-gray-500">
+              <button className="text-blue-600 hover:text-blue-700">Save Filter</button>
+              <button className="p-2 rounded-lg border border-gray-200 bg-white">
+                <Repeat className="w-4 h-4 text-gray-400" />
+              </button>
+              <button
+                onClick={() => {
+                  setCalendarStatusFilters(['OPEN', 'IN PROGRESS', 'ON HOLD', 'COMPLETE']);
+                  setCalendarPriorityFilters(['HIGH', 'MEDIUM', 'LOW', 'NONE']);
+                  setCalendarAssigneeFilter('all');
+                  setCalendarDayFilter('any');
+                  setCalendarLocationFilters([]);
+                }}
+                className="px-3 py-1.5 rounded-lg border border-gray-200 bg-white flex items-center gap-2"
+              >
+                <Sparkles className="w-4 h-4 text-gray-400" />
+                Quick Filters
+              </button>
+            </div>
+          </div>
+
+          <div className="relative">
+            <FilterPopover
+              isOpen={calendarFilterOpen === 'status'}
+              onClose={() => setCalendarFilterOpen(null)}
+              title="Status"
+              className="w-64"
+            >
+              {['OPEN', 'IN PROGRESS', 'ON HOLD', 'COMPLETE'].map((s) => (
+                <label key={s} className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded-lg cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    checked={calendarStatusFilters.includes(s)}
+                    onChange={(e) => {
+                      const next = e.target.checked
+                        ? [...calendarStatusFilters, s]
+                        : calendarStatusFilters.filter((x) => x !== s);
+                      setCalendarStatusFilters(next);
+                    }}
+                  />
+                  <span className="text-sm font-semibold text-gray-700">{s}</span>
+                </label>
+              ))}
+            </FilterPopover>
+
+            <FilterPopover
+              isOpen={calendarFilterOpen === 'priority'}
+              onClose={() => setCalendarFilterOpen(null)}
+              title="Priority"
+              className="w-56"
+            >
+              {['HIGH', 'MEDIUM', 'LOW', 'NONE'].map((p) => (
+                <label key={p} className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded-lg cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    checked={calendarPriorityFilters.includes(p)}
+                    onChange={(e) => {
+                      const next = e.target.checked
+                        ? [...calendarPriorityFilters, p]
+                        : calendarPriorityFilters.filter((x) => x !== p);
+                      setCalendarPriorityFilters(next);
+                    }}
+                  />
+                  <span className="text-sm font-semibold text-gray-700">{p}</span>
+                </label>
+              ))}
+            </FilterPopover>
+
+            <FilterPopover
+              isOpen={calendarFilterOpen === 'assignee'}
+              onClose={() => setCalendarFilterOpen(null)}
+              title="Assignee"
+              className="w-56"
+            >
+              {[
+                { id: 'all', label: 'Everyone' },
+                { id: 'assigned', label: 'Assigned' },
+                { id: 'unassigned', label: 'Unassigned' }
+              ].map((opt) => (
+                <label key={opt.id} className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded-lg cursor-pointer">
+                  <input
+                    type="radio"
+                    className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+                    name="calendar-assignee"
+                    checked={calendarAssigneeFilter === opt.id}
+                    onChange={() => setCalendarAssigneeFilter(opt.id)}
+                  />
+                  <span className="text-sm font-semibold text-gray-700">{opt.label}</span>
+                </label>
+              ))}
+            </FilterPopover>
+
+            <FilterPopover
+              isOpen={calendarFilterOpen === 'day'}
+              onClose={() => setCalendarFilterOpen(null)}
+              title="Day"
+              className="w-56"
+            >
+              {[
+                { id: 'any', label: 'Any Day' },
+                { id: 'today', label: 'Today' },
+                { id: 'week', label: 'This Week' },
+                { id: 'month', label: 'This Month' }
+              ].map((opt) => (
+                <label key={opt.id} className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded-lg cursor-pointer">
+                  <input
+                    type="radio"
+                    className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+                    name="calendar-day"
+                    checked={calendarDayFilter === opt.id}
+                    onChange={() => setCalendarDayFilter(opt.id)}
+                  />
+                  <span className="text-sm font-semibold text-gray-700">{opt.label}</span>
+                </label>
+              ))}
+            </FilterPopover>
+
+            <FilterPopover
+              isOpen={calendarFilterOpen === 'location'}
+              onClose={() => setCalendarFilterOpen(null)}
+              title="Location"
+              className="w-72"
+            >
+              <div className="space-y-1">
+                {allLocations.map((loc) => (
+                  <label key={loc} className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded-lg cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      checked={calendarLocationFilters.includes(loc)}
+                      onChange={(e) => {
+                        const next = e.target.checked
+                          ? [...calendarLocationFilters, loc]
+                          : calendarLocationFilters.filter((x) => x !== loc);
+                        setCalendarLocationFilters(next);
+                      }}
+                    />
+                    <span className="text-sm font-semibold text-gray-700">{loc}</span>
+                  </label>
+                ))}
+                {allLocations.length === 0 && (
+                  <div className="p-3 text-xs text-gray-400 italic text-center">No locations found</div>
+                )}
+              </div>
+            </FilterPopover>
+          </div>
+
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-lg font-bold text-gray-900">{monthLabel}</h3>
+            <span className="text-xs text-gray-500">Dates are based on due date or created date</span>
+          </div>
+
+          <div className="grid grid-cols-7 gap-0 text-xs font-bold text-gray-500 mb-2 border border-gray-200 rounded-t-xl overflow-hidden">
+            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
+              <div key={d} className="text-center py-2 bg-gray-50 border-r last:border-r-0 border-gray-200">{d}</div>
+            ))}
+          </div>
+          <div className="grid grid-cols-7 gap-0 border border-gray-200 border-t-0 rounded-b-xl overflow-hidden bg-white">
+            {calendarDays.map((day, i) => {
+              if (!day) {
+                return <div key={`empty-${i}`} className="h-28 border-r border-b border-gray-200 bg-gray-50/50" />;
+              }
+              const key = day.toISOString().slice(0, 10);
+              const dayIssues = calendarIssuesByDay[key] || [];
+              const isToday = new Date().toDateString() === day.toDateString();
+              return (
+                <div key={key} className={`h-28 border-r border-b border-gray-200 p-2 overflow-hidden ${isToday ? 'bg-blue-50/60' : 'bg-white'}`}>
+                  <div className="text-[11px] font-bold text-gray-500 text-right">{String(day.getDate()).padStart(2, '0')}</div>
+                  <div className="mt-1 space-y-1">
+                    {dayIssues.slice(0, 2).map((issue, idx) => {
+                      const status = normalizeStatus(issue);
+                      const tone = status.includes('PROGRESS')
+                        ? 'bg-emerald-500'
+                        : status.includes('HOLD')
+                          ? 'bg-amber-500'
+                          : status.includes('COMPLETE')
+                            ? 'bg-slate-500'
+                            : 'bg-rose-500';
+                      const timeLabel = (issue.fixDeadline || issue.dueDate || issue.createdAt)
+                        ? normalizeDate(issue.fixDeadline || issue.dueDate || issue.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+                        : '3:00 pm';
+                      return (
+                        <div
+                          key={`${key}-${idx}`}
+                          onClick={() => onOpenDetails && onOpenDetails('issue', issue)}
+                          className={`px-2 py-0.5 rounded text-[10px] font-semibold text-white truncate ${tone}`}
+                          title={issue.title}
+                        >
+                          {timeLabel} #{String(normalizeId(issue._id || issue.id)).slice(-4)} {issue.title}
+                        </div>
+                      );
+                    })}
+                    {dayIssues.length > 2 && (
+                      <div className="text-[10px] text-gray-400 font-semibold">+{dayIssues.length - 2} more</div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -6800,7 +8605,7 @@ const FeedbackTab = ({ feedbacks, loadingFeedbacks }) => (
   </div>
 );
 
-const DetailsModal = ({ open, type, item, onClose, getAssignedTechName, onRefresh, technicians = [], teams = [] }) => {
+const DetailsModal = ({ open, type, item, onClose, getAssignedTechName, onRefresh, technicians = [], teams = [], onPrivateMessage }) => {
   const [formData, setFormData] = useState({
     category: item?.category || '',
     priority: item?.priority || 'MEDIUM',
@@ -6816,6 +8621,8 @@ const DetailsModal = ({ open, type, item, onClose, getAssignedTechName, onRefres
   });
   const [activeTab, setActiveTab] = useState('overview');
   const [chatInput, setChatInput] = useState('');
+  const [mentionCandidates, setMentionCandidates] = useState([]);
+  const [mentionContext, setMentionContext] = useState(null);
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const userName = user.name || user.username || 'Manager';
   const userRole = String(user.role || user.userRole || user.type || user.accountType || '').toLowerCase();
@@ -6863,6 +8670,8 @@ const DetailsModal = ({ open, type, item, onClose, getAssignedTechName, onRefres
   const isRequestReadOnly = isRequest && !canEdit;
   const requestLockClass = isRequestReadOnly ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : '';
   const requestFieldClass = `w-full border border-gray-300 rounded-lg p-2.5 text-sm ${requestLockClass}`;
+  const privateRecipientId = item?.assignedTo || item?.userId || item?.requestorId || '';
+  const privateRecipientName = getAssignedTechName ? getAssignedTechName(item) : (item?.name || item?.email || 'User');
   const showTabs = isIssue;
   const tabs = [
     { id: 'overview', label: 'Overview' },
@@ -6971,10 +8780,44 @@ const DetailsModal = ({ open, type, item, onClose, getAssignedTechName, onRefres
       await api.put(`/api/issues/${item.id || item._id}`, { chat: updatedChat });
       setFormData(prev => ({ ...prev, chat: updatedChat }));
       setChatInput('');
+      setMentionCandidates([]);
+      setMentionContext(null);
     } catch (err) {
       console.error('Failed to send message:', err);
       alert('Failed to send message.');
     }
+  };
+
+  const updateMentionSuggestions = (value, cursorPosition) => {
+    const context = getMentionContext(value, cursorPosition);
+    setMentionContext(context);
+    if (!context) {
+      setMentionCandidates([]);
+      return;
+    }
+    const currentUserId = String(user?.id || user?._id || '');
+    const filtered = (technicians || [])
+      .filter((person) => {
+        const id = String(person?._id || person?.id || '');
+        if (!id || id === currentUserId) return false;
+        const haystack = `${person?.name || ''} ${person?.email || ''} ${buildMentionHandle(person)}`.toLowerCase();
+        return !context.query || haystack.includes(context.query);
+      })
+      .slice(0, 6);
+    setMentionCandidates(filtered);
+  };
+
+  const handleChatInputChange = (e) => {
+    const value = e.target.value;
+    setChatInput(value);
+    updateMentionSuggestions(value, e.target.selectionStart);
+  };
+
+  const insertMention = (person) => {
+    const nextValue = applyMentionToText(chatInput, mentionContext, person);
+    setChatInput(nextValue);
+    setMentionCandidates([]);
+    setMentionContext(null);
   };
 
   const addChecklistItem = () => {
@@ -6998,9 +8841,25 @@ const DetailsModal = ({ open, type, item, onClose, getAssignedTechName, onRefres
               <h3 className="text-xl font-bold text-gray-900">{title}</h3>
               <p className="text-xs text-gray-500">Details and Approval Settings</p>
             </div>
-            <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-lg transition-colors md:hidden">
-              <X className="w-5 h-5 text-gray-400" />
-            </button>
+            <div className="flex items-center gap-2">
+              {!!privateRecipientId && (
+                <button
+                  type="button"
+                  onClick={() => onPrivateMessage && onPrivateMessage({
+                    recipientUserId: privateRecipientId,
+                    recipientName: privateRecipientName,
+                    link: `/manager-dashboard?tab=issues&id=${item.id || item._id}`
+                  })}
+                  className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
+                >
+                  <Send className="w-4 h-4" />
+                  Private Message
+                </button>
+              )}
+              <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-lg transition-colors md:hidden">
+                <X className="w-5 h-5 text-gray-400" />
+              </button>
+            </div>
           </div>
 
           <div className="p-6 overflow-y-auto flex-1 space-y-5">
@@ -7686,27 +9545,48 @@ const DetailsModal = ({ open, type, item, onClose, getAssignedTechName, onRefres
         {/* Right Side: Chat Panel */}
         <div className="w-full md:w-80 lg:w-96 flex flex-col bg-gray-50 border-l border-gray-200 flex-shrink-0">
           <div className="px-4 py-4 border-b border-gray-200 bg-white flex items-center justify-between">
-            <h4 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-green-500"></span>
-              Internal Chat
-            </h4>
+            <div>
+              <h4 className="text-sm font-bold text-gray-900">Comments</h4>
+              <p className="mt-1 text-[11px] text-gray-500">Shared work-order discussion for the team.</p>
+            </div>
             <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors hidden md:block">
               <X className="w-4 h-4 text-gray-400" />
             </button>
           </div>
 
-          <div className="flex-1 p-4 overflow-y-auto space-y-4">
-            <div className="text-center text-xs text-gray-400 font-semibold mt-2 mb-4">Messages</div>
+          <div className="flex-1 space-y-4 overflow-y-auto bg-gradient-to-b from-slate-50 via-white to-white p-4">
+            <div className="flex items-center justify-between">
+              <div className="text-xs font-semibold uppercase tracking-wide text-gray-400">Conversation</div>
+              <div className="rounded-full bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500 shadow-sm">
+                {formData.chat.length} comments
+              </div>
+            </div>
             {formData.chat.length === 0 ? (
-              <div className="text-center text-gray-400 text-xs py-10 italic">No messages yet. Start the conversation.</div>
+              <div className="rounded-2xl border border-dashed border-gray-200 bg-white px-5 py-10 text-center">
+                <div className="text-sm font-semibold text-gray-700">No comments yet</div>
+                <div className="mt-1 text-xs text-gray-500">Post the first update for this work order, or mention someone with @.</div>
+              </div>
             ) : (
               formData.chat.map((msg, i) => (
-                <div key={i} className={`flex flex-col gap-1 ${msg.sender === userName ? 'items-end' : 'items-start'}`}>
-                  <span className={`text-[10px] text-gray-500 ${msg.sender === userName ? 'mr-1' : 'ml-1'}`}>
-                    {msg.sender} - {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </span>
-                  <div className={`${msg.sender === userName ? 'bg-blue-600 text-white rounded-tr-sm' : 'bg-white border border-gray-200 text-gray-800 rounded-tl-sm'} rounded-2xl px-4 py-2 text-sm shadow-sm max-w-[85%] break-words`}>
-                    {msg.text}
+                <div key={i} className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                  <div className="flex items-start gap-3">
+                    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xs font-bold ${String(msg.sender || msg.user || '').trim() === userName ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'}`}>
+                      {String(msg.sender || msg.user || 'U').trim().split(' ').map(part => part?.[0] || '').join('').slice(0, 2).toUpperCase() || 'U'}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <span className="text-sm font-bold text-gray-900">{msg.sender || msg.user || 'Unknown'}</span>
+                        {msg.role && (
+                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
+                            {String(msg.role).replace(/_/g, ' ')}
+                          </span>
+                        )}
+                        <span className="text-[11px] text-gray-400">
+                          {new Date(msg.timestamp || msg.createdAt || Date.now()).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                      <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-gray-700">{msg.text}</p>
+                    </div>
                   </div>
                 </div>
               ))
@@ -7714,22 +9594,44 @@ const DetailsModal = ({ open, type, item, onClose, getAssignedTechName, onRefres
           </div>
 
           {/* Chat Input */}
-          <div className="p-3 bg-white border-t border-gray-200">
-            <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2">
-              <input
-                type="text"
-                className="flex-1 bg-transparent border-none text-sm focus:outline-none"
-                placeholder="Type a message..."
+          <div className="border-t border-gray-200 bg-white p-3">
+            <div className="rounded-2xl border border-gray-200 bg-slate-50/80 p-4 shadow-sm">
+              <div className="mb-3">
+                <div className="text-sm font-bold text-gray-900">Add a public comment</div>
+                <div className="text-xs text-gray-500">Everyone on this work order can see this message.</div>
+              </div>
+            <div className="relative">
+              {mentionCandidates.length > 0 && (
+                <div className="absolute bottom-full left-0 right-0 mb-2 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl z-20">
+                  {mentionCandidates.map((person) => (
+                    <button
+                      key={person._id || person.id}
+                      type="button"
+                      onClick={() => insertMention(person)}
+                      className="w-full border-b border-gray-100 px-3 py-2 text-left hover:bg-gray-50 last:border-b-0"
+                    >
+                      <div className="text-sm font-semibold text-gray-900">{person.name}</div>
+                      <div className="text-xs text-gray-500">@{buildMentionHandle(person)}{person.email ? ` • ${person.email}` : ''}</div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            <div className="flex items-end gap-2 rounded-2xl border border-white bg-white px-3 py-3 ring-1 ring-slate-100">
+              <textarea
+                className="min-h-[88px] flex-1 resize-none bg-transparent border-none text-sm text-gray-800 focus:outline-none"
+                placeholder="Share an update, add context, or mention a teammate with @..."
                 value={chatInput}
-                onChange={e => setChatInput(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleSendMessage()}
+                onChange={handleChatInputChange}
               />
               <button
                 onClick={handleSendMessage}
-                className="text-blue-600 font-semibold p-1 bg-blue-50 rounded hover:bg-blue-100 transition-colors"
+                className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 transition-colors"
               >
-                Send
+                <Send className="w-4 h-4" />
+                Post
               </button>
+            </div>
+            </div>
             </div>
           </div>
         </div>
@@ -7815,6 +9717,7 @@ const AIInsights = ({ aiSentiment, loadingAI, aiError, aiRecommendations, loadin
 };
 
 export default ManagerDashboard;
+
 
 
 

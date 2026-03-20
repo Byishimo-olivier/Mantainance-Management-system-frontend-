@@ -1,0 +1,12 @@
+ 7799:         {[
+ 7800:           { label: 'Total Devices', value: devices.length, icon: 'ð¥ï¸', color: 'from-blue-50 to-indigo-50 border-blue-100' },
+ 7801:           { label: 'Online', value: online, icon: 'ð¢', color: 'from-emerald-50 to-green-50 border-emerald-100' },
+ 7802:           { label: 'Offline', value: devices.length - online, icon: 'ð´', color: 'from-rose-50 to-pink-50 border-rose-100' },
+ 7803:         ].map(c => (
+ 7804:           <div key={c.label} className={`bg-gradient-to-br ${c.color} border rounded-xl p-4 flex items-center gap-4`}>
+ 7805:             <span className="text-3xl">{c.icon}</span>
+ 7806:             <div><p className="text-xs font-bold text-gray-500 uppercase tracking-wider">{c.label}</p><p className="text-2xl font-black text-gray-900 mt-0.5">{c.value}</p></div>
+ 7807:           </div>
+ 7808:         ))}
+ 7809:       </div>
+ 7810:       <div className="flex items-center gap-3">

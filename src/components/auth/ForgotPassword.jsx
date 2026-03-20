@@ -1,4 +1,8 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
+import api from '../../api/axios';
+import backgroundVideo from '../../assets/136906-765457769_small.mp4';
+import AuthHeader from './AuthHeader';
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');
@@ -12,77 +16,104 @@ export default function ForgotPassword() {
     setMessage('');
     setLoading(true);
     try {
-      const res = await fetch((import.meta.env.VITE_API_URL || '') + '/api/auth/forgot-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setMessage(data.message);
-      } else {
-        setError(data.error || 'Failed to send reset link');
-      }
+      const res = await api.post('/api/auth/forgot-password', { email });
+      setMessage(res.data.message);
     } catch (err) {
-      setError('Network error');
+      setError(err.response?.data?.error || 'Something went wrong. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      background: '#f5f6fa',
-    }}>
-      <form onSubmit={handleSubmit} style={{
-        background: '#fff',
-        padding: '2rem 2.5rem',
-        borderRadius: '10px',
-        boxShadow: '0 2px 16px rgba(0,0,0,0.08)',
-        minWidth: 320,
-        maxWidth: 400,
-        width: '100%'
-      }}>
-        <h2 style={{ textAlign: 'center', marginBottom: 24, color: '#2d3436' }}>Forgot Password</h2>
-        <div style={{ marginBottom: 18 }}>
-          <label style={{ display: 'block', marginBottom: 6, color: '#636e72' }}>Email Address</label>
-          <input
-            type="email"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            placeholder="Enter your email"
-            required
-            style={{ width: '100%', padding: 8, borderRadius: 4, border: '1px solid #dfe6e9' }}
-          />
+    <div className="auth-shell auth-shell--with-header">
+      <AuthHeader />
+      <div className="video-background-container">
+        <video autoPlay loop muted playsInline className="video-background">
+          <source src={backgroundVideo} type="video/mp4" />
+        </video>
+        <div className="video-overlay" />
+      </div>
+
+      {message ? (
+        <div className="auth-card auth-card--narrow">
+          <div className="auth-header auth-header--left">
+            {/* Success icon */}
+            <div style={{ textAlign: 'center', marginBottom: '16px' }}>
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 56,
+                height: 56,
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #10b981, #059669)',
+                marginBottom: 8,
+              }}>
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              </div>
+            </div>
+            <h1 className="auth-title" style={{ textAlign: 'center' }}>Check your email</h1>
+            <p className="auth-subtitle" style={{ textAlign: 'center' }}>
+              {message}
+            </p>
+            <p style={{ textAlign: 'center', color: 'var(--auth-text-muted, #9ca3af)', fontSize: 13, marginTop: 4 }}>
+              Didn't get it? Check your spam folder or{' '}
+              <button
+                type="button"
+                onClick={() => setMessage('')}
+                style={{ background: 'none', border: 'none', color: 'var(--auth-link-color, #2563eb)', cursor: 'pointer', fontWeight: 600, padding: 0, fontSize: 'inherit' }}
+              >
+                try again
+              </button>
+              .
+            </p>
+          </div>
+          <div className="auth-footer" style={{ marginTop: 24 }}>
+            <Link to="/login" className="auth-link">← Back to Login</Link>
+          </div>
         </div>
-        <button
-          type="submit"
-          disabled={loading}
-          style={{
-            width: '100%',
-            padding: '10px 0',
-            background: '#0984e3',
-            color: '#fff',
-            border: 'none',
-            borderRadius: 4,
-            fontWeight: 600,
-            fontSize: 16,
-            cursor: loading ? 'not-allowed' : 'pointer',
-            marginBottom: 12
-          }}
-        >
-          {loading ? 'Sending...' : 'Send Reset Link'}
-        </button>
-        {message && <div style={{ color: 'green', textAlign: 'center', marginBottom: 8 }}>{message}</div>}
-        {error && <div style={{ color: 'red', textAlign: 'center', marginBottom: 8 }}>{error}</div>}
-        <div style={{ textAlign: 'center', marginTop: '1rem' }}>
-          <a href="/login" style={{ color: '#2563eb', textDecoration: 'none', fontWeight: 500 }}>Back to Login</a>
-        </div>
-      </form>
+      ) : (
+        <form onSubmit={handleSubmit} className="auth-card auth-card--narrow">
+          <div className="auth-header auth-header--left">
+            <h1 className="auth-title auth-title--left">Forgot Password</h1>
+            <p className="auth-subtitle auth-subtitle--left">
+              Enter your email and we'll send you a reset link.
+            </p>
+          </div>
+
+          <div className="auth-field">
+            <label htmlFor="forgot-email" className="auth-label">Email Address</label>
+            <input
+              id="forgot-email"
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              placeholder="Enter your email"
+              autoComplete="email"
+              required
+              className="auth-input"
+            />
+          </div>
+
+          <button
+            type="submit"
+            className="auth-primary-btn"
+            disabled={loading || !email}
+          >
+            {loading ? 'Sending...' : 'Send Reset Link'}
+          </button>
+
+          {error && <div className="auth-error">{error}</div>}
+
+          <div className="auth-footer">
+            Remember your password?{' '}
+            <Link to="/login" className="auth-link">Log in</Link>
+          </div>
+        </form>
+      )}
     </div>
   );
 }

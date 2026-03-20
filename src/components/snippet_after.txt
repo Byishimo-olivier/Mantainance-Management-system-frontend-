@@ -1,0 +1,16 @@
+ 7120:             </div>
+ 7121:             <div className="md:col-span-2 flex flex-col gap-1">
+ 7122:               <label className="text-xs font-semibold text-gray-600">Notes</label>
+ 7123:               <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm min-h-[90px]" />
+ 7124:             </div>
+ 7125:             <label className="md:col-span-2 flex items-center gap-2 text-sm text-gray-600">
+ 7126:               <input type="checkbox" checked={form.hideLogoOnPdf} onChange={e => setForm(f => ({ ...f, hideLogoOnPdf: e.target.checked }))} />
+ 7127:               Hide logo on PDF
+ 7128:             <button type="submit" disabled={saving} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold disabled:opacity-60">
+ 7129:               {saving ? 'Saving...' : 'Create PO'}
+ 7130:             </button>
+ 7131:           </div>
+ 7132:         </form>
+ 7133:       )}
+ 7134:       <div className="glass-surface rounded-lg overflow-hidden">
+ 7135:         <div className="overflow-x-auto">

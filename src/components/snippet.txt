@@ -1,0 +1,121 @@
+ 7085:                   <input value={form.shippingState} onChange={e => setForm(f => ({ ...f, shippingState: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+ 7086:                 </div>
+ 7087:                 <div className="flex flex-col gap-1">
+ 7088:                   <label className="text-xs font-semibold text-gray-600">Zip Code</label>
+ 7089:                   <input value={form.shippingZip} onChange={e => setForm(f => ({ ...f, shippingZip: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+ 7090:                 </div>
+ 7091:               </>
+ 7092:             )}
+ 7093:           </div>
+ 7094: 
+ 7095:           <div className="md:col-span-2 border-t border-gray-100 pt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+ 7096:             <div className="flex flex-col gap-1">
+ 7097:               <label className="text-xs font-semibold text-gray-600">Purchase Date</label>
+ 7098:               <input type="date" value={form.purchaseDate} onChange={e => setForm(f => ({ ...f, purchaseDate: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+ 7099:             </div>
+ 7100:             <div className="flex flex-col gap-1">
+ 7101:               <label className="text-xs font-semibold text-gray-600">Terms</label>
+ 7102:               <input value={form.terms} onChange={e => setForm(f => ({ ...f, terms: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+ 7103:             </div>
+ 7104:             <div className="flex flex-col gap-1">
+ 7105:               <label className="text-xs font-semibold text-gray-600">Shipping Method</label>
+ 7106:               <input value={form.shippingMethod} onChange={e => setForm(f => ({ ...f, shippingMethod: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+ 7107:             </div>
+ 7108:             <div className="flex flex-col gap-1">
+ 7109:               <label className="text-xs font-semibold text-gray-600">F.O.B. Shipping Point</label>
+ 7110:               <input value={form.fobShippingPoint} onChange={e => setForm(f => ({ ...f, fobShippingPoint: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+ 7111:             </div>
+ 7112:             <div className="md:col-span-2 flex flex-col gap-1">
+ 7113:               <label className="text-xs font-semibold text-gray-600">Requisitioner</label>
+ 7114:               <input value={form.requisitioner} onChange={e => setForm(f => ({ ...f, requisitioner: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+ 7115:             </div>
+ 7116:             <div className="md:col-span-2 flex flex-col gap-1">
+ 7117:               <label className="text-xs font-semibold text-gray-600">Notes</label>
+ 7118:               <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm min-h-[90px]" />
+ 7119:             </div>
+ 7120:             <label className="md:col-span-2 flex items-center gap-2 text-sm text-gray-600">
+ 7121:               <input type="checkbox" checked={form.hideLogoOnPdf} onChange={e => setForm(f => ({ ...f, hideLogoOnPdf: e.target.checked }))} />
+ 7122:               Hide logo on PDF
+ 7123:             </label>
+ 7124:           </div>
+ 7125:         </form>
+ 7126:       )}
+ 7127:       
+ 7128:           <div className="flex flex-col gap-1">
+ 7129:             <label className="text-xs font-semibold text-gray-600">Vendor</label>
+ 7130:             <select
+ 7131:               value={form.vendorId}
+ 7132:               onChange={e => setForm(f => ({ ...f, vendorId: e.target.value, vendor: '' }))}
+ 7133:               className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white"
+ 7134:             >
+ 7135:               <option value="">Select vendor</option>
+ 7136:               {vendors.map(v => <option key={v._id || v.id} value={v._id || v.id}>{v.name}</option>)}
+ 7137:             </select>
+ 7138:             <input
+ 7139:               value={form.vendor}
+ 7140:               onChange={e => setForm(f => ({ ...f, vendor: e.target.value, vendorId: '' }))}
+ 7141:               className="px-3 py-2 border border-gray-200 rounded-lg text-sm mt-2"
+ 7142:               placeholder="Or enter new vendor name"
+ 7143:             />
+ 7144:           </div>
+ 7145:           <div className="flex flex-col gap-1">
+ 7146:             <label className="text-xs font-semibold text-gray-600">Expected Date</label>
+ 7147:             <input type="date" value={form.expectedDate} onChange={e => setForm(f => ({ ...f, expectedDate: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+ 7148:           </div>
+ 7149:           <div className="flex flex-col gap-1">
+ 7150:             <label className="text-xs font-semibold text-gray-600">Item</label>
+ 7151:             <input value={form.itemName} onChange={e => setForm(f => ({ ...f, itemName: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" placeholder="Optional" />
+ 7152:           </div>
+ 7153:           <div className="flex flex-col gap-1">
+ 7154:             <label className="text-xs font-semibold text-gray-600">Quantity</label>
+ 7155:             <input type="number" min="1" value={form.quantity} onChange={e => setForm(f => ({ ...f, quantity: Number(e.target.value) || 1 }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+ 7156:           </div>
+ 7157:           <div className="flex flex-col gap-1">
+ 7158:             <label className="text-xs font-semibold text-gray-600">Unit Cost</label>
+ 7159:             <input type="number" step="0.01" value={form.unitCost} onChange={e => setForm(f => ({ ...f, unitCost: Number(e.target.value) || 0 }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+ 7160:           </div>
+ 7161:           <div className="col-span-full flex flex-col gap-1">
+ 7162:             <label className="text-xs font-semibold text-gray-600">Description</label>
+ 7163:             <textarea
+ 7164:               value={vendorForm.description}
+ 7165:               onChange={e => setVendorForm(f => ({ ...f, description: e.target.value }))}
+ 7166:               className="px-3 py-2 border border-gray-200 rounded-lg text-sm min-h-[80px]"
+ 7167:             />
+ 7168:           </div>
+ 7169:           <div className="col-span-full grid grid-cols-1 md:grid-cols-3 gap-3 items-center">
+ 7170:             <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
+ 7171:               <span className="px-3 text-sm text-gray-500">$</span>
+ 7172:               <input
+ 7173:                 type="number"
+ 7174:                 step="0.01"
+ 7175:                 value={vendorForm.hourlyRate}
+ 7176:                 onChange={e => setVendorForm(f => ({ ...f, hourlyRate: e.target.value }))}
+ 7177:                 className="flex-1 px-3 py-2 text-sm outline-none"
+ 7178:                 placeholder="Hourly Rate"
+ 7179:               />
+ 7180:             </div>
+ 7181:             <label className="flex items-center gap-2 text-sm text-gray-600">
+ 7182:               <input
+ 7183:                 type="checkbox"
+ 7184:                 checked={vendorForm.isLocationBased}
+ 7185:                 onChange={e => setVendorForm(f => ({ ...f, isLocationBased: e.target.checked }))}
+ 7186:               />
+ 7187:               Is Location Based
+ 7188:             </label>
+ 7189:           </div>
+ 7190:           <div className="col-span-full flex items-center gap-2 justify-end">
+ 7191:             <button type="button" onClick={() => setShowAdd(false)} className="px-3 py-2 text-sm border rounded-lg">Cancel</button>
+ 7192:             <button type="submit" disabled={saving} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold disabled:opacity-60">
+ 7193:               {saving ? 'Saving...' : 'Create PO'}
+ 7194:             </button>
+ 7195:           </div>
+ 7196:         </form>
+ 7197:       )}
+ 7198:       <div className="glass-surface rounded-lg overflow-hidden">
+ 7199:         <div className="overflow-x-auto">
+ 7200:           <table className="w-full text-left border-collapse">
+ 7201:             <thead className="bg-[#fcfcfd] border-b border-gray-100">
+ 7202:               <tr>{['Title', 'PO Number', '# Items', 'Total Cost', 'Vendor', 'Actions'].map(h => <th key={h} className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">{h}</th>)}</tr>
+ 7203:             </thead>
+ 7204:             <tbody>
+ 7205:               {orders.map((o, idx) => (

@@ -9,7 +9,7 @@ const products = [
       'Mobile-first maintenance management that turns reactive firefighting into proactive operations. Create work orders in seconds, automate PMs, and give your team real-time visibility from any device.'
   },
   {
-    name: 'UpKeep Intelligence',
+    name: 'FixNest Intelligence',
     label: 'Intelligence',
     description:
       'Embedded AI tools that eliminate busywork and surface insights your team would never find manually. From smart scheduling to predictive recommendations, Intelligence helps you work faster and smarter without extra setup.'
@@ -27,19 +27,19 @@ const products = [
       'Capture safety events in seconds with voice-to-text reporting that works in any language. Automated OSHA logs, AI-powered CAPAs, and instant audit trails help you reduce incidents and stay compliant.'
   },
   {
-    name: 'UpKeep Edge',
+    name: 'FixNestEdge',
     label: 'Edge',
     description:
       'Wireless IoT sensors that monitor your assets 24/7 and automatically create work orders when conditions change. Install in hours, not months, and avoid hardwiring or data science overhead.'
   },
   {
-    name: 'UpKeep Fleet',
+    name: 'FixNestFleet',
     label: 'Fleet',
     description:
       'Vehicle maintenance management that connects telematics data to work orders through real-time integrations and automated PM scheduling. Instant VIN lookup, digital inspections, and complete vehicle history in one system.'
   },
   {
-    name: 'UpKeep LMS',
+    name: 'FixNestLMS',
     label: 'Learning Management Software',
     description:
       'Enable your frontline team to access job-relevant training, track certifications, and prove compliance. No more spreadsheets, delays, or one-size-fits-all courses.'
@@ -61,7 +61,7 @@ const pricingPlans = [
     period: '/user/mo',
     description: 'Growing maintenance teams ready to move from reactive to preventive maintenance.',
     features: [
-      'UpKeep Studio',
+      'FixNestStudio',
       'PM scheduling',
       'Custom checklists',
       'Parts & inventory with costing',
@@ -167,7 +167,7 @@ const LandingPage = () => {
       <section className="landing-section landing-pricing">
         <div className="landing-section-header">
           <div>
-            <div className="landing-kicker">UPKEEP PRICING</div>
+            <div className="landing-kicker">FixNestPRICING</div>
             <div className="landing-section-title">Plans for Every Team</div>
           </div>
         </div>

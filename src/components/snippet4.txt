@@ -1,0 +1,76 @@
+ 6920:               <label className="text-xs font-semibold text-gray-600">Vendor</label>
+ 6921:               <select
+ 6922:                 value={form.vendorId}
+ 6923:                 onChange={e => setForm(f => ({ ...f, vendorId: e.target.value, vendor: '' }))}
+ 6924:                 className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white"
+ 6925:               >
+ 6926:                 <option value="">Select vendor</option>
+ 6927:                 {vendors.map(v => <option key={v._id || v.id} value={v._id || v.id}>{v.name}</option>)}
+ 6928:               </select>
+ 6929:               <input
+ 6930:                 value={form.vendor}
+ 6931:                 onChange={e => setForm(f => ({ ...f, vendor: e.target.value, vendorId: '' }))}
+ 6932:                 className="px-3 py-2 border border-gray-200 rounded-lg text-sm mt-2"
+ 6933:                 placeholder="Or enter new vendor name"
+ 6934:               />
+ 6935:             </div>
+ 6936:             <div className="flex flex-col gap-1">
+ 6937:               <label className="text-xs font-semibold text-gray-600">Due Date</label>
+ 6938:               <input type="date" value={form.dueDate} onChange={e => setForm(f => ({ ...f, dueDate: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+ 6939:             </div>
+ 6940:             <div className="flex flex-col gap-1">
+ 6941:               <label className="text-xs font-semibold text-gray-600">Category</label>
+ 6942:               <input value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+ 6943:             </div>
+ 6944:             <div className="flex flex-col gap-1">
+ 6945:               <label className="text-xs font-semibold text-gray-600">Tags</label>
+ 6946:               <input value={form.tags} onChange={e => setForm(f => ({ ...f, tags: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" placeholder="Comma separated" />
+ 6947:             </div>
+ 6948:             <div className="md:col-span-2 flex flex-col gap-1">
+ 6949:               <label className="text-xs font-semibold text-gray-600">Additional Details</label>
+ 6950:               <textarea value={form.additionalDetails} onChange={e => setForm(f => ({ ...f, additionalDetails: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm min-h-[90px]" />
+ 6951:             </div>
+ 6952:           </div>
+ 6953: 
+ 6954:           <div className="md:col-span-2 border-t border-gray-100 pt-4">
+ 6955:             <div className="flex items-center justify-between mb-3">
+ 6956:               <h4 className="text-sm font-bold text-gray-900">Line Items *</h4>
+ 6957:               <div className="flex items-center gap-2">
+ 6958:                 <button type="button" onClick={() => setForm(f => ({ ...f, lineItems: [...(f.lineItems || []), { name: '', quantity: 1, unitCost: 0 }] }))} className="px-3 py-2 border rounded-lg text-sm">Add Parts</button>
+ 6959:                 <button type="button" className="px-3 py-2 border rounded-lg text-sm">More Actions</button>
+ 6960:               </div>
+ 6961:             </div>
+ 6962:             {(!form.lineItems || form.lineItems.length === 0) ? (
+ 6963:               <div className="text-sm text-gray-400 py-6 text-center border border-dashed border-gray-200 rounded-lg">No line items have been added yet</div>
+ 6964:             ) : (
+ 6965:               <div className="flex flex-col gap-3">
+ 6966:                 {(form.lineItems || []).map((item, idx) => (
+ 6967:                   <div key={`li-${idx}`} className="grid grid-cols-1 md:grid-cols-4 gap-3 items-center">
+ 6968:                     <input
+ 6969:                       value={item.name}
+ 6970:                       onChange={e => setForm(f => ({ ...f, lineItems: f.lineItems.map((it, i) => i === idx ? { ...it, name: e.target.value } : it) }))}
+ 6971:                       className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
+ 6972:                       placeholder="Item name"
+ 6973:                     />
+ 6974:                     <input
+ 6975:                       type="number"
+ 6976:                       min="1"
+ 6977:                       value={item.quantity}
+ 6978:                       onChange={e => setForm(f => ({ ...f, lineItems: f.lineItems.map((it, i) => i === idx ? { ...it, quantity: Number(e.target.value) || 1 } : it) }))}
+ 6979:                       className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
+ 6980:                       placeholder="Qty"
+ 6981:                     />
+ 6982:                     <input
+ 6983:                       type="number"
+ 6984:                       step="0.01"
+ 6985:                       value={item.unitCost}
+ 6986:                       onChange={e => setForm(f => ({ ...f, lineItems: f.lineItems.map((it, i) => i === idx ? { ...it, unitCost: Number(e.target.value) || 0 } : it) }))}
+ 6987:                       className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
+ 6988:                       placeholder="Unit Cost"
+ 6989:                     />
+ 6990:                     <button type="button" onClick={() => setForm(f => ({ ...f, lineItems: f.lineItems.filter((_, i) => i !== idx) }))} className="px-3 py-2 text-sm border rounded-lg">Remove</button>
+ 6991:                   </div>
+ 6992:                 ))}
+ 6993:               </div>
+ 6994:             )}
+ 6995:           </div>

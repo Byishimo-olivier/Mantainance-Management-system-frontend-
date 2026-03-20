@@ -1,0 +1,19 @@
+ 8020:           { label: 'Offline', value: devices.length - online, icon: 'ð´', color: 'from-rose-50 to-pink-50 border-rose-100' },
+ 8021:         ].map(c => (
+ 8022:           <div key={c.label} className={`bg-gradient-to-br ${c.color} border rounded-xl p-4 flex items-center gap-4`}>
+ 8023:             <span className="text-3xl">{c.icon}</span>
+ 8024:             <div><p className="text-xs font-bold text-gray-500 uppercase tracking-wider">{c.label}</p><p className="text-2xl font-black text-gray-900 mt-0.5">{c.value}</p></div>
+ 8025:           </div>
+ 8026:         ))}
+ 8027:       </div>
+ 8028:       <div className="flex items-center gap-3">
+ 8029:         <div className="relative flex-1 max-w-xs">
+ 8030:           <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" /></svg>
+ 8031:           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search devices..." className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+ 8032:         </div>
+ 8033:         <div className="flex bg-gray-100 rounded-xl p-1">
+ 8034:           {statuses.map(s => <button key={s} onClick={() => setFilter(s)} className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 ${filter === s ? 'bg-white/70 shadow-sm text-gray-900 backdrop-blur' : 'text-gray-500 hover:text-gray-700'}`}>{s !== 'All' && <span className={`w-1.5 h-1.5 rounded-full ${s === 'Online' ? 'bg-emerald-500' : 'bg-gray-400'}`} />}{s}</button>)}
+ 8035:         </div>
+ 8036:       </div>
+ 8037:       <div className="glass-surface rounded-lg overflow-hidden">
+ 8038:         <div className="overflow-x-auto">

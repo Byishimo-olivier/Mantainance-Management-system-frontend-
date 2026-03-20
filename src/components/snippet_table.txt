@@ -1,0 +1,40 @@
+  301:         <h2 style={{ fontSize: 20, fontWeight: 700, color: '#111827', margin: 0 }}>{title}</h2>
+  302:         {count !== undefined && (
+  303:           <span style={{ background: '#F3F4F6', color: '#6B7280', fontSize: 12, fontWeight: 600, padding: '2px 8px', borderRadius: 20 }}>{count}</span>
+  304:         )}
+  305:       </div>
+  306:       {action}
+  307:     </div>
+  308:   );
+  309: }
+  310: 
+  311: // ââ Table âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+  312: function Table({ heads, rows, empty = 'No data found.' }) {
+  313:   return (
+  314:     <div className="glass-surface border border-white/10 rounded-xl overflow-hidden shadow-lg backdrop-blur-sm">
+  315:       {rows.length === 0 ? (
+  316:         <div className="text-center py-16 px-6 text-white/40 text-sm font-medium">{empty}</div>
+  317:       ) : (
+  318:         <div className="overflow-x-auto">
+  319:           <table className="w-full border-collapse">
+  320:             <thead>
+  321:               <tr className="bg-white/5 border-b border-white/10">
+  322:                 {heads.map((h, i) => (
+  323:                   <th key={i} className="py-4 px-6 text-left text-[10px] font-bold text-white/50 uppercase tracking-widest whitespace-nowrap">{h}</th>
+  324:                 ))}
+  325:               </tr>
+  326:             </thead>
+  327:             <tbody className="divide-y divide-white/5">
+  328:               {rows.map((row, i) => {
+  329:                 if (!row) return null;
+  330:                 if (React.isValidElement(row)) return row;
+  331:                 const rowData = Array.isArray(row) ? { cells: row } : row;
+  332:                 const cells = Array.isArray(rowData) ? rowData : rowData.cells;
+  333:                 if (!cells) return null;
+  334:                 const isClickable = typeof rowData.onClick === 'function';
+  335:                 const rowClass = rowData.className || '';
+  336:                 return (
+  337:                   <tr
+  338:                     key={rowData.key || i}
+  339:                     onClick={rowData.onClick}
+  340:                     className={`hover:bg-white/10 transition-colors duration-200 ${isClickable ? 'cursor-pointer' : ''} ${rowClass}`}

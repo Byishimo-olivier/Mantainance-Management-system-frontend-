@@ -1,5 +1,5 @@
 import React, { useState } from 'react'; // Deployment trigger commit
-import { Routes, Route, useParams, useNavigate, Navigate } from 'react-router-dom';
+import { Routes, Route, useNavigate, Navigate } from 'react-router-dom';
 import Login from './components/auth/Login';
 import Register from './components/auth/Register';
 import SsoLogin from './components/auth/SsoLogin';
@@ -32,10 +32,6 @@ import ManagerFeedback from './components/ManagerFeedback';
 import AIChatbot from './components/AIChatbot';
 import { LanguageProvider } from './i18n/LanguageContext';
 
-function ResetPasswordWrapper() {
-  const { token } = useParams();
-  return <ResetPassword token={token} />;
-}
 
 function App() {
   const [auth, setAuth] = useState(() => {
@@ -85,7 +81,7 @@ function App() {
           ) : <Login onLogin={handleLogin} />} />
           <Route path="/issues" element={auth ? <AllIssues /> : <Login onLogin={handleLogin} />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/reset-password/:token" element={<ResetPasswordWrapper />} />
+          <Route path="/reset-password/:token" element={<ResetPassword />} />
           <Route path="/new-issue" element={<NewIssue />} />
           <Route path="/requests" element={auth ? <RequestsPage /> : <Login onLogin={handleLogin} />} />
           <Route path="/admin-dashboard" element={auth ? <AdminDashboard /> : <Login onLogin={handleLogin} />} />

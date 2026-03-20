@@ -1,0 +1,76 @@
+ 7020:             </div>
+ 7021:             {!form.billingUseCompanyProfile && (
+ 7022:               <>
+ 7023:                 <div className="flex flex-col gap-1">
+ 7024:                   <label className="text-xs font-semibold text-gray-600">Company Name</label>
+ 7025:                   <input value={form.billingCompanyName} onChange={e => setForm(f => ({ ...f, billingCompanyName: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+ 7026:                 </div>
+ 7027:                 <div className="flex flex-col gap-1">
+ 7028:                   <label className="text-xs font-semibold text-gray-600">Address</label>
+ 7029:                   <input value={form.billingAddress} onChange={e => setForm(f => ({ ...f, billingAddress: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+ 7030:                 </div>
+ 7031:                 <div className="flex flex-col gap-1">
+ 7032:                   <label className="text-xs font-semibold text-gray-600">City</label>
+ 7033:                   <input value={form.billingCity} onChange={e => setForm(f => ({ ...f, billingCity: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+ 7034:                 </div>
+ 7035:                 <div className="flex flex-col gap-1">
+ 7036:                   <label className="text-xs font-semibold text-gray-600">State</label>
+ 7037:                   <input value={form.billingState} onChange={e => setForm(f => ({ ...f, billingState: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+ 7038:                 </div>
+ 7039:                 <div className="flex flex-col gap-1">
+ 7040:                   <label className="text-xs font-semibold text-gray-600">Zip Code</label>
+ 7041:                   <input value={form.billingZip} onChange={e => setForm(f => ({ ...f, billingZip: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+ 7042:                 </div>
+ 7043:                 <div className="flex flex-col gap-1">
+ 7044:                   <label className="text-xs font-semibold text-gray-600">Phone Number</label>
+ 7045:                   <input value={form.billingPhone} onChange={e => setForm(f => ({ ...f, billingPhone: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+ 7046:                 </div>
+ 7047:                 <div className="flex flex-col gap-1">
+ 7048:                   <label className="text-xs font-semibold text-gray-600">Fax Number</label>
+ 7049:                   <input value={form.billingFax} onChange={e => setForm(f => ({ ...f, billingFax: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+ 7050:                 </div>
+ 7051:               </>
+ 7052:             )}
+ 7053:           </div>
+ 7054: 
+ 7055:           <div className="md:col-span-2 border-t border-gray-100 pt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+ 7056:             <div className="md:col-span-2">
+ 7057:               <h4 className="text-sm font-bold text-gray-900 mb-2">Shipping Address</h4>
+ 7058:               <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
+ 7059:                 <label className="flex items-center gap-2">
+ 7060:                   <input type="radio" checked={form.shippingSameAsBilling} onChange={() => setForm(f => ({ ...f, shippingSameAsBilling: true }))} />
+ 7061:                   Same as billing address
+ 7062:                 </label>
+ 7063:                 <label className="flex items-center gap-2">
+ 7064:                   <input type="radio" checked={!form.shippingSameAsBilling} onChange={() => setForm(f => ({ ...f, shippingSameAsBilling: false }))} />
+ 7065:                   Use a different address
+ 7066:                 </label>
+ 7067:               </div>
+ 7068:             </div>
+ 7069:             {!form.shippingSameAsBilling && (
+ 7070:               <>
+ 7071:                 <div className="flex flex-col gap-1">
+ 7072:                   <label className="text-xs font-semibold text-gray-600">Ship To Name</label>
+ 7073:                   <input value={form.shippingName} onChange={e => setForm(f => ({ ...f, shippingName: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+ 7074:                 </div>
+ 7075:                 <div className="flex flex-col gap-1">
+ 7076:                   <label className="text-xs font-semibold text-gray-600">Address</label>
+ 7077:                   <input value={form.shippingAddress} onChange={e => setForm(f => ({ ...f, shippingAddress: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+ 7078:                 </div>
+ 7079:                 <div className="flex flex-col gap-1">
+ 7080:                   <label className="text-xs font-semibold text-gray-600">City</label>
+ 7081:                   <input value={form.shippingCity} onChange={e => setForm(f => ({ ...f, shippingCity: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+ 7082:                 </div>
+ 7083:                 <div className="flex flex-col gap-1">
+ 7084:                   <label className="text-xs font-semibold text-gray-600">State</label>
+ 7085:                   <input value={form.shippingState} onChange={e => setForm(f => ({ ...f, shippingState: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+ 7086:                 </div>
+ 7087:                 <div className="flex flex-col gap-1">
+ 7088:                   <label className="text-xs font-semibold text-gray-600">Zip Code</label>
+ 7089:                   <input value={form.shippingZip} onChange={e => setForm(f => ({ ...f, shippingZip: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+ 7090:                 </div>
+ 7091:               </>
+ 7092:             )}
+ 7093:           </div>
+ 7094: 
+ 7095:           <div className="md:col-span-2 border-t border-gray-100 pt-4 grid grid-cols-1 md:grid-cols-2 gap-4">

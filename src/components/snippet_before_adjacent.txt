@@ -1,0 +1,26 @@
+ 7910:           <div className="relative glass-surface-strong rounded-xl p-6 w-full max-w-md z-10">
+ 7911:             <h3 className="text-lg font-bold mb-3">Add Meter</h3>
+ 7912:             <div className="flex flex-col gap-2">
+ 7913:               <input value={newMeter.name} onChange={e => setNewMeter({ ...newMeter, name: e.target.value })} placeholder="Name" className="p-2 border rounded" />
+ 7914:               <select value={newMeter.type} onChange={e => setNewMeter({ ...newMeter, type: e.target.value, unit: e.target.value === 'Water' ? 'mÂ³' : 'kWh' })} className="p-2 border rounded">
+ 7915:                 <option>Electricity</option><option>Water</option><option>Gas</option>
+ 7916:               </select>
+ 7917:               <input value={newMeter.location} onChange={e => setNewMeter({ ...newMeter, location: e.target.value })} placeholder="Location" className="p-2 border rounded" />
+ 7918:               <div className="flex gap-2">
+ 7919:                 <input type="number" value={newMeter.reading} onChange={e => setNewMeter({ ...newMeter, reading: Number(e.target.value) })} className="p-2 border rounded flex-1" />
+ 7920:                 <input value={newMeter.unit} onChange={e => setNewMeter({ ...newMeter, unit: e.target.value })} className="p-2 border rounded w-24" />
+ 7921:               </div>
+ 7922:               <div className="flex justify-end gap-2 mt-3">
+ 7923:                 <button onClick={() => setShowAdd(false)} className="px-3 py-2 glass-ghost rounded">Cancel</button>
+ 7924:                 <button onClick={async () => { try { const res = await api.post('/api/meters', newMeter); setMeters(p => [res.data, ...p]); setShowAdd(false); setNewMeter({ name: '', type: 'Electricity', reading: 0, unit: 'kWh', status: 'Normal', location: '' }); } catch { alert('Failed to add meter'); } }} className="px-3 py-2 bg-blue-600 text-white rounded">Create</button>
+ 7925:               </div>
+ 7926:             </div>
+ 7927:           </div>
+ 7928:         </div>
+ 7929:       )}
+ 7930:       <div className="grid grid-cols-3 gap-4">
+ 7931:         {[
+ 7932:           { label: 'Total Electricity', value: `${(meters.filter(m => m.type === 'Electricity').reduce((s, m) => s + (Number(m.reading) || 0), 0) / 1000).toFixed(1)} MWh`, icon: 'â¡', color: 'from-amber-50 to-yellow-50 border-amber-100' },
+ 7933:           { label: 'Total Water', value: `${meters.filter(m => m.type === 'Water').reduce((s, m) => s + (Number(m.reading) || 0), 0).toLocaleString()} mÂ³`, icon: 'ð§', color: 'from-blue-50 to-cyan-50 border-blue-100' },
+ 7934:           { label: 'Active Alerts', value: meters.filter(m => m.status !== 'Normal').length, icon: 'ð¨', color: 'from-rose-50 to-pink-50 border-rose-100' },
+ 7935:         ].map(c => (

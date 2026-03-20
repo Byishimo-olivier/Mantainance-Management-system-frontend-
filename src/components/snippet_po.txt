@@ -1,0 +1,241 @@
+ 6800:     setSaving(true);
+ 6801:     try {
+ 6802:       const payload = {
+ 6803:         title: form.title,
+ 6804:         poNumber: form.poNumber || `PO-${Date.now()}`,
+ 6805:         vendor: form.vendor || vendors.find(v => String(v._id || v.id) === String(form.vendorId))?.name,
+ 6806:         vendorId: form.vendorId || undefined,
+ 6807:         dueDate: form.dueDate || undefined,
+ 6808:         category: form.category || undefined,
+ 6809:         tags: form.tags || undefined,
+ 6810:         additionalDetails: form.additionalDetails || undefined,
+ 6811:         purchaseDate: form.purchaseDate || undefined,
+ 6812:         terms: form.terms || undefined,
+ 6813:         shippingMethod: form.shippingMethod || undefined,
+ 6814:         fobShippingPoint: form.fobShippingPoint || undefined,
+ 6815:         requisitioner: form.requisitioner || undefined,
+ 6816:         notes: form.notes || undefined,
+ 6817:         billing: {
+ 6818:           useCompanyProfile: form.billingUseCompanyProfile,
+ 6819:           companyName: form.billingCompanyName,
+ 6820:           address: form.billingAddress,
+ 6821:           city: form.billingCity,
+ 6822:           state: form.billingState,
+ 6823:           zip: form.billingZip,
+ 6824:           phone: form.billingPhone,
+ 6825:           fax: form.billingFax,
+ 6826:           showLogoOnPdf: form.showLogoOnPdf,
+ 6827:           hideLogoOnPdf: form.hideLogoOnPdf
+ 6828:         },
+ 6829:         shipping: {
+ 6830:           sameAsBilling: form.shippingSameAsBilling,
+ 6831:           name: form.shippingName,
+ 6832:           address: form.shippingAddress,
+ 6833:           city: form.shippingCity,
+ 6834:           state: form.shippingState,
+ 6835:           zip: form.shippingZip
+ 6836:         },
+ 6837:         items: (form.lineItems || []).map(it => ({
+ 6838:           name: it.name,
+ 6839:           quantity: Number(it.quantity) || 1,
+ 6840:           unitCost: Number(it.unitCost) || 0
+ 6841:         }))
+ 6842:       };
+ 6843:       const res = await api.post('/api/purchase-orders', payload);
+ 6844:       setOrders(prev => [res.data, ...(prev || [])]);
+ 6845:       setForm({
+ 6846:         title: '',
+ 6847:         poNumber: '',
+ 6848:         vendor: '',
+ 6849:         vendorId: '',
+ 6850:         dueDate: '',
+ 6851:         category: '',
+ 6852:         tags: '',
+ 6853:         additionalDetails: '',
+ 6854:         lineItems: [],
+ 6855:         files: [],
+ 6856:         purchaseDate: '',
+ 6857:         terms: '',
+ 6858:         shippingMethod: '',
+ 6859:         fobShippingPoint: '',
+ 6860:         requisitioner: '',
+ 6861:         notes: '',
+ 6862:         billingUseCompanyProfile: true,
+ 6863:         billingCompanyName: '',
+ 6864:         billingAddress: '',
+ 6865:         billingCity: '',
+ 6866:         billingState: '',
+ 6867:         billingZip: '',
+ 6868:         billingPhone: '',
+ 6869:         billingFax: '',
+ 6870:         showLogoOnPdf: false,
+ 6871:         hideLogoOnPdf: false,
+ 6872:         shippingSameAsBilling: true,
+ 6873:         shippingName: '',
+ 6874:         shippingAddress: '',
+ 6875:         shippingCity: '',
+ 6876:         shippingState: '',
+ 6877:         shippingZip: ''
+ 6878:       });
+ 6879:       setShowAdd(false);
+ 6880:     } catch (err) {
+ 6881:       alert(err.response?.data?.error || err.message);
+ 6882:     } finally {
+ 6883:       setSaving(false);
+ 6884:     }
+ 6885:   };
+ 6886: 
+ 6887:   return (
+ 6888:     <div className="flex flex-col gap-6">
+ 6889:       <div className="flex items-center justify-between">
+ 6890:         <div>
+ 6891:           <h2 className="text-xl font-bold text-gray-900">Purchase Orders</h2>
+ 6892:           <p className="text-sm text-gray-500 mt-0.5">Create, view and export purchase orders</p>
+ 6893:         </div>
+ 6894:         <div className="flex items-center gap-3">
+ 6895:           <button onClick={() => setShowAdd(s => !s)} className="px-3 py-2 bg-white border rounded-xl text-sm font-semibold hover:bg-gray-50">
+ 6896:             {showAdd ? 'Close' : 'New PO'}
+ 6897:           </button>
+ 6898:           <button onClick={exportCSV} className="px-3 py-2 glass-ghost rounded-xl text-sm font-semibold hover:bg-white/70">Export CSV</button>
+ 6899:         </div>
+ 6900:       </div>
+ 6901:             {showAdd && (
+ 6902:         <form onSubmit={savePo} className="glass-surface rounded-lg border border-white/10 p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+ 6903:           <div className="md:col-span-2 flex items-center justify-between">
+ 6904:             <h3 className="text-lg font-bold text-gray-900">New Purchase Order</h3>
+ 6905:             <div className="flex items-center gap-2">
+ 6906:               <button type="button" onClick={() => setShowAdd(false)} className="px-3 py-2 text-sm border rounded-lg">Cancel</button>
+ 6907:               <button type="submit" disabled={saving} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold disabled:opacity-60">
+ 6908:                 {saving ? 'Saving...' : 'Create Purchase Order'}
+ 6909:               </button>
+ 6910:             </div>
+ 6911:           </div>
+ 6912: 
+ 6913:           <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+ 6914:             <div className="flex flex-col gap-1">
+ 6915:               <label className="text-xs font-semibold text-gray-600">Title *</label>
+ 6916:               <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" required />
+ 6917:             </div>
+ 6918:             <div className="flex flex-col gap-1">
+ 6919:               <label className="text-xs font-semibold text-gray-600">PO Number</label>
+ 6920:               <input value={form.poNumber} onChange={e => setForm(f => ({ ...f, poNumber: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" placeholder="Auto-generates if blank" />
+ 6921:               <span className="text-[11px] text-gray-400">This auto-generates unless a custom one is entered</span>
+ 6922:             </div>
+ 6923:             <div className="flex flex-col gap-1">
+ 6924:               <label className="text-xs font-semibold text-gray-600">Vendor</label>
+ 6925:               <select
+ 6926:                 value={form.vendorId}
+ 6927:                 onChange={e => setForm(f => ({ ...f, vendorId: e.target.value, vendor: '' }))}
+ 6928:                 className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white"
+ 6929:               >
+ 6930:                 <option value="">Select vendor
+ 6931: </option>
+ 6932:                 {vendors.map(v => <option key={v._id || v.id} value={v._id || v.id}>{v.name}</option>)}
+ 6933:               </select>
+ 6934:               <input
+ 6935:                 value={form.vendor}
+ 6936:                 onChange={e => setForm(f => ({ ...f, vendor: e.target.value, vendorId: '' }))}
+ 6937:                 className="px-3 py-2 border border-gray-200 rounded-lg text-sm mt-2"
+ 6938:                 placeholder="Or enter new vendor name"
+ 6939:               />
+ 6940:             </div>
+ 6941:             <div className="flex flex-col gap-1">
+ 6942:               <label className="text-xs font-semibold text-gray-600">Due Date</label>
+ 6943:               <input type="date" value={form.dueDate} onChange={e => setForm(f => ({ ...f, dueDate: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+ 6944:             </div>
+ 6945:             <div className="flex flex-col gap-1">
+ 6946:               <label className="text-xs font-semibold text-gray-600">Category</label>
+ 6947:               <input value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+ 6948:             </div>
+ 6949:             <div className="flex flex-col gap-1">
+ 6950:               <label className="text-xs font-semibold text-gray-600">Tags</label>
+ 6951:               <input value={form.tags} onChange={e => setForm(f => ({ ...f, tags: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" placeholder="Comma separated" />
+ 6952:             </div>
+ 6953:             <div className="md:col-span-2 flex flex-col gap-1">
+ 6954:               <label className="text-xs font-semibold text-gray-600">Additional Details</label>
+ 6955:               <textarea value={form.additionalDetails} onChange={e => setForm(f => ({ ...f, additionalDetails: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm min-h-[90px]" />
+ 6956:             </div>
+ 6957:           </div>
+ 6958: 
+ 6959:           <div className="md:col-span-2 border-t border-gray-100 pt-4">
+ 6960:             <div className="flex items-center justify-between mb-3">
+ 6961:               <h4 className="text-sm font-bold text-gray-900">Line Items *</h4>
+ 6962:               <div className="flex items-center gap-2">
+ 6963:                 <button type="button" onClick={() => setForm(f => ({ ...f, lineItems: [...(f.lineItems || []), { name: '', quantity: 1, unitCost: 0 }] }))} className="px-3 py-2 border rounded-lg text-sm">Add Parts</button>
+ 6964:                 <button type="button" className="px-3 py-2 border rounded-lg text-sm">More Actions</button>
+ 6965:               </div>
+ 6966:             </div>
+ 6967:             {(!form.lineItems || form.lineItems.length === 0) ? (
+ 6968:               <div className="text-sm text-gray-400 py-6 text-center border border-dashed border-gray-200 rounded-lg">No line items have been added yet</div>
+ 6969:             ) : (
+ 6970:               <div className="flex flex-col gap-3">
+ 6971:                 {(form.lineItems || []).map((item, idx) => (
+ 6972:                   <div key={`li-${idx}`} className="grid grid-cols-1 md:grid-cols-4 gap-3 items-center">
+ 6973:                     <input
+ 6974:                       value={item.name}
+ 6975:                       onChange={e => setForm(f => ({ ...f, lineItems: f.lineItems.map((it, i) => i === idx ? { ...it, name: e.target.value } : it) }))}
+ 6976:                       className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
+ 6977:                       placeholder="Item name"
+ 6978:                     />
+ 6979:                     <input
+ 6980:                       type="number"
+ 6981:                       min="1"
+ 6982:                       value={item.quantity}
+ 6983:                       onChange={e => setForm(f => ({ ...f, lineItems: f.lineItems.map((it, i) => i === idx ? { ...it, quantity: Number(e.target.value) || 1 } : it) }))}
+ 6984:                       className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
+ 6985:                       placeholder="Qty"
+ 6986:                     />
+ 6987:                     <input
+ 6988:                       type="number"
+ 6989:                       step="0.01"
+ 6990:                       value={item.unitCost}
+ 6991:                       onChange={e => setForm(f => ({ ...f, lineItems: f.lineItems.map((it, i) => i === idx ? { ...it, unitCost: Number(e.target.value) || 0 } : it) }))}
+ 6992:                       className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
+ 6993:                       placeholder="Unit Cost"
+ 6994:                     />
+ 6995:                     <button type="button" onClick={() => setForm(f => ({ ...f, lineItems: f.lineItems.filter((_, i) => i !== idx) }))} className="px-3 py-2 text-sm border rounded-lg">Remove</button>
+ 6996:                   </div>
+ 6997:                 ))}
+ 6998:               </div>
+ 6999:             )}
+ 7000:           </div>
+ 7001: 
+ 7002:           <div className="md:col-span-2 border-t border-gray-100 pt-4">
+ 7003:             <h4 className="text-sm font-bold text-gray-900 mb-2">Files</h4>
+ 7004:             <div className="border border-dashed border-gray-200 rounded-lg p-6 text-center text-sm text-gray-500">Upload or drop files</div>
+ 7005:             <button type="button" className="mt-2 text-sm text-blue-600 hover:underline">Add from Saved Files</button>
+ 7006:           </div>
+ 7007: 
+ 7008:           <div className="md:col-span-2 border-t border-gray-100 pt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+ 7009:             <div className="md:col-span-2">
+ 7010:               <h4 className="text-sm font-bold text-gray-900 mb-2">Billing Address</h4>
+ 7011:               <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
+ 7012:                 <label className="flex items-center gap-2">
+ 7013:                   <input type="radio" checked={form.billingUseCompanyProfile} onChange={() => setForm(f => ({ ...f, billingUseCompanyProfile: true }))} />
+ 7014:                   Use address from Company profile
+ 7015:                 </label>
+ 7016:                 <label className="flex items-center gap-2">
+ 7017:                   <input type="radio" checked={!form.billingUseCompanyProfile} onChange={() => setForm(f => ({ ...f, billingUseCompanyProfile: false }))} />
+ 7018:                   Use a different address
+ 7019:                 </label>
+ 7020:               </div>
+ 7021:               <label className="flex items-center gap-2 text-sm text-gray-600 mt-2">
+ 7022:                 <input type="checkbox" checked={form.showLogoOnPdf} onChange={e => setForm(f => ({ ...f, showLogoOnPdf: e.target.checked }))} />
+ 7023:                 Show company logo on PDF
+ 7024:               </label>
+ 7025:             </div>
+ 7026:             {!form.billingUseCompanyProfile && (
+ 7027:               <>
+ 7028:                 <div className="flex flex-col gap-1">
+ 7029:                   <label className="text-xs font-semibold text-gray-600">Company Name</label>
+ 7030:                   <input value={form.billingCompanyName} onChange={e => setForm(f => ({ ...f, billingCompanyName: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+ 7031:                 </div>
+ 7032:                 <div className="flex flex-col gap-1">
+ 7033:                   <label className="text-xs font-semibold text-gray-600">Address</label>
+ 7034:                   <input value={form.billingAddress} onChange={e => setForm(f => ({ ...f, billingAddress: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+ 7035:                 </div>
+ 7036:                 <div className="flex flex-col gap-1">
+ 7037:                   <label className="text-xs font-semibold text-gray-600">City</label>
+ 7038:                   <input value={form.billingCity} onChange={e => setForm(f => ({ ...f, billingCity: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+ 7039:                 </div>
+ 7040:                 <div className="flex flex-col gap-1">

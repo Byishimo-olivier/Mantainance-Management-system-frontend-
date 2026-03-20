@@ -1,0 +1,29 @@
+ 7880:               <label className="text-xs font-semibold text-gray-600">Purchase Date</label>
+ 7881:               <input type="date" value={form.purchaseDate} onChange={e => setForm(f => ({ ...f, purchaseDate: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+ 7882:             </div>
+ 7883:             <div className="flex flex-col gap-1">
+ 7884:               <label className="text-xs font-semibold text-gray-600">Terms</label>
+ 7885:               <input value={form.terms} onChange={e => setForm(f => ({ ...f, terms: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+ 7886:             </div>
+ 7887:             <div className="flex flex-col gap-1">
+ 7888:               <label className="text-xs font-semibold text-gray-600">Shipping Method</label>
+ 7889:               <input value={form.shippingMethod} onChange={e => setForm(f => ({ ...f, shippingMethod: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+ 7890:             </div>
+ 7891:             <div className="flex flex-col gap-1">
+ 7892:               <label className="text-xs font-semibold text-gray-600">F.O.B. Shipping Point</label>
+ 7893:               <input value={form.fobShippingPoint} onChange={e => setForm(f => ({ ...f, fobShippingPoint: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+ 7894:             </div>
+ 7895:             <div className="md:col-span-2 flex flex-col gap-1">
+ 7896:               <label className="text-xs font-semibold text-gray-600">Requisitioner</label>
+ 7897:               <input value={form.requisitioner} onChange={e => setForm(f => ({ ...f, requisitioner: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+ 7898:             </div>
+ 7899:             <div className="md:col-span-2 flex flex-col gap-1">
+ 7900:               <label className="text-xs font-semibold text-gray-600">Notes</label>
+ 7901:               <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm min-h-[90px]" />
+ 7902:             </div>
+ 7903:             <label className="md:col-span-2 flex items-center gap-2 text-sm text-gray-600">
+ 7904:               <input type="checkbox" checked={form.hideLogoOnPdf} onChange={e => setForm(f => ({ ...f, hideLogoOnPdf: e.target.checked }))} />
+ 7905:               Hide logo on PDF
+ 7906:             </label>
+ 7907:           </div>
+ 7908:         </form>

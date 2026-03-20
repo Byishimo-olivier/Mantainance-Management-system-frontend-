@@ -43,17 +43,22 @@
   }
 
   .glass-theme-blue {
-    --glass-alpha: 0.12;
-    --glass-alpha-strong: 0.2;
-    --glass-blue: rgba(56, 189, 248, 0.12);
-    --glass-blue-strong: rgba(59, 130, 246, 0.18);
-    --glass-border: rgba(191, 219, 254, 0.2);
-    --glass-shadow: 0 12px 30px rgba(15, 23, 42, 0.15);
-    --glass-tint: rgba(30, 64, 175, 0.08);
-    --glass-tint-strong: rgba(30, 64, 175, 0.12);
-    --glass-ink: #0b1f3a;
-    --glass-subtle: #1e3a5f;
-    --glass-muted: #3b5f85;
+    --glass-alpha: 0.72;
+    --glass-alpha-strong: 0.88;
+    --glass-blue: rgba(14, 165, 233, 0.1);
+    --glass-blue-strong: rgba(59, 130, 246, 0.14);
+    --glass-border: rgba(148, 163, 184, 0.22);
+    --glass-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+    --glass-tint: rgba(255, 255, 255, 0.74);
+    --glass-tint-strong: rgba(255, 255, 255, 0.9);
+    --glass-ink: #0f172a;
+    --glass-subtle: #334155;
+    --glass-muted: #64748b;
+    background:
+      radial-gradient(circle at top left, rgba(14, 165, 233, 0.14), transparent 32%),
+      radial-gradient(circle at 88% 12%, rgba(59, 130, 246, 0.12), transparent 28%),
+      linear-gradient(180deg, #f8fbff 0%, #eef4fb 54%, #e7edf5 100%);
+    color: #0f172a;
   }
 
   .glass-app {
@@ -185,10 +190,10 @@
 
   .glass-theme-blue :where(.bg-white, .bg-gray-50, .bg-gray-100, .bg-slate-50, .bg-slate-100, .bg-\[\#fcfcfd\]) {
     background:
-      linear-gradient(135deg, var(--glass-tint) 0%, rgba(255, 255, 255, var(--glass-alpha)) 60%),
+      linear-gradient(145deg, rgba(255, 255, 255, 0.94) 0%, rgba(248, 250, 252, 0.92) 100%),
       radial-gradient(circle at top right, var(--glass-blue-strong), transparent 60%),
       radial-gradient(circle at bottom left, var(--glass-blue), transparent 55%);
-    backdrop-filter: blur(16px);
+    backdrop-filter: blur(18px);
     border: 1px solid var(--glass-border);
     box-shadow: var(--glass-shadow);
     color: var(--glass-ink);
@@ -196,7 +201,7 @@
 
   .glass-theme-blue :where(.bg-white\/50, .bg-white\/60, .bg-white\/70, .bg-gray-50\/50, .bg-gray-100\/50, .bg-slate-50\/50, .bg-slate-100\/50) {
     background:
-      linear-gradient(135deg, rgba(219, 234, 254, 0.7) 0%, rgba(255, 255, 255, 0.6) 60%),
+      linear-gradient(145deg, rgba(255, 255, 255, 0.86) 0%, rgba(241, 245, 249, 0.8) 100%),
       radial-gradient(circle at top right, var(--glass-blue), transparent 65%);
     backdrop-filter: blur(12px);
     border: 1px solid var(--glass-border);
@@ -209,15 +214,30 @@
   }
 
   .glass-theme-blue :where(.glass-surface, .glass-surface-strong, .glass-ghost, .bg-white, .bg-gray-50, .bg-gray-100, .bg-slate-50, .bg-slate-100, .bg-\[\#fcfcfd\]) :where(.text-gray-900, .text-slate-900, .text-gray-800, .text-slate-800) {
-    color: var(--glass-ink) !important;
+    color: #0f172a !important;
   }
 
   .glass-theme-blue :where(.glass-surface, .glass-surface-strong, .glass-ghost, .bg-white, .bg-gray-50, .bg-gray-100, .bg-slate-50, .bg-slate-100, .bg-\[\#fcfcfd\]) :where(.text-gray-700, .text-slate-700, .text-gray-600, .text-slate-600) {
-    color: var(--glass-subtle) !important;
+    color: #334155 !important;
   }
 
   .glass-theme-blue :where(.glass-surface, .glass-surface-strong, .glass-ghost, .bg-white, .bg-gray-50, .bg-gray-100, .bg-slate-50, .bg-slate-100, .bg-\[\#fcfcfd\]) :where(.text-gray-500, .text-slate-500, .text-gray-400, .text-slate-400) {
-    color: var(--glass-muted) !important;
+    color: #64748b !important;
+  }
+
+  .glass-theme-blue aside.glass-surface-strong,
+  .glass-theme-blue header.glass-surface {
+    background:
+      linear-gradient(180deg, rgba(15, 23, 42, 0.92) 0%, rgba(30, 41, 59, 0.9) 100%),
+      radial-gradient(circle at top right, rgba(56, 189, 248, 0.18), transparent 60%);
+    border-color: rgba(148, 163, 184, 0.18);
+    box-shadow: 0 18px 42px rgba(15, 23, 42, 0.22);
+    color: #f8fafc;
+  }
+
+  .glass-theme-blue aside.glass-surface-strong :where(.text-white, .text-white\/70, .text-white\/60, .text-white\/50, .text-white\/40),
+  .glass-theme-blue header.glass-surface :where(.text-white, .text-white\/70, .text-white\/60, .text-white\/50, .text-white\/40) {
+    color: inherit;
   }
 
   .glass-theme-blue [style*="background: white"],
@@ -226,7 +246,7 @@
   .glass-theme-blue [style*="background:#FFFFFF"],
   .glass-theme-blue [style*="background: rgb(255, 255, 255)"] {
     background:
-      linear-gradient(135deg, rgba(255, 255, 255, var(--glass-alpha)) 0%, rgba(255, 255, 255, var(--glass-alpha)) 60%),
+      linear-gradient(145deg, rgba(255, 255, 255, 0.96) 0%, rgba(248, 250, 252, 0.94) 100%),
       radial-gradient(circle at top right, var(--glass-blue-strong), transparent 60%),
       radial-gradient(circle at bottom left, var(--glass-blue), transparent 55%) !important;
     backdrop-filter: blur(16px) !important;
@@ -241,7 +261,7 @@
   .glass-theme-blue [style*="background:#F3F4F6"],
   .glass-theme-blue [style*="background: rgb(243, 244, 246)"] {
     background:
-      linear-gradient(135deg, rgba(255, 255, 255, 0.66) 0%, rgba(255, 255, 255, 0.58) 60%),
+      linear-gradient(145deg, rgba(255, 255, 255, 0.9) 0%, rgba(241, 245, 249, 0.84) 100%),
       radial-gradient(circle at top right, var(--glass-blue), transparent 65%) !important;
     backdrop-filter: blur(12px) !important;
     border: 1px solid var(--glass-border) !important;
