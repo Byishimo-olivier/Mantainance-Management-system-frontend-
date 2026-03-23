@@ -7,7 +7,57 @@ import SubscriptionWidget from './SubscriptionWidget';
 import SubscriptionManagement from './SubscriptionManagement';
 import { getImageUrl } from '../utils/imageUrl';
 import { useLanguage, useTranslation } from "../i18n/LanguageContext";
-import { Clock, Calendar, CheckCircle, X, Bell, Download, Package, ShoppingCart, Gauge, Plus, Search, Eye, MapPin, AlertCircle, Repeat, Edit, ChevronLeft, ChevronRight, ChevronDown, SlidersHorizontal, Flag, MoreHorizontal, Trash2, Image as ImageIcon, Tag, Paperclip, MessageSquare, Send } from 'lucide-react';
+import { Clock, Calendar, CheckCircle, X, Bell, Download, Package, ShoppingCart, Gauge, Plus, Search, Eye, MapPin, AlertCircle, Repeat, Edit, ChevronLeft, ChevronRight, ChevronDown, SlidersHorizontal, Flag, MoreHorizontal, Trash2, Image as ImageIcon, Tag, Paperclip, MessageSquare, Send, Navigation } from 'lucide-react';
+
+const createEmptyPropertyForm = () => ({
+  name: '',
+  type: '',
+  address: '',
+  beds: '',
+  baths: '',
+  area: '',
+  floors: '',
+  blocks: '',
+  rooms: '',
+  namedBlocks: [],
+  roomNames: [],
+  latitude: '',
+  longitude: '',
+  includeMapCoordinates: false,
+  assignedWorkers: [],
+  assignedTeam: '',
+  vendors: [],
+  customers: [],
+  customData: []
+});
+
+const createEmptyAssetForm = () => ({
+  name: '',
+  type: '',
+  description: '',
+  serialNumber: '',
+  propertyId: '',
+  locationType: 'property',
+  branchId: '',
+  quantity: 1,
+  building: '',
+  blocks: [],
+  room: ''
+});
+
+const normalizeCoordinate = (value) => {
+  if (value === undefined || value === null || value === '') return '';
+  const numeric = Number(value);
+  if (Number.isNaN(numeric)) return '';
+  return numeric.toFixed(6);
+};
+
+const buildDirectionsUrl = (latitude, longitude) => {
+  const lat = Number(latitude);
+  const lng = Number(longitude);
+  if (Number.isNaN(lat) || Number.isNaN(lng)) return '';
+  return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+};
 
 const buildMentionHandle = (person) => {
   const emailLocal = String(person?.email || '').split('@')[0].trim().toLowerCase();
@@ -35,7 +85,31 @@ const applyMentionToText = (value, context, person) => {
   return `${text.slice(0, context.start)}@${handle} ${text.slice(context.end)}`;
 };
 
-const DirectMessageModal = ({ open, recipientName, message, sending, onChange, onClose, onSend }) => {
+const parseDirectMessageSenderName = (notification) => {
+  const title = String(notification?.title || '').trim();
+  const match = title.match(/^Private message from\s+(.+)$/i);
+  return match?.[1]?.trim() || '';
+};
+
+const parseDirectMessageRecipientName = (notification) => {
+  const title = String(notification?.title || '').trim();
+  const match = title.match(/^Private message to\s+(.+)$/i);
+  return match?.[1]?.trim() || '';
+};
+
+const getDirectMessageTargetId = (notification) => {
+  const rawLink = String(notification?.link || '').trim();
+  if (!rawLink) return '';
+  try {
+    const queryString = rawLink.includes('?') ? rawLink.slice(rawLink.indexOf('?')) : '';
+    const params = new URLSearchParams(queryString);
+    return String(params.get('dm') || '').trim();
+  } catch {
+    return '';
+  }
+};
+
+const DirectMessageModal = ({ open, recipientName, message, sending, messages = [], onChange, onClose, onSend }) => {
   if (!open) return null;
 
   return (
@@ -60,6 +134,36 @@ const DirectMessageModal = ({ open, recipientName, message, sending, onChange, o
           <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3">
             <div className="text-xs font-semibold uppercase tracking-wide text-emerald-700">To</div>
             <div className="mt-1 text-sm font-semibold text-emerald-900">{recipientName || 'Assigned person'}</div>
+          </div>
+          <div className="rounded-2xl border border-gray-200 bg-gradient-to-b from-slate-50 via-white to-white">
+            <div className="border-b border-gray-100 px-4 py-3">
+              <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Chat</div>
+            </div>
+            <div className="max-h-[300px] space-y-3 overflow-y-auto px-4 py-4">
+              {messages.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-gray-200 bg-white px-4 py-8 text-center">
+                  <div className="text-sm font-semibold text-gray-700">No messages yet</div>
+                  <div className="mt-1 text-xs text-gray-500">Start the conversation with {recipientName || 'this person'}.</div>
+                </div>
+              ) : (
+                messages.map((entry, index) => {
+                  const mine = entry.direction === 'outgoing';
+                  return (
+                    <div key={entry.id || index} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
+                      <div className={`max-w-[85%] rounded-2xl px-4 py-3 shadow-sm ${mine ? 'bg-emerald-600 text-white' : 'border border-gray-200 bg-white text-gray-900'}`}>
+                        <div className={`text-[11px] font-semibold ${mine ? 'text-emerald-50' : 'text-gray-500'}`}>
+                          {entry.sender || (mine ? 'You' : recipientName || 'Contact')}
+                        </div>
+                        <div className="mt-1 whitespace-pre-wrap text-sm">{entry.text || entry.message}</div>
+                        <div className={`mt-2 text-[10px] ${mine ? 'text-emerald-100' : 'text-gray-400'}`}>
+                          {entry.timestamp ? new Date(entry.timestamp).toLocaleString() : ''}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
           </div>
           <div>
             <label className="mb-2 block text-sm font-semibold text-gray-700">Message</label>
@@ -1166,16 +1270,10 @@ function ClientDashboard() {
   const [teams, setTeams] = useState([]);
   const [maintenanceSchedules, setMaintenanceSchedules] = useState([]);
   const [editingProperty, setEditingProperty] = useState(null);
-  const [propertyForm, setPropertyForm] = useState({ 
-    name: '', type: '', address: '', beds: '', baths: '', area: '', floors: '', blocks: '', rooms: '', namedBlocks: [], roomNames: [],
-    latitude: '', longitude: '', includeMapCoordinates: false,
-    parentPropertyId: '', assignedWorkers: [], assignedTeam: '',
-    vendors: [], customers: [],
-    customData: [] // Array of { name, value, unit }
-  });
+  const [propertyForm, setPropertyForm] = useState(createEmptyPropertyForm);
   const [propertyFiles, setPropertyFiles] = useState(null);
   const [editingAsset, setEditingAsset] = useState(null);
-  const [assetForm, setAssetForm] = useState({ name: '', type: '', description: '', propertyId: '', quantity: 1, building: '', blocks: [], room: '' });
+  const [assetForm, setAssetForm] = useState(createEmptyAssetForm);
   const [originalAssetBlocks, setOriginalAssetBlocks] = useState([]);
   const [selectedAsset, setSelectedAsset] = useState(null);
   const [assetModalOpen, setAssetModalOpen] = useState(false);
@@ -1184,6 +1282,28 @@ function ClientDashboard() {
   const [editingSchedule, setEditingSchedule] = useState(null);
   const [showScheduleForm, setShowScheduleForm] = useState(false);
   const [selectedSchedule, setSelectedSchedule] = useState(null);
+  const handleUseCurrentPropertyLocation = useCallback(() => {
+    if (typeof window === 'undefined' || !window.navigator?.geolocation) {
+      alert('Live location is not available on this device or browser.');
+      return;
+    }
+
+    window.navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setPropertyForm((prev) => ({
+          ...prev,
+          latitude: normalizeCoordinate(position.coords.latitude),
+          longitude: normalizeCoordinate(position.coords.longitude),
+          includeMapCoordinates: true
+        }));
+      },
+      (error) => {
+        console.error('Failed to get current location', error);
+        alert('Unable to get your current location. Please allow location access and try again.');
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+  }, []);
   const [scheduleDetailTab, setScheduleDetailTab] = useState('assets');
   const [reminders, setReminders] = useState([]);
   const [issues, setIssues] = useState([]);
@@ -1211,6 +1331,30 @@ function ClientDashboard() {
   const [privateNote, setPrivateNote] = useState('');
   const [mentionNotifications, setMentionNotifications] = useState([]);
   const [noteReady, setNoteReady] = useState(false);
+  const [branches, setBranches] = useState([]);
+  const [branchLoading, setBranchLoading] = useState(false);
+  const [branchSaving, setBranchSaving] = useState(false);
+  const [branchError, setBranchError] = useState('');
+  const [branchSuccess, setBranchSuccess] = useState('');
+  const [branchForm, setBranchForm] = useState({
+    firstName: '',
+    lastName: '',
+    countryCode: '+1',
+    phone: '',
+    branchName: '',
+    branchDetails: '',
+    branchLocation: '',
+    branchLatitude: '',
+    branchLongitude: '',
+    branchEvidenceOne: '',
+    branchEvidenceTwo: '',
+    branchEvidenceOneFile: null,
+    branchEvidenceTwoFile: null,
+    branchImages: [],
+    technicians: '',
+    email: '',
+    password: ''
+  });
   const propertiesRef = useRef([]);
   const assetsRef = useRef([]);
   const importFileRef = useRef(null);
@@ -1262,8 +1406,11 @@ function ClientDashboard() {
     recipientName: '',
     link: '/client-dashboard',
     message: '',
-    sending: false
+    sending: false,
+    messages: []
   });
+  const [directMessageThreads, setDirectMessageThreads] = useState({});
+  const [directMessageNotifications, setDirectMessageNotifications] = useState([]);
 
   const startNewPm = () => {
     setPmWorkOrder({
@@ -1380,6 +1527,17 @@ function ClientDashboard() {
     );
   }, [internalTechnicians, technicians, people]);
 
+  const assignableSchedulerPeople = React.useMemo(() => {
+    const eligibleRoles = new Set(['admin', 'manager', 'technician', 'internal', 'staff']);
+    return dedupeById(
+      [
+        ...internalTechnicians,
+        ...allWorkers.filter((person) => eligibleRoles.has(String(person?.role || '').toLowerCase()))
+      ],
+      (person) => person?._id || person?.id || person?.userId || person?.email || person?.phone
+    );
+  }, [allWorkers, internalTechnicians]);
+
   // New Detail Modal Implementation (manager parity)
   const DetailsModal = useCallback(function DetailsModal({ open, type, item, onClose, getAssignedTechName, onRefresh, technicians = [], teams = [], workOrders = [], people = [], onPrivateMessage }) {
     const normalizeTaskArray = (value) => {
@@ -1410,7 +1568,7 @@ function ClientDashboard() {
       status: item?.status || '',
       location: item?.location || item?.address || '',
       assetName: item?.assetName || '',
-      assignedTo: item?.assignedTo || '',
+      assignedTo: extractId(item?.assignedTo) || item?.assignedTo || '',
       additionalResponsibleWorkers: item?.additionalResponsibleWorkers || '',
       team: item?.team || '',
       estimatedTime: item?.estimatedTime || '',
@@ -1427,6 +1585,10 @@ function ClientDashboard() {
     const [localFiles, setLocalFiles] = useState([]);
     const [localLinks, setLocalLinks] = useState([]);
     const [newLink, setNewLink] = useState({ title: '', url: '' });
+    const [startingWorkOrder, setStartingWorkOrder] = useState(false);
+    const [savingAssignee, setSavingAssignee] = useState(false);
+    const [timerStartedAt, setTimerStartedAt] = useState(item?.fixTime || item?.startedAt || null);
+    const [timerNow, setTimerNow] = useState(Date.now());
     const [linkRelation, setLinkRelation] = useState('relates to');
     const [linkedWorkOrders, setLinkedWorkOrders] = useState('');
     const [providerEnabled, setProviderEnabled] = useState(false);
@@ -1452,6 +1614,9 @@ function ClientDashboard() {
     const isManagerOrAdmin = userRole === 'manager' || userRole === 'admin';
 
     const itemId = item?.id || item?._id;
+    const isMaterial = type === 'material';
+    const isRequest = type === 'request';
+    const isIssue = type === 'issue';
 
     useEffect(() => {
       if (item) {
@@ -1463,7 +1628,7 @@ function ClientDashboard() {
           status: item.status || '',
           location: item.location || item.address || '',
           assetName: item.assetName || '',
-          assignedTo: item.assignedTo || '',
+          assignedTo: extractId(item.assignedTo) || item.assignedTo || '',
           additionalResponsibleWorkers: item.additionalResponsibleWorkers || '',
           team: item.team || '',
           estimatedTime: item.estimatedTime || '',
@@ -1473,6 +1638,7 @@ function ClientDashboard() {
           checklist: normalizeTaskArray(item.checklist || item.tasks || item.taskList),
           chat: Array.isArray(item.chat) ? item.chat : []
         });
+        setTimerStartedAt(item.fixTime || item.startedAt || null);
       }
     }, [item]);
 
@@ -1709,17 +1875,17 @@ function ClientDashboard() {
       }
     }, [itemId, userName, userRole]);
 
-    const isMaterial = type === 'material';
-    const isRequest = type === 'request';
-    const isIssue = type === 'issue';
-
     const title = isMaterial ? 'Material Request Details' : isRequest ? 'Request Details' : 'Work Order Details';
     const location = formData.location || item?.locationName || item?.propertyName || item?.assetLocation || 'Not specified';
     const dueDate = item?.fixDeadline || item?.dueDate || item?.nextDate || item?.scheduledFor || null;
     const createdAt = item?.createdAt || item?.date || item?.nextDate || null;
     const status = item?.status || (item?.approved ? 'IN PROGRESS' : 'PENDING') || 'â€”';
     const description = item?.description || item?.details || 'No description provided.';
-    const assignee = isIssue ? (typeof getAssignedTechName === 'function' ? getAssignedTechName(item) : item?.assignedTo) : (item?.technicianName || item?.assignedTo || 'Unassigned');
+    const assignee = isIssue
+      ? (typeof getAssignedTechName === 'function'
+        ? getAssignedTechName({ ...item, assignedTo: formData.assignedTo || item?.assignedTo })
+        : (formData.assignedTo || item?.assignedTo))
+      : (item?.technicianName || item?.assignedTo || 'Unassigned');
     const workOrderRef = item?.workOrderId || item?.workOrder || item?.workOrderNumber || item?.workOrderNo || item?.workOrderCode || item?.workOrderRef || '';
     const frequencyValue = formData.frequency || item?.frequency || item?.interval || '';
     const normalizedStatus = String(status || '').toLowerCase();
@@ -1731,6 +1897,104 @@ function ClientDashboard() {
     const isRequestReadOnly = !canEdit;
     const requestLockClass = isRequestReadOnly ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : '';
     const requestFieldClass = `w-full border border-gray-300 rounded-lg p-2.5 text-sm ${requestLockClass}`;
+    const selectableWorkers = React.useMemo(() => {
+      const pool = Array.isArray(technicians) ? technicians : [];
+      const fallbackPeople = Array.isArray(people) ? people : [];
+      return dedupeById(
+        [...pool, ...fallbackPeople].filter(Boolean),
+        (worker) => worker?._id || worker?.id || worker?.userId || worker?.email || worker?.phone || worker?.name
+      );
+    }, [people, technicians]);
+    const findWorkerRecord = useCallback((value) => {
+      if (!value) return null;
+      const normalizedValue = typeof value === 'object'
+        ? (extractId(value) || value?.email || value?.phone || value?.name || value?.fullName || '')
+        : String(value).trim();
+      if (!normalizedValue) return null;
+      const normalizedNeedle = String(normalizedValue).trim().toLowerCase();
+      return selectableWorkers.find((worker) => {
+        const candidates = [
+          worker?._id,
+          worker?.id,
+          worker?.userId,
+          worker?.email,
+          worker?.phone,
+          worker?.name,
+          worker?.fullName
+        ].filter(Boolean).map((candidate) => String(candidate).trim().toLowerCase());
+        return candidates.includes(normalizedNeedle);
+      }) || null;
+    }, [selectableWorkers]);
+    const normalizeWorkerSelection = useCallback((value) => {
+      if (!value) return null;
+      const worker = findWorkerRecord(value);
+      if (worker) {
+        return {
+          id: String(worker._id || worker.id || worker.userId || ''),
+          name: worker.name || worker.fullName || worker.email || String(worker._id || worker.id || worker.userId || ''),
+          email: worker.email || '',
+          phone: worker.phone || '',
+          role: worker.role || ''
+        };
+      }
+      if (typeof value === 'object') {
+        const fallbackId = extractId(value) || '';
+        const fallbackName = value.name || value.fullName || value.email || fallbackId;
+        if (!fallbackId && !fallbackName) return null;
+        return {
+          id: String(fallbackId || ''),
+          name: fallbackName,
+          email: value.email || '',
+          phone: value.phone || '',
+          role: value.role || ''
+        };
+      }
+      const text = String(value).trim();
+      if (!text) return null;
+      return { id: '', name: text, email: '', phone: '', role: '' };
+    }, [findWorkerRecord]);
+    const selectedTeamMembers = React.useMemo(() => {
+      const selectedTeam = Array.isArray(teams)
+        ? teams.find((team) => String(team?.name || team?.title || team?._id || team?.id || '') === String(formData.team || ''))
+        : null;
+      const members = Array.isArray(selectedTeam?.members) ? selectedTeam.members : [];
+      return members
+        .map((member) => normalizeWorkerSelection(member))
+        .filter(Boolean);
+    }, [formData.team, normalizeWorkerSelection, teams]);
+    const normalizedAdditionalWorkers = React.useMemo(() => {
+      const raw = formData.additionalResponsibleWorkers;
+      if (!raw) return [];
+      if (Array.isArray(raw)) {
+        return raw.map((entry) => normalizeWorkerSelection(entry)).filter(Boolean);
+      }
+      if (typeof raw === 'string') {
+        const trimmed = raw.trim();
+        if (!trimmed) return [];
+        try {
+          const parsed = JSON.parse(trimmed);
+          const items = Array.isArray(parsed) ? parsed : [parsed];
+          return items.map((entry) => normalizeWorkerSelection(entry)).filter(Boolean);
+        } catch (e) {
+          return trimmed
+            .split(',')
+            .map((entry) => normalizeWorkerSelection(entry.trim()))
+            .filter(Boolean);
+        }
+      }
+      return [normalizeWorkerSelection(raw)].filter(Boolean);
+    }, [formData.additionalResponsibleWorkers, normalizeWorkerSelection]);
+    const approvalSecondaryWorkers = React.useMemo(() => {
+      const primaryWorker = normalizeWorkerSelection(formData.assignedTo);
+      const primaryKey = String(primaryWorker?.id || primaryWorker?.email || primaryWorker?.name || '').trim().toLowerCase();
+      return dedupeById(
+        [...selectedTeamMembers, ...normalizedAdditionalWorkers].filter((worker) => {
+          const workerKey = String(worker?.id || worker?.email || worker?.name || '').trim().toLowerCase();
+          return workerKey && workerKey !== primaryKey;
+        }),
+        (worker) => worker?.id || worker?.email || worker?.name
+      );
+    }, [formData.assignedTo, normalizeWorkerSelection, normalizedAdditionalWorkers, selectedTeamMembers]);
     const showTabs = isIssue;
     const tabs = [
       { id: 'overview', label: 'Overview' },
@@ -1753,6 +2017,15 @@ function ClientDashboard() {
     const hasStructuredTasks = (Array.isArray(item?.tasks) && item.tasks.length > 0)
       || (Array.isArray(item?.taskList) && item.taskList.length > 0)
       || tasks.length > 0;
+    useEffect(() => {
+      const startValue = timerStartedAt;
+      if (!isIssue || !isInProgress || !startValue) return undefined;
+      setTimerNow(Date.now());
+      const intervalId = window.setInterval(() => {
+        setTimerNow(Date.now());
+      }, 1000);
+      return () => window.clearInterval(intervalId);
+    }, [isIssue, isInProgress, timerStartedAt]);
     const laborEntries = Array.isArray(item?.labor) ? item.labor : Array.isArray(item?.laborEntries) ? item.laborEntries : [];
     const partsItems = Array.isArray(item?.parts) ? item.parts : Array.isArray(item?.materials) ? item.materials : Array.isArray(item?.items) ? item.items : [];
     const fileItems = Array.isArray(item?.files) ? item.files : Array.isArray(item?.attachments) ? item.attachments : [];
@@ -1895,7 +2168,15 @@ function ClientDashboard() {
       const secs = Math.floor(s % 60).toString().padStart(2, '0');
       return `${hrs}:${mins}:${secs}`;
     };
-    const timeDisplay = formatTimer(laborSeconds);
+    let activeTimerSeconds = 0;
+    if (timerStartedAt) {
+      const startedMs = new Date(timerStartedAt).getTime();
+      if (!Number.isNaN(startedMs)) {
+        const endMs = isInProgress ? timerNow : Date.now();
+        activeTimerSeconds = Math.max(0, Math.floor((endMs - startedMs) / 1000));
+      }
+    }
+    const timeDisplay = formatTimer(Math.max(laborSeconds, activeTimerSeconds));
     const assetStatus = item?.assetStatus || item?.operationalStatus || 'Operational';
     const priorityValue = formData.priority || item?.priority || 'Medium';
     const closeoutNotes = item?.closeoutNotes || item?.closeoutNote || item?.closeout || 'N/A';
@@ -2253,7 +2534,28 @@ function ClientDashboard() {
         return;
       }
       try {
-        await api.post(`/api/issues/${item.id || item._id}/approve`);
+        const primaryWorker = normalizeWorkerSelection(formData.assignedTo);
+        const approvalPayload = {
+          title: formData.title || item?.title || '',
+          description: formData.description || item?.description || '',
+          category: formData.category || item?.category || '',
+          priority: formData.priority || item?.priority || 'MEDIUM',
+          location: String(formData.location || item?.location || item?.address || '').trim(),
+          assetName: String(formData.assetName || item?.assetName || '').trim(),
+          team: String(formData.team || item?.team || '').trim(),
+          checklist: Array.isArray(formData.checklist) ? formData.checklist : [],
+          estimatedTime: formData.estimatedTime || item?.estimatedTime || '',
+          signature: Boolean(formData.signature || item?.signature),
+          additionalResponsibleWorkers: approvalSecondaryWorkers
+        };
+        if (formData.fixDeadline) {
+          approvalPayload.fixDeadline = formData.fixDeadline;
+        }
+        if (primaryWorker) {
+          approvalPayload.assignedTo = primaryWorker.id || primaryWorker.name;
+          approvalPayload.assignees = [primaryWorker];
+        }
+        await api.post(`/api/issues/${item.id || item._id}/approve`, approvalPayload);
         alert('Request approved.');
         if (onRefresh) onRefresh();
         logActivity('Approved request', workOrderTitle);
@@ -2338,8 +2640,18 @@ function ClientDashboard() {
       setMentionContext(null);
     };
 
-    const privateRecipientId = item?.assignedTo || item?.userId || item?.requestorId || '';
-    const privateRecipientName = getAssignedTechName ? getAssignedTechName(item) : (item?.name || item?.email || 'User');
+    const assigneeOptions = Array.isArray(technicians) ? technicians.filter(Boolean) : [];
+    const selectedAssigneeEntry = assigneeOptions.find((person) => {
+      const ids = [person?._id, person?.id, person?.userId].filter(Boolean).map(String);
+      return ids.includes(String(formData.assignedTo || ''));
+    });
+    const privateRecipientId = formData.assignedTo || item?.assignedTo || item?.userId || item?.requestorId || '';
+    const privateRecipientName = selectedAssigneeEntry?.name
+      || selectedAssigneeEntry?.fullName
+      || (getAssignedTechName ? getAssignedTechName({ ...item, assignedTo: formData.assignedTo || item?.assignedTo }) : '')
+      || item?.name
+      || item?.email
+      || 'User';
 
     const addChecklistItem = () => {
       setFormData(prev => ({ ...prev, checklist: [...prev.checklist, { text: '', completed: false }] }));
@@ -2349,6 +2661,54 @@ function ClientDashboard() {
       const newList = [...formData.checklist];
       newList[index][field] = value;
       setFormData(prev => ({ ...prev, checklist: newList }));
+    };
+
+    const handleStartWorkOrder = async () => {
+      if (!isIssue || !itemId || startingWorkOrder) return;
+      try {
+        setStartingWorkOrder(true);
+        const startedAt = new Date().toISOString();
+        await api.put(`/api/issues/${itemId}`, {
+          status: 'IN PROGRESS',
+          fixTime: startedAt
+        });
+        setFormData((prev) => ({
+          ...prev,
+          status: 'IN PROGRESS'
+        }));
+        setTimerStartedAt(startedAt);
+        setTimerNow(Date.now());
+        if (typeof onRefresh === 'function') {
+          await onRefresh();
+        }
+      } catch (err) {
+        alert(err?.response?.data?.error || err?.message || 'Failed to start work order.');
+      } finally {
+        setStartingWorkOrder(false);
+      }
+    };
+
+    const handleSavePrimaryAssignee = async () => {
+      if (!isIssue || !itemId) return;
+      try {
+        setSavingAssignee(true);
+        const res = await api.put(`/api/issues/${itemId}`, {
+          assignedTo: formData.assignedTo || null
+        });
+        const updatedIssue = res?.data || {};
+        setFormData((prev) => ({
+          ...prev,
+          assignedTo: updatedIssue.assignedTo ?? prev.assignedTo
+        }));
+        if (typeof onRefresh === 'function') {
+          await onRefresh();
+        }
+        alert('Primary assignee saved.');
+      } catch (err) {
+        alert(err?.response?.data?.error || err?.message || 'Failed to save primary assignee.');
+      } finally {
+        setSavingAssignee(false);
+      }
     };
 
     if (!open || !item) return null;
@@ -2406,8 +2766,14 @@ function ClientDashboard() {
                         </button>
                       </div>
                     </div>
-                    <button className="px-4 py-2 border border-blue-200 text-blue-700 rounded-lg text-sm font-semibold hover:bg-blue-50">
-                      Start Timer
+                    <button
+                      onClick={handleStartWorkOrder}
+                      disabled={startingWorkOrder || String(formData.status || '').toUpperCase().includes('PROGRESS')}
+                      className="px-4 py-2 border border-blue-200 text-blue-700 rounded-lg text-sm font-semibold hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {String(formData.status || '').toUpperCase().includes('PROGRESS')
+                        ? 'Started'
+                        : (startingWorkOrder ? 'Starting...' : 'Start Timer')}
                     </button>
                   </div>
                 </div>
@@ -2556,7 +2922,35 @@ function ClientDashboard() {
                           </div>
                           <div>
                             <div className="text-xs text-gray-500 font-semibold uppercase tracking-wider">Primary Assignee</div>
-                            <div className="mt-1 text-gray-800">{assignee || 'N/A'}</div>
+                            <div className="mt-1">
+                              <div className="flex gap-2">
+                                <select
+                                  value={String(formData.assignedTo || '')}
+                                  onChange={(e) => setFormData((prev) => ({ ...prev, assignedTo: e.target.value }))}
+                                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-800 bg-white"
+                                >
+                                  <option value="">Select assignee...</option>
+                                  {assigneeOptions.map((person, index) => {
+                                    const optionValue = person?._id || person?.id || person?.userId || '';
+                                    if (!optionValue) return null;
+                                    const optionLabel = person?.name || person?.fullName || person?.email || `Person ${index + 1}`;
+                                    return (
+                                      <option key={optionValue} value={optionValue}>
+                                        {optionLabel}
+                                      </option>
+                                    );
+                                  })}
+                                </select>
+                                <button
+                                  type="button"
+                                  onClick={handleSavePrimaryAssignee}
+                                  disabled={savingAssignee}
+                                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                  {savingAssignee ? 'Saving...' : 'Save'}
+                                </button>
+                              </div>
+                            </div>
                           </div>
                           <div>
                             <div className="text-xs text-gray-500 font-semibold uppercase tracking-wider">PM Trigger</div>
@@ -4026,13 +4420,17 @@ function ClientDashboard() {
     let cancelled = false;
     const loadSideData = async () => {
       try {
-        const [noteRes, mentionsRes] = await Promise.all([
+        const [noteRes, allNotificationsRes] = await Promise.all([
           api.get('/api/private-notes/me', { params: { scope: 'client-dashboard' } }),
-          api.get('/api/notifications', { params: { type: 'mention', limit: 6 } })
+          api.get('/api/notifications', { params: { limit: 100 } })
         ]);
         if (cancelled) return;
+        const allNotifications = Array.isArray(allNotificationsRes?.data) ? allNotificationsRes.data : [];
         setPrivateNote(noteRes?.data?.content || '');
-        setMentionNotifications(Array.isArray(mentionsRes?.data) ? mentionsRes.data : []);
+        setMentionNotifications(allNotifications.filter((entry) => String(entry?.type || '').toLowerCase() === 'mention').slice(0, 6));
+        setDirectMessageNotifications(
+          allNotifications.filter((entry) => String(entry?.type || '').toLowerCase().startsWith('direct_message'))
+        );
       } catch (err) {
         console.error('Failed to load client dashboard side data', err);
       } finally {
@@ -4041,7 +4439,11 @@ function ClientDashboard() {
     };
 
     loadSideData();
-    return () => { cancelled = true; };
+    const interval = setInterval(loadSideData, 30000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, [currentUser]);
 
   useEffect(() => {
@@ -4543,11 +4945,13 @@ function ClientDashboard() {
     }
   }, [fetchIssues]);
 
-  const assignToTech = useCallback(async (issueId, techId) => {
+  const assignToTech = useCallback(async (issueId, techId, dueDate) => {
     if (!techId) return;
     try {
       setAssignLoading(s => ({ ...s, [issueId]: true }));
-      await api.post(`/api/issues/${issueId}/assign`, { techId });
+      const payload = { techId };
+      if (dueDate) payload.dueDate = dueDate;
+      await api.post(`/api/issues/${issueId}/assign`, payload);
       await fetchIssues();
     } catch {
       alert('Failed to assign');
@@ -4555,6 +4959,16 @@ function ClientDashboard() {
       setAssignLoading(s => ({ ...s, [issueId]: false }));
     }
   }, [fetchIssues]);
+
+  const scheduleCompanyPerson = useCallback(async (issueId, assigneeId, dueDate) => {
+    const normalizedId = String(assigneeId || '');
+    if (!normalizedId) return;
+    const internalMatch = internalTechnicians.find((tech) => String(tech._id || tech.id || tech.userId || '') === normalizedId);
+    if (internalMatch) {
+      return assignInternal(issueId, normalizedId, dueDate);
+    }
+    return assignToTech(issueId, normalizedId, dueDate);
+  }, [assignInternal, assignToTech, internalTechnicians]);
 
   // Reminder actions
   const dismissOne = useCallback(async (id) => {
@@ -4669,31 +5083,89 @@ function ClientDashboard() {
     if (issue.assignedTo && typeof issue.assignedTo === 'object' && (issue.assignedTo.name || issue.assignedTo.fullName)) return issue.assignedTo.name || issue.assignedTo.fullName;
     const aid = extractId(issue.assignedTo) || extractId(issue.technician) || (issue.assignedTo && String(issue.assignedTo));
     if (!aid) return 'â€”';
+    const matchesAssigned = (entry) => [entry?._id, entry?.id, entry?.userId, entry?.email, entry?.phone].filter(Boolean).map(String).includes(String(aid));
     // Look in internal technicians first
-    let tech = internalTechnicians.find(t => [t._id, t.id, t.userId].filter(Boolean).map(String).includes(String(aid)));
+    let tech = internalTechnicians.find(matchesAssigned);
     if (tech) return tech.name || tech.fullName || tech.email || String(aid);
     // Then external technicians
-    tech = technicians.find(t => [t._id, t.id, t.userId].filter(Boolean).map(String).includes(String(aid)));
+    tech = technicians.find(matchesAssigned);
     if (tech) return tech.name || tech.fullName || tech.email || String(aid);
+    // Then other company people/users
+    const person = allWorkers.find(matchesAssigned) || people.find(matchesAssigned);
+    if (person) return person.name || person.fullName || person.email || String(aid);
+    // Then names captured in assignees payload
+    const namedAssignee = Array.isArray(issue.assignees)
+      ? issue.assignees.find((entry) => matchesAssigned(entry) || (entry?.name && String(entry.name).trim()))
+      : null;
+    if (namedAssignee?.name) return namedAssignee.name;
+    if (issue.assignedToName) return issue.assignedToName;
+    if (issue.assignedTechnicianName) return issue.assignedTechnicianName;
     // Fallback: if assignedTo is a string name already
     if (typeof issue.assignedTo === 'string' && issue.assignedTo.length && isNaN(Number(issue.assignedTo))) return issue.assignedTo;
     return String(aid);
-  }, [internalTechnicians, technicians]);
+  }, [allWorkers, internalTechnicians, people, technicians]);
+
+  const persistedDirectMessageThreads = React.useMemo(() => {
+    const contactsById = new Map();
+    [...allWorkers, ...internalTechnicians, ...technicians, ...people].forEach((entry) => {
+      const id = String(entry?._id || entry?.id || entry?.userId || '').trim();
+      if (!id || contactsById.has(id)) return;
+      contactsById.set(id, entry);
+    });
+
+    const threadMap = {};
+    (Array.isArray(directMessageNotifications) ? directMessageNotifications : []).forEach((notification) => {
+      const type = String(notification?.type || '').toLowerCase();
+      if (!type.startsWith('direct_message')) return;
+      const contactId = getDirectMessageTargetId(notification);
+      if (!contactId) return;
+      const contact = contactsById.get(contactId);
+      const nextEntry = {
+        id: `${type}-${notification.id}`,
+        sender: type === 'direct_message_sent'
+          ? (currentUser?.name || currentUser?.username || 'You')
+          : (parseDirectMessageSenderName(notification) || contact?.name || contact?.fullName || 'Contact'),
+        text: notification.message || '',
+        timestamp: notification.createdAt || new Date().toISOString(),
+        direction: type === 'direct_message_sent' ? 'outgoing' : 'incoming',
+        read: notification.read
+      };
+      threadMap[contactId] = [...(threadMap[contactId] || []), nextEntry];
+    });
+
+    Object.keys(threadMap).forEach((key) => {
+      threadMap[key] = threadMap[key]
+        .filter((entry, index, list) => {
+          const signature = `${entry.direction}|${entry.sender}|${entry.text}|${entry.timestamp}`;
+          return list.findIndex((candidate) => `${candidate.direction}|${candidate.sender}|${candidate.text}|${candidate.timestamp}` === signature) === index;
+        })
+        .sort((a, b) => new Date(a.timestamp || 0).getTime() - new Date(b.timestamp || 0).getTime());
+    });
+
+    return threadMap;
+  }, [allWorkers, currentUser, directMessageNotifications, internalTechnicians, people, technicians]);
 
   const openPrivateMessageComposer = useCallback(({ recipientUserId, recipientName, link }) => {
     if (!recipientUserId) {
       alert('No recipient is available for private message.');
       return;
     }
+    const recipientKey = String(recipientUserId);
     setDirectMessageModal({
       open: true,
-      recipientUserId: String(recipientUserId),
+      recipientUserId: recipientKey,
       recipientName: recipientName || 'Assigned person',
       link: link || '/client-dashboard',
       message: '',
-      sending: false
+      sending: false,
+      messages: [...(persistedDirectMessageThreads[recipientKey] || []), ...(directMessageThreads[recipientKey] || [])]
+        .filter((entry, index, list) => {
+          const signature = `${entry.direction}|${entry.sender}|${entry.text}|${entry.timestamp}`;
+          return list.findIndex((candidate) => `${candidate.direction}|${candidate.sender}|${candidate.text}|${candidate.timestamp}` === signature) === index;
+        })
+        .sort((a, b) => new Date(a.timestamp || 0).getTime() - new Date(b.timestamp || 0).getTime())
     });
-  }, []);
+  }, [directMessageThreads, persistedDirectMessageThreads]);
 
   const closeDirectMessageModal = useCallback(() => {
     setDirectMessageModal({
@@ -4702,9 +5174,22 @@ function ClientDashboard() {
       recipientName: '',
       link: '/client-dashboard',
       message: '',
-      sending: false
+      sending: false,
+      messages: []
     });
   }, []);
+
+  useEffect(() => {
+    if (!directMessageModal.open || !directMessageModal.recipientUserId) return;
+    const recipientKey = String(directMessageModal.recipientUserId);
+    const mergedMessages = [...(persistedDirectMessageThreads[recipientKey] || []), ...(directMessageThreads[recipientKey] || [])]
+      .filter((entry, index, list) => {
+        const signature = `${entry.direction}|${entry.sender}|${entry.text}|${entry.timestamp}`;
+        return list.findIndex((candidate) => `${candidate.direction}|${candidate.sender}|${candidate.text}|${candidate.timestamp}` === signature) === index;
+      })
+      .sort((a, b) => new Date(a.timestamp || 0).getTime() - new Date(b.timestamp || 0).getTime());
+    setDirectMessageModal((prev) => ({ ...prev, messages: mergedMessages }));
+  }, [directMessageModal.open, directMessageModal.recipientUserId, directMessageThreads, persistedDirectMessageThreads]);
 
   const openCommentModal = useCallback((item) => {
     setCommentModal({ open: true, item });
@@ -4737,19 +5222,36 @@ function ClientDashboard() {
     if (!text) return;
     setDirectMessageModal(prev => ({ ...prev, sending: true }));
     try {
+      const outgoingMessage = {
+        id: `dm-${Date.now()}`,
+        sender: userName || 'You',
+        text,
+        timestamp: new Date().toISOString(),
+        direction: 'outgoing'
+      };
       await api.post('/api/notifications/direct-message', {
         recipientUserId: directMessageModal.recipientUserId,
+        recipientName: directMessageModal.recipientName,
         message: text,
         title: `Private message from ${userName || 'User'}`,
         link: directMessageModal.link || '/client-dashboard'
       });
-      alert('Private message sent.');
-      closeDirectMessageModal();
+      setDirectMessageThreads((prev) => {
+        const key = String(directMessageModal.recipientUserId);
+        const nextThread = [...(prev[key] || []), outgoingMessage];
+        return { ...prev, [key]: nextThread };
+      });
+      setDirectMessageModal((prev) => ({
+        ...prev,
+        message: '',
+        sending: false,
+        messages: [...(prev.messages || []), outgoingMessage]
+      }));
     } catch (err) {
       setDirectMessageModal(prev => ({ ...prev, sending: false }));
       alert('Failed to send private message: ' + (err?.response?.data?.message || err.message));
     }
-  }, [closeDirectMessageModal, directMessageModal, userName]);
+  }, [directMessageModal, userName]);
 
   // Import assets from Excel (.xlsx/.xls)
   const handleImportAssetsFile = useCallback(async (file) => {
@@ -4906,6 +5408,7 @@ function ClientDashboard() {
 
   const pendingRequests = allIssues.filter(issue => !isRejectedRequest(issue));
   const workOrders = allIssues.filter(issue => isApprovedWorkOrder(issue));
+  const schedulerWorkOrders = React.useMemo(() => workOrders, [workOrders]);
   const clientTasks = allIssues.flatMap((issue) => {
     const rawTasks = Array.isArray(issue?.tasks) && issue.tasks.length
       ? issue.tasks
@@ -4971,6 +5474,9 @@ function ClientDashboard() {
   const startEditingAsset = useCallback((asset) => {
     if (!asset) return;
     const blocksSource = asset.blocks ?? asset.block ?? asset.location?.block;
+    const branchId = asset.location?.branchId || '';
+    const branchName = asset.location?.branchName || '';
+    const isBranchAsset = String(asset.location?.locationType || '').toLowerCase() === 'branch' || (!!branchId || (!!branchName && !(asset.propertyId || asset.property?.id || asset.property?._id)));
     let blocksArr = [];
     if (Array.isArray(blocksSource)) blocksArr = blocksSource.map(String);
     else if (blocksSource) blocksArr = String(blocksSource).split(/[;,|]/).map(s => s.trim()).filter(Boolean);
@@ -4980,18 +5486,157 @@ function ClientDashboard() {
       name: asset.name,
       type: asset.type,
       description: asset.description || '',
-      propertyId: asset.propertyId || asset.property?.id || asset.property?._id || '',
+      serialNumber: asset.serialNumber || '',
+      propertyId: isBranchAsset ? '' : (asset.propertyId || asset.property?.id || asset.property?._id || ''),
+      locationType: isBranchAsset ? 'branch' : 'property',
+      branchId,
       quantity: asset.quantity || 1,
       building: asset.building || asset.location?.building || '',
-      blocks: blocksArr,
+      blocks: isBranchAsset ? [] : blocksArr,
       room: asset.room || asset.location?.room || ''
     });
+  }, []);
+
+  const getPropertyBlockOptions = useCallback((propertyId) => {
+    const prop = properties.find((p) => String(p.id || p._id) === String(propertyId || ''));
+    if (!prop) return [];
+
+    if (Array.isArray(prop.blocks)) {
+      return prop.blocks.map((block) => String(block).trim()).filter(Boolean);
+    }
+
+    if (prop.blocks && String(prop.blocks).match(/[,|;]/)) {
+      return String(prop.blocks).split(/[;,|]/).map((s) => s.trim()).filter(Boolean);
+    }
+
+    const blocksCount = parseInt(prop?.blocks, 10) || 0;
+    if (blocksCount > 0) {
+      return Array.from({ length: blocksCount }, (_, idx) => `Block ${idx + 1}`);
+    }
+
+    return [];
+  }, [properties]);
+
+  const getAssetLocationLabel = useCallback((asset) => {
+    if (asset?.property?.name) return asset.property.name;
+    if (asset?.location?.branchName) return `${asset.location.branchName} (Branch)`;
+    if (asset?.location?.building) return asset.location.building;
+    return '';
+  }, []);
+
+  const resetBranchForm = useCallback(() => {
+    setBranchForm({
+      firstName: '',
+      lastName: '',
+      countryCode: '+1',
+      phone: '',
+      branchName: '',
+      branchDetails: '',
+      branchLocation: '',
+      branchLatitude: '',
+      branchLongitude: '',
+      branchEvidenceOne: '',
+      branchEvidenceTwo: '',
+      branchEvidenceOneFile: null,
+      branchEvidenceTwoFile: null,
+      branchImages: [],
+      technicians: '',
+      email: '',
+      password: ''
+    });
+  }, []);
+
+  const fetchBranches = useCallback(async () => {
+    if (!currentUser?.companyName) {
+      setBranches([]);
+      return;
+    }
+    try {
+      setBranchLoading(true);
+      setBranchError('');
+      const res = await api.get('/api/users');
+      const companyUsers = Array.isArray(res.data) ? res.data : [];
+      const branchUsers = companyUsers.filter((user) => String(user.companyType || '').toLowerCase() === 'branch');
+      setBranches(branchUsers);
+    } catch (err) {
+      console.error('Failed to load branches', err);
+      setBranchError(err?.response?.data?.error || err.message || 'Failed to load branches.');
+    } finally {
+      setBranchLoading(false);
+    }
+  }, [currentUser?.companyName]);
+
+  const handleBranchSubmit = useCallback(async (e) => {
+    e.preventDefault();
+    if (!currentUser?.companyName) {
+      setBranchError('Your account has no company name.');
+      return;
+    }
+
+    try {
+      setBranchSaving(true);
+      setBranchError('');
+      setBranchSuccess('');
+
+      const payload = new FormData();
+      payload.append('name', `${branchForm.firstName} ${branchForm.lastName}`.trim());
+      payload.append('firstName', branchForm.firstName.trim());
+      payload.append('lastName', branchForm.lastName.trim());
+      payload.append('countryCode', branchForm.countryCode.trim() || '+1');
+      payload.append('phone', `${branchForm.countryCode}${branchForm.phone}`.replace(/[^+\d]/g, ''));
+      payload.append('email', branchForm.email.trim());
+      payload.append('password', branchForm.password);
+      payload.append('role', 'CLIENT');
+      payload.append('companyName', currentUser.companyName);
+      payload.append('companyType', 'branch');
+      payload.append('branchName', branchForm.branchName.trim());
+      payload.append('branchDetails', branchForm.branchDetails.trim());
+      payload.append('branchLocation', branchForm.branchLocation.trim());
+      payload.append('branchLatitude', branchForm.branchLatitude);
+      payload.append('branchLongitude', branchForm.branchLongitude);
+      payload.append('branchEvidenceOne', branchForm.branchEvidenceOne.trim());
+      payload.append('branchEvidenceTwo', branchForm.branchEvidenceTwo.trim());
+      if (branchForm.technicians) payload.append('techniciansCount', branchForm.technicians);
+      if (branchForm.branchEvidenceOneFile) payload.append('branchEvidenceOneFile', branchForm.branchEvidenceOneFile);
+      if (branchForm.branchEvidenceTwoFile) payload.append('branchEvidenceTwoFile', branchForm.branchEvidenceTwoFile);
+      if (Array.isArray(branchForm.branchImages)) {
+        branchForm.branchImages.forEach((file) => payload.append('branchImages', file));
+      }
+
+      await api.post('/api/users/register', payload, { headers: { 'Content-Type': 'multipart/form-data' } });
+      setBranchSuccess('Branch added successfully.');
+      resetBranchForm();
+      await fetchBranches();
+    } catch (err) {
+      console.error('Failed to create branch', err);
+      setBranchError(err?.response?.data?.error || err.message || 'Failed to create branch.');
+    } finally {
+      setBranchSaving(false);
+    }
+  }, [branchForm, currentUser?.companyName, fetchBranches, resetBranchForm]);
+
+  const handleUseCurrentBranchLocation = useCallback(() => {
+    if (typeof window === 'undefined' || !window.navigator?.geolocation) {
+      setBranchError('Live location is not available on this device or browser.');
+      return;
+    }
+
+    window.navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setBranchForm((prev) => ({
+          ...prev,
+          branchLatitude: Number(position.coords.latitude).toFixed(6),
+          branchLongitude: Number(position.coords.longitude).toFixed(6)
+        }));
+      },
+      () => setBranchError('Unable to get current branch coordinates.'),
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
   }, []);
 
   const navItems = [
     { key: 'dashboard', label: t("manager.sidebar.dashboard"), icon: <Icon.Dashboard /> },
     { key: 'intelligence', label: t("manager.sidebar.intelligence"), icon: <Icon.Analytics /> },
-    { key: 'studio', label: t("manager.sidebar.studio"), icon: <Icon.Templates /> },
 
     { key: 'workOrders', label: t("manager.sidebar.workOrders"), icon: <Icon.Requests />, group: 'core' },
     { key: 'preventiveMaintenance', label: t("manager.sidebar.preventiveMaintenance"), icon: <Icon.Templates />, group: 'core' },
@@ -5007,6 +5652,7 @@ function ClientDashboard() {
 
     { key: 'assets', label: t("manager.sidebar.assets"), icon: <Icon.Assets />, group: 'resources' },
     { key: 'properties', label: t("manager.sidebar.locations"), icon: <Icon.Properties />, group: 'resources' },
+    { key: 'branches', label: 'Branches', icon: <Icon.Properties />, group: 'resources' },
     { key: 'internalTechnicians', label: t("manager.sidebar.peopleTeams"), icon: <Icon.Staff />, group: 'resources' },
     { key: 'maintenanceTemplates', label: t("manager.sidebar.checklists"), icon: <Icon.Templates />, group: 'resources' },
     { key: 'files', label: t("manager.sidebar.files"), icon: <Icon.Download />, group: 'resources' },
@@ -5016,6 +5662,12 @@ function ClientDashboard() {
     { key: 'vendors', label: 'Vendors', icon: <Icon.Vendors />, group: 'procurement' },
     { key: 'customers', label: 'Customers', icon: <Icon.Staff />, group: 'procurement' },
   ];
+
+  useEffect(() => {
+    if ((activeTab === 'branches' || activeTab === 'assets') && currentUser?.companyName) {
+      fetchBranches();
+    }
+  }, [activeTab, currentUser?.companyName, fetchBranches]);
 
   const navSections = [
     { key: 'core', label: t("manager.sidebar.core") },
@@ -5059,6 +5711,12 @@ function ClientDashboard() {
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{userName}</div>
               <div style={{ fontSize: 11, color: '#9CA3AF', textTransform: 'capitalize' }}>{currentUser?.role || 'client'}</div>
+              <div style={{ fontSize: 11, color: '#6B7280', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {currentUser?.companyName || 'No company'}
+              </div>
+              <div style={{ fontSize: 10, color: '#9CA3AF', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                Company ID: {currentUser?.companyId || currentUser?.id || currentUser?._id || '—'}
+              </div>
             </div>
           </div>
         </div>
@@ -5494,16 +6152,12 @@ function ClientDashboard() {
           )}
 
           {activeTab === 'intelligence' && (
-            <PlaceholderPanel
-              title={t("manager.sidebar.intelligence")}
-              description="AI-driven insights and automation tools will appear here soon."
-            />
-          )}
-
-          {activeTab === 'studio' && (
-            <PlaceholderPanel
-              title={t("manager.sidebar.studio")}
-              description="Build custom workflows, forms, and automations here."
+            <ClientIntelligenceTab
+              assets={assets}
+              issues={allIssues}
+              technicians={internalTechnicians}
+              properties={properties}
+              people={people}
             />
           )}
 
@@ -5978,7 +6632,13 @@ function ClientDashboard() {
           <MeterScheduleModal open={showMeterSchedule} onClose={() => setShowMeterSchedule(false)} />
           <CombinedScheduleModal open={showCombinedSchedule} onClose={() => setShowCombinedSchedule(false)} />
           {activeTab === 'scheduler' && (
-            <ClientSchedulerTab issues={workOrders} technicians={allWorkers} />
+            <ClientSchedulerTab
+              workOrders={schedulerWorkOrders}
+              technicians={allWorkers}
+              assignableTechnicians={assignableSchedulerPeople}
+              onSchedule={scheduleCompanyPerson}
+              onOpenWorkOrderDetails={(issue) => setModalData({ open: true, type: 'issue', item: issue })}
+            />
           )}
 
           {activeTab === 'files' && (
@@ -6354,7 +7014,7 @@ function ClientDashboard() {
           {activeTab === 'properties' && (
             <div>
               <SectionHeader title={t("client.sections.locations")} count={properties.length}
-                action={!editingProperty && <Btn onClick={() => setEditingProperty({})} variant="primary" size="sm"><Icon.Plus /> {t("client.actions.addLocations")}</Btn>} />
+                action={!editingProperty && <Btn onClick={() => { setEditingProperty({}); setPropertyFiles(null); setPropertyUseNamedBlocks(false); setPropertyForm(createEmptyPropertyForm()); }} variant="primary" size="sm"><Icon.Plus /> {t("client.actions.addLocations")}</Btn>} />
 
               {loading.properties && <div style={{ textAlign: 'center', padding: 40, color: '#9CA3AF' }}>Loadingâ€¦</div>}
               {errors.properties && <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 10, padding: 14, marginBottom: 16, color: '#991B1B', fontSize: 13 }}>Error: {errors.properties}</div>}
@@ -6403,13 +7063,7 @@ function ClientDashboard() {
                       }
                       setEditingProperty(null);
                       setPropertyFiles(null);
-                      setPropertyForm({ 
-                        name: '', type: '', address: '', block: '', hierarchy: '', beds: '', baths: '', area: '', floors: '', blocks: '', rooms: '', namedBlocks: [], roomNames: [],
-                        latitude: '', longitude: '', includeMapCoordinates: false,
-                        parentPropertyId: '', assignedWorkers: [], assignedTeam: '',
-                        vendors: [], customers: [],
-                        customData: []
-                      });
+                      setPropertyForm(createEmptyPropertyForm());
                       const res = await api.get('/api/properties');
                       setProperties(res.data || []);
                     } catch {
@@ -6423,6 +7077,43 @@ function ClientDashboard() {
                           <Input placeholder={ph} type={type} value={propertyForm[field]} onChange={e => setPropertyForm(f => ({ ...f, [field]: e.target.value }))} required={req} />
                         </div>
                       ))}
+                      <div style={{ gridColumn: '1 / -1', border: '1px solid #DBEAFE', background: '#EFF6FF', borderRadius: 12, padding: 14 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                          <div>
+                            <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: '#1D4ED8', letterSpacing: '0.05em' }}>Live Location</div>
+                            <div style={{ fontSize: 13, color: '#1E3A8A', marginTop: 4 }}>
+                              Save GPS coordinates so company staff can open directions to this branch.
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleUseCurrentPropertyLocation}
+                            style={{ border: '1px solid #93C5FD', background: 'white', color: '#1D4ED8', borderRadius: 10, padding: '10px 14px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+                          >
+                            Use My Current Location
+                          </button>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginTop: 12 }}>
+                          <div>
+                            <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Latitude</label>
+                            <Input placeholder="e.g. -1.944072" type="number" step="any" value={propertyForm.latitude || ''} onChange={e => setPropertyForm(f => ({ ...f, latitude: e.target.value }))} />
+                          </div>
+                          <div>
+                            <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Longitude</label>
+                            <Input placeholder="e.g. 30.061885" type="number" step="any" value={propertyForm.longitude || ''} onChange={e => setPropertyForm(f => ({ ...f, longitude: e.target.value }))} />
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+                            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 10 }}>
+                              <input
+                                type="checkbox"
+                                checked={!!propertyForm.includeMapCoordinates}
+                                onChange={(e) => setPropertyForm((prev) => ({ ...prev, includeMapCoordinates: e.target.checked }))}
+                              />
+                              Enable map coordinates
+                            </label>
+                          </div>
+                        </div>
+                      </div>
                       <div style={{ gridColumn: '1 / -1', marginTop: 8 }}>
                         <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: 4, textTransform: 'uppercase' }}>Room Names (comma separated)</label>
                         <textarea value={(propertyForm.roomNames || []).join(', ')} onChange={e => setPropertyForm(f => ({ ...f, roomNames: String(e.target.value).split(/[;,|]/).map(s => s.trim()).filter(Boolean) }))} style={{ width: '100%', minHeight: 64, padding: 8, borderRadius: 8, border: '1px solid #D1D5DB', fontFamily: 'inherit' }} />
@@ -6531,6 +7222,7 @@ function ClientDashboard() {
                             ['Parent/Hierarchy', propertyForm.hierarchy || editingProperty.hierarchy || editingProperty.parentName || '—'],
                             ['Latitude', propertyForm.latitude || editingProperty.latitude || '—'],
                             ['Longitude', propertyForm.longitude || editingProperty.longitude || '—'],
+                            ['Map Sharing', propertyForm.includeMapCoordinates ? 'Enabled' : 'Disabled'],
                           ].map(([label, value]) => (
                             <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #E5E7EB' }}>
                               <span style={{ fontSize: 13, fontWeight: 600, color: '#4B5563' }}>{label}</span>
@@ -6550,13 +7242,7 @@ function ClientDashboard() {
                       <Btn onClick={() => {
                         setEditingProperty(null);
                         setPropertyFiles(null);
-                        setPropertyForm({ 
-                        name: '', type: '', address: '', block: '', hierarchy: '', beds: '', baths: '', area: '', floors: '', blocks: '', rooms: '', namedBlocks: [], roomNames: [],
-                        latitude: '', longitude: '', includeMapCoordinates: false,
-                        parentPropertyId: '', assignedWorkers: [], assignedTeam: '',
-                        vendors: [], customers: [],
-                        customData: []
-                      });
+                        setPropertyForm(createEmptyPropertyForm());
                       }} variant="ghost">Cancel</Btn>
                     </div>
                   </form>
@@ -6587,6 +7273,7 @@ function ClientDashboard() {
                             setEditingProperty(p);
                             setPropertyUseNamedBlocks(!!named);
                             setPropertyForm({
+                              ...createEmptyPropertyForm(),
                               name: p.name || '',
                               type: p.type || '',
                               address: p.address || '',
@@ -6597,7 +7284,10 @@ function ClientDashboard() {
                               blocks: !named ? (p.blocks || '') : '',
                               namedBlocks: named ? (Array.isArray(p.blocks) ? p.blocks : String(p.blocks).split(/[;,|]/).map(s => s.trim()).filter(Boolean)) : [],
                               rooms: p.rooms || '',
-                              roomNames: Array.isArray(p.roomNames) ? p.roomNames : (p.roomNames ? String(p.roomNames).split(/[;,|]/).map(s => s.trim()).filter(Boolean) : [])
+                              roomNames: Array.isArray(p.roomNames) ? p.roomNames : (p.roomNames ? String(p.roomNames).split(/[;,|]/).map(s => s.trim()).filter(Boolean) : []),
+                              latitude: p.latitude ?? '',
+                              longitude: p.longitude ?? '',
+                              includeMapCoordinates: p.includeMapCoordinates === true
                             });
                           }}>Edit</Btn>
                           <Btn size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setSelectedProperty(p); setPropertyModalOpen(true); }}>View</Btn>
@@ -6624,6 +7314,10 @@ function ClientDashboard() {
               {propertyModalOpen && selectedProperty && (
                 <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                   <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl border border-gray-200 overflow-hidden max-h-[90vh] flex flex-col">
+                    {(() => {
+                      const directionsUrl = buildDirectionsUrl(selectedProperty.latitude, selectedProperty.longitude);
+                      return (
+                        <>
                     <div className="flex items-start justify-between px-6 py-4 border-b border-gray-200">
                       <div>
                         <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-gray-500">Details</p>
@@ -6761,6 +7455,7 @@ function ClientDashboard() {
                           ['Parent', selectedProperty.parentName || selectedProperty.hierarchy || '—'],
                           ['Latitude', selectedProperty.latitude ?? '—'],
                           ['Longitude', selectedProperty.longitude ?? '—'],
+                          ['Map Sharing', selectedProperty.includeMapCoordinates ? 'Enabled' : 'Disabled'],
                           ['Created At', selectedProperty.createdAt ? new Date(selectedProperty.createdAt).toLocaleString() : '—'],
                         ].map(([label, value]) => (
                           <div key={label} className="flex items-center justify-between py-2 border-b border-gray-200 last:border-b-0">
@@ -6780,6 +7475,17 @@ function ClientDashboard() {
                               <div className="text-[11px] text-amber-600 mt-1">Map coordinates are currently disabled for this location.</div>
                             )}
                           </div>
+                          {directionsUrl && (
+                            <a
+                              href={directionsUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50"
+                            >
+                              <Navigation className="w-4 h-4" />
+                              Open Directions
+                            </a>
+                          )}
                         </div>
                       )}
 
@@ -6787,11 +7493,258 @@ function ClientDashboard() {
                         <Btn variant="primary" onClick={() => setPropertyModalOpen(false)}>Close</Btn>
                       </div>
                     </div>
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
               )}
 
           </div>
+          )}
+          {activeTab === 'branches' && (
+            <div>
+              <SectionHeader title="Branches" count={branches.length} />
+
+              {branchSuccess && (
+                <div style={{ background: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: 12, padding: 14, marginBottom: 16, color: '#065F46', fontSize: 13 }}>
+                  {branchSuccess}
+                </div>
+              )}
+              {branchError && (
+                <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 12, padding: 14, marginBottom: 16, color: '#991B1B', fontSize: 13 }}>
+                  {branchError}
+                </div>
+              )}
+
+              <div style={{ display: 'grid', gap: 20 }}>
+                <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 14, padding: 24 }}>
+                  <div style={{ fontWeight: 800, fontSize: 18, color: '#111827', marginBottom: 8 }}>Add Branch</div>
+                  <div style={{ fontSize: 13, color: '#6B7280', marginBottom: 18 }}>
+                    Create a branch under <strong>{currentUser?.companyName || 'your company'}</strong>. This creates a branch account and keeps it under the same company.
+                  </div>
+                  <form onSubmit={handleBranchSubmit}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}>
+                      <div style={{ gridColumn: '1 / -1' }}>
+                        <label style={{ fontSize: 11, fontWeight: 700, color: '#6B7280', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Main Company</label>
+                        <Input value={currentUser?.companyName || ''} readOnly />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 11, fontWeight: 700, color: '#6B7280', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Branch Name</label>
+                        <Input value={branchForm.branchName} onChange={(e) => setBranchForm((prev) => ({ ...prev, branchName: e.target.value }))} placeholder="Kigali Branch" required />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 11, fontWeight: 700, color: '#6B7280', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Technicians</label>
+                        <Select value={branchForm.technicians} onChange={(e) => setBranchForm((prev) => ({ ...prev, technicians: e.target.value }))} required>
+                          <option value="">Select range...</option>
+                          <option value="1-5">1-5</option>
+                          <option value="6-10">6-10</option>
+                          <option value="11-25">11-25</option>
+                          <option value="26-50">26-50</option>
+                          <option value="51-100">51-100</option>
+                          <option value="100+">100+</option>
+                        </Select>
+                      </div>
+                      <div style={{ gridColumn: '1 / -1' }}>
+                        <label style={{ fontSize: 11, fontWeight: 700, color: '#6B7280', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Branch Details</label>
+                        <textarea value={branchForm.branchDetails} onChange={(e) => setBranchForm((prev) => ({ ...prev, branchDetails: e.target.value }))} placeholder="Describe this branch and how it belongs to the same company." required style={{ width: '100%', minHeight: 92, padding: 12, borderRadius: 10, border: '1px solid #D1D5DB', fontFamily: 'inherit' }} />
+                      </div>
+                      <div style={{ gridColumn: '1 / -1' }}>
+                        <label style={{ fontSize: 11, fontWeight: 700, color: '#6B7280', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Branch Location</label>
+                        <Input value={branchForm.branchLocation} onChange={(e) => setBranchForm((prev) => ({ ...prev, branchLocation: e.target.value }))} placeholder="Enter branch address or location" />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 11, fontWeight: 700, color: '#6B7280', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Latitude</label>
+                        <Input type="number" step="any" value={branchForm.branchLatitude} onChange={(e) => setBranchForm((prev) => ({ ...prev, branchLatitude: e.target.value }))} placeholder="-1.944072" />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 11, fontWeight: 700, color: '#6B7280', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Longitude</label>
+                        <Input type="number" step="any" value={branchForm.branchLongitude} onChange={(e) => setBranchForm((prev) => ({ ...prev, branchLongitude: e.target.value }))} placeholder="30.061885" />
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+                        <Btn type="button" variant="outline" onClick={handleUseCurrentBranchLocation}>Use Current Location</Btn>
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 11, fontWeight: 700, color: '#6B7280', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Evidence 1</label>
+                        <Input value={branchForm.branchEvidenceOne} onChange={(e) => setBranchForm((prev) => ({ ...prev, branchEvidenceOne: e.target.value }))} placeholder="Registration number or proof" required />
+                        <input
+                          type="file"
+                          accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"
+                          onChange={(e) => setBranchForm((prev) => ({ ...prev, branchEvidenceOneFile: e.target.files?.[0] || null }))}
+                          style={{ width: '100%', marginTop: 8, fontSize: 12 }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 11, fontWeight: 700, color: '#6B7280', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Evidence 2</label>
+                        <Input value={branchForm.branchEvidenceTwo} onChange={(e) => setBranchForm((prev) => ({ ...prev, branchEvidenceTwo: e.target.value }))} placeholder="TIN, certificate, or second proof" required />
+                        <input
+                          type="file"
+                          accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"
+                          onChange={(e) => setBranchForm((prev) => ({ ...prev, branchEvidenceTwoFile: e.target.files?.[0] || null }))}
+                          style={{ width: '100%', marginTop: 8, fontSize: 12 }}
+                        />
+                      </div>
+                      <div style={{ gridColumn: '1 / -1' }}>
+                        <label style={{ fontSize: 11, fontWeight: 700, color: '#6B7280', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Branch Images</label>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          onChange={(e) => setBranchForm((prev) => ({ ...prev, branchImages: Array.from(e.target.files || []) }))}
+                          style={{ width: '100%', fontSize: 12 }}
+                        />
+                        {Array.isArray(branchForm.branchImages) && branchForm.branchImages.length > 0 && (
+                          <div style={{ fontSize: 12, color: '#6B7280', marginTop: 6 }}>
+                            {branchForm.branchImages.length} image(s) selected
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 11, fontWeight: 700, color: '#6B7280', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Admin First Name</label>
+                        <Input value={branchForm.firstName} onChange={(e) => setBranchForm((prev) => ({ ...prev, firstName: e.target.value }))} required />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 11, fontWeight: 700, color: '#6B7280', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Admin Last Name</label>
+                        <Input value={branchForm.lastName} onChange={(e) => setBranchForm((prev) => ({ ...prev, lastName: e.target.value }))} required />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 11, fontWeight: 700, color: '#6B7280', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Country Code</label>
+                        <Input value={branchForm.countryCode} onChange={(e) => setBranchForm((prev) => ({ ...prev, countryCode: e.target.value }))} placeholder="+1" required />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 11, fontWeight: 700, color: '#6B7280', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Phone</label>
+                        <Input value={branchForm.phone} onChange={(e) => setBranchForm((prev) => ({ ...prev, phone: e.target.value }))} placeholder="788123456" required />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 11, fontWeight: 700, color: '#6B7280', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Branch Email</label>
+                        <Input type="email" value={branchForm.email} onChange={(e) => setBranchForm((prev) => ({ ...prev, email: e.target.value }))} required />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 11, fontWeight: 700, color: '#6B7280', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Password</label>
+                        <Input type="password" value={branchForm.password} onChange={(e) => setBranchForm((prev) => ({ ...prev, password: e.target.value }))} required />
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
+                      <Btn type="submit" variant="primary" disabled={branchSaving}>{branchSaving ? 'Saving...' : 'Add Branch'}</Btn>
+                      <Btn type="button" variant="ghost" onClick={() => { resetBranchForm(); setBranchError(''); setBranchSuccess(''); }}>Clear</Btn>
+                    </div>
+                  </form>
+                </div>
+
+                <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 14, padding: 24 }}>
+                  <div style={{ fontWeight: 800, fontSize: 18, color: '#111827', marginBottom: 8 }}>Existing Branches</div>
+                  <div style={{ fontSize: 13, color: '#6B7280', marginBottom: 18 }}>
+                    Branches already linked to this company.
+                  </div>
+
+                  {branchLoading ? (
+                    <div style={{ color: '#9CA3AF', fontSize: 13 }}>Loading branches...</div>
+                  ) : branches.length === 0 ? (
+                    <div style={{ color: '#6B7280', fontSize: 13 }}>No branches added yet.</div>
+                  ) : (
+                    <div style={{ overflowX: 'auto', border: '1px solid #E5E7EB', borderRadius: 12 }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1100, background: 'white' }}>
+                        <thead>
+                          <tr style={{ background: '#F9FAFB', borderBottom: '1px solid #E5E7EB' }}>
+                            {['Branch', 'Details', 'Contact', 'Location', 'Coordinates', 'Evidence', 'Images', 'Map'].map((head) => (
+                              <th
+                                key={head}
+                                style={{
+                                  textAlign: 'left',
+                                  padding: '12px 14px',
+                                  fontSize: 11,
+                                  fontWeight: 800,
+                                  color: '#6B7280',
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.05em',
+                                  verticalAlign: 'top'
+                                }}
+                              >
+                                {head}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {branches.map((branch) => (
+                            <tr key={branch._id || branch.id || branch.email} style={{ borderBottom: '1px solid #E5E7EB' }}>
+                              <td style={{ padding: '14px', verticalAlign: 'top' }}>
+                                <div style={{ fontSize: 14, fontWeight: 800, color: '#111827' }}>{branch.branchName || branch.name || 'Branch'}</div>
+                                <div style={{ fontSize: 12, color: '#6B7280', marginTop: 4 }}>{branch.companyName || '—'}</div>
+                              </td>
+                              <td style={{ padding: '14px', verticalAlign: 'top', fontSize: 13, color: '#4B5563', maxWidth: 260 }}>
+                                {branch.branchDetails || '—'}
+                              </td>
+                              <td style={{ padding: '14px', verticalAlign: 'top', fontSize: 12, color: '#6B7280' }}>
+                                <div><strong>Email:</strong> {branch.email || '—'}</div>
+                                <div style={{ marginTop: 6 }}><strong>Phone:</strong> {branch.phone || '—'}</div>
+                              </td>
+                              <td style={{ padding: '14px', verticalAlign: 'top', fontSize: 12, color: '#6B7280' }}>
+                                {branch.branchLocation || '—'}
+                              </td>
+                              <td style={{ padding: '14px', verticalAlign: 'top', fontSize: 12, color: '#6B7280' }}>
+                                {(branch.branchLatitude !== undefined && branch.branchLongitude !== undefined && branch.branchLatitude !== null && branch.branchLongitude !== null)
+                                  ? `${branch.branchLatitude}, ${branch.branchLongitude}`
+                                  : '—'}
+                              </td>
+                              <td style={{ padding: '14px', verticalAlign: 'top', fontSize: 12, color: '#6B7280' }}>
+                                <div><strong>1:</strong> {branch.branchEvidenceOne || '—'}</div>
+                                <div style={{ marginTop: 6 }}><strong>2:</strong> {branch.branchEvidenceTwo || '—'}</div>
+                              </td>
+                              <td style={{ padding: '14px', verticalAlign: 'top' }}>
+                                {Array.isArray(branch.branchImages) && branch.branchImages.length > 0 ? (
+                                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 56px)', gap: 6 }}>
+                                    {branch.branchImages.slice(0, 4).map((img, idx) => (
+                                      <img
+                                        key={`${img}-${idx}`}
+                                        src={imageSrc(img)}
+                                        alt={`Branch ${idx + 1}`}
+                                        style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 8, border: '1px solid #E5E7EB' }}
+                                      />
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <span style={{ fontSize: 12, color: '#9CA3AF' }}>No images</span>
+                                )}
+                              </td>
+                              <td style={{ padding: '14px', verticalAlign: 'top' }}>
+                                {buildDirectionsUrl(branch.branchLatitude, branch.branchLongitude) ? (
+                                  <a
+                                    href={buildDirectionsUrl(branch.branchLatitude, branch.branchLongitude)}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: 8,
+                                      border: '1px solid #BFDBFE',
+                                      background: 'white',
+                                      color: '#1D4ED8',
+                                      borderRadius: 10,
+                                      padding: '8px 12px',
+                                      fontSize: 12,
+                                      fontWeight: 700,
+                                      textDecoration: 'none',
+                                      whiteSpace: 'nowrap'
+                                    }}
+                                  >
+                                    <Navigation className="w-4 h-4" />
+                                    Open Map
+                                  </a>
+                                ) : (
+                                  <span style={{ fontSize: 12, color: '#9CA3AF' }}>No map</span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           )}
           {/* â”€â”€ Assets â”€â”€ */}
           {activeTab === 'assets' && (
@@ -6808,11 +7761,32 @@ function ClientDashboard() {
                   <form onSubmit={async (e) => {
                     e.preventDefault();
                     try {
-                      const payload = { ...assetForm };
+                      const payload = {
+                        name: assetForm.name,
+                        type: assetForm.type,
+                        description: assetForm.description,
+                        serialNumber: assetForm.serialNumber,
+                        quantity: assetForm.quantity,
+                        propertyId: assetForm.locationType === 'property' ? assetForm.propertyId || null : null,
+                        building: assetForm.building,
+                        blocks: assetForm.locationType === 'property' ? assetForm.blocks : [],
+                        room: assetForm.room
+                      };
+                      if (assetForm.locationType === 'branch' && assetForm.branchId) {
+                        const branch = branches.find((item) => String(item.id || item._id) === String(assetForm.branchId));
+                        payload.location = {
+                          locationType: 'branch',
+                          branchId: assetForm.branchId,
+                          branchName: branch?.branchName || branch?.name || '',
+                          branchLocation: branch?.branchLocation || '',
+                          branchLatitude: branch?.branchLatitude ?? '',
+                          branchLongitude: branch?.branchLongitude ?? ''
+                        };
+                      }
                       const eid = editingAsset._id || editingAsset.id;
                       if (eid) {
                         const prev = originalAssetBlocks.map(String);
-                        const now = (assetForm.blocks || []).map(String);
+                        const now = assetForm.locationType === 'property' ? (assetForm.blocks || []).map(String) : [];
                         const remove = prev.filter(p => !now.includes(p));
                         if (remove.length) payload.removeBlocks = remove;
                         await api.put(`/api/assets/${eid}`, payload);
@@ -6823,7 +7797,7 @@ function ClientDashboard() {
                         await api.post('/api/assets', { ...payload, userId });
                         setEditingAsset(null);
                       }
-                      setAssetForm({ name: '', type: '', description: '', propertyId: '', quantity: 1, building: '', blocks: [], room: '' });
+                      setAssetForm(createEmptyAssetForm());
                       const r = await api.get('/api/assets');
                       setAssets(r.data || []);
                     } catch {
@@ -6843,7 +7817,7 @@ function ClientDashboard() {
                       </div>
                     )}
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-                      {[['Asset Name', 'name', 'text', true], ['Type', 'type', 'text', true], ['Description', 'description', 'text']].map(([ph, field, type, req]) => (
+                      {[['Asset Name', 'name', 'text', true], ['Type', 'type', 'text', true], ['Description', 'description', 'text'], ['Serial Number', 'serialNumber', 'text']].map(([ph, field, type, req]) => (
                         <div key={field}>
                           <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{ph}</label>
                           <Input placeholder={ph} type={type} value={assetForm[field] || ''} onChange={e => setAssetForm(f => ({ ...f, [field]: e.target.value }))} required={req} />
@@ -6858,100 +7832,90 @@ function ClientDashboard() {
                         </div>
                       </div>
                       <div>
-                        <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Property</label>
-                        <Select value={assetForm.propertyId} onChange={e => {
-                          const pid = e.target.value;
-                          const prop = properties.find(p => (p.id || p._id) === pid);
-                          setAssetForm(f => ({ ...f, propertyId: pid, building: prop?.name || '', blocks: [] }));
+                        <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Location</label>
+                        <Select value={assetForm.locationType === 'branch' ? (assetForm.branchId ? `branch:${assetForm.branchId}` : '') : (assetForm.propertyId ? `property:${assetForm.propertyId}` : '')} onChange={e => {
+                          const [type, rawId] = String(e.target.value || '').split(':');
+                          if (type === 'branch') {
+                            const branch = branches.find((item) => String(item.id || item._id) === String(rawId));
+                            setAssetForm(f => ({
+                              ...f,
+                              locationType: 'branch',
+                              branchId: rawId,
+                              propertyId: '',
+                              building: branch?.branchLocation || branch?.branchName || branch?.name || '',
+                              blocks: []
+                            }));
+                            return;
+                          }
+                          const prop = properties.find(p => String(p.id || p._id) === String(rawId));
+                          setAssetForm(f => ({
+                            ...f,
+                            locationType: 'property',
+                            propertyId: rawId,
+                            branchId: '',
+                            building: prop?.name || '',
+                            blocks: []
+                          }));
                         }} required>
                           <option value="">Select locationâ€¦</option>
-                          {properties.map((p, idx) => (
-                            <option key={`${p.id || p._id || 'property'}-${idx}`} value={p.id || p._id}>
-                              {p.name}
-                            </option>
-                          ))}
+                          <optgroup label="Locations">
+                            {properties.map((p, idx) => (
+                              <option key={`${p.id || p._id || 'property'}-${idx}`} value={`property:${p.id || p._id}`}>
+                                {p.name}
+                              </option>
+                            ))}
+                          </optgroup>
+                          <optgroup label="Branches">
+                            {branches.map((branch, idx) => (
+                              <option key={`${branch.id || branch._id || 'branch'}-${idx}`} value={`branch:${branch.id || branch._id}`}>
+                                {branch.branchName || branch.name}
+                              </option>
+                            ))}
+                          </optgroup>
                         </Select>
                       </div>
                       <div>
                         <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Room</label>
                         <Input placeholder="Room (optional)" value={assetForm.room || ''} onChange={e => setAssetForm(f => ({ ...f, room: e.target.value }))} />
                       </div>
-                      {/* Blocks */}
-                      {(() => {
-                        const prop = properties.find(p => (p.id || p._id) === assetForm.propertyId) || {};
-                        let namedBlocks = [];
-                        let blocksCount = 0;
-                        if (Array.isArray(prop.blocks)) namedBlocks = prop.blocks.map(String);
-                        else if (prop.blocks && String(prop.blocks).match(/[,|;]/)) namedBlocks = String(prop.blocks).split(/[;,|]/).map(s => s.trim()).filter(Boolean);
-                        else blocksCount = parseInt(prop?.blocks) || 0;
-
-                        if (namedBlocks.length > 0) return (
-                          <div style={{ gridColumn: '1 / -1' }}>
-                            <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Blocks</label>
-                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                              {namedBlocks.map((name, idx) => {
-                                const val = String(name);
-                                const checked = (assetForm.blocks || []).map(String).includes(val);
-                                return <label key={idx} style={{ cursor: 'pointer', padding: '5px 12px', borderRadius: 6, border: `1px solid ${checked ? '#1D4ED8' : '#D1D5DB'}`, background: checked ? '#EFF6FF' : 'white', fontSize: 12, fontWeight: 600, color: checked ? '#1D4ED8' : '#374151', display: 'flex', alignItems: 'center', gap: 6 }}>
-                                  <input type="checkbox" style={{ display: 'none' }} checked={checked} onChange={() => setAssetForm(f => {
-                                    const cur = (f.blocks || []).map(String);
-                                    return { ...f, blocks: cur.includes(val) ? cur.filter(x => x !== val) : [...cur, val] };
-                                  })} />
-                                  {val}
-                                </label>;
-                              })}
-                            </div>
-                          </div>
-                        );
-
-                        if (blocksCount > 0) return (
-                          <div style={{ gridColumn: '1 / -1' }}>
-                            <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Blocks</label>
-                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                              {Array.from({ length: blocksCount }).map((_, idx) => {
-                                const val = String(idx + 1);
-                                const checked = (assetForm.blocks || []).includes(val);
-                                return <label key={val} style={{ cursor: 'pointer', padding: '5px 12px', borderRadius: 6, border: `1px solid ${checked ? '#1D4ED8' : '#D1D5DB'}`, background: checked ? '#EFF6FF' : 'white', fontSize: 12, fontWeight: 600, color: checked ? '#1D4ED8' : '#374151', display: 'flex', alignItems: 'center', gap: 6 }}>
-                                  <input type="checkbox" style={{ display: 'none' }} checked={checked} onChange={() => setAssetForm(f => {
-                                    const cur = f.blocks || [];
-                                    return { ...f, blocks: cur.includes(val) ? cur.filter(x => x !== val) : [...cur, val] };
-                                  })} />
-                                  Block {val}
-                                </label>;
-                              })}
-                            </div>
-                          </div>
-                        );
-
-                        return (
-                          <div>
-                            <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Block</label>
-                            <Input placeholder="Block (optional)" value={(assetForm.blocks || []).join(', ')} onChange={e => setAssetForm(f => ({ ...f, blocks: String(e.target.value).split(/[;,|]/).map(s => s.trim()).filter(Boolean) }))} />
-                          </div>
-                        );
-                      })()}
+                      <div>
+                        <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Block</label>
+                        <Select
+                          value={(assetForm.blocks || [])[0] || ''}
+                          onChange={e => setAssetForm(f => ({ ...f, blocks: e.target.value ? [e.target.value] : [] }))}
+                          disabled={!assetForm.propertyId || assetForm.locationType !== 'property'}
+                        >
+                          <option value="">{assetForm.locationType === 'branch' ? 'Blocks are only for locations...' : assetForm.propertyId ? 'Select block...' : 'Select location first...'}</option>
+                          {getPropertyBlockOptions(assetForm.propertyId).map((block, idx) => (
+                            <option key={`${block}-${idx}`} value={block}>
+                              {block}
+                            </option>
+                          ))}
+                        </Select>
+                      </div>
                     </div>
                     <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
                       <Btn type="submit" variant="primary">Save Asset</Btn>
                       <Btn onClick={() => {
                         setEditingAsset(null);
-                        setAssetForm({ name: '', type: '', description: '', propertyId: '', quantity: 1, building: '', blocks: [], room: '' });
+                        setAssetForm(createEmptyAssetForm());
                       }} variant="ghost">Cancel</Btn>
                     </div>
                   </form>
                 </div>
               )}
 
-              <Table heads={['Name', 'Type', 'Qty', 'Location', 'Building', 'Room', 'Block', 'Description', 'Actions']} empty="No assets yet."
+              <Table heads={['Name', 'Serial Number', 'Type', 'Qty', 'Location', 'Building', 'Room', 'Block', 'Description', 'Actions']} empty="No assets yet."
                 rows={assets.map(asset => ({
                   onClick: () => { setSelectedAsset(asset); setAssetModalOpen(true); },
                   cells: [
                   <Td key="n">
                     <span style={{ fontWeight: 600, color: '#111827' }}>{asset.name}</span>
                   </Td>,
+                  <Td key="sn">{renderValue(asset.serialNumber)}</Td>,
                   <Td key="t"><span style={{ background: '#EFF6FF', color: '#1D4ED8', padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 600 }}>{asset.type}</span></Td>,
                   <Td key="q"><span style={{ fontWeight: 700 }}>{asset.quantity || 1}</span></Td>,
-                  <Td key="p">{renderValue(asset.property?.name)}</Td>,
+                  <Td key="p">{renderValue(getAssetLocationLabel(asset))}</Td>,
                   <Td key="bu">{renderValue(asset.building || asset.location?.building)}</Td>,
                   <Td key="ro">{renderValue(asset.room || asset.location?.room)}</Td>,
                   <Td key="bl">{renderValue(asset.blocks || asset.block || asset.location?.block)}</Td>,
@@ -6981,7 +7945,7 @@ function ClientDashboard() {
                     <div className="flex items-start justify-between border-b border-gray-100 px-6 py-5">
                       <div>
                         <h3 className="text-2xl font-bold text-gray-900">{selectedAsset.name || 'Asset'}</h3>
-                        <p className="mt-1 text-sm text-gray-500">{selectedAsset.property?.name || 'No location assigned'}</p>
+                        <p className="mt-1 text-sm text-gray-500">{getAssetLocationLabel(selectedAsset) || 'No location assigned'}</p>
                       </div>
                       <button
                         type="button"
@@ -6997,6 +7961,7 @@ function ClientDashboard() {
                         <div className="mb-3 text-sm font-bold text-gray-700">Asset Information</div>
                         {[
                           ['Name', selectedAsset.name],
+                          ['Serial Number', selectedAsset.serialNumber],
                           ['Type', selectedAsset.type],
                           ['Quantity', selectedAsset.quantity || 1],
                           ['Description', selectedAsset.description],
@@ -7011,7 +7976,7 @@ function ClientDashboard() {
                       <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
                         <div className="mb-3 text-sm font-bold text-gray-700">Location Details</div>
                         {[
-                          ['Property', selectedAsset.property?.name],
+                          ['Location', getAssetLocationLabel(selectedAsset)],
                           ['Building', selectedAsset.building || selectedAsset.location?.building],
                           ['Room', selectedAsset.room || selectedAsset.location?.room],
                           ['Block', selectedAsset.blocks || selectedAsset.block || selectedAsset.location?.block],
@@ -7827,6 +8792,7 @@ function ClientDashboard() {
         recipientName={directMessageModal.recipientName}
         message={directMessageModal.message}
         sending={directMessageModal.sending}
+        messages={directMessageModal.messages}
         onChange={(value) => setDirectMessageModal(prev => ({ ...prev, message: value }))}
         onClose={closeDirectMessageModal}
         onSend={handleSendDirectMessage}
@@ -7843,13 +8809,1014 @@ const PlaceholderPanel = ({ title, description }) => (
   </div>
 );
 
+const normalizeOpsText = (value) => String(value || '').toLowerCase().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
+
+const opsIncludes = (value, term) => normalizeOpsText(value).includes(normalizeOpsText(term));
+
+const formatOpsDate = (value) => {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleDateString();
+};
+
+const getOpsEntityId = (item) => item?._id || item?.id || item?.issueId || item?.assetId || '';
+
+const getOpsAssetName = (asset) => asset?.name || asset?.title || asset?.assetName || asset?.serialNumber || 'Asset';
+
+const getOpsIssueStatus = (issue) => {
+  const raw = String(issue?.status || issue?.workOrderStatus || issue?.issueStatus || '').trim();
+  if (issue?.approved || /approved/i.test(raw)) return 'Open';
+  if (/progress/i.test(raw)) return 'In Progress';
+  if (/complete|closed|resolved|verified/i.test(raw)) return 'Completed';
+  if (/pending|new/i.test(raw)) return 'Pending';
+  return raw || 'Open';
+};
+
+const isOpsWorkOrder = (issue) => {
+  const raw = String(issue?.status || issue?.workOrderStatus || '').toUpperCase();
+  const hasWorkOrderRef = !!(issue?.workOrderId || issue?.workOrder || issue?.workOrderNumber || issue?.workOrderNo || issue?.workOrderCode || issue?.workOrderRef);
+  return Boolean(issue?.approved) || hasWorkOrderRef || raw === 'APPROVED' || raw.includes('IN PROGRESS') || raw.includes('COMPLETE');
+};
+
+const startOfOpsDay = (date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+const getOpsDateRange = (query) => {
+  const q = normalizeOpsText(query);
+  const now = new Date();
+  const today = startOfOpsDay(now);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(today.getDate() + 1);
+
+  const betweenMatch = q.match(/\bbetween\s+(\d{4}-\d{2}-\d{2})\s+and\s+(\d{4}-\d{2}-\d{2})\b/);
+  if (betweenMatch) {
+    const from = new Date(`${betweenMatch[1]}T00:00:00`);
+    const to = new Date(`${betweenMatch[2]}T23:59:59`);
+    if (!Number.isNaN(from.getTime()) && !Number.isNaN(to.getTime())) {
+      return { from, to, label: `between ${betweenMatch[1]} and ${betweenMatch[2]}` };
+    }
+  }
+
+  const fromToMatch = q.match(/\bfrom\s+(\d{4}-\d{2}-\d{2})\s+to\s+(\d{4}-\d{2}-\d{2})\b/);
+  if (fromToMatch) {
+    const from = new Date(`${fromToMatch[1]}T00:00:00`);
+    const to = new Date(`${fromToMatch[2]}T23:59:59`);
+    if (!Number.isNaN(from.getTime()) && !Number.isNaN(to.getTime())) {
+      return { from, to, label: `from ${fromToMatch[1]} to ${fromToMatch[2]}` };
+    }
+  }
+
+  const onDateMatch = q.match(/\b(?:on|for)\s+(\d{4}-\d{2}-\d{2})\b/);
+  if (onDateMatch) {
+    const from = new Date(`${onDateMatch[1]}T00:00:00`);
+    const to = new Date(`${onDateMatch[1]}T23:59:59`);
+    if (!Number.isNaN(from.getTime()) && !Number.isNaN(to.getTime())) {
+      return { from, to, label: `on ${onDateMatch[1]}` };
+    }
+  }
+
+  if (q.includes('today')) return { from: today, to: tomorrow, label: 'today' };
+  if (q.includes('yesterday')) {
+    const from = new Date(today);
+    from.setDate(from.getDate() - 1);
+    return { from, to: today, label: 'yesterday' };
+  }
+  if (q.includes('this week')) {
+    const from = new Date(today);
+    const day = from.getDay();
+    from.setDate(from.getDate() - day);
+    return { from, to: tomorrow, label: 'this week' };
+  }
+  if (q.includes('last week')) {
+    const end = new Date(today);
+    const day = end.getDay();
+    end.setDate(end.getDate() - day);
+    const from = new Date(end);
+    from.setDate(from.getDate() - 7);
+    return { from, to: end, label: 'last week' };
+  }
+  if (q.includes('this month')) {
+    const from = new Date(now.getFullYear(), now.getMonth(), 1);
+    return { from, to: tomorrow, label: 'this month' };
+  }
+  if (q.includes('last month')) {
+    const from = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const to = new Date(now.getFullYear(), now.getMonth(), 1);
+    return { from, to, label: 'last month' };
+  }
+  if (q.includes('this year')) {
+    const from = new Date(now.getFullYear(), 0, 1);
+    return { from, to: tomorrow, label: 'this year' };
+  }
+  return null;
+};
+
+const extractOpsTerm = (query, patterns = []) => {
+  const q = normalizeOpsText(query);
+  for (const pattern of patterns) {
+    const match = q.match(pattern);
+    if (match?.[1]) {
+      const value = String(match[1]).trim().replace(/[?.!,]+$/, '');
+      if (value) return value;
+    }
+  }
+  return '';
+};
+
+const sanitizeOpsFilterTerm = (value, blockedTerms = []) => {
+  const normalized = normalizeOpsText(value);
+  if (!normalized) return '';
+  if (blockedTerms.some((term) => normalized === normalizeOpsText(term))) return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) return '';
+  return value;
+};
+
+const buildOpsDatasets = ({ assets = [], issues = [], technicians = [], properties = [], people = [] }) => {
+  const assetRows = (assets || []).map((asset, index) => {
+    const propertyName = asset?.property?.name || asset?.propertyName || asset?.location || asset?.site || '';
+    const assignedTo = asset?.assignedToName || asset?.assignedTo?.name || asset?.owner?.name || asset?.technician?.name || '';
+    const status = asset?.status || asset?.condition || 'Active';
+    const category = asset?.category || asset?.type || asset?.assetType || '';
+    const createdAt = asset?.createdAt || asset?.updatedAt || null;
+    return {
+      id: getOpsEntityId(asset) || `asset-${index}`,
+      title: getOpsAssetName(asset),
+      subtitle: asset?.serialNumber || asset?.assetCode || asset?.barcode || '',
+      who: assignedTo,
+      where: propertyName,
+      status,
+      priority: '',
+      category,
+      date: createdAt,
+      raw: asset,
+      export: {
+        Name: getOpsAssetName(asset),
+        Status: status || '—',
+        Category: category || '—',
+        Location: propertyName || '—',
+        AssignedTo: assignedTo || '—',
+        SerialNumber: asset?.serialNumber || '—',
+        CreatedAt: formatOpsDate(createdAt),
+      },
+      searchText: normalizeOpsText([
+        getOpsAssetName(asset),
+        asset?.description,
+        asset?.serialNumber,
+        asset?.assetCode,
+        propertyName,
+        assignedTo,
+        status,
+        category,
+      ].join(' ')),
+    };
+  });
+
+  const issueRows = (issues || []).map((issue, index) => {
+    const assignedTo = issue?.assignedTechnicianName || issue?.assignedToName || issue?.assignedTo?.name || issue?.technician?.name || '';
+    const where = issue?.property?.name || issue?.propertyName || issue?.location || issue?.asset?.name || '';
+    const status = getOpsIssueStatus(issue);
+    const priority = issue?.priority || issue?.severity || '';
+    const category = issue?.category || issue?.issueType || '';
+    const createdAt = issue?.createdAt || issue?.updatedAt || issue?.date || null;
+    return {
+      id: getOpsEntityId(issue) || `issue-${index}`,
+      title: issue?.title || issue?.name || issue?.subject || 'Issue',
+      subtitle: issue?.description || issue?.summary || '',
+      who: assignedTo,
+      where,
+      status,
+      priority,
+      category,
+      date: createdAt,
+      raw: issue,
+      export: {
+        Title: issue?.title || issue?.name || 'Issue',
+        Status: status || '—',
+        Priority: priority || '—',
+        Category: category || '—',
+        AssignedTo: assignedTo || '—',
+        Location: where || '—',
+        CreatedAt: formatOpsDate(createdAt),
+      },
+      searchText: normalizeOpsText([
+        issue?.title,
+        issue?.description,
+        issue?.summary,
+        assignedTo,
+        where,
+        status,
+        priority,
+        category,
+      ].join(' ')),
+    };
+  });
+
+  const workOrderRows = issueRows.filter((row) => isOpsWorkOrder(row.raw)).map((row) => ({
+    ...row,
+    export: {
+      WorkOrder: row.title,
+      Status: row.status || '—',
+      Priority: row.priority || '—',
+      Category: row.category || '—',
+      AssignedTo: row.who || '—',
+      Location: row.where || '—',
+      Date: formatOpsDate(row.date),
+    },
+  }));
+
+  const technicianRows = (technicians || []).map((technician, index) => {
+    const where = technician?.property?.name || technician?.companyName || technician?.location || '';
+    const status = technician?.status || technician?.availability || 'Active';
+    const role = technician?.role || technician?.jobTitle || 'Technician';
+    return {
+      id: getOpsEntityId(technician) || `tech-${index}`,
+      title: technician?.name || technician?.fullName || technician?.email || 'Technician',
+      subtitle: technician?.email || technician?.phone || '',
+      who: technician?.name || '',
+      where,
+      status,
+      priority: '',
+      category: role,
+      date: technician?.createdAt || technician?.updatedAt || null,
+      raw: technician,
+      export: {
+        Name: technician?.name || technician?.fullName || 'Technician',
+        Email: technician?.email || '—',
+        Role: role || '—',
+        Status: status || '—',
+        Location: where || '—',
+      },
+      searchText: normalizeOpsText([
+        technician?.name,
+        technician?.fullName,
+        technician?.email,
+        technician?.phone,
+        where,
+        status,
+        role,
+      ].join(' ')),
+    };
+  });
+
+  const propertyRows = (properties || []).map((property, index) => ({
+    id: getOpsEntityId(property) || `property-${index}`,
+    title: property?.name || property?.title || property?.address || 'Location',
+    subtitle: property?.address || property?.city || '',
+    who: property?.manager?.name || '',
+    where: property?.address || property?.city || property?.name || '',
+    status: property?.status || 'Active',
+    priority: '',
+    category: property?.type || property?.category || 'Property',
+    date: property?.createdAt || property?.updatedAt || null,
+    raw: property,
+    export: {
+      Name: property?.name || 'Location',
+      Address: property?.address || '—',
+      City: property?.city || '—',
+      Type: property?.type || property?.category || '—',
+      Status: property?.status || 'Active',
+    },
+    searchText: normalizeOpsText([
+      property?.name,
+      property?.title,
+      property?.address,
+      property?.city,
+      property?.type,
+      property?.category,
+      property?.status,
+    ].join(' ')),
+  }));
+
+  const personRows = (people || []).map((person, index) => ({
+    id: getOpsEntityId(person) || `person-${index}`,
+    title: person?.name || person?.fullName || person?.email || 'Person',
+    subtitle: person?.email || person?.phone || '',
+    who: person?.name || '',
+    where: person?.companyName || person?.property?.name || '',
+    status: person?.status || 'Active',
+    priority: '',
+    category: person?.role || person?.kind || 'User',
+    date: person?.createdAt || person?.updatedAt || null,
+    raw: person,
+    export: {
+      Name: person?.name || 'Person',
+      Email: person?.email || '—',
+      Role: person?.role || person?.kind || '—',
+      Status: person?.status || 'Active',
+      Company: person?.companyName || person?.property?.name || '—',
+    },
+    searchText: normalizeOpsText([
+      person?.name,
+      person?.fullName,
+      person?.email,
+      person?.role,
+      person?.kind,
+      person?.companyName,
+      person?.property?.name,
+      person?.status,
+    ].join(' ')),
+  }));
+
+  return {
+    assets: {
+      label: 'Assets',
+      filename: 'assets',
+      rows: assetRows,
+      columns: [
+        { key: 'title', label: 'Name' },
+        { key: 'status', label: 'Status' },
+        { key: 'category', label: 'Category' },
+        { key: 'where', label: 'Location' },
+        { key: 'who', label: 'Assigned To' },
+        { key: 'date', label: 'Created' },
+      ],
+    },
+    issues: {
+      label: 'Issues',
+      filename: 'issues',
+      rows: issueRows,
+      columns: [
+        { key: 'title', label: 'Issue' },
+        { key: 'status', label: 'Status' },
+        { key: 'priority', label: 'Priority' },
+        { key: 'category', label: 'Category' },
+        { key: 'who', label: 'Assigned To' },
+        { key: 'where', label: 'Where' },
+        { key: 'date', label: 'Created' },
+      ],
+    },
+    workOrders: {
+      label: 'Work Orders',
+      filename: 'work-orders',
+      rows: workOrderRows,
+      columns: [
+        { key: 'title', label: 'Work Order' },
+        { key: 'status', label: 'Status' },
+        { key: 'priority', label: 'Priority' },
+        { key: 'category', label: 'Category' },
+        { key: 'who', label: 'Assigned To' },
+        { key: 'where', label: 'Where' },
+        { key: 'date', label: 'Date' },
+      ],
+    },
+    technicians: {
+      label: 'Technicians',
+      filename: 'technicians',
+      rows: technicianRows,
+      columns: [
+        { key: 'title', label: 'Name' },
+        { key: 'subtitle', label: 'Contact' },
+        { key: 'category', label: 'Role' },
+        { key: 'status', label: 'Status' },
+        { key: 'where', label: 'Location' },
+      ],
+    },
+    properties: {
+      label: 'Locations',
+      filename: 'locations',
+      rows: propertyRows,
+      columns: [
+        { key: 'title', label: 'Name' },
+        { key: 'subtitle', label: 'Address' },
+        { key: 'category', label: 'Type' },
+        { key: 'status', label: 'Status' },
+      ],
+    },
+    people: {
+      label: 'People',
+      filename: 'people',
+      rows: personRows,
+      columns: [
+        { key: 'title', label: 'Name' },
+        { key: 'subtitle', label: 'Contact' },
+        { key: 'category', label: 'Role' },
+        { key: 'status', label: 'Status' },
+        { key: 'where', label: 'Company / Site' },
+      ],
+    },
+  };
+};
+
+const parseOpsListIntent = (query) => {
+  const q = normalizeOpsText(query);
+  const wantsList = /\b(show|list|give|display|find|export|table|report|see|which|what)\b/.test(q);
+  if (!wantsList) return null;
+
+  let datasetKey = '';
+  if (/\bwork\s*orders?\b|\bwo\b/.test(q)) datasetKey = 'workOrders';
+  else if (/\bissues?\b|\brequests?\b|\btickets?\b/.test(q)) datasetKey = 'issues';
+  else if (/\bassets?\b|\bequipment\b|\bmachines?\b/.test(q)) datasetKey = 'assets';
+  else if (/\btechnicians?\b|\bworkers?\b|\bstaff\b/.test(q)) datasetKey = 'technicians';
+  else if (/\blocations?\b|\bproperties\b|\bsites?\b/.test(q)) datasetKey = 'properties';
+  else if (/\bpeople\b|\busers\b/.test(q)) datasetKey = 'people';
+  if (!datasetKey) return null;
+
+  const statusOptions = ['open', 'in progress', 'completed', 'complete', 'closed', 'pending', 'active', 'inactive', 'approved'];
+  const priorityOptions = ['low', 'medium', 'high', 'urgent', 'critical'];
+  const categoryOptions = ['electrical', 'plumbing', 'hvac', 'mechanical', 'general', 'safety', 'inspection'];
+
+  const dateRange = getOpsDateRange(q);
+  const whoTerm = extractOpsTerm(q, [
+    /\bassigned to\s+([a-z0-9 .@_-]+?)(?=\s+(?:in|at|from|on|today|yesterday|this|last|with|status|priority|category)\b|$)/i,
+    /\btechnician\s+([a-z0-9 .@_-]+?)(?=\s+(?:in|at|from|on|today|yesterday|this|last|with|status|priority|category)\b|$)/i,
+    /\bfor\s+([a-z0-9 .@_-]+?)(?=\s+(?:in|at|from|on|today|yesterday|this|last|with|status|priority|category)\b|$)/i,
+  ]);
+  const whereTerm = extractOpsTerm(q, [
+    /\bin\s+([a-z0-9 .#@_-]+?)(?=\s+(?:for|assigned|on|today|yesterday|this|last|with|status|priority|category)\b|$)/i,
+    /\bat\s+([a-z0-9 .#@_-]+?)(?=\s+(?:for|assigned|on|today|yesterday|this|last|with|status|priority|category)\b|$)/i,
+    /\blocation\s+([a-z0-9 .#@_-]+?)(?=\s+(?:for|assigned|on|today|yesterday|this|last|with|status|priority|category)\b|$)/i,
+  ]);
+  const statusTerm = statusOptions.find((option) => q.includes(option));
+  const priorityTerm = priorityOptions.find((option) => q.includes(option));
+  const categoryTerm = categoryOptions.find((option) => q.includes(option));
+  const searchTerm = extractOpsTerm(q, [
+    /\bnamed\s+([a-z0-9 .#@_-]+)$/i,
+    /\bcalled\s+([a-z0-9 .#@_-]+)$/i,
+    /\babout\s+([a-z0-9 .#@_-]+)$/i,
+    /\bwith\s+([a-z0-9 .#@_-]+)$/i,
+  ]);
+
+  const blockedWhoTerms = [...statusOptions, ...priorityOptions, ...categoryOptions, 'today', 'yesterday', 'this week', 'last week', 'this month', 'last month', 'this year'];
+  const blockedWhereTerms = [...blockedWhoTerms, 'progress'];
+
+  return {
+    datasetKey,
+    dateRange,
+    whoTerm: sanitizeOpsFilterTerm(whoTerm, blockedWhoTerms),
+    whereTerm: sanitizeOpsFilterTerm(whereTerm, blockedWhereTerms),
+    statusTerm,
+    priorityTerm,
+    categoryTerm,
+    searchTerm,
+    query: q,
+  };
+};
+
+const buildOpsTableResponse = (query, datasets) => {
+  const intent = parseOpsListIntent(query);
+  if (!intent) return null;
+  const dataset = datasets?.[intent.datasetKey];
+  if (!dataset) return null;
+
+  const filteredRows = (dataset.rows || []).filter((row) => {
+    if (intent.whoTerm && ![row.who, row.title, row.subtitle, row.searchText].some((value) => opsIncludes(value, intent.whoTerm))) return false;
+    if (intent.whereTerm && ![row.where, row.searchText].some((value) => opsIncludes(value, intent.whereTerm))) return false;
+    if (intent.statusTerm && !opsIncludes(row.status, intent.statusTerm)) return false;
+    if (intent.priorityTerm && !opsIncludes(row.priority, intent.priorityTerm)) return false;
+    if (intent.categoryTerm && ![row.category, row.searchText].some((value) => opsIncludes(value, intent.categoryTerm))) return false;
+    if (intent.searchTerm && !opsIncludes(row.searchText, intent.searchTerm)) return false;
+    if (intent.dateRange?.from || intent.dateRange?.to) {
+      const rowDate = row.date ? new Date(row.date) : null;
+      if (!rowDate || Number.isNaN(rowDate.getTime())) return false;
+      if (intent.dateRange.from && rowDate < intent.dateRange.from) return false;
+      if (intent.dateRange.to && rowDate > intent.dateRange.to) return false;
+    }
+    return true;
+  });
+
+  const filters = [];
+  if (intent.whoTerm) filters.push(`who: ${intent.whoTerm}`);
+  if (intent.whereTerm) filters.push(`where: ${intent.whereTerm}`);
+  if (intent.statusTerm) filters.push(`status: ${intent.statusTerm}`);
+  if (intent.priorityTerm) filters.push(`priority: ${intent.priorityTerm}`);
+  if (intent.categoryTerm) filters.push(`category: ${intent.categoryTerm}`);
+  if (intent.dateRange?.label) filters.push(`date: ${intent.dateRange.label}`);
+  if (intent.searchTerm) filters.push(`search: ${intent.searchTerm}`);
+
+  const title = `${dataset.label}${filters.length ? ` filtered by ${filters.join(', ')}` : ''}`;
+  const content = filteredRows.length
+    ? `I found ${filteredRows.length} ${dataset.label.toLowerCase()} in a table below. You can export the current result to CSV.`
+    : `I could not find any ${dataset.label.toLowerCase()} matching that filter yet.`;
+
+  return {
+    role: 'model',
+    kind: 'table',
+    content,
+    table: {
+      title,
+      datasetLabel: dataset.label,
+      filename: `${dataset.filename}-${new Date().toISOString().slice(0, 10)}.csv`,
+      columns: dataset.columns,
+      rows: filteredRows.slice(0, 200),
+      totalRows: filteredRows.length,
+      filters,
+    },
+  };
+};
+
+const ClientIntelligenceTab = ({ assets = [], issues = [], technicians = [], properties = [], people = [] }) => {
+  const AI_CACHE_TTL_MS = 5 * 60 * 1000;
+  const SENTIMENT_CACHE_KEY = 'client-intelligence-sentiment-cache';
+  const RECOMMENDATIONS_CACHE_KEY = 'client-intelligence-recommendations-cache';
+  const [aiSentiment, setAiSentiment] = React.useState(null);
+  const [aiRecommendations, setAiRecommendations] = React.useState([]);
+  const [loadingSentiment, setLoadingSentiment] = React.useState(false);
+  const [loadingRecommendations, setLoadingRecommendations] = React.useState(false);
+  const [sentimentError, setSentimentError] = React.useState('');
+  const [recommendationsError, setRecommendationsError] = React.useState('');
+  const [triageInput, setTriageInput] = React.useState('');
+  const [triageResult, setTriageResult] = React.useState(null);
+  const [triageLoading, setTriageLoading] = React.useState(false);
+  const [selectedAssetId, setSelectedAssetId] = React.useState('');
+  const [prediction, setPrediction] = React.useState(null);
+  const [predictionLoading, setPredictionLoading] = React.useState(false);
+  const [predictionError, setPredictionError] = React.useState('');
+  const [chatMessages, setChatMessages] = React.useState([
+    { role: 'model', content: 'Ask Intelligence for help with maintenance planning, issue triage, and operational trends.' }
+  ]);
+  const [chatInput, setChatInput] = React.useState('');
+  const [chatLoading, setChatLoading] = React.useState(false);
+
+  const opsDatasets = React.useMemo(() => buildOpsDatasets({ assets, issues, technicians, properties, people }), [assets, issues, technicians, properties, people]);
+
+  const exportOpsTable = React.useCallback((table) => {
+    if (!table?.rows?.length) return;
+    const columns = Array.isArray(table.columns) ? table.columns : [];
+    const header = columns.map((column) => `"${String(column.label || column.key || '').replace(/"/g, '""')}"`).join(',');
+    const body = table.rows.map((row) => columns.map((column) => {
+      const rawValue = column.key === 'date' ? formatOpsDate(row?.[column.key]) : (row?.[column.key] ?? '—');
+      return `"${String(rawValue).replace(/"/g, '""')}"`;
+    }).join(',')).join('\n');
+    const csv = [header, body].filter(Boolean).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const anchor = Object.assign(document.createElement('a'), {
+      href: url,
+      download: table.filename || `intelligence-export-${new Date().toISOString().slice(0, 10)}.csv`,
+    });
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+  }, []);
+
+  const loadCache = React.useCallback((key) => {
+    try {
+      const raw = sessionStorage.getItem(key);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed?.timestamp || (Date.now() - parsed.timestamp) > AI_CACHE_TTL_MS) return null;
+      return parsed.data;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const saveCache = React.useCallback((key, data) => {
+    try {
+      sessionStorage.setItem(key, JSON.stringify({ timestamp: Date.now(), data }));
+    } catch {
+      // ignore cache write failures
+    }
+  }, []);
+
+  const refreshSentiment = React.useCallback(async ({ force = false } = {}) => {
+    if (!force) {
+      const cached = loadCache(SENTIMENT_CACHE_KEY);
+      if (cached) {
+        setAiSentiment(cached);
+        setSentimentError('');
+        return;
+      }
+    }
+    try {
+      setLoadingSentiment(true);
+      setSentimentError('');
+      const res = await api.get('/api/ai/sentiment-summary');
+      const next = res.data || null;
+      setAiSentiment(next);
+      saveCache(SENTIMENT_CACHE_KEY, next);
+    } catch (err) {
+      console.error('Failed to fetch AI sentiment', err);
+      setSentimentError(err?.response?.data?.message || err?.message || 'Sentiment service unavailable');
+    } finally {
+      setLoadingSentiment(false);
+    }
+  }, [loadCache, saveCache]);
+
+  const refreshRecommendations = React.useCallback(async ({ force = false } = {}) => {
+    if (!force) {
+      const cached = loadCache(RECOMMENDATIONS_CACHE_KEY);
+      if (cached) {
+        setAiRecommendations(Array.isArray(cached) ? cached : []);
+        setRecommendationsError('');
+        return;
+      }
+    }
+    try {
+      setLoadingRecommendations(true);
+      setRecommendationsError('');
+      const res = await api.get('/api/ai/dashboard-recommendations');
+      const next = Array.isArray(res?.data?.recommendations) ? res.data.recommendations : [];
+      setAiRecommendations(next);
+      saveCache(RECOMMENDATIONS_CACHE_KEY, next);
+    } catch (err) {
+      console.error('Failed to fetch AI recommendations', err);
+      setRecommendationsError(err?.response?.data?.message || err?.message || 'Recommendation service unavailable');
+    } finally {
+      setLoadingRecommendations(false);
+    }
+  }, [loadCache, saveCache]);
+
+  React.useEffect(() => {
+    refreshSentiment();
+    refreshRecommendations();
+  }, [refreshRecommendations, refreshSentiment]);
+
+  const submitTriage = async () => {
+    if (!String(triageInput || '').trim()) return;
+    try {
+      setTriageLoading(true);
+      const res = await api.post('/api/ai/triage-issue', { description: triageInput });
+      setTriageResult(res.data || null);
+    } catch (err) {
+      console.error('Failed to triage issue', err);
+      alert(err?.response?.data?.message || err?.message || 'Failed to triage issue');
+    } finally {
+      setTriageLoading(false);
+    }
+  };
+
+  const predictAssetMaintenance = async () => {
+    if (!selectedAssetId) return;
+    try {
+      setPredictionLoading(true);
+      setPredictionError('');
+      const res = await api.post(`/api/ai/predict-maintenance/${selectedAssetId}`);
+      setPrediction(res.data || null);
+    } catch (err) {
+      console.error('Failed to fetch maintenance prediction', err);
+      setPredictionError(err?.response?.data?.message || err?.message || 'Prediction service unavailable');
+    } finally {
+      setPredictionLoading(false);
+    }
+  };
+
+  const sendChatMessage = async () => {
+    const content = String(chatInput || '').trim();
+    if (!content || chatLoading) return;
+    const nextMessages = [...chatMessages, { role: 'user', content }];
+    const tableResponse = buildOpsTableResponse(content, opsDatasets);
+    const validHistory = chatMessages.filter((message, index) => {
+      if (!message?.content) return false;
+      if (index === 0 && message.role !== 'user') return false;
+      return message.role === 'user' || message.role === 'model';
+    });
+    setChatMessages(nextMessages);
+    setChatInput('');
+    if (tableResponse) {
+      setChatMessages((prev) => [...prev, tableResponse]);
+      return;
+    }
+    try {
+      setChatLoading(true);
+      const res = await api.post('/api/ai/chat', {
+        message: content,
+        history: validHistory,
+      });
+      setChatMessages((prev) => [...prev, { role: 'model', content: res?.data?.response || 'No response received.' }]);
+    } catch (err) {
+      console.error('Failed to send AI chat message', err);
+      setChatMessages((prev) => [...prev, { role: 'model', content: err?.response?.data?.message || err?.message || 'The assistant is unavailable right now.' }]);
+    } finally {
+      setChatLoading(false);
+    }
+  };
+
+  const sentimentToneClass = aiSentiment?.overallSentiment === 'Positive'
+    ? 'bg-emerald-100 text-emerald-700'
+    : aiSentiment?.overallSentiment === 'Negative'
+      ? 'bg-rose-100 text-rose-700'
+      : 'bg-slate-100 text-slate-700';
+
+  return (
+    <div className="space-y-6">
+      <div className="glass-surface rounded-3xl border border-white/20 p-6 shadow-xl">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">Intelligence</h2>
+            <p className="mt-2 text-sm text-gray-500">AI signals, recommendations, and operational guidance for your maintenance team.</p>
+          </div>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            {[
+              ['Issues', issues.length],
+              ['Assets', assets.length],
+              ['Technicians', technicians.length],
+              ['Signals', (aiRecommendations || []).length],
+            ].map(([label, value]) => (
+              <div key={label} className="rounded-2xl border border-gray-200 bg-white px-4 py-3">
+                <div className="text-xs font-bold uppercase tracking-wider text-gray-400">{label}</div>
+                <div className="mt-1 text-2xl font-bold text-gray-900">{value}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-2">
+        <div className="glass-surface rounded-3xl border border-white/20 p-6 shadow-xl">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="rounded-2xl bg-indigo-100 p-3 text-indigo-600">
+                <Gauge className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">Sentiment Summary</h3>
+                <p className="text-sm text-gray-500">Feedback and recent issue tone</p>
+              </div>
+            </div>
+            <button type="button" onClick={() => refreshSentiment({ force: true })} className="rounded-xl border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">Refresh</button>
+          </div>
+          <div className="mt-5">
+            {loadingSentiment ? (
+              <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-4 py-10 text-center text-sm text-gray-500">Analyzing recent sentiment...</div>
+            ) : sentimentError ? (
+              <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700">{sentimentError}</div>
+            ) : aiSentiment ? (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold text-gray-600">Overall Sentiment</span>
+                  <span className={`rounded-full px-3 py-1 text-xs font-bold ${sentimentToneClass}`}>{aiSentiment.overallSentiment || 'Neutral'}</span>
+                </div>
+                <div className="rounded-2xl border border-gray-200 bg-white px-4 py-4 text-sm leading-7 text-gray-700">
+                  {aiSentiment.summary || 'No summary available yet.'}
+                </div>
+                {Array.isArray(aiSentiment.urgentFeedbackIds) && aiSentiment.urgentFeedbackIds.length > 0 && (
+                  <div className="text-xs font-semibold uppercase tracking-wider text-amber-600">
+                    Urgent flags: {aiSentiment.urgentFeedbackIds.join(', ')}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-4 py-10 text-center text-sm text-gray-500">No sentiment data available yet.</div>
+            )}
+          </div>
+        </div>
+
+        <div className="glass-surface rounded-3xl border border-white/20 p-6 shadow-xl">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="rounded-2xl bg-amber-100 p-3 text-amber-600">
+                <Flag className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">Recommendations</h3>
+                <p className="text-sm text-gray-500">Proactive suggestions from your current data</p>
+              </div>
+            </div>
+            <button type="button" onClick={() => refreshRecommendations({ force: true })} className="rounded-xl border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">Refresh</button>
+          </div>
+          <div className="mt-5 space-y-3">
+            {loadingRecommendations ? (
+              <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-4 py-10 text-center text-sm text-gray-500">Generating recommendations...</div>
+            ) : recommendationsError ? (
+              <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700">{recommendationsError}</div>
+            ) : aiRecommendations.length > 0 ? (
+              aiRecommendations.map((rec, index) => (
+                <div key={`${rec.title}-${index}`} className="rounded-2xl border border-gray-200 bg-white px-4 py-4">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-blue-600">{rec.type || 'Recommendation'}</div>
+                  <div className="mt-1 text-base font-bold text-gray-900">{rec.title || 'Untitled'}</div>
+                  <p className="mt-2 text-sm leading-6 text-gray-600">{rec.content || ''}</p>
+                </div>
+              ))
+            ) : (
+              <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-4 py-10 text-center text-sm text-gray-500">No recommendations available yet.</div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-2">
+        <div className="glass-surface rounded-3xl border border-white/20 p-6 shadow-xl">
+          <div className="flex items-center gap-3">
+            <div className="rounded-2xl bg-rose-100 p-3 text-rose-600">
+              <AlertCircle className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">Issue Triage</h3>
+              <p className="text-sm text-gray-500">Ask AI to classify a new issue before dispatching it</p>
+            </div>
+          </div>
+          <div className="mt-5 space-y-4">
+            <textarea
+              className="min-h-[130px] w-full rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm text-gray-900 outline-none focus:border-blue-500"
+              placeholder="Describe the issue here..."
+              value={triageInput}
+              onChange={(e) => setTriageInput(e.target.value)}
+            />
+            <div className="flex justify-end">
+              <button type="button" onClick={submitTriage} disabled={triageLoading || !String(triageInput || '').trim()} className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60">
+                {triageLoading ? 'Analyzing...' : 'Triage Issue'}
+              </button>
+            </div>
+            {triageResult && (
+              <div className="grid gap-3 rounded-2xl border border-gray-200 bg-white p-4 md:grid-cols-2">
+                <div><div className="text-xs font-bold uppercase tracking-wider text-gray-400">Priority</div><div className="mt-1 text-sm font-semibold text-gray-900">{triageResult.priority || '—'}</div></div>
+                <div><div className="text-xs font-bold uppercase tracking-wider text-gray-400">Category</div><div className="mt-1 text-sm font-semibold text-gray-900">{triageResult.category || '—'}</div></div>
+                <div><div className="text-xs font-bold uppercase tracking-wider text-gray-400">Suggested Technician</div><div className="mt-1 text-sm font-semibold text-gray-900">{triageResult.suggestedTechnicianId || '—'}</div></div>
+                <div><div className="text-xs font-bold uppercase tracking-wider text-gray-400">Confidence</div><div className="mt-1 text-sm font-semibold text-gray-900">{triageResult.confidence ?? '—'}</div></div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="glass-surface rounded-3xl border border-white/20 p-6 shadow-xl">
+          <div className="flex items-center gap-3">
+            <div className="rounded-2xl bg-emerald-100 p-3 text-emerald-600">
+              <Repeat className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">Maintenance Prediction</h3>
+              <p className="text-sm text-gray-500">Get the next likely maintenance window for an asset</p>
+            </div>
+          </div>
+          <div className="mt-5 space-y-4">
+            <select
+              className="h-12 w-full rounded-2xl border border-gray-300 bg-white px-4 text-sm text-gray-900 outline-none focus:border-blue-500"
+              value={selectedAssetId}
+              onChange={(e) => setSelectedAssetId(e.target.value)}
+            >
+              <option value="">Select asset</option>
+              {assets.map((asset, index) => (
+                <option key={asset.id || asset._id || `asset-${index}`} value={asset.id || asset._id}>
+                  {asset.name || asset.title || asset.assetName || 'Asset'}
+                </option>
+              ))}
+            </select>
+            <div className="flex justify-end">
+              <button type="button" onClick={predictAssetMaintenance} disabled={!selectedAssetId || predictionLoading} className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60">
+                {predictionLoading ? 'Predicting...' : 'Predict Maintenance'}
+              </button>
+            </div>
+            {predictionError && <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700">{predictionError}</div>}
+            {prediction && (
+              <div className="rounded-2xl border border-gray-200 bg-white p-4">
+                <div className="text-xs font-bold uppercase tracking-wider text-gray-400">Predicted Date</div>
+                <div className="mt-1 text-lg font-bold text-gray-900">{prediction.predictedDate || '—'}</div>
+                <div className="mt-4 text-xs font-bold uppercase tracking-wider text-gray-400">Risk Level</div>
+                <div className="mt-1 text-sm font-semibold text-gray-900">{prediction.riskLevel || '—'}</div>
+                <div className="mt-4 text-xs font-bold uppercase tracking-wider text-gray-400">Reasoning</div>
+                <p className="mt-1 text-sm leading-6 text-gray-600">{prediction.reasoning || '—'}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="glass-surface rounded-3xl border border-white/20 p-6 shadow-xl">
+        <div className="flex items-center gap-3">
+          <div className="rounded-2xl bg-blue-100 p-3 text-blue-600">
+            <MessageSquare className="h-5 w-5" />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-gray-900">AI Assistant</h3>
+            <p className="text-sm text-gray-500">Ask questions about your operations, maintenance, or next actions.</p>
+          </div>
+        </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {[
+            'List assets in warehouse',
+            'Show open issues this week',
+            'List work orders assigned to a technician',
+            'Show assets in Kigali this month',
+          ].map((prompt) => (
+            <button
+              key={prompt}
+              type="button"
+              onClick={() => setChatInput(prompt)}
+              className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100"
+            >
+              {prompt}
+            </button>
+          ))}
+        </div>
+        <div className="mt-5 rounded-3xl border border-gray-200 bg-white">
+          <div className="max-h-[360px] space-y-4 overflow-y-auto px-5 py-5">
+            {chatMessages.map((message, index) => (
+              <div key={index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                {message.kind === 'table' && message.table ? (
+                  <div className="w-full max-w-[92%] rounded-3xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-800 shadow-sm">
+                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                      <div>
+                        <div className="text-base font-bold text-gray-900">{message.table.title}</div>
+                        <div className="mt-1 text-sm text-gray-600">{message.content}</div>
+                        {Array.isArray(message.table.filters) && message.table.filters.length > 0 && (
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {message.table.filters.map((filter) => (
+                              <span key={filter} className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-gray-600 border border-gray-200">
+                                {filter}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => exportOpsTable(message.table)}
+                        disabled={!message.table.rows?.length}
+                        className="inline-flex items-center gap-2 rounded-2xl border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+                      >
+                        <Download className="h-4 w-4" />
+                        Export CSV
+                      </button>
+                    </div>
+                    <div className="mt-4 overflow-x-auto rounded-2xl border border-gray-200 bg-white">
+                      <table className="min-w-full divide-y divide-gray-200 text-left text-sm">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            {message.table.columns.map((column) => (
+                              <th key={column.key} className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-gray-500">
+                                {column.label}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {message.table.rows.length > 0 ? message.table.rows.map((row) => (
+                            <tr key={row.id}>
+                              {message.table.columns.map((column) => (
+                                <td key={column.key} className="px-4 py-3 align-top text-gray-700">
+                                  {column.key === 'date' ? formatOpsDate(row?.[column.key]) : (row?.[column.key] || '—')}
+                                </td>
+                              ))}
+                            </tr>
+                          )) : (
+                            <tr>
+                              <td colSpan={message.table.columns.length} className="px-4 py-8 text-center text-sm text-gray-500">
+                                No matching records found.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                    {message.table.totalRows > message.table.rows.length && (
+                      <div className="mt-3 text-xs text-gray-500">
+                        Showing the first {message.table.rows.length} of {message.table.totalRows} rows. Export the current table if you need the visible result in CSV.
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm shadow-sm ${message.role === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-50 text-gray-800 border border-gray-200'}`}>
+                    {message.content}
+                  </div>
+                )}
+              </div>
+            ))}
+            {chatLoading && (
+              <div className="flex justify-start">
+                <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-500">Thinking...</div>
+              </div>
+            )}
+          </div>
+          <div className="border-t border-gray-200 px-5 py-4">
+            <div className="mb-3 text-xs text-gray-500">
+              Ask for operational lists in natural language using the exact person, place, date, status, priority, category, or name you type.
+            </div>
+            <div className="flex gap-3">
+              <input
+                className="flex-1 rounded-2xl border border-gray-300 bg-gray-50 px-4 py-3 text-sm text-gray-900 outline-none focus:border-blue-500"
+                placeholder="Try: list work orders assigned to the technician name you enter this week"
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendChatMessage();
+                  }
+                }}
+              />
+              <button type="button" onClick={sendChatMessage} disabled={!String(chatInput || '').trim() || chatLoading} className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60">
+                <Send className="h-4 w-4" />
+                Send
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 
 const ClientPartsTab = () => {
   const [items, setItems] = React.useState([]);
   const [search, setSearch] = React.useState('');
   const fileRef = React.useRef(null);
+  const partFileInputRef = React.useRef(null);
   const [showAddPart, setShowAddPart] = React.useState(false);
   const [savingPart, setSavingPart] = React.useState(false);
+  const [selectedPart, setSelectedPart] = React.useState(null);
+  const [partDetailOpen, setPartDetailOpen] = React.useState(false);
+  const [partDetailTab, setPartDetailTab] = React.useState('details');
+  const [relatedIssues, setRelatedIssues] = React.useState([]);
+  const [relatedAssets, setRelatedAssets] = React.useState([]);
+  const [partFiles, setPartFiles] = React.useState([]);
+  const [partEditMode, setPartEditMode] = React.useState(false);
+  const [partEditSaving, setPartEditSaving] = React.useState(false);
+  const [partAdjustSaving, setPartAdjustSaving] = React.useState(false);
+  const [partEditForm, setPartEditForm] = React.useState(null);
+  const [partAdjustmentForm, setPartAdjustmentForm] = React.useState({ quantity: 1, reason: '' });
   const [newPart, setNewPart] = React.useState({
     name: '',
     partNumber: '',
@@ -7873,7 +9840,133 @@ const ClientPartsTab = () => {
       catch { setItems([]); }
     })();
   }, []);
+  React.useEffect(() => {
+    if (!selectedPart?._id && !selectedPart?.id) return;
+    const partId = selectedPart._id || selectedPart.id;
+    const partName = String(selectedPart.name || '').toLowerCase();
+
+    (async () => {
+      try {
+        const [issuesRes, assetsRes, filesRes, freshPartRes] = await Promise.all([
+          api.get('/api/issues'),
+          api.get('/api/assets'),
+          api.get('/api/files'),
+          api.get(`/api/parts/${partId}`),
+        ]);
+        const freshPart = freshPartRes?.data || selectedPart;
+        setSelectedPart(freshPart);
+        setPartEditForm({
+          name: freshPart.name || '',
+          partNumber: freshPart.partNumber || '',
+          category: freshPart.category || '',
+          tags: Array.isArray(freshPart.tags) ? freshPart.tags : [],
+          description: freshPart.description || '',
+          status: freshPart.status || 'STOCK_IN',
+          available: Number(freshPart.available || 0),
+          allocated: Number(freshPart.allocated || 0),
+          onHand: Number(freshPart.onHand || 0),
+          incoming: Number(freshPart.incoming || 0),
+          location: freshPart.location || '',
+          barcode: freshPart.barcode || '',
+          nonStock: !!freshPart.nonStock,
+          critical: !!freshPart.critical,
+          minQtyThreshold: Number(freshPart.minQtyThreshold || 0),
+          maxQtyThreshold: Number(freshPart.maxQtyThreshold || 0),
+          inventoryLines: Array.isArray(freshPart.inventoryLines) ? freshPart.inventoryLines : [],
+        });
+        const issues = Array.isArray(issuesRes?.data) ? issuesRes.data : [];
+        const assets = Array.isArray(assetsRes?.data) ? assetsRes.data : [];
+        const files = Array.isArray(filesRes?.data) ? filesRes.data : [];
+        setRelatedIssues(issues.filter((issue) => {
+          const haystack = `${issue?.title || ''} ${issue?.description || ''}`.toLowerCase();
+          return partName && haystack.includes(partName);
+        }));
+        setRelatedAssets(assets.filter((asset) => {
+          const spareParts = Array.isArray(asset?.spareParts) ? asset.spareParts : [];
+          const assetText = `${asset?.name || ''} ${asset?.description || ''}`.toLowerCase();
+          return spareParts.some((entry) => String(entry?.name || '').toLowerCase() === partName) || (partName && assetText.includes(partName));
+        }));
+        setPartFiles(files.filter((file) => String(file?.entityId || file?.partId || '') === String(partId) || (String(file?.module || '').toLowerCase() === 'part' && String(file?.entityRef || '') === String(partId))));
+      } catch (err) {
+        console.error('Failed to load part details', err);
+        setRelatedIssues([]);
+        setRelatedAssets([]);
+        setPartFiles([]);
+      }
+    })();
+  }, [selectedPart?._id, selectedPart?.id, selectedPart?.name]);
   const filtered = items.filter(it => (it.name || it.partName || '').toLowerCase().includes(search.toLowerCase()));
+  const openPartDetails = (part) => {
+    setSelectedPart(part);
+    setPartDetailTab('details');
+    setPartDetailOpen(true);
+    setPartEditMode(false);
+  };
+  const savePartDetails = async () => {
+    if (!selectedPart?._id && !selectedPart?.id) return;
+    setPartEditSaving(true);
+    try {
+      const partId = selectedPart._id || selectedPart.id;
+      const res = await api.put(`/api/parts/${partId}`, partEditForm);
+      const updated = res.data;
+      setSelectedPart(updated);
+      setItems((prev) => prev.map((entry) => String(entry._id || entry.id) === String(partId) ? updated : entry));
+      setPartEditMode(false);
+    } catch (err) {
+      alert(err?.response?.data?.error || err?.message || 'Failed to update part');
+    } finally {
+      setPartEditSaving(false);
+    }
+  };
+  const adjustPartQuantity = async () => {
+    if (!selectedPart?._id && !selectedPart?.id) return;
+    setPartAdjustSaving(true);
+    try {
+      const partId = selectedPart._id || selectedPart.id;
+      const createdBy = (() => {
+        try {
+          const user = JSON.parse(localStorage.getItem('user') || '{}');
+          return user?.name || user?.email || '';
+        } catch {
+          return '';
+        }
+      })();
+      const res = await api.post(`/api/parts/${partId}/adjust`, {
+        quantity: Number(partAdjustmentForm.quantity || 0),
+        reason: partAdjustmentForm.reason || '',
+        createdBy,
+      });
+      const updated = res.data;
+      setSelectedPart(updated);
+      setItems((prev) => prev.map((entry) => String(entry._id || entry.id) === String(partId) ? updated : entry));
+      setPartAdjustmentForm({ quantity: 1, reason: '' });
+      setPartDetailTab('adjustments');
+    } catch (err) {
+      alert(err?.response?.data?.error || err?.message || 'Failed to adjust quantity');
+    } finally {
+      setPartAdjustSaving(false);
+    }
+  };
+  const addPartFile = async (file) => {
+    if (!file || !selectedPart) return;
+    try {
+      const partId = selectedPart._id || selectedPart.id;
+      const res = await api.post('/api/files', {
+        name: file.name,
+        entityId: partId,
+        entityRef: partId,
+        module: 'part',
+        partId,
+        size: file.size || 0,
+        mimeType: file.type || '',
+      });
+      setPartFiles((prev) => [res.data, ...(prev || [])]);
+    } catch (err) {
+      alert(err?.response?.data?.error || err?.message || 'Failed to attach file');
+    } finally {
+      if (partFileInputRef.current) partFileInputRef.current.value = '';
+    }
+  };
   const exportCSV = () => {
     if (!filtered.length) return;
     const keys = ['name', 'status', 'available', 'allocated', 'onHand', 'incoming', 'location'];
@@ -8170,7 +10263,7 @@ const ClientPartsTab = () => {
             </thead>
             <tbody>
               {filtered.map((it, idx) => (
-                <tr key={it._id || it.id || `part-${idx}`} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+                <tr key={it._id || it.id || `part-${idx}`} className="cursor-pointer border-b border-gray-50 hover:bg-gray-50/50 transition-colors" onClick={() => openPartDetails(it)}>
                   <td className="py-4 px-4 text-sm font-bold text-gray-900">{it.name || it.partName || 'Unnamed'}</td>
                   <td className="py-4 px-4 text-sm text-gray-600">
                     {(it.status || 'â€”').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
@@ -8180,7 +10273,7 @@ const ClientPartsTab = () => {
                   <td className="py-4 px-4 text-sm text-gray-600">{it.onHand || 0}</td>
                   <td className="py-4 px-4 text-sm text-gray-600">{it.incoming || 0}</td>
                   <td className="py-4 px-4 text-sm text-gray-600">{it.location || it.warehouse || 'â€”'}</td>
-                  <td className="py-4 px-4 text-right"><button className="p-1.5 hover:bg-gray-100 rounded-lg"><svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg></button></td>
+                  <td className="py-4 px-4 text-right"><button type="button" onClick={(e) => { e.stopPropagation(); openPartDetails(it); }} className="p-1.5 hover:bg-gray-100 rounded-lg"><svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg></button></td>
                 </tr>
               ))}
               {filtered.length === 0 && <tr><td colSpan="8" className="py-20 text-center text-gray-500">No parts or inventory found</td></tr>}
@@ -8188,6 +10281,313 @@ const ClientPartsTab = () => {
           </table>
         </div>
       </div>
+
+      {partDetailOpen && selectedPart && (
+        <div className="fixed inset-0 z-[95] overflow-y-auto bg-black/60 backdrop-blur-sm p-4">
+          <div className="flex min-h-full items-center justify-center">
+            <div className="my-6 w-full max-w-7xl overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-2xl">
+              <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+                <div className="flex items-center gap-4">
+                  <button type="button" onClick={() => setPartDetailOpen(false)} className="rounded-lg p-2 text-gray-500 hover:bg-gray-100">
+                    <ChevronLeft className="h-5 w-5" />
+                  </button>
+                  <div>
+                    <h3 className="text-3xl font-bold text-gray-900">{selectedPart.name || 'Part'}</h3>
+                    <p className="mt-1 text-sm text-gray-500">{selectedPart.partNumber || selectedPart.category || 'Part details and inventory overview'}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button type="button" onClick={() => setPartEditMode(true)} className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">Edit</button>
+                  <button type="button" onClick={() => setPartDetailTab('adjustments')} className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Adjust Quantity</button>
+                </div>
+              </div>
+
+              <div className="grid min-h-[720px] grid-cols-1 xl:grid-cols-[1fr_320px]">
+                <div className="border-r border-gray-200">
+                  <div className="flex flex-wrap items-center gap-8 border-b border-gray-200 px-6 py-4 text-base font-semibold text-gray-600">
+                    {[
+                      ['details', 'Details'],
+                      ['workOrders', 'Work Orders'],
+                      ['files', 'Files'],
+                      ['assets', 'Assets'],
+                      ['adjustments', 'Adjustments'],
+                    ].map(([key, label]) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => setPartDetailTab(key)}
+                        className={`border-b-2 pb-3 transition ${partDetailTab === key ? 'border-blue-600 text-blue-600' : 'border-transparent hover:text-gray-800'}`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="max-h-[calc(100vh-220px)] overflow-y-auto px-6 py-6">
+                    {partDetailTab === 'details' && (
+                      partEditMode && partEditForm ? (
+                        <div className="space-y-5">
+                          <div className="grid gap-4 md:grid-cols-2">
+                            {[
+                              ['Part Name', 'name'],
+                              ['Part Number', 'partNumber'],
+                              ['Category', 'category'],
+                              ['Location', 'location'],
+                              ['Barcode', 'barcode'],
+                              ['Status', 'status'],
+                            ].map(([label, field]) => (
+                              <div key={field}>
+                                <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-500">{label}</label>
+                                <input
+                                  className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-blue-500"
+                                  value={partEditForm[field] || ''}
+                                  onChange={(e) => setPartEditForm((prev) => ({ ...prev, [field]: e.target.value }))}
+                                />
+                              </div>
+                            ))}
+                          </div>
+                          <div>
+                            <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-500">Description</label>
+                            <textarea className="min-h-[96px] w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-blue-500" value={partEditForm.description || ''} onChange={(e) => setPartEditForm((prev) => ({ ...prev, description: e.target.value }))} />
+                          </div>
+                          <div className="grid gap-4 md:grid-cols-4">
+                            {[
+                              ['Available', 'available'],
+                              ['Allocated', 'allocated'],
+                              ['On Hand', 'onHand'],
+                              ['Incoming', 'incoming'],
+                            ].map(([label, field]) => (
+                              <div key={field}>
+                                <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-500">{label}</label>
+                                <input type="number" className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-blue-500" value={partEditForm[field] || 0} onChange={(e) => setPartEditForm((prev) => ({ ...prev, [field]: Number(e.target.value || 0) }))} />
+                              </div>
+                            ))}
+                          </div>
+                          <div className="flex items-center justify-end gap-3">
+                            <button type="button" onClick={() => setPartEditMode(false)} className="rounded-xl border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">Cancel</button>
+                            <button type="button" onClick={savePartDetails} disabled={partEditSaving} className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60">{partEditSaving ? 'Saving...' : 'Save Changes'}</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <div className="rounded-2xl border border-gray-200 bg-gray-50 p-5">
+                            <div className="mb-3 text-sm font-bold text-gray-700">Part Details</div>
+                            {[
+                              ['Name', selectedPart.name],
+                              ['Part Number', selectedPart.partNumber],
+                              ['Category', selectedPart.category],
+                              ['Description', selectedPart.description],
+                              ['Barcode', selectedPart.barcode],
+                              ['Status', selectedPart.status],
+                            ].map(([label, value]) => (
+                              <div key={label} className="flex items-center justify-between border-b border-gray-200 py-2 last:border-b-0">
+                                <span className="text-sm font-semibold text-gray-600">{label}</span>
+                                <span className="max-w-[60%] text-right text-sm text-gray-900">{value || '—'}</span>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="rounded-2xl border border-gray-200 bg-gray-50 p-5">
+                            <div className="mb-3 text-sm font-bold text-gray-700">Inventory</div>
+                            {[
+                              ['Available Qty', selectedPart.available || 0],
+                              ['Allocated Qty', selectedPart.allocated || 0],
+                              ['On Hand Qty', selectedPart.onHand || 0],
+                              ['Incoming Qty', selectedPart.incoming || 0],
+                              ['Location', selectedPart.location],
+                              ['Critical Part', selectedPart.critical ? 'Yes' : 'No'],
+                            ].map(([label, value]) => (
+                              <div key={label} className="flex items-center justify-between border-b border-gray-200 py-2 last:border-b-0">
+                                <span className="text-sm font-semibold text-gray-600">{label}</span>
+                                <span className="max-w-[60%] text-right text-sm text-gray-900">{String(value || '—')}</span>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="md:col-span-2 rounded-2xl border border-gray-200 bg-white p-5">
+                            <div className="mb-3 text-sm font-bold text-gray-700">Inventory Lines</div>
+                            {(selectedPart.inventoryLines || []).length === 0 ? (
+                              <div className="text-sm text-gray-500">No inventory lines available.</div>
+                            ) : (
+                              <div className="overflow-x-auto">
+                                <table className="min-w-full text-left text-sm">
+                                  <thead className="border-b border-gray-200 text-gray-500">
+                                    <tr>{['Location', 'Area', 'Min Qty', 'Max Qty', 'Avail Qty', 'Cost', 'Barcode'].map((label) => <th key={label} className="px-3 py-2 font-semibold">{label}</th>)}</tr>
+                                  </thead>
+                                  <tbody>
+                                    {(selectedPart.inventoryLines || []).map((line, index) => (
+                                      <tr key={index} className="border-b border-gray-100">
+                                        <td className="px-3 py-2">{line.location || '—'}</td>
+                                        <td className="px-3 py-2">{line.area || '—'}</td>
+                                        <td className="px-3 py-2">{line.minQty || 0}</td>
+                                        <td className="px-3 py-2">{line.maxQty || 0}</td>
+                                        <td className="px-3 py-2">{line.availQty || 0}</td>
+                                        <td className="px-3 py-2">{line.cost || 0}</td>
+                                        <td className="px-3 py-2">{line.barcode || '—'}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    )}
+
+                    {partDetailTab === 'workOrders' && (
+                      relatedIssues.length === 0 ? (
+                        <div className="text-sm text-gray-500">No work orders linked to this part yet.</div>
+                      ) : (
+                        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
+                          <table className="w-full text-left text-sm">
+                            <thead className="border-b border-gray-200 bg-gray-50 text-gray-600">
+                              <tr>{['Title', 'Status', 'Priority', 'Location'].map((label) => <th key={label} className="px-4 py-3 font-semibold">{label}</th>)}</tr>
+                            </thead>
+                            <tbody>
+                              {relatedIssues.map((issue, index) => (
+                                <tr key={issue._id || issue.id || index} className="border-b border-gray-100">
+                                  <td className="px-4 py-3 font-semibold text-gray-900">{issue.title || 'Work Order'}</td>
+                                  <td className="px-4 py-3 text-gray-600">{issue.status || '—'}</td>
+                                  <td className="px-4 py-3 text-gray-600">{issue.priority || '—'}</td>
+                                  <td className="px-4 py-3 text-gray-600">{issue.location || '—'}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )
+                    )}
+
+                    {partDetailTab === 'assets' && (
+                      relatedAssets.length === 0 ? (
+                        <div className="text-sm text-gray-500">No assets linked to this part yet.</div>
+                      ) : (
+                        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
+                          <table className="w-full text-left text-sm">
+                            <thead className="border-b border-gray-200 bg-gray-50 text-gray-600">
+                              <tr>{['Asset', 'Type', 'Property', 'Location'].map((label) => <th key={label} className="px-4 py-3 font-semibold">{label}</th>)}</tr>
+                            </thead>
+                            <tbody>
+                              {relatedAssets.map((asset, index) => (
+                                <tr key={asset._id || asset.id || index} className="border-b border-gray-100">
+                                  <td className="px-4 py-3 font-semibold text-gray-900">{asset.name || 'Asset'}</td>
+                                  <td className="px-4 py-3 text-gray-600">{asset.type || '—'}</td>
+                                  <td className="px-4 py-3 text-gray-600">{getAssetLocationLabel(asset) || '—'}</td>
+                                  <td className="px-4 py-3 text-gray-600">{asset.location?.building || asset.location || '—'}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )
+                    )}
+
+                    {partDetailTab === 'files' && (
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <div className="text-sm font-semibold text-gray-700">{partFiles.length} file(s)</div>
+                          <div className="flex items-center gap-3">
+                            <button type="button" onClick={() => partFileInputRef.current?.click()} className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">Upload</button>
+                            <input ref={partFileInputRef} type="file" className="hidden" onChange={(e) => addPartFile(e.target.files?.[0])} />
+                          </div>
+                        </div>
+                        <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-6 py-8 text-center text-sm text-gray-500">
+                          Upload a file to attach it to this part record.
+                        </div>
+                        {partFiles.length === 0 ? (
+                          <div className="py-16 text-center text-lg font-semibold text-gray-700">No files added yet</div>
+                        ) : (
+                          <div className="space-y-3">
+                            {partFiles.map((file, index) => (
+                              <div key={file.id || index} className="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-4 py-3">
+                                <div>
+                                  <div className="font-semibold text-gray-900">{file.name || 'File'}</div>
+                                  <div className="mt-1 text-xs text-gray-500">{file.mimeType || 'Unknown type'}{file.size ? ` | ${file.size} bytes` : ''}</div>
+                                </div>
+                                <div className="text-xs text-gray-500">{file.createdAt ? new Date(file.createdAt).toLocaleString() : 'Just now'}</div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {partDetailTab === 'adjustments' && (
+                      <div className="space-y-5">
+                        <div className="rounded-2xl border border-gray-200 bg-gray-50 p-5">
+                          <div className="mb-3 text-sm font-bold text-gray-700">Adjust Quantity</div>
+                          <div className="grid gap-4 md:grid-cols-[180px_1fr_auto]">
+                            <input type="number" className="rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-blue-500" value={partAdjustmentForm.quantity} onChange={(e) => setPartAdjustmentForm((prev) => ({ ...prev, quantity: Number(e.target.value || 0) }))} />
+                            <input className="rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-blue-500" placeholder="Reason for adjustment" value={partAdjustmentForm.reason} onChange={(e) => setPartAdjustmentForm((prev) => ({ ...prev, reason: e.target.value }))} />
+                            <button type="button" onClick={adjustPartQuantity} disabled={partAdjustSaving} className="rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60">
+                              {partAdjustSaving ? 'Saving...' : 'Apply'}
+                            </button>
+                          </div>
+                        </div>
+                        {(selectedPart.adjustments || []).length === 0 ? (
+                          <div className="text-sm text-gray-500">No quantity adjustments recorded yet.</div>
+                        ) : (
+                          <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
+                            <table className="w-full text-left text-sm">
+                              <thead className="border-b border-gray-200 bg-gray-50 text-gray-600">
+                                <tr>{['Date', 'Change', 'Previous', 'New', 'Reason', 'By'].map((label) => <th key={label} className="px-4 py-3 font-semibold">{label}</th>)}</tr>
+                              </thead>
+                              <tbody>
+                                {(selectedPart.adjustments || []).map((entry, index) => (
+                                  <tr key={index} className="border-b border-gray-100">
+                                    <td className="px-4 py-3 text-gray-600">{entry.createdAt ? new Date(entry.createdAt).toLocaleString() : '—'}</td>
+                                    <td className="px-4 py-3 font-semibold text-gray-900">{entry.quantity > 0 ? `+${entry.quantity}` : entry.quantity}</td>
+                                    <td className="px-4 py-3 text-gray-600">{entry.previousAvailable ?? '—'}</td>
+                                    <td className="px-4 py-3 text-gray-600">{entry.newAvailable ?? '—'}</td>
+                                    <td className="px-4 py-3 text-gray-600">{entry.reason || '—'}</td>
+                                    <td className="px-4 py-3 text-gray-600">{entry.createdBy || '—'}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="bg-gray-50">
+                  <div className="space-y-8 border-l border-gray-200 px-6 py-8">
+                    <div>
+                      <div className="mb-4 text-2xl font-bold text-gray-900">Inventory</div>
+                      <div className="space-y-4">
+                        {[
+                          ['Status', (selectedPart.status || '').replace(/_/g, ' ') || '—'],
+                          ['Available Qty', selectedPart.available || 0],
+                          ['Min Qty Threshold', selectedPart.minQtyThreshold || 'None'],
+                          ['Max Qty Threshold', selectedPart.maxQtyThreshold || 'None'],
+                        ].map(([label, value]) => (
+                          <div key={label} className="flex items-center justify-between text-sm">
+                            <span className="text-gray-500">{label}</span>
+                            <span className="font-semibold text-gray-900">{String(value)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="mb-4 text-2xl font-bold text-gray-900">Location</div>
+                      <div className="text-sm text-gray-700">{selectedPart.location || 'No location'}</div>
+                    </div>
+                    <div>
+                      <div className="mb-4 text-2xl font-bold text-gray-900">Area</div>
+                      <div className="text-sm text-gray-700">{selectedPart.inventoryLines?.[0]?.area || 'No area'}</div>
+                    </div>
+                    <div>
+                      <div className="mb-4 text-2xl font-bold text-gray-900">Assigned To</div>
+                      <div className="text-sm text-gray-700">{Array.isArray(selectedPart.assignedTo) && selectedPart.assignedTo.length ? selectedPart.assignedTo.join(', ') : 'No assignees'}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -9483,13 +11883,17 @@ const ClientEdgeTab = () => {
 };
 
 // ── Scheduler (client) copied from Manager ───────────────────────────────────
-const ClientSchedulerTab = ({ issues = [], technicians = [] }) => {
+const ClientSchedulerTab = ({ workOrders = [], technicians = [], assignableTechnicians = [], onSchedule, onOpenWorkOrderDetails }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewType, setViewType] = useState('Day');
   const [currentPage, setCurrentPage] = useState(1);
   const [showUnscheduled, setShowUnscheduled] = useState(true);
   const [schedulerPopover, setSchedulerPopover] = useState(null);
   const [unscheduledFilters, setUnscheduledFilters] = useState({ status: [], priority: [] });
+  const [selectedUnscheduledIssue, setSelectedUnscheduledIssue] = useState(null);
+  const [scheduleForm, setScheduleForm] = useState({ techId: '', dueDate: '' });
+  const [scheduleSaving, setScheduleSaving] = useState(false);
+  const [scheduleError, setScheduleError] = useState('');
 
   const getIssueDueDate = (issue) => {
     const raw = issue?.fixDeadline || issue?.dueDate || issue?.scheduledFor || issue?.nextDate || issue?.scheduleDate;
@@ -9501,6 +11905,13 @@ const ClientSchedulerTab = ({ issues = [], technicians = [] }) => {
       const dt = new Date(raw);
       return !isNaN(dt.getTime()) ? dt : null;
     }
+  };
+
+  const toDateTimeLocalValue = (value) => {
+    const dt = value ? new Date(value) : null;
+    if (!(dt instanceof Date) || Number.isNaN(dt?.getTime?.())) return '';
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
   };
 
   const isCompletedStatus = (status) => {
@@ -9515,7 +11926,7 @@ const ClientSchedulerTab = ({ issues = [], technicians = [] }) => {
   };
 
   const cardsPerPage = 5;
-  const filteredUnscheduled = issues.filter(issue => {
+  const filteredUnscheduled = workOrders.filter(issue => {
     if (isScheduledIssue(issue)) return false;
     if (unscheduledFilters.status.length > 0 && !unscheduledFilters.status.includes(issue.status)) return false;
     if (unscheduledFilters.priority.length > 0 && !unscheduledFilters.priority.includes(issue.priority)) return false;
@@ -9555,10 +11966,24 @@ const ClientSchedulerTab = ({ issues = [], technicians = [] }) => {
   };
 
   const scheduledForTech = (tech) => {
-    const techId = String(tech?._id || tech?.id || tech?.userId || '');
-    return (issues || []).filter(issue => {
-      const assignedId = String(issue.assignedTo || (Array.isArray(issue.assignees) && issue.assignees[0]?.id) || '');
-      if (!assignedId || assignedId !== techId) return false;
+    const techIds = Array.from(new Set(
+      [
+        tech?._id,
+        tech?.id,
+        tech?.userId,
+        tech?.email
+      ].filter(Boolean).map((value) => String(value))
+    ));
+    return (workOrders || []).filter(issue => {
+      const issueAssigneeIds = Array.from(new Set(
+        [
+          issue.assignedTo,
+          issue.assignedTo?.id,
+          issue.assignedTo?._id,
+          ...(Array.isArray(issue.assignees) ? issue.assignees.flatMap((assignee) => [assignee?.id, assignee?.email]) : [])
+        ].filter(Boolean).map((value) => String(value))
+      ));
+      if (!issueAssigneeIds.length || !techIds.some((id) => issueAssigneeIds.includes(id))) return false;
       const due = getIssueDueDate(issue);
       if (!due) return false;
       if (!isSameDay(due, currentDate)) return false;
@@ -9691,10 +12116,21 @@ const ClientSchedulerTab = ({ issues = [], technicians = [] }) => {
               const typeChip = issue.category || issue.issueType || issue.priority || 'Task';
               const due = getIssueDueDate(issue);
               return (
-                <div key={issue._id || issue.id || idx} className="min-w-[300px] bg-white border border-gray-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer group space-y-3">
+                <div key={issue._id || issue.id || idx} onClick={() => {
+                  if (typeof onOpenWorkOrderDetails === 'function') {
+                    onOpenWorkOrderDetails(issue);
+                    return;
+                  }
+                  setSelectedUnscheduledIssue(issue);
+                  setScheduleError('');
+                  setScheduleForm({
+                    techId: '',
+                    dueDate: toDateTimeLocalValue(getIssueDueDate(issue))
+                  });
+                }} className="min-w-[300px] bg-white border border-gray-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer group space-y-3">
                   <div className="flex justify-between items-start gap-2">
                     <span className="text-xs font-bold text-gray-500">#{String(issue._id || issue.id).slice(-4).toUpperCase()}</span>
-                    <button className="p-1 rounded-lg border border-gray-200 text-gray-400 hover:bg-gray-50">
+                    <button type="button" onClick={(e) => e.stopPropagation()} className="p-1 rounded-lg border border-gray-200 text-gray-400 hover:bg-gray-50">
                       <MoreHorizontal className="w-4 h-4" />
                     </button>
                   </div>
@@ -9726,6 +12162,140 @@ const ClientSchedulerTab = ({ issues = [], technicians = [] }) => {
                 No unscheduled work orders
               </div>
             )}
+          </div>
+        )}
+        {selectedUnscheduledIssue && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-2xl">
+              <div className="flex items-start justify-between border-b border-gray-100 px-6 py-5">
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-gray-500">Unscheduled Work Order</p>
+                  <h3 className="mt-1 text-2xl font-bold text-gray-900">{selectedUnscheduledIssue.title || 'Work Order'}</h3>
+                  <p className="mt-1 text-sm text-gray-500">#{String(selectedUnscheduledIssue._id || selectedUnscheduledIssue.id || '').slice(-8).toUpperCase() || 'N/A'}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedUnscheduledIssue(null)}
+                  className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto">
+                <div className="grid gap-4 px-6 py-6 md:grid-cols-2">
+                  <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                    <div className="mb-3 text-sm font-bold text-gray-700">Overview</div>
+                    {[
+                      ['Status', selectedUnscheduledIssue.status || 'Open'],
+                      ['Priority', selectedUnscheduledIssue.priority || 'None'],
+                      ['Category', selectedUnscheduledIssue.category || selectedUnscheduledIssue.issueType || 'Task'],
+                      ['Estimated Hours', selectedUnscheduledIssue.expectedHours || '1'],
+                      ['Due Date', getIssueDueDate(selectedUnscheduledIssue)?.toLocaleString() || 'Not scheduled'],
+                      ['Created At', selectedUnscheduledIssue.createdAt ? new Date(selectedUnscheduledIssue.createdAt).toLocaleString() : '—'],
+                    ].map(([label, value]) => (
+                      <div key={label} className="flex items-center justify-between border-b border-gray-200 py-2 last:border-b-0">
+                        <span className="text-sm font-semibold text-gray-600">{label}</span>
+                        <span className="max-w-[60%] text-right text-sm text-gray-900">{value || '—'}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                    <div className="mb-3 text-sm font-bold text-gray-700">Assignment & Location</div>
+                    {[
+                      ['Location', selectedUnscheduledIssue.location || selectedUnscheduledIssue.property?.name || '—'],
+                      ['Asset', selectedUnscheduledIssue.assetName || selectedUnscheduledIssue.asset?.name || '—'],
+                      ['Assigned To', selectedUnscheduledIssue.assignedToName || selectedUnscheduledIssue.assignedTo || 'Unassigned'],
+                      ['Requester', selectedUnscheduledIssue.requesterName || selectedUnscheduledIssue.reportedBy || '—'],
+                      ['Block', selectedUnscheduledIssue.block || '—'],
+                      ['Room', selectedUnscheduledIssue.room || '—'],
+                    ].map(([label, value]) => (
+                      <div key={label} className="flex items-center justify-between border-b border-gray-200 py-2 last:border-b-0">
+                        <span className="text-sm font-semibold text-gray-600">{label}</span>
+                        <span className="max-w-[60%] text-right text-sm text-gray-900">{value || '—'}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="border-t border-gray-100 bg-gray-50 px-6 py-5">
+                  <div className="mb-2 text-sm font-bold text-gray-700">Description</div>
+                  <div className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700">
+                    {selectedUnscheduledIssue.description || 'No description provided.'}
+                  </div>
+                </div>
+
+                <div className="border-t border-gray-100 bg-white px-6 py-5">
+                  <div className="mb-3 text-sm font-bold text-gray-700">Schedule Work Order</div>
+                  {scheduleError && (
+                    <div className="mb-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                      {scheduleError}
+                    </div>
+                  )}
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div>
+                      <label className="mb-2 block text-xs font-bold uppercase tracking-[0.08em] text-gray-500">Technician</label>
+                      <select
+                        value={scheduleForm.techId}
+                        onChange={(e) => setScheduleForm((prev) => ({ ...prev, techId: e.target.value }))}
+                        className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 shadow-sm focus:border-blue-400 focus:outline-none"
+                      >
+                        <option value="">Select technician...</option>
+                        {assignableTechnicians.map((tech, idx) => (
+                          <option key={tech._id || tech.id || tech.userId || idx} value={tech._id || tech.id || tech.userId}>
+                            {`${tech.name || tech.fullName || tech.email || `Technician ${idx + 1}`}${tech.role ? ` (${tech.role})` : ''}`}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="mb-2 block text-xs font-bold uppercase tracking-[0.08em] text-gray-500">Date & Time</label>
+                      <input
+                        type="datetime-local"
+                        value={scheduleForm.dueDate}
+                        onChange={(e) => setScheduleForm((prev) => ({ ...prev, dueDate: e.target.value }))}
+                        className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 shadow-sm focus:border-blue-400 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 border-t border-gray-100 bg-white px-6 py-4">
+                <Btn
+                  variant="primary"
+                  onClick={async () => {
+                    if (!scheduleForm.techId || !scheduleForm.dueDate) {
+                      setScheduleError('Select a technician and date before scheduling this work order.');
+                      return;
+                    }
+                    if (typeof onSchedule !== 'function') {
+                      setScheduleError('Scheduling is not available right now.');
+                      return;
+                    }
+                    try {
+                      setScheduleSaving(true);
+                      setScheduleError('');
+                      await onSchedule(
+                        selectedUnscheduledIssue.id || selectedUnscheduledIssue._id,
+                        scheduleForm.techId,
+                        scheduleForm.dueDate
+                      );
+                      setSelectedUnscheduledIssue(null);
+                    } catch (err) {
+                      setScheduleError(err?.response?.data?.error || err?.message || 'Failed to schedule work order.');
+                    } finally {
+                      setScheduleSaving(false);
+                    }
+                  }}
+                  disabled={scheduleSaving}
+                >
+                  {scheduleSaving ? 'Scheduling...' : 'Schedule'}
+                </Btn>
+                <Btn variant="outline" onClick={() => setSelectedUnscheduledIssue(null)}>Close</Btn>
+              </div>
+            </div>
           </div>
         )}
       </section>
@@ -9784,7 +12354,7 @@ const ClientSchedulerTab = ({ issues = [], technicians = [] }) => {
                       const issueAtSlot = techIssues.find((iss) => {
                         const due = getIssueDueDate(iss);
                         if (!due) return false;
-                        return due.getHours() === slotHourMap[slotIdx];
+                        return slotIndexForIssue(iss) === slotIdx;
                       });
                       return (
                         <td key={slot} className="h-16 px-2 py-2 text-center align-middle">

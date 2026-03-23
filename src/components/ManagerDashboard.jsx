@@ -724,10 +724,13 @@ function ManagerDashboard() {
   const [searchQuery, setSearchQuery] = useState('');
   const [aiSentiment, setAiSentiment] = useState(null);
   const [aiRecommendations, setAiRecommendations] = useState([]);
+  const [aiSummary, setAiSummary] = useState(null);
   const [loadingAI, setLoadingAI] = useState(false);
   const [loadingRecs, setLoadingRecs] = useState(false);
+  const [loadingSummary, setLoadingSummary] = useState(false);
   const [aiError, setAiError] = useState(null);
   const [recsError, setRecsError] = useState(null);
+  const [summaryError, setSummaryError] = useState(null);
   const navigate = useNavigate();
 
   // Load logged-in user from localStorage for sidebar display
@@ -965,6 +968,20 @@ function ManagerDashboard() {
     }
   };
 
+  const fetchAIMaintenanceSummary = async () => {
+    try {
+      setLoadingSummary(true);
+      setSummaryError(null);
+      const res = await api.get("/api/ai/maintenance-summary");
+      setAiSummary(res.data);
+    } catch (err) {
+      console.error("Failed to fetch AI maintenance summary:", err);
+      setSummaryError(err.response?.data?.message || "Maintenance summary unavailable");
+    } finally {
+      setLoadingSummary(false);
+    }
+  };
+
   const fetchMaterialRequests = async () => {
     try {
       const res = await api.get('/api/material-requests');
@@ -1027,6 +1044,7 @@ function ManagerDashboard() {
     fetchDashboardData();
     fetchAISentiment();
     fetchAIRecommendations();
+    fetchAIMaintenanceSummary();
     fetchMaterialRequests();
   }, []);
 
@@ -2505,8 +2523,11 @@ const OverviewTab = ({
       loadingAI={loadingAI}
       aiError={aiError}
       aiRecommendations={aiRecommendations}
+      aiSummary={aiSummary}
       loadingRecs={loadingRecs}
+      loadingSummary={loadingSummary}
       recsError={recsError}
+      summaryError={summaryError}
       exportToPDF={exportToPDF}
       exportToExcel={exportToExcel}
     />
@@ -9641,16 +9662,60 @@ const DetailsModal = ({ open, type, item, onClose, getAssignedTechName, onRefres
   );
 };
 
-const AIInsights = ({ aiSentiment, loadingAI, aiError, aiRecommendations, loadingRecs, recsError, exportToPDF, exportToExcel }) => {
-  if (loadingAI || loadingRecs) return (
+const AIInsights = ({ aiSentiment, loadingAI, aiError, aiRecommendations, aiSummary, loadingRecs, loadingSummary, recsError, summaryError, exportToPDF, exportToExcel }) => {
+  if (loadingAI || loadingRecs || loadingSummary) return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
       <div className="p-8 bg-white/50 rounded-2xl animate-pulse text-center border border-gray-100">Analysing sentiment trends...</div>
       <div className="p-8 bg-white/50 rounded-2xl animate-pulse text-center border border-gray-100">Generating proactive recommendations...</div>
     </div>
   );
 
+  const topPropertiesData = (aiSummary?.topProperties || []).map((entry) => ({
+    name: entry.property,
+    incidents: entry.incidentCount
+  }));
+  const recurringIssuesData = (aiSummary?.recurringIssues || []).map((entry) => ({
+    name: `${entry.category} @ ${entry.property}`,
+    count: entry.count
+  }));
+  const technicianSpeedData = (aiSummary?.technicianPerformance || []).map((entry) => ({
+    name: entry.technicianName,
+    hours: entry.averageResolutionHours || 0
+  }));
+  const slaData = [
+    { name: 'Breached', value: aiSummary?.metrics?.slaBreaches || 0 },
+    { name: 'Within SLA', value: Math.max(0, (aiSummary?.metrics?.totalIssues || 0) - (aiSummary?.metrics?.slaBreaches || 0)) }
+  ];
+  const chartColors = ['#2563eb', '#7c3aed', '#14b8a6', '#f59e0b', '#ef4444'];
+
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+    <div className="space-y-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <GlassCard className="p-5 bg-gradient-to-br from-blue-50 to-white border-blue-100">
+          <div className="text-xs font-bold uppercase tracking-widest text-blue-500">Open Issues</div>
+          <div className="mt-2 text-3xl font-black text-gray-900">{aiSummary?.metrics?.openIssues ?? '—'}</div>
+          <p className="mt-2 text-xs text-gray-500">Current unresolved work orders</p>
+        </GlassCard>
+        <GlassCard className="p-5 bg-gradient-to-br from-rose-50 to-white border-rose-100">
+          <div className="text-xs font-bold uppercase tracking-widest text-rose-500">SLA Breaches</div>
+          <div className="mt-2 text-3xl font-black text-gray-900">{aiSummary?.metrics?.slaBreaches ?? '—'}</div>
+          <p className="mt-2 text-xs text-gray-500">Issues past due or beyond target</p>
+        </GlassCard>
+        <GlassCard className="p-5 bg-gradient-to-br from-emerald-50 to-white border-emerald-100">
+          <div className="text-xs font-bold uppercase tracking-widest text-emerald-500">Avg Resolution</div>
+          <div className="mt-2 text-3xl font-black text-gray-900">
+            {aiSummary?.metrics?.avgResolutionHours ? `${aiSummary.metrics.avgResolutionHours}h` : '—'}
+          </div>
+          <p className="mt-2 text-xs text-gray-500">Average time to resolve completed issues</p>
+        </GlassCard>
+        <GlassCard className="p-5 bg-gradient-to-br from-violet-50 to-white border-violet-100">
+          <div className="text-xs font-bold uppercase tracking-widest text-violet-500">Active Technicians</div>
+          <div className="mt-2 text-3xl font-black text-gray-900">{aiSummary?.metrics?.activeTechnicians ?? '—'}</div>
+          <p className="mt-2 text-xs text-gray-500">Technicians currently in the system</p>
+        </GlassCard>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* Sentiment Analysis Card */}
       <GlassCard className="p-6 bg-gradient-to-br from-indigo-50 to-white border-indigo-100">
         <div className="flex items-center gap-3 mb-4">
@@ -9712,6 +9777,141 @@ const AIInsights = ({ aiSentiment, loadingAI, aiError, aiRecommendations, loadin
           )}
         </div>
       </GlassCard>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <GlassCard className="p-6 bg-gradient-to-br from-white to-blue-50 border-blue-100">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2 bg-blue-100 rounded-lg">
+              <BarChart3 className="w-5 h-5 text-blue-600" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">Risky Properties</h3>
+              <p className="text-xs text-gray-500">Properties with the highest incident counts</p>
+            </div>
+          </div>
+          {topPropertiesData.length > 0 ? (
+            <div className="h-72">
+              <ResponsiveContainer width="100%" height="100%">
+                <ReBarChart data={topPropertiesData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                  <Tooltip />
+                  <Bar dataKey="incidents" fill="#2563eb" radius={[8, 8, 0, 0]} />
+                </ReBarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-12 text-center text-sm text-gray-500">
+              {summaryError || 'No property incident data available yet.'}
+            </div>
+          )}
+        </GlassCard>
+
+        <GlassCard className="p-6 bg-gradient-to-br from-white to-rose-50 border-rose-100">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2 bg-rose-100 rounded-lg">
+              <AlertCircle className="w-5 h-5 text-rose-600" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">SLA Performance</h3>
+              <p className="text-xs text-gray-500">Breached versus within-target incidents</p>
+            </div>
+          </div>
+          {aiSummary ? (
+            <div className="h-72">
+              <ResponsiveContainer width="100%" height="100%">
+                <RePieChart>
+                  <Pie data={slaData} dataKey="value" nameKey="name" innerRadius={60} outerRadius={90} paddingAngle={4}>
+                    {slaData.map((entry, index) => (
+                      <Cell key={entry.name} fill={index === 0 ? '#ef4444' : '#14b8a6'} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                  <Legend />
+                </RePieChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-12 text-center text-sm text-gray-500">
+              {summaryError || 'No SLA data available yet.'}
+            </div>
+          )}
+        </GlassCard>
+
+        <GlassCard className="p-6 bg-gradient-to-br from-white to-violet-50 border-violet-100">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2 bg-violet-100 rounded-lg">
+              <Repeat className="w-5 h-5 text-violet-600" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">Recurring Issues</h3>
+              <p className="text-xs text-gray-500">Patterns that suggest preventive maintenance opportunities</p>
+            </div>
+          </div>
+          {recurringIssuesData.length > 0 ? (
+            <div className="space-y-3">
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <ReBarChart data={recurringIssuesData} layout="vertical" margin={{ left: 10, right: 10 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
+                    <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={120} />
+                    <Tooltip />
+                    <Bar dataKey="count" fill="#7c3aed" radius={[0, 8, 8, 0]} />
+                  </ReBarChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="space-y-2">
+                {(aiSummary?.recurringIssues || []).slice(0, 3).map((item) => (
+                  <div key={`${item.category}-${item.property}`} className="rounded-xl border border-violet-100 bg-white px-3 py-3">
+                    <div className="text-sm font-semibold text-gray-900">{item.category} at {item.property}</div>
+                    <div className="mt-1 text-xs text-gray-600">{item.prediction}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-12 text-center text-sm text-gray-500">
+              {summaryError || 'No recurring issue pattern detected yet.'}
+            </div>
+          )}
+        </GlassCard>
+
+        <GlassCard className="p-6 bg-gradient-to-br from-white to-emerald-50 border-emerald-100">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2 bg-emerald-100 rounded-lg">
+              <Clock className="w-5 h-5 text-emerald-600" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">Technician Resolution Speed</h3>
+              <p className="text-xs text-gray-500">Lower resolution time means faster issue closure</p>
+            </div>
+          </div>
+          {technicianSpeedData.length > 0 ? (
+            <div className="h-72">
+              <ResponsiveContainer width="100%" height="100%">
+                <ReBarChart data={technicianSpeedData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                  <YAxis tick={{ fontSize: 11 }} />
+                  <Tooltip />
+                  <Bar dataKey="hours" fill="#14b8a6" radius={[8, 8, 0, 0]}>
+                    {technicianSpeedData.map((entry, index) => (
+                      <Cell key={entry.name} fill={chartColors[index % chartColors.length]} />
+                    ))}
+                  </Bar>
+                </ReBarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-12 text-center text-sm text-gray-500">
+              {summaryError || 'Not enough technician performance data yet.'}
+            </div>
+          )}
+        </GlassCard>
+      </div>
     </div>
   );
 };

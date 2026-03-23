@@ -46,6 +46,7 @@ export function WorkOrderForm({
     asset?.name ||
     asset?.title ||
     asset?.assetName ||
+    asset?.serialNumber ||
     asset?.tag ||
     'Unnamed asset'
   );
@@ -56,6 +57,19 @@ export function WorkOrderForm({
     property?.fullAddress ||
     ''
   );
+
+  const getAssetLocationLabel = (asset) => {
+    if (!asset) return '';
+    if (typeof asset.location === 'string') return asset.location;
+    if (asset.location?.branchName) return `${asset.location.branchName} (Branch)`;
+    return [
+      asset.property?.name,
+      asset.location?.building,
+      asset.location?.floor,
+      asset.location?.room,
+      asset.location?.block
+    ].filter(Boolean).join(' - ');
+  };
 
   useEffect(() => {
     let active = true;
@@ -139,7 +153,16 @@ export function WorkOrderForm({
 
   const filteredAssets = useMemo(() => {
     if (!form.propertyId) return assets;
-    return assets.filter((asset) => String(asset.propertyId || asset.property?.id || asset.property?._id || '') === String(form.propertyId));
+    const selectedProperty = properties.find((property) => String(property.id || property._id) === String(form.propertyId));
+    const selectedPropertyName = String(getPropertyLabel(selectedProperty) || '').trim().toLowerCase();
+    return assets.filter((asset) => {
+      const assetPropertyId = String(asset.propertyId || asset.property?.id || asset.property?._id || '').trim();
+      if (assetPropertyId && assetPropertyId === String(form.propertyId)) return true;
+      const assetPropertyName = String(asset.property?.name || asset.propertyName || '').trim().toLowerCase();
+      if (selectedPropertyName && assetPropertyName && assetPropertyName === selectedPropertyName) return true;
+      const assetLocationName = String(asset.location?.branchName || asset.location?.building || asset.location || '').trim().toLowerCase();
+      return Boolean(selectedPropertyName && assetLocationName && assetLocationName.includes(selectedPropertyName));
+    });
   }, [assets, form.propertyId]);
 
   const filteredTechnicians = useMemo(() => {
@@ -169,11 +192,7 @@ export function WorkOrderForm({
 
       if (name === 'assetId') {
         const selectedAsset = assets.find((asset) => String(asset.id || asset._id) === String(value));
-        const assetLocation = [
-          selectedAsset?.location?.building,
-          selectedAsset?.location?.floor,
-          selectedAsset?.location?.room
-        ].filter(Boolean).join(' - ');
+        const assetLocation = getAssetLocationLabel(selectedAsset);
         return {
           ...prev,
           assetId: value,
@@ -412,13 +431,22 @@ export function WorkOrderForm({
                       onChange={handleChange}
                       className="mt-2 w-full rounded-xl glass-input px-3 py-2"
                     >
-                      <option value="">Select company asset</option>
+                      <option value="">
+                        {filteredAssets.length ? `Select company asset (${filteredAssets.length})` : 'No company assets found'}
+                      </option>
                       {filteredAssets.map((asset) => (
                         <option key={asset.id || asset._id} value={asset.id || asset._id}>
-                          {getAssetLabel(asset)}
+                          {[getAssetLabel(asset), getAssetLocationLabel(asset)].filter(Boolean).join(' - ')}
                         </option>
                       ))}
                     </select>
+                    {filteredAssets.length === 0 && (
+                      <div className="mt-2 text-xs text-slate-500">
+                        {form.propertyId
+                          ? 'No assets are linked to this location yet. You can still submit the request without an asset.'
+                          : 'All company assets will appear here once they are available.'}
+                      </div>
+                    )}
                   </div>
                 </div>
 

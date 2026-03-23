@@ -12,7 +12,7 @@ import { useLanguage, useTranslation } from "../i18n/LanguageContext";
  * - user: { name, role } (optional, for dashboards)
  * - className: Extra classes
  */
-export default function Header({ title, subtitle, right, user, className = "" }) {
+export default function Header({ title, subtitle, right, user, className = "", onNotificationNavigate }) {
   const { language, setLanguage, languages } = useLanguage();
   const { t } = useTranslation();
   // Role label mapping
@@ -73,6 +73,24 @@ export default function Header({ title, subtitle, right, user, className = "" })
     } catch (err) {
       console.error("Failed to mark all as read:", err);
     }
+  };
+
+  const handleNotificationNavigate = async (notification) => {
+    if (!notification) return;
+    if (!notification.read) {
+      await markAsRead(notification.id);
+    }
+    if (typeof onNotificationNavigate === "function") {
+      const handled = onNotificationNavigate(notification);
+      if (handled) {
+        setShowNotifications(false);
+        return;
+      }
+    }
+    if (notification.link) {
+      window.location.href = notification.link;
+    }
+    setShowNotifications(false);
   };
 
   const unreadCount = notifications.filter(n => !n.read).length;
@@ -143,14 +161,14 @@ export default function Header({ title, subtitle, right, user, className = "" })
                                 </button>
                               )}
                             </div>
-                            {n.link && (
-                              <a
-                                href={n.link}
+                            {(n.link || typeof onNotificationNavigate === "function") && (
+                              <button
+                                type="button"
                                 className="mt-3 flex items-center gap-1.5 text-[10px] font-bold text-indigo-600 hover:text-indigo-700 uppercase tracking-wider"
-                                onClick={() => markAsRead(n.id)}
+                                onClick={() => handleNotificationNavigate(n)}
                               >
                                 View Details <ExternalLink className="w-3 h-3" />
-                              </a>
+                              </button>
                             )}
                           </div>
                         ))}

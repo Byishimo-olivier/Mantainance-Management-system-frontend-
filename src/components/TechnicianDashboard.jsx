@@ -1,10 +1,11 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import backgroundVideo from "../assets/136906-765457769_small.mp4";
 import api from "../api/axios";
 import { getImageUrl } from '../utils/imageUrl';
 import { useNavigate } from 'react-router-dom';
 import Header from "./Header";
 import { useTranslation } from "../i18n/LanguageContext";
+import { MessageSquare } from "lucide-react";
 
 const buildMentionHandle = (person) => {
   const emailLocal = String(person?.email || '').split('@')[0].trim().toLowerCase();
@@ -31,6 +32,273 @@ const applyMentionToText = (value, context, person) => {
   const text = String(value || '');
   return `${text.slice(0, context.start)}@${handle} ${text.slice(context.end)}`;
 };
+
+const extractDirectMessageContacts = (job, currentUserId = '') => {
+  if (!job) return [];
+  const seen = new Set();
+  const contacts = [];
+  const currentId = String(currentUserId || '');
+
+  const addContact = (raw, sourceLabel = '') => {
+    const id = String(
+      raw?.recipientUserId ||
+      raw?.userId ||
+      raw?.requestorId ||
+      raw?.id ||
+      raw?._id ||
+      ''
+    ).trim();
+    if (!id || id === currentId || seen.has(id)) return;
+    seen.add(id);
+    contacts.push({
+      id,
+      name: String(
+        raw?.recipientName ||
+        raw?.requestorName ||
+        raw?.name ||
+        raw?.fullName ||
+        raw?.userName ||
+        raw?.email ||
+        'Team member'
+      ).trim(),
+      email: String(raw?.email || raw?.requestorEmail || '').trim(),
+      role: String(raw?.role || raw?.recipientRole || '').trim(),
+      sourceLabel
+    });
+  };
+
+  addContact({
+    requestorId: job.requestorId || job.userId,
+    requestorName: job.requestorName || job.name || job.createdByName,
+    requestorEmail: job.requestorEmail || job.email
+  }, 'Requestor');
+
+  addContact(job.requestor, 'Requestor');
+  addContact(job.createdBy, 'Created By');
+  addContact(job.manager, 'Manager');
+  addContact(job.propertyManager, 'Property Manager');
+
+  addContact({
+    id: job.createdById,
+    name: job.createdByName,
+    email: job.createdByEmail,
+    role: job.createdByRole
+  }, 'Created By');
+
+  addContact({
+    id: job.managerId,
+    name: job.managerName,
+    email: job.managerEmail,
+    role: job.managerRole
+  }, 'Manager');
+
+  addContact({
+    id: job.propertyManagerId,
+    name: job.propertyManagerName,
+    email: job.propertyManagerEmail,
+    role: job.propertyManagerRole
+  }, 'Property Manager');
+
+  (Array.isArray(job.assignees) ? job.assignees : []).forEach((entry) => addContact(entry, 'Assignee'));
+  (Array.isArray(job.additionalResponsibleWorkers) ? job.additionalResponsibleWorkers : []).forEach((entry) => addContact(entry, 'Team'));
+
+  return contacts;
+};
+
+const parseDirectMessageSenderName = (notification) => {
+  const title = String(notification?.title || '').trim();
+  const match = title.match(/^Private message from\s+(.+)$/i);
+  return match?.[1]?.trim() || '';
+};
+
+const parseDirectMessageRecipientName = (notification) => {
+  const title = String(notification?.title || '').trim();
+  const match = title.match(/^Private message to\s+(.+)$/i);
+  return match?.[1]?.trim() || '';
+};
+
+const getDirectMessageTargetId = (notification) => {
+  const rawLink = String(notification?.link || '').trim();
+  if (!rawLink) return '';
+  try {
+    const queryString = rawLink.includes('?') ? rawLink.slice(rawLink.indexOf('?')) : '';
+    const params = new URLSearchParams(queryString);
+    return String(params.get('dm') || '').trim();
+  } catch {
+    return '';
+  }
+};
+
+function TechnicianMessageCenter({
+  id,
+  textareaId,
+  contacts,
+  recipientId,
+  onRecipientChange,
+  onQuickSelect,
+  selectedRecipient,
+  thread,
+  draft,
+  onDraftChange,
+  onSend,
+  sending
+}) {
+  return (
+    <div id={id} className="glass-surface rounded-3xl shadow-lg border border-white/50 p-6">
+      <div className="flex items-center justify-between mb-5">
+        <div>
+          <h2 className="text-2xl font-black text-slate-900">Private Messages</h2>
+          <p className="text-sm text-slate-500 mt-1">See the messages you sent and send a new one to people linked to your work orders.</p>
+        </div>
+        <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-black uppercase">
+          {contacts.length} Contacts
+        </span>
+      </div>
+      {contacts.length === 0 ? (
+        <div className="rounded-2xl border-2 border-dashed border-white/70 bg-white/30 px-4 py-8 text-center text-slate-500">
+          No available contacts yet. Open a work order that has a requestor or manager linked to it.
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
+            <div>
+              <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Send To</label>
+              <select
+                value={recipientId}
+                onChange={(e) => onRecipientChange(e.target.value)}
+                className="mt-2 w-full rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm text-slate-800 outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-200/60"
+              >
+                {contacts.map((contact) => (
+                  <option key={contact.id} value={contact.id}>
+                    {contact.name}{contact.sourceLabel ? ` - ${contact.sourceLabel}` : ''}{contact.role ? ` (${contact.role})` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex flex-wrap items-end gap-2">
+              {contacts.slice(0, 3).map((contact) => (
+                <button
+                  key={`quick-contact-${contact.id}`}
+                  type="button"
+                  onClick={() => onQuickSelect(contact)}
+                  className={`rounded-full px-3 py-2 text-xs font-semibold transition ${
+                    String(recipientId) === String(contact.id)
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-white/80 text-slate-700 hover:bg-white'
+                  }`}
+                >
+                  {contact.name}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50 via-white to-white">
+            <div className="border-b border-slate-100 px-4 py-3">
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Conversation</div>
+              <div className="mt-1 text-sm font-semibold text-slate-900">
+                {selectedRecipient?.name || 'Select a contact'}
+              </div>
+              {selectedRecipient?.sourceLabel && (
+                <div className="text-xs text-slate-500">{selectedRecipient.sourceLabel}</div>
+              )}
+            </div>
+            <div className="max-h-[280px] space-y-3 overflow-y-auto px-4 py-4">
+              {thread.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-8 text-center">
+                  <div className="text-sm font-semibold text-slate-700">No sent messages yet</div>
+                  <div className="mt-1 text-xs text-slate-500">Send your first private message to start this thread.</div>
+                </div>
+              ) : (
+                thread.map((entry, index) => (
+                  <div key={entry.id || index} className={`flex ${entry.direction === 'outgoing' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[85%] rounded-2xl px-4 py-3 shadow-sm ${
+                      entry.direction === 'outgoing'
+                        ? 'bg-emerald-600 text-white'
+                        : 'border border-slate-200 bg-white text-slate-900'
+                    }`}>
+                      <div className={`text-[11px] font-semibold ${entry.direction === 'outgoing' ? 'text-emerald-50' : 'text-slate-500'}`}>
+                        {entry.sender || (entry.direction === 'outgoing' ? 'You' : selectedRecipient?.name || 'Contact')}
+                      </div>
+                      <div className="mt-1 whitespace-pre-wrap text-sm">{entry.text || entry.message}</div>
+                      <div className={`mt-2 text-[10px] ${entry.direction === 'outgoing' ? 'text-emerald-100' : 'text-slate-400'}`}>
+                        {entry.timestamp ? new Date(entry.timestamp).toLocaleString() : ''}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-semibold text-slate-700">Message</label>
+            <textarea
+              id={textareaId}
+              value={draft}
+              onChange={(e) => onDraftChange(e.target.value)}
+              rows={5}
+              placeholder="Write a private message about the work order, follow-up, or anything only that person should see..."
+              className="w-full rounded-2xl border border-white/60 bg-white/70 px-4 py-3 text-sm text-slate-800 outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-200/60"
+            />
+          </div>
+
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-xs text-slate-500">
+              These messages are private. Shared work updates should stay in the work-order comments.
+            </div>
+            <button
+              type="button"
+              onClick={onSend}
+              disabled={sending || !String(draft || '').trim() || !recipientId}
+              className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-60"
+            >
+              {sending ? 'Sending...' : 'Send Message'}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TechnicianJobMessageActions({ contacts, activeRecipientId, onSelectRecipient }) {
+  return (
+    <div className="border-t pt-4">
+      <div className="mb-3 flex items-center justify-between">
+        <div>
+          <h3 className="font-semibold text-slate-700">Private Message</h3>
+          <p className="text-xs text-slate-500">Send a direct message to someone linked to this work order.</p>
+        </div>
+        <span className="rounded-full bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500 shadow-sm">
+          {contacts.length} people
+        </span>
+      </div>
+      {contacts.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-6 text-sm text-slate-500">
+          No direct-message contact is linked to this work order yet.
+        </div>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {contacts.map((contact) => (
+            <button
+              key={`selected-job-contact-${contact.id}`}
+              type="button"
+              onClick={() => onSelectRecipient(contact)}
+              className={`rounded-full px-3 py-2 text-sm font-semibold transition ${
+                String(activeRecipientId) === String(contact.id)
+                  ? 'bg-emerald-600 text-white'
+                  : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              Message {contact.name}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // BEFORE EVIDENCE FORM WITH START DETAILS
 function BeforeEvidenceForm({ issueId, onSuccess, hasExistingImage }) {
@@ -127,6 +395,7 @@ function BeforeEvidenceForm({ issueId, onSuccess, hasExistingImage }) {
 function AfterEvidenceForm({ issueId, onSuccess }) {
   const [afterImage, setAfterImage] = React.useState(null);
   const [completionDetails, setCompletionDetails] = React.useState("");
+  const [feedback, setFeedback] = React.useState("");
   const [loading, setLoading] = React.useState(false);
 
   const handleFileChange = (e) => {
@@ -141,6 +410,7 @@ function AfterEvidenceForm({ issueId, onSuccess }) {
     const formData = new FormData();
     if (afterImage) formData.append("afterImage", afterImage);
     formData.append("address", completionDetails);
+    formData.append("feedback", feedback);
     try {
       // Authorization handled by interceptor. 
       // Important: Allow axios/browser to set Content-Type for FormData to include boundary
@@ -151,6 +421,7 @@ function AfterEvidenceForm({ issueId, onSuccess }) {
       );
       setAfterImage(null);
       setCompletionDetails("");
+      setFeedback("");
       if (onSuccess) onSuccess();
       alert("AFTER evidence submitted. Status set to Complete.");
       console.log("AFTER evidence response:", response.data);
@@ -163,16 +434,16 @@ function AfterEvidenceForm({ issueId, onSuccess }) {
 
   return (
     <form className="glass-surface-strong rounded-2xl p-6 max-w-lg mx-auto" onSubmit={handleSubmit}>
-      <h2 className="font-semibold text-lg mb-4 text-blue-800">Upload AFTER Evidence</h2>
+      <h2 className="font-semibold text-lg mb-4 text-blue-800">Complete Work Order</h2>
       <div className="mb-4">
         <label className="block text-gray-700 mb-1">Upload AFTER image</label>
         <input
           type="file"
           accept="image/*"
           onChange={handleFileChange}
-          required
           className="w-full text-sm text-slate-600 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-100/70 file:text-blue-700 hover:file:bg-blue-200/80 transition-colors"
         />
+        <p className="text-[10px] text-gray-400 mt-1 italic">Optional. Add a completion photo if you have one.</p>
       </div>
       <div className="mb-4">
         <label className="block text-gray-700 mb-1">Completion Details</label>
@@ -185,12 +456,23 @@ function AfterEvidenceForm({ issueId, onSuccess }) {
           required
         />
       </div>
+      <div className="mb-4">
+        <label className="block text-gray-700 mb-1">Requester Feedback</label>
+        <textarea
+          className="w-full rounded-xl glass-input px-3 py-2 focus:ring-2 focus:ring-blue-300/60 focus:border-blue-400 outline-none"
+          rows="3"
+          value={feedback}
+          onChange={(e) => setFeedback(e.target.value)}
+          placeholder="Write the feedback or completion summary that should be emailed to the requester..."
+          required
+        />
+      </div>
       <button
         type="submit"
         className="w-full glass-surface bg-emerald-500/30 text-white px-6 py-2 rounded-xl font-bold uppercase tracking-widest hover:bg-emerald-500/50 transition-all border border-emerald-400/30"
         disabled={loading}
       >
-        {loading ? "Uploading..." : "Submit AFTER Evidence"}
+        {loading ? "Completing..." : "Complete Work Order"}
       </button>
     </form>
   );
@@ -199,6 +481,7 @@ function AfterEvidenceForm({ issueId, onSuccess }) {
 const TechnicianDashboard = () => {
   const { t } = useTranslation();
   const [jobs, setJobs] = useState([]);
+  const [techSchedules, setTechSchedules] = useState([]);
   const [materialRequests, setMaterialRequests] = useState([]);
   const [user, setUser] = useState({ name: "", id: "" });
   const [showAfterForm, setShowAfterForm] = useState({});
@@ -219,7 +502,20 @@ const TechnicianDashboard = () => {
   const [companyPeople, setCompanyPeople] = useState([]);
   const [mentionCandidates, setMentionCandidates] = useState([]);
   const [mentionContext, setMentionContext] = useState(null);
+  const [startingTimer, setStartingTimer] = useState(false);
+  const [scheduleAt, setScheduleAt] = useState('');
+  const [savingSchedule, setSavingSchedule] = useState(false);
+  const [showCompletionForm, setShowCompletionForm] = useState(false);
+  const [completionForm, setCompletionForm] = useState({ details: '', feedback: '' });
+  const [directMessageThreads, setDirectMessageThreads] = useState({});
+  const [directMessageNotifications, setDirectMessageNotifications] = useState([]);
+  const [directMessageRecipientId, setDirectMessageRecipientId] = useState('');
+  const [directMessageDraft, setDirectMessageDraft] = useState('');
+  const [directMessageSending, setDirectMessageSending] = useState(false);
   const navigate = useNavigate();
+  const userName = user?.name || user?.username || 'Technician';
+  const currentUserId = String(user?._id || user?.id || '');
+  const messageSectionRef = useRef(null);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -378,6 +674,7 @@ const TechnicianDashboard = () => {
       const u = JSON.parse(userStr);
       const res = await api.get(`/api/maintenance-schedules/technician/${u._id || u.id}`);
       const schedules = res.data || [];
+      setTechSchedules(Array.isArray(schedules) ? schedules : []);
 
       const now = new Date();
       const cutoff = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 hours
@@ -420,6 +717,7 @@ const TechnicianDashboard = () => {
       setReminders(upcomingSchedules); // Maintain for any components still using it
     } catch (err) {
       console.warn('Failed to fetch alerts:', err);
+      setTechSchedules([]);
     }
   };
 
@@ -467,6 +765,106 @@ const TechnicianDashboard = () => {
       alert('Could not send chat message');
     } finally {
       setChatSending(false);
+    }
+  };
+
+  const handleStartTimer = async (job) => {
+    if (!job) return;
+    const id = job._id || job.id;
+    const startedAt = new Date().toISOString();
+    const baseChat = Array.isArray(job.chat) ? job.chat : [];
+    const startMessage = {
+      text: 'Work started.',
+      sender: user.name || 'Technician',
+      role: user.role || 'technician',
+      timestamp: startedAt
+    };
+    const chat = [...baseChat, startMessage];
+    try {
+      setStartingTimer(true);
+      await api.put(`/api/issues/${id}`, {
+        status: 'IN PROGRESS',
+        fixTime: startedAt,
+        chat
+      });
+      const nextJob = { ...job, status: 'IN PROGRESS', fixTime: startedAt, chat };
+      setSelectedJob(nextJob);
+      setJobs((prev) => prev.map((entry) => (
+        String(entry._id || entry.id) === String(id)
+          ? { ...entry, status: 'IN PROGRESS', fixTime: startedAt, chat }
+          : entry
+      )));
+      window.dispatchEvent(new CustomEvent('issueStatusUpdated', { detail: { id, status: 'IN PROGRESS', chat } }));
+      await Promise.allSettled([fetchAssignedIssues(), fetchReminders()]);
+    } catch (err) {
+      console.error('Failed to start timer', err);
+      alert('Failed to start timer.');
+    } finally {
+      setStartingTimer(false);
+    }
+  };
+
+  const handleStopTimer = async (job, payload = {}) => {
+    if (!job) return;
+    const id = job._id || job.id;
+    const completedAt = new Date().toISOString();
+    const completionDetails = String(payload.details || '').trim();
+    const feedback = String(payload.feedback || '').trim();
+    const formData = new FormData();
+    formData.append('address', completionDetails);
+    formData.append('feedback', feedback);
+    try {
+      setStartingTimer(true);
+      await api.post(`/api/issues/${id}/evidence/after`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      const completeMessage = {
+        text: 'Work completed.',
+        sender: user.name || 'Technician',
+        role: user.role || 'technician',
+        timestamp: completedAt
+      };
+      const chat = [...(Array.isArray(job.chat) ? job.chat : []), completeMessage];
+      const nextJob = { ...job, status: 'COMPLETED', completedAt, chat };
+      setSelectedJob(nextJob);
+      setShowCompletionForm(false);
+      setCompletionForm({ details: '', feedback: '' });
+      setJobs((prev) => prev.map((entry) => (
+        String(entry._id || entry.id) === String(id)
+          ? { ...entry, status: 'COMPLETED', completedAt, chat }
+          : entry
+      )));
+      window.dispatchEvent(new CustomEvent('issueStatusUpdated', { detail: { id, status: 'COMPLETED', chat } }));
+      await Promise.allSettled([fetchAssignedIssues(), fetchReminders()]);
+    } catch (err) {
+      console.error('Failed to stop timer', err);
+      alert('Failed to stop timer.');
+    } finally {
+      setStartingTimer(false);
+    }
+  };
+
+  const handleSaveSchedule = async () => {
+    if (!selectedJob || !scheduleAt) return;
+    const id = selectedJob._id || selectedJob.id;
+    try {
+      setSavingSchedule(true);
+      await api.put(`/api/issues/${id}`, { fixDeadline: scheduleAt });
+      const nextJob = { ...selectedJob, fixDeadline: scheduleAt };
+      setSelectedJob(nextJob);
+      setJobs((prev) => prev.map((entry) => (
+        String(entry._id || entry.id) === String(id)
+          ? { ...entry, fixDeadline: scheduleAt }
+          : entry
+      )));
+      window.dispatchEvent(new CustomEvent('issueStatusUpdated', { detail: { id, fixDeadline: scheduleAt } }));
+      await Promise.allSettled([fetchAssignedIssues(), fetchReminders()]);
+      alert('Schedule saved.');
+    } catch (err) {
+      console.error('Failed to save schedule', err);
+      alert('Failed to save schedule.');
+    } finally {
+      setSavingSchedule(false);
     }
   };
 
@@ -568,13 +966,17 @@ const TechnicianDashboard = () => {
 
     const fetchDashboardSideData = async () => {
       try {
-        const [noteRes, mentionsRes] = await Promise.all([
+        const [noteRes, allNotificationsRes] = await Promise.all([
           api.get('/api/private-notes/me', { params: { scope: 'technician-dashboard' } }),
-          api.get('/api/notifications', { params: { type: 'mention', limit: 6 } })
+          api.get('/api/notifications', { params: { limit: 100 } })
         ]);
         if (cancelled) return;
+        const allNotifications = Array.isArray(allNotificationsRes?.data) ? allNotificationsRes.data : [];
         setPrivateNote(noteRes?.data?.content || '');
-        setMentionNotifications(Array.isArray(mentionsRes?.data) ? mentionsRes.data : []);
+        setMentionNotifications(allNotifications.filter((entry) => String(entry?.type || '').toLowerCase() === 'mention').slice(0, 6));
+        setDirectMessageNotifications(
+          allNotifications.filter((entry) => String(entry?.type || '').toLowerCase().startsWith('direct_message'))
+        );
       } catch (err) {
         console.error('Failed to load technician dashboard side data', err);
       } finally {
@@ -583,18 +985,15 @@ const TechnicianDashboard = () => {
     };
 
     fetchDashboardSideData();
-    return () => { cancelled = true; };
+    const interval = setInterval(fetchDashboardSideData, 30000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, [user]);
 
   useEffect(() => {
-    const userId = user?._id || user?.id;
-    if (!userId) return;
-    api.get('/api/users')
-      .then((res) => setCompanyPeople(Array.isArray(res.data) ? res.data : []))
-      .catch((err) => {
-        console.error('Failed to load people for mentions', err);
-        setCompanyPeople([]);
-      });
+    setCompanyPeople([]);
   }, [user]);
 
   useEffect(() => {
@@ -654,6 +1053,7 @@ const TechnicianDashboard = () => {
         return {
           id: normalized.id || normalized._id || `${job._id || job.id}-task-${idx}`,
           jobId: job._id || job.id,
+          job,
           jobTitle: job.title || 'Work order',
           title: normalized.title || normalized.text || normalized.name || `Task ${idx + 1}`,
           status,
@@ -666,9 +1066,256 @@ const TechnicianDashboard = () => {
     });
   }, [jobs]);
 
+  const canStartTimerForJob = (job) => {
+    const status = String(getJobStatus(job) || '').toUpperCase();
+    return ['PENDING', 'ASSIGNED', 'OVERDUE', 'APPROVED', 'OPEN'].includes(status);
+  };
+
+  const canStopTimerForJob = (job) => {
+    const status = String(getJobStatus(job) || '').toUpperCase();
+    return ['IN PROGRESS', 'IN_PROGRESS'].includes(status);
+  };
+
+  useEffect(() => {
+    if (!selectedJob) {
+      setScheduleAt('');
+      setShowCompletionForm(false);
+      setCompletionForm({ details: '', feedback: '' });
+      return;
+    }
+    const rawValue = selectedJob.fixDeadline || selectedJob.dueDate || selectedJob.scheduledFor || '';
+    if (!rawValue) {
+      setScheduleAt('');
+      return;
+    }
+    const parsed = new Date(rawValue);
+    if (Number.isNaN(parsed.getTime())) {
+      setScheduleAt('');
+      return;
+    }
+    const pad = (value) => String(value).padStart(2, '0');
+    setScheduleAt(`${parsed.getFullYear()}-${pad(parsed.getMonth() + 1)}-${pad(parsed.getDate())}T${pad(parsed.getHours())}:${pad(parsed.getMinutes())}`);
+  }, [selectedJob]);
+
+  const selectedJobTasks = useMemo(() => {
+    if (!selectedJob) return [];
+    const rawTasks = Array.isArray(selectedJob?.tasks) && selectedJob.tasks.length
+      ? selectedJob.tasks
+      : Array.isArray(selectedJob?.taskList) && selectedJob.taskList.length
+        ? selectedJob.taskList
+        : Array.isArray(selectedJob?.checklist)
+          ? selectedJob.checklist
+          : [];
+    return rawTasks.map((task, idx) => {
+      const normalized = typeof task === 'string' ? { title: task } : (task || {});
+      const status = String(
+        normalized.status ||
+        (normalized.completed ? 'COMPLETED' : normalized.done ? 'COMPLETED' : 'OPEN')
+      ).toUpperCase();
+      return {
+        id: normalized.id || normalized._id || `${selectedJob._id || selectedJob.id}-selected-task-${idx}`,
+        title: normalized.title || normalized.text || normalized.name || `Task ${idx + 1}`,
+        status,
+        assignee: normalized.assignedTo || normalized.assignee || normalized.owner || '',
+        dueDate: normalized.dueDate || normalized.deadline || normalized.due || selectedJob.fixDeadline || selectedJob.dueDate || null,
+        completed: status.includes('COMPLETE')
+      };
+    });
+  }, [selectedJob]);
+
+  const selectedJobSchedules = useMemo(() => {
+    if (!selectedJob) return [];
+    const selectedJobId = String(selectedJob._id || selectedJob.id || '');
+    const selectedAssetId = String(selectedJob.assetId || selectedJob.asset?._id || selectedJob.asset?.id || '');
+    const selectedPropertyId = String(selectedJob.propertyId || selectedJob.property?._id || selectedJob.property?.id || '');
+    const selectedTitle = String(selectedJob.title || '').trim().toLowerCase();
+    return (Array.isArray(techSchedules) ? techSchedules : []).filter((schedule) => {
+      const scheduleAssetIds = Array.isArray(schedule.assets)
+        ? schedule.assets.map((asset) => String(asset?._id || asset?.id || asset))
+        : String(schedule.assets || '').split(',').map((value) => value.trim()).filter(Boolean);
+      const scheduleAssetId = String(schedule.assetId || schedule.asset?._id || schedule.asset?.id || '');
+      const schedulePropertyId = String(schedule.propertyId || schedule.property?._id || schedule.property?.id || '');
+      const scheduleName = String(schedule.name || schedule.title || '').trim().toLowerCase();
+      const linkedWorkOrderId = String(schedule.workOrderId || schedule.issueId || '').trim();
+      return (
+        (selectedJobId && linkedWorkOrderId && linkedWorkOrderId === selectedJobId) ||
+        (selectedAssetId && (scheduleAssetId === selectedAssetId || scheduleAssetIds.includes(selectedAssetId))) ||
+        (selectedPropertyId && schedulePropertyId === selectedPropertyId) ||
+        (selectedTitle && scheduleName && (selectedTitle.includes(scheduleName) || scheduleName.includes(selectedTitle)))
+      );
+    });
+  }, [selectedJob, techSchedules]);
+
   const mentionItems = useMemo(() => (
     Array.isArray(mentionNotifications) ? mentionNotifications : []
   ), [mentionNotifications]);
+
+  const messageContacts = useMemo(() => {
+    const byId = new Map();
+    jobs.forEach((job) => {
+      extractDirectMessageContacts(job, currentUserId).forEach((contact) => {
+        if (!contact?.id || byId.has(contact.id)) return;
+        byId.set(contact.id, contact);
+      });
+    });
+    (Array.isArray(directMessageNotifications) ? directMessageNotifications : []).forEach((notification) => {
+      const targetId = getDirectMessageTargetId(notification);
+      if (!targetId || byId.has(targetId) || targetId === currentUserId) return;
+      const incomingName = parseDirectMessageSenderName(notification);
+      const outgoingName = parseDirectMessageRecipientName(notification);
+      const fallbackName = incomingName || outgoingName || 'Message Contact';
+      byId.set(targetId, {
+        id: targetId,
+        name: fallbackName,
+        email: '',
+        role: '',
+        sourceLabel: 'Messages'
+      });
+    });
+    return Array.from(byId.values());
+  }, [jobs, currentUserId, directMessageNotifications]);
+
+  const selectedJobContacts = useMemo(
+    () => extractDirectMessageContacts(selectedJob, currentUserId),
+    [selectedJob, currentUserId]
+  );
+
+  const selectedDirectRecipient = useMemo(
+    () => messageContacts.find((contact) => String(contact.id) === String(directMessageRecipientId)) || null,
+    [messageContacts, directMessageRecipientId]
+  );
+
+  const incomingDirectMessageThreads = useMemo(() => {
+    const threadMap = {};
+    const contactsById = new Map(messageContacts.map((contact) => [String(contact.id), contact]));
+
+    (Array.isArray(directMessageNotifications) ? directMessageNotifications : []).forEach((notification) => {
+      const type = String(notification?.type || '').toLowerCase();
+      const contactId = getDirectMessageTargetId(notification);
+      if (!contactId || !contactsById.has(contactId)) return;
+      const senderName = type === 'direct_message_sent'
+        ? userName
+        : (parseDirectMessageSenderName(notification) || contactsById.get(contactId)?.name || 'Contact');
+      const nextEntry = {
+        id: `${type}-${notification.id}`,
+        sender: senderName,
+        text: notification.message || '',
+        timestamp: notification.createdAt || notification.timestamp || new Date().toISOString(),
+        direction: type === 'direct_message_sent' ? 'outgoing' : 'incoming',
+        read: notification.read
+      };
+      threadMap[contactId] = [...(threadMap[contactId] || []), nextEntry];
+    });
+
+    return threadMap;
+  }, [directMessageNotifications, messageContacts, userName]);
+
+  const selectedDirectThread = useMemo(() => {
+    const key = String(directMessageRecipientId);
+    const liveEntries = directMessageThreads[key] || [];
+    const persistedEntries = incomingDirectMessageThreads[key] || [];
+    const merged = persistedEntries.length > 0 ? persistedEntries : liveEntries;
+    const deduped = merged.filter((entry, index, list) => {
+      const signature = `${entry.direction}|${entry.sender}|${entry.text}|${entry.timestamp}`;
+      return list.findIndex((candidate) => `${candidate.direction}|${candidate.sender}|${candidate.text}|${candidate.timestamp}` === signature) === index;
+    });
+    return deduped.sort((a, b) => {
+      const aTime = new Date(a.timestamp || 0).getTime();
+      const bTime = new Date(b.timestamp || 0).getTime();
+      return aTime - bTime;
+    });
+  }, [directMessageThreads, incomingDirectMessageThreads, directMessageRecipientId]);
+
+  useEffect(() => {
+    if (!messageContacts.length) {
+      setDirectMessageRecipientId('');
+      return;
+    }
+    const stillExists = messageContacts.some((contact) => String(contact.id) === String(directMessageRecipientId));
+    if (!stillExists) {
+      setDirectMessageRecipientId(String(messageContacts[0].id));
+    }
+  }, [messageContacts, directMessageRecipientId]);
+
+  const openDirectMessageComposer = (contact) => {
+    if (!contact?.id) {
+      alert('No recipient is available for private message.');
+      return;
+    }
+    setDirectMessageRecipientId(String(contact.id));
+    setDirectMessageDraft('');
+  };
+
+  const handleSendDirectMessage = async () => {
+    const recipientId = String(directMessageRecipientId || '').trim();
+    const text = String(directMessageDraft || '').trim();
+    if (!recipientId) {
+      alert('Choose who you want to message first.');
+      return;
+    }
+    if (!text) return;
+    try {
+      setDirectMessageSending(true);
+      const outgoingMessage = {
+        id: `tech-dm-${Date.now()}`,
+        sender: userName,
+        text,
+        timestamp: new Date().toISOString(),
+        direction: 'outgoing'
+      };
+      await api.post('/api/notifications/direct-message', {
+        recipientUserId: recipientId,
+        recipientName: selectedDirectRecipient?.name || '',
+        message: text,
+        title: `Private message from ${userName}`,
+        link: '/technician-dashboard'
+      });
+      setDirectMessageThreads((prev) => {
+        const key = String(recipientId);
+        return { ...prev, [key]: [...(prev[key] || []), outgoingMessage] };
+      });
+      try {
+        const notificationsRes = await api.get('/api/notifications', { params: { limit: 100 } });
+        const allNotifications = Array.isArray(notificationsRes?.data) ? notificationsRes.data : [];
+        setMentionNotifications(allNotifications.filter((entry) => String(entry?.type || '').toLowerCase() === 'mention').slice(0, 6));
+        setDirectMessageNotifications(
+          allNotifications.filter((entry) => String(entry?.type || '').toLowerCase().startsWith('direct_message'))
+        );
+        setDirectMessageThreads((prev) => ({ ...prev, [key]: [] }));
+      } catch (refreshErr) {
+        console.error('Failed to refresh direct messages after send', refreshErr);
+      }
+      setDirectMessageDraft('');
+    } catch (err) {
+      console.error('Failed to send direct message', err);
+      alert('Failed to send private message: ' + (err?.response?.data?.message || err.message));
+    } finally {
+      setDirectMessageSending(false);
+    }
+  };
+
+  const focusMessageCenter = (recipientId = '') => {
+    if (recipientId) {
+      setDirectMessageRecipientId(String(recipientId));
+    }
+    requestAnimationFrame(() => {
+      const section = messageSectionRef.current || document.getElementById('technician-message-center');
+      if (section) {
+        section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+      const composer = document.getElementById('technician-message-draft');
+      if (composer) {
+        composer.focus();
+      }
+    });
+  };
+
+  const handleNotificationNavigate = (notification) => {
+    const type = String(notification?.type || '').toLowerCase();
+    if (!type.startsWith('direct_message')) return false;
+    focusMessageCenter(getDirectMessageTargetId(notification) || '');
+    return true;
+  };
 
   return (
     <div className="glass-theme-blue min-h-screen text-slate-900 overflow-hidden relative" style={{ fontFamily: "'DM Sans', 'Segoe UI', system-ui, sans-serif" }}>
@@ -789,8 +1436,16 @@ const TechnicianDashboard = () => {
         title={t("technician.title")}
         subtitle={t("technician.subtitle", { name: user.name || "" })}
         user={user}
+        onNotificationNavigate={handleNotificationNavigate}
         right={
           <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={() => focusMessageCenter()}
+              className="px-4 py-2 glass-ghost text-slate-700 rounded-full font-semibold hover:bg-white/80 transition inline-flex items-center gap-2"
+            >
+              <MessageSquare className="w-4 h-4" />
+              Messages
+            </button>
             <button
               onClick={toggleMaterialRequestForm}
               className="px-6 py-2 glass-surface bg-blue-500/30 text-white rounded-full font-bold uppercase tracking-widest hover:bg-blue-500/50 transition-all border border-blue-400/20 shadow-lg"
@@ -966,6 +1621,37 @@ const TechnicianDashboard = () => {
                     {getJobStatus(job).replace(/_/g, ' ')}
                   </span>
                 </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {canStartTimerForJob(job) && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleStartTimer(job);
+                      }}
+                      disabled={startingTimer}
+                      className="rounded-full bg-blue-600 px-3 py-1.5 text-[11px] font-black uppercase tracking-wide text-white hover:bg-blue-700 disabled:opacity-60"
+                    >
+                      {startingTimer ? 'Starting...' : 'Start Timer'}
+                    </button>
+                  )}
+                  {canStopTimerForJob(job) && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleStopTimer(job);
+                      }}
+                      disabled={startingTimer}
+                      className="rounded-full bg-emerald-600 px-3 py-1.5 text-[11px] font-black uppercase tracking-wide text-white hover:bg-emerald-700 disabled:opacity-60"
+                    >
+                      {startingTimer ? 'Stopping...' : 'Stop Timer'}
+                    </button>
+                  )}
+                  <span className="rounded-full bg-white/70 px-3 py-1.5 text-[11px] font-semibold text-slate-600 border border-white/60">
+                    Open details
+                  </span>
+                </div>
               </button>
             ))}
             {jobs.length === 0 && (
@@ -988,11 +1674,12 @@ const TechnicianDashboard = () => {
           </div>
           <div className="space-y-3">
             {myTasks.slice(0, 6).map((task) => (
-              <div key={task.id} className="rounded-2xl border border-white/60 bg-white/50 px-4 py-3">
+              <button key={task.id} type="button" onClick={() => handleViewJob(task.job)} className="w-full text-left rounded-2xl border border-white/60 bg-white/50 px-4 py-3 hover:border-blue-200 hover:shadow-md transition">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-sm font-bold text-slate-900 truncate">{task.title}</p>
                     <p className="text-xs text-slate-500 mt-1 truncate">{task.jobTitle}{task.location ? ` • ${task.location}` : ''}</p>
+                    <p className="text-[11px] text-blue-600 mt-2 font-semibold">Open work order details</p>
                   </div>
                   <span className={`shrink-0 px-2 py-1 rounded-full text-[10px] font-black uppercase ${
                     task.completed
@@ -1004,7 +1691,7 @@ const TechnicianDashboard = () => {
                     {task.completed ? 'Completed' : task.overdue ? 'Overdue' : 'Open'}
                   </span>
                 </div>
-              </div>
+              </button>
             ))}
             {myTasks.length === 0 && (
               <div className="rounded-2xl border-2 border-dashed border-white/70 bg-white/30 px-4 py-8 text-center text-slate-500">
@@ -1024,6 +1711,23 @@ const TechnicianDashboard = () => {
             onChange={(e) => setPrivateNote(e.target.value)}
             placeholder="Write your to-do list, follow-ups, or personal reminders here..."
             className="w-full min-h-[220px] rounded-2xl border border-white/60 bg-white/55 px-4 py-4 text-sm text-slate-700 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-200/60"
+          />
+        </div>
+
+        <div ref={messageSectionRef}>
+          <TechnicianMessageCenter
+            id="technician-message-center"
+            textareaId="technician-message-draft"
+            contacts={messageContacts}
+            recipientId={directMessageRecipientId}
+            onRecipientChange={setDirectMessageRecipientId}
+            onQuickSelect={openDirectMessageComposer}
+            selectedRecipient={selectedDirectRecipient}
+            thread={selectedDirectThread}
+            draft={directMessageDraft}
+            onDraftChange={setDirectMessageDraft}
+            onSend={handleSendDirectMessage}
+            sending={directMessageSending}
           />
         </div>
 
@@ -1320,7 +2024,7 @@ const TechnicianDashboard = () => {
       {/* Issue Details Modal */}
       {selectedJob && (
         <div className="fixed inset-0 bg-slate-900/40 flex items-center justify-center p-4 z-50 backdrop-blur-md">
-          <div className="glass-surface-strong rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+          <div className="glass-surface-strong rounded-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
             <div className="p-6">
               <div className="flex justify-between items-start mb-4">
                 <div>
@@ -1335,6 +2039,79 @@ const TechnicianDashboard = () => {
                 </button>
               </div>
 
+              <div className="mb-5 flex flex-wrap gap-3 rounded-2xl border border-white/60 bg-white/55 p-4">
+                {canStartTimerForJob(selectedJob) && (
+                  <button
+                    onClick={() => handleStartTimer(selectedJob)}
+                    disabled={startingTimer}
+                    className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-black uppercase tracking-wide text-white hover:bg-blue-700 disabled:opacity-60"
+                  >
+                    {startingTimer ? 'Starting...' : 'Start Timer'}
+                  </button>
+                )}
+                {canStopTimerForJob(selectedJob) && (
+                  <button
+                    onClick={() => setShowCompletionForm((current) => !current)}
+                    disabled={startingTimer}
+                    className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-black uppercase tracking-wide text-white hover:bg-emerald-700 disabled:opacity-60"
+                  >
+                    {showCompletionForm ? 'Hide Completion Form' : 'Stop Timer'}
+                  </button>
+                )}
+                {/* <div className="flex items-center text-xs font-semibold text-slate-500">
+                  Start makes the work order IN PROGRESS. Stop makes it COMPLETED.
+                </div> */}
+              </div>
+
+              {showCompletionForm && canStopTimerForJob(selectedJob) && (
+                <div className="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-5 shadow-sm">
+                  <div className="mb-4">
+                    <h3 className="text-lg font-bold text-slate-900">Complete Work Order</h3>
+                    <p className="mt-1 text-sm text-slate-600">Write the completion details and the feedback that should be sent to the requester.</p>
+                  </div>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-1">Completion Details</label>
+                      <textarea
+                        value={completionForm.details}
+                        onChange={(e) => setCompletionForm((prev) => ({ ...prev, details: e.target.value }))}
+                        placeholder="Explain what was done to finish this work order..."
+                        className="w-full min-h-[110px] rounded-xl border border-emerald-200 bg-white px-3 py-3 text-sm text-slate-800 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200/60"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-1">Requester Feedback</label>
+                      <textarea
+                        value={completionForm.feedback}
+                        onChange={(e) => setCompletionForm((prev) => ({ ...prev, feedback: e.target.value }))}
+                        placeholder="Write the feedback message that should be emailed to the requester..."
+                        className="w-full min-h-[110px] rounded-xl border border-emerald-200 bg-white px-3 py-3 text-sm text-slate-800 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200/60"
+                      />
+                    </div>
+                    <div className="flex flex-wrap gap-3">
+                      <button
+                        type="button"
+                        onClick={() => handleStopTimer(selectedJob, completionForm)}
+                        disabled={startingTimer}
+                        className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-60"
+                      >
+                        {startingTimer ? 'Completing...' : 'Confirm Completion'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowCompletionForm(false);
+                          setCompletionForm({ details: '', feedback: '' });
+                        }}
+                        className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-4">
                 <div>
                   <h3 className="font-semibold text-slate-700">{t("technician.issue.fieldTitle")}</h3>
@@ -1347,6 +2124,20 @@ const TechnicianDashboard = () => {
                 <div>
                   <h3 className="font-semibold text-slate-700">{t("technician.issue.fieldLocation")}</h3>
                   <p className="text-slate-900">{selectedJob.location}</p>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <h3 className="font-semibold text-slate-700">Due Date</h3>
+                    <p className="text-slate-900">
+                      {selectedJob.fixDeadline || selectedJob.dueDate
+                        ? new Date(selectedJob.fixDeadline || selectedJob.dueDate).toLocaleString()
+                        : 'Not set'}
+                    </p>
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-slate-700">Asset</h3>
+                    <p className="text-slate-900">{selectedJob.assetName || selectedJob.asset?.name || 'Not set'}</p>
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -1376,6 +2167,119 @@ const TechnicianDashboard = () => {
                   <span className="inline-block px-2 py-1 rounded text-xs font-semibold bg-blue-100/70 text-blue-700">
                     {selectedJob.frequency || selectedJob.interval || selectedJob?.checklist?.frequency || 'Not set'}
                   </span>
+                </div>
+
+                <TechnicianJobMessageActions
+                  contacts={selectedJobContacts}
+                  activeRecipientId={directMessageRecipientId}
+                  onSelectRecipient={openDirectMessageComposer}
+                />
+
+                <div className="border-t pt-4">
+                  <div className="mb-3 flex items-center justify-between">
+                    <div>
+                      <h3 className="font-semibold text-slate-700">Tasks</h3>
+                      <p className="text-xs text-slate-500">Checklist and work order tasks for this job.</p>
+                    </div>
+                    <span className="rounded-full bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500 shadow-sm">
+                      {selectedJobTasks.length} tasks
+                    </span>
+                  </div>
+                  {selectedJobTasks.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-6 text-sm text-slate-500">
+                      No tasks linked to this work order yet.
+                    </div>
+                  ) : (
+                    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                      <table className="min-w-full text-left text-sm">
+                        <thead className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
+                          <tr>
+                            <th className="px-4 py-3">Task</th>
+                            <th className="px-4 py-3">Status</th>
+                            <th className="px-4 py-3">Assignee</th>
+                            <th className="px-4 py-3">Due</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {selectedJobTasks.map((task) => (
+                            <tr key={task.id}>
+                              <td className="px-4 py-3 font-medium text-slate-800">{task.title}</td>
+                              <td className="px-4 py-3">{task.status.replace(/_/g, ' ')}</td>
+                              <td className="px-4 py-3">{task.assignee || '—'}</td>
+                              <td className="px-4 py-3">{task.dueDate ? new Date(task.dueDate).toLocaleString() : '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+
+                <div className="border-t pt-4">
+                  <div className="mb-3 flex items-center justify-between">
+                    <div>
+                      <h3 className="font-semibold text-slate-700">Schedules</h3>
+                      <p className="text-xs text-slate-500">Maintenance schedules related to this work order.</p>
+                    </div>
+                    <span className="rounded-full bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500 shadow-sm">
+                      {selectedJobSchedules.length} linked
+                    </span>
+                  </div>
+                  <div className="mb-4 rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
+                    <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+                      <div>
+                        <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Schedule Work Order</label>
+                        <input
+                          type="datetime-local"
+                          value={scheduleAt}
+                          onChange={(e) => setScheduleAt(e.target.value)}
+                          className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-200/60"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleSaveSchedule}
+                        disabled={!scheduleAt || savingSchedule}
+                        className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-60"
+                      >
+                        {savingSchedule ? 'Saving...' : 'Save Schedule'}
+                      </button>
+                    </div>
+                  </div>
+                  {selectedJobSchedules.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-6 text-sm text-slate-500">
+                      No related schedules found for this work order.
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {selectedJobSchedules.map((schedule) => (
+                        <div key={schedule._id || schedule.id} className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="min-w-0">
+                              <div className="text-sm font-bold text-slate-900">{schedule.name || schedule.title || 'Maintenance schedule'}</div>
+                              <div className="mt-1 text-xs text-slate-500">
+                                {(schedule.category || schedule.type || 'Schedule')}
+                                {(schedule.frequency || schedule.interval) ? ` • ${schedule.frequency || schedule.interval}` : ''}
+                              </div>
+                            </div>
+                            <span className="rounded-full bg-blue-100 px-2.5 py-1 text-[10px] font-bold uppercase text-blue-700">
+                              {String(schedule.status || 'Scheduled').replace(/_/g, ' ')}
+                            </span>
+                          </div>
+                          <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+                            <div>
+                              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Next date</div>
+                              <div className="text-slate-800">{schedule.nextDate ? new Date(schedule.nextDate).toLocaleString() : 'Not set'}</div>
+                            </div>
+                            <div>
+                              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Asset / Location</div>
+                              <div className="text-slate-800">{schedule.asset?.name || schedule.location || selectedJob.location || 'Not set'}</div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Evidence Display */}
@@ -1500,21 +2404,23 @@ const TechnicianDashboard = () => {
 
                 <div className="flex flex-col gap-4 pt-6 border-t mt-6">
                   {/* CONTEXTUAL ACTION BUTTONS INSIDE MODAL */}
-                  {['PENDING', 'ASSIGNED', 'OVERDUE'].includes(getJobStatus(selectedJob).toUpperCase()) && !showBeforeForm[selectedJob.id || selectedJob._id] && (
+                  {canStartTimerForJob(selectedJob) && !showBeforeForm[selectedJob.id || selectedJob._id] && (
                     <button
-                      onClick={() => handleStartWork(selectedJob.id || selectedJob._id)}
-                      className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition shadow-md flex items-center justify-center gap-2"
+                      onClick={() => handleStartTimer(selectedJob)}
+                      disabled={startingTimer}
+                      className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition shadow-md flex items-center justify-center gap-2 disabled:opacity-60"
                     >
-                      {t("technician.issue.notifyStart")}
+                      {startingTimer ? 'Starting...' : 'Start Timer'}
                     </button>
                   )}
 
-                  {['IN_PROGRESS', 'IN PROGRESS'].includes(getJobStatus(selectedJob).toUpperCase()) && !showAfterForm[selectedJob.id || selectedJob._id] && (
+                  {canStopTimerForJob(selectedJob) && !showAfterForm[selectedJob.id || selectedJob._id] && (
                     <button
-                      onClick={() => toggleAfterForm(selectedJob.id || selectedJob._id)}
+                      onClick={() => handleStopTimer(selectedJob)}
+                      disabled={startingTimer}
                       className="w-full py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition shadow-md flex items-center justify-center gap-2"
                     >
-                      {t("technician.issue.completeAfter")}
+                      {startingTimer ? 'Stopping...' : 'Stop Timer'}
                     </button>
                   )}
 

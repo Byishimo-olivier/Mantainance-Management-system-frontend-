@@ -7,10 +7,12 @@ const AIChatbot = () => {
     const [isOpen, setIsOpen] = useState(false);
     const [isMaximized, setIsMaximized] = useState(false);
     const [messages, setMessages] = useState([
-        { role: 'model', content: "Hello! I'm your KAT AI assistant. How can I help you manage your maintenance today?" }
+        { role: 'model', content: "Hello! I'm your maintenance AI assistant. Ask me about incident trends, risky properties, technician performance, SLA breaches, or what to prioritize first." }
     ]);
     const [input, setInput] = useState('');
     const [isTyping, setIsTyping] = useState(false);
+    const [summary, setSummary] = useState(null);
+    const [loadingSummary, setLoadingSummary] = useState(false);
     const messagesEndRef = useRef(null);
 
     const scrollToBottom = () => {
@@ -21,11 +23,34 @@ const AIChatbot = () => {
         scrollToBottom();
     }, [messages, isTyping]);
 
+    useEffect(() => {
+        if (!isOpen || summary || loadingSummary) return;
+
+        const fetchSummary = async () => {
+            try {
+                setLoadingSummary(true);
+                const res = await api.get('/api/ai/maintenance-summary');
+                setSummary(res.data);
+            } catch (error) {
+                console.error("Failed to load AI maintenance summary:", error);
+            } finally {
+                setLoadingSummary(false);
+            }
+        };
+
+        fetchSummary();
+    }, [isOpen, summary, loadingSummary]);
+
     const handleSend = async (e) => {
         e.preventDefault();
         if (!input.trim() || isTyping) return;
 
         const userMessage = { role: 'user', content: input };
+        const validHistory = messages.filter((msg, index) => {
+            if (!msg?.content) return false;
+            if (index === 0 && msg.role !== 'user') return false;
+            return msg.role === 'user' || msg.role === 'model';
+        });
         setMessages(prev => [...prev, userMessage]);
         setInput('');
         setIsTyping(true);
@@ -33,7 +58,7 @@ const AIChatbot = () => {
         try {
             const res = await api.post('/api/ai/chat', {
                 message: input,
-                history: messages
+                history: validHistory
             });
 
             setMessages(prev => [...prev, { role: 'model', content: res.data.response }]);
@@ -48,8 +73,12 @@ const AIChatbot = () => {
 
     const clearChat = () => {
         if (window.confirm("Clear chat history?")) {
-            setMessages([{ role: 'model', content: "Hello again! How can I help you today?" }]);
+            setMessages([{ role: 'model', content: "Hello again! Ask me about trends, repeated failures, risky properties, or what the team should fix first." }]);
         }
+    };
+
+    const applyPrompt = (prompt) => {
+        setInput(prompt);
     };
 
     return (
@@ -112,6 +141,58 @@ const AIChatbot = () => {
 
                         {/* Messages Area */}
                         <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/50">
+                            {(loadingSummary || summary) && (
+                                <div className="rounded-2xl border border-indigo-100 bg-white p-4 shadow-sm">
+                                    <div className="flex items-center justify-between gap-3">
+                                        <div>
+                                            <div className="text-xs font-bold uppercase tracking-[0.2em] text-indigo-500">AI Snapshot</div>
+                                            <div className="mt-1 text-sm font-semibold text-slate-900">
+                                                {loadingSummary ? 'Loading maintenance insights...' : 'Live maintenance overview'}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {summary && (
+                                        <>
+                                            <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-700">
+                                                <div className="rounded-xl bg-slate-50 px-3 py-2">
+                                                    <div className="font-semibold text-slate-500">Open Issues</div>
+                                                    <div className="mt-1 text-sm font-bold text-slate-900">{summary.metrics?.openIssues ?? '—'}</div>
+                                                </div>
+                                                <div className="rounded-xl bg-slate-50 px-3 py-2">
+                                                    <div className="font-semibold text-slate-500">SLA Breaches</div>
+                                                    <div className="mt-1 text-sm font-bold text-slate-900">{summary.metrics?.slaBreaches ?? '—'}</div>
+                                                </div>
+                                                <div className="rounded-xl bg-slate-50 px-3 py-2">
+                                                    <div className="font-semibold text-slate-500">Avg Resolution</div>
+                                                    <div className="mt-1 text-sm font-bold text-slate-900">
+                                                        {summary.metrics?.avgResolutionHours ? `${summary.metrics.avgResolutionHours}h` : 'Not enough data'}
+                                                    </div>
+                                                </div>
+                                                <div className="rounded-xl bg-slate-50 px-3 py-2">
+                                                    <div className="font-semibold text-slate-500">Top Property</div>
+                                                    <div className="mt-1 text-sm font-bold text-slate-900">
+                                                        {summary.topProperties?.[0]?.property || 'No data'}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            {Array.isArray(summary.suggestedQuestions) && summary.suggestedQuestions.length > 0 && (
+                                                <div className="mt-3 flex flex-wrap gap-2">
+                                                    {summary.suggestedQuestions.slice(0, 4).map((prompt) => (
+                                                        <button
+                                                            key={prompt}
+                                                            type="button"
+                                                            onClick={() => applyPrompt(prompt)}
+                                                            className="rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition"
+                                                        >
+                                                            {prompt}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
+                                </div>
+                            )}
                             {messages.map((msg, i) => (
                                 <motion.div
                                     initial={{ opacity: 0, x: msg.role === 'user' ? 20 : -20 }}

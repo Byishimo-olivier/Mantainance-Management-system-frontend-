@@ -9,7 +9,18 @@ const initialForm = {
   countryIso: 'US',
   countryCode: '+1',
   phone: '',
+  companyType: 'main',
   companyName: '',
+  branchName: '',
+  branchDetails: '',
+  branchLocation: '',
+  branchLatitude: '',
+  branchLongitude: '',
+  branchEvidenceOne: '',
+  branchEvidenceTwo: '',
+  branchEvidenceOneFile: null,
+  branchEvidenceTwoFile: null,
+  branchImages: [],
   technicians: '',
   email: '',
   password: ''
@@ -274,7 +285,16 @@ export default function Register() {
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
-  const isSubmitDisabled = isSubmitting || !form.firstName || !form.lastName || !form.phone || !form.companyName || !form.technicians || !form.email || !form.password;
+  const isBranch = form.companyType === 'branch';
+  const isSubmitDisabled = isSubmitting
+    || !form.firstName
+    || !form.lastName
+    || !form.phone
+    || !form.companyName
+    || !form.technicians
+    || !form.email
+    || !form.password
+    || (isBranch && (!form.branchName || !form.branchDetails || !form.branchEvidenceOne || !form.branchEvidenceTwo));
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -285,6 +305,31 @@ export default function Register() {
         countryIso: value,
         countryCode: selected ? selected.code : prev.countryCode
       }));
+      return;
+    }
+    if (name === 'companyType') {
+      setForm((prev) => ({
+        ...prev,
+        companyType: value,
+        branchName: value === 'branch' ? prev.branchName : '',
+        branchDetails: value === 'branch' ? prev.branchDetails : '',
+        branchLocation: value === 'branch' ? prev.branchLocation : '',
+        branchLatitude: value === 'branch' ? prev.branchLatitude : '',
+        branchLongitude: value === 'branch' ? prev.branchLongitude : '',
+        branchEvidenceOne: value === 'branch' ? prev.branchEvidenceOne : '',
+        branchEvidenceTwo: value === 'branch' ? prev.branchEvidenceTwo : '',
+        branchEvidenceOneFile: value === 'branch' ? prev.branchEvidenceOneFile : null,
+        branchEvidenceTwoFile: value === 'branch' ? prev.branchEvidenceTwoFile : null,
+        branchImages: value === 'branch' ? prev.branchImages : []
+      }));
+      return;
+    }
+    if (name === 'branchEvidenceOneFile' || name === 'branchEvidenceTwoFile') {
+      setForm((prev) => ({ ...prev, [name]: e.target.files?.[0] || null }));
+      return;
+    }
+    if (name === 'branchImages') {
+      setForm((prev) => ({ ...prev, branchImages: Array.from(e.target.files || []) }));
       return;
     }
     setForm((prev) => ({ ...prev, [name]: value }));
@@ -299,24 +344,35 @@ export default function Register() {
     const fullName = `${form.firstName} ${form.lastName}`.trim();
     const phoneValue = `${form.countryCode}${form.phone}`.replace(/[^+\d]/g, '');
 
-    const payload = {
-      name: fullName,
-      firstName: form.firstName.trim(),
-      lastName: form.lastName.trim(),
-      countryCode: form.countryCode,
-      phone: phoneValue,
-      email: form.email.trim(),
-      password: form.password,
-      role: 'CLIENT',
-      companyName: form.companyName.trim(),
-      techniciansCount: form.technicians || undefined
-    };
+    const payload = new FormData();
+    payload.append('name', fullName);
+    payload.append('firstName', form.firstName.trim());
+    payload.append('lastName', form.lastName.trim());
+    payload.append('countryCode', form.countryCode);
+    payload.append('phone', phoneValue);
+    payload.append('email', form.email.trim());
+    payload.append('password', form.password);
+    payload.append('role', 'CLIENT');
+    payload.append('companyName', form.companyName.trim());
+    payload.append('companyType', form.companyType);
+    payload.append('branchName', isBranch ? form.branchName.trim() : '');
+    payload.append('branchDetails', isBranch ? form.branchDetails.trim() : '');
+    payload.append('branchLocation', isBranch ? form.branchLocation.trim() : '');
+    payload.append('branchLatitude', isBranch ? form.branchLatitude : '');
+    payload.append('branchLongitude', isBranch ? form.branchLongitude : '');
+    payload.append('branchEvidenceOne', isBranch ? form.branchEvidenceOne.trim() : '');
+    payload.append('branchEvidenceTwo', isBranch ? form.branchEvidenceTwo.trim() : '');
+    if (form.technicians) payload.append('techniciansCount', form.technicians);
+    if (isBranch && form.branchEvidenceOneFile) payload.append('branchEvidenceOneFile', form.branchEvidenceOneFile);
+    if (isBranch && form.branchEvidenceTwoFile) payload.append('branchEvidenceTwoFile', form.branchEvidenceTwoFile);
+    if (isBranch && Array.isArray(form.branchImages)) {
+      form.branchImages.forEach((file) => payload.append('branchImages', file));
+    }
 
     try {
       const res = await fetch((import.meta.env.VITE_API_URL || '') + '/api/users/register', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: payload
       });
       const data = await res.json();
       if (res.ok) {
@@ -415,19 +471,165 @@ export default function Register() {
           </div>
 
           <div className="auth-field">
-            <label htmlFor="companyName" className="auth-label">Company Name*</label>
+            <label htmlFor="companyType" className="auth-label">Company Setup*</label>
+            <select
+              id="companyType"
+              name="companyType"
+              value={form.companyType}
+              onChange={handleChange}
+              className="auth-input auth-select-input"
+            >
+              <option value="main">Main Company</option>
+              <option value="branch">Add Branch</option>
+            </select>
+          </div>
+
+          <div className="auth-field">
+            <label htmlFor="companyName" className="auth-label">{isBranch ? 'Main Company Name*' : 'Company Name*'}</label>
             <input
               id="companyName"
               name="companyName"
               type="text"
               value={form.companyName}
               onChange={handleChange}
-              placeholder="Enter your company name"
+              placeholder={isBranch ? 'Enter the main company name' : 'Enter your company name'}
               autoComplete="organization"
               required
               className="auth-input"
             />
           </div>
+
+          {isBranch && (
+            <>
+              <div className="auth-field">
+                <label htmlFor="branchName" className="auth-label">Branch Name*</label>
+                <input
+                  id="branchName"
+                  name="branchName"
+                  type="text"
+                  value={form.branchName}
+                  onChange={handleChange}
+                  placeholder="Enter branch name"
+                  required
+                  className="auth-input"
+                />
+              </div>
+
+              <div className="auth-field">
+                <label htmlFor="branchDetails" className="auth-label">Branch Details*</label>
+                <textarea
+                  id="branchDetails"
+                  name="branchDetails"
+                  value={form.branchDetails}
+                  onChange={handleChange}
+                  placeholder="Describe this branch and its company details"
+                  required
+                  className="auth-input"
+                  rows={4}
+                />
+              </div>
+
+              <div className="auth-field">
+                <label htmlFor="branchLocation" className="auth-label">Branch Location</label>
+                <input
+                  id="branchLocation"
+                  name="branchLocation"
+                  type="text"
+                  value={form.branchLocation}
+                  onChange={handleChange}
+                  placeholder="Enter branch location or address"
+                  className="auth-input"
+                />
+              </div>
+
+              <div className="auth-grid">
+                <div className="auth-field">
+                  <label htmlFor="branchLatitude" className="auth-label">Latitude</label>
+                  <input
+                    id="branchLatitude"
+                    name="branchLatitude"
+                    type="number"
+                    step="any"
+                    value={form.branchLatitude}
+                    onChange={handleChange}
+                    placeholder="-1.944072"
+                    className="auth-input"
+                  />
+                </div>
+                <div className="auth-field">
+                  <label htmlFor="branchLongitude" className="auth-label">Longitude</label>
+                  <input
+                    id="branchLongitude"
+                    name="branchLongitude"
+                    type="number"
+                    step="any"
+                    value={form.branchLongitude}
+                    onChange={handleChange}
+                    placeholder="30.061885"
+                    className="auth-input"
+                  />
+                </div>
+              </div>
+
+              <div className="auth-grid">
+                <div className="auth-field">
+                  <label htmlFor="branchEvidenceOne" className="auth-label">Evidence 1*</label>
+                  <input
+                    id="branchEvidenceOne"
+                    name="branchEvidenceOne"
+                    type="text"
+                    value={form.branchEvidenceOne}
+                    onChange={handleChange}
+                    placeholder="Registration number, document ID, or proof"
+                    required
+                    className="auth-input"
+                  />
+                  <input
+                    id="branchEvidenceOneFile"
+                    name="branchEvidenceOneFile"
+                    type="file"
+                    onChange={handleChange}
+                    className="auth-input"
+                    accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"
+                  />
+                </div>
+                <div className="auth-field">
+                  <label htmlFor="branchEvidenceTwo" className="auth-label">Evidence 2*</label>
+                  <input
+                    id="branchEvidenceTwo"
+                    name="branchEvidenceTwo"
+                    type="text"
+                    value={form.branchEvidenceTwo}
+                    onChange={handleChange}
+                    placeholder="TIN, certificate, URL, or second proof"
+                    required
+                    className="auth-input"
+                  />
+                  <input
+                    id="branchEvidenceTwoFile"
+                    name="branchEvidenceTwoFile"
+                    type="file"
+                    onChange={handleChange}
+                    className="auth-input"
+                    accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"
+                  />
+                </div>
+              </div>
+
+              <div className="auth-field">
+                <label htmlFor="branchImages" className="auth-label">Branch Images</label>
+                <input
+                  id="branchImages"
+                  name="branchImages"
+                  type="file"
+                  multiple
+                  onChange={handleChange}
+                  className="auth-input"
+                  accept="image/*"
+                />
+              </div>
+            </>
+          )}
 
           <div className="auth-field">
             <div className="auth-label-row">
