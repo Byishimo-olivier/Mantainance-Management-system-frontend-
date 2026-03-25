@@ -4,6 +4,14 @@ import api from '../../api/axios';
 import backgroundVideo from '../../assets/136906-765457769_small.mp4';
 import AuthHeader from './AuthHeader';
 
+const getHomeRouteForRole = (role) => {
+  const normalizedRole = String(role || '').trim().toLowerCase();
+  if (normalizedRole === 'superadmin' || normalizedRole === 'super-admin') return '/manager-dashboard';
+  if (normalizedRole === 'admin' || normalizedRole === 'manager') return '/dashboard';
+  if (normalizedRole === 'technician') return '/technician-dashboard';
+  return '/dashboard';
+};
+
 export default function Login({ onLogin }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -22,18 +30,7 @@ export default function Login({ onLogin }) {
       const data = res.data;
       if (res.status === 200) {
         onLogin && onLogin(data.token, data.user);
-        // Role-based redirect
-        if (data.user && data.user.role === 'admin') {
-          navigate('/manager-dashboard', { replace: true });
-        } else if (data.user && data.user.role === 'manager') {
-          navigate('/manager-dashboard', { replace: true });
-        } else if (data.user && data.user.role === 'technician') {
-          navigate('/technician-dashboard', { replace: true });
-        } else if (data.user && data.user.role === 'client') {
-          navigate('/dashboard', { replace: true });
-        } else {
-          navigate('/dashboard', { replace: true });
-        }
+        navigate(getHomeRouteForRole(data.user?.role), { replace: true });
       } else {
         setError(data.error || 'Login failed');
       }

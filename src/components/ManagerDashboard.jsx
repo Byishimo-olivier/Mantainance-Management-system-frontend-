@@ -576,8 +576,11 @@ const useBulkSelection = (items, getId) => {
     .filter(Boolean);
 
   useEffect(() => {
-    setSelectedIds((prev) => prev.filter((id) => ids.includes(id)));
-  }, [items]);
+    setSelectedIds((prev) => {
+      const next = prev.filter((id) => ids.includes(id));
+      return next.length === prev.length && next.every((id, index) => id === prev[index]) ? prev : next;
+    });
+  }, [ids.join('|')]);
 
   const allSelected = ids.length > 0 && ids.every((id) => selectedIds.includes(id));
   const toggleAll = (checked) => setSelectedIds(checked ? ids : []);
@@ -672,6 +675,7 @@ function ManagerDashboard() {
   const [pendingRequests, setPendingRequests] = useState([]);
   const [materialRequests, setMaterialRequests] = useState([]);
   const [technicians, setTechnicians] = useState([]);
+  const [systemUsers, setSystemUsers] = useState([]);
   const [teams, setTeams] = useState([]);
   const [locations, setLocations] = useState([]);
   const [assets, setAssets] = useState([]);
@@ -853,6 +857,7 @@ function ManagerDashboard() {
 
       setIssues(approvedWorkOrders);
       setPendingRequests(pendingRequestsData);
+      setSystemUsers(usersRes.data || []);
 
       const combinedTechs = combinePeopleUsers(techRes.data || [], usersRes.data || []);
       setTechnicians(combinedTechs);
@@ -877,6 +882,7 @@ function ManagerDashboard() {
       setIssues([]);
       setAllIssues([]);
       setPendingRequests([]);
+      setSystemUsers([]);
       setTechnicians([]);
       setSummary({ pending: 0, inProgress: 0, completed: 0, overdue: 0 });
     } finally {
@@ -1272,7 +1278,7 @@ function ManagerDashboard() {
   const NavItem = ({ active, onClick, icon: Icon, label, badge, badgeColor = "bg-blue-600" }) => (
     <button
       onClick={onClick}
-      className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 group relative mb-1 ${active
+      className={`w-full flex items-start justify-between gap-3 px-4 py-3 rounded-xl transition-all duration-200 group relative mb-1 text-left ${active
         ? 'bg-white/20 text-white shadow-lg shadow-black/5'
         : 'text-white/60 hover:text-white hover:bg-white/10'
         }`}
@@ -1280,14 +1286,16 @@ function ManagerDashboard() {
       {active && (
         <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-white rounded-r-full shadow-glow-white" />
       )}
-      <div className="flex items-center gap-3">
-        <span className={`transition-transform duration-200 group-hover:scale-110 ${active ? 'text-white' : 'text-white/40 group-hover:text-white/70'}`}>
+      <div className="flex min-w-0 flex-1 items-start gap-3">
+        <span className={`mt-0.5 shrink-0 transition-transform duration-200 group-hover:scale-110 ${active ? 'text-white' : 'text-white/40 group-hover:text-white/70'}`}>
           <Icon className="w-4 h-4" />
         </span>
-        <span className="text-sm font-bold tracking-tight">{label}</span>
+        <span className="min-w-0 flex-1 text-sm font-bold tracking-tight leading-5 break-words whitespace-normal">
+          {label}
+        </span>
       </div>
       {badge && (
-        <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold text-white min-w-[18px] text-center ${badgeColor}`}>
+        <span className={`mt-0.5 shrink-0 px-1.5 py-0.5 rounded-md text-[10px] font-bold text-white min-w-[18px] text-center ${badgeColor}`}>
           {badge}
         </span>
       )}
@@ -1318,7 +1326,7 @@ function ManagerDashboard() {
 
       <div className="relative z-10 flex min-h-screen">
         {/* Sidebar Redesign */}
-        <aside className="glass-surface-strong border-r border-white/20 flex flex-col sticky top-0 h-screen overflow-y-auto shrink-0" style={{ width: 220 }}>
+        <aside className="glass-surface-strong border-r border-white/20 flex flex-col sticky top-0 h-screen overflow-y-auto shrink-0" style={{ width: 272 }}>
           {/* Sidebar Header */}
           <div style={{ padding: '24px 16px 20px', borderBottom: '1px solid rgba(255,255,255,0.12)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -1474,6 +1482,18 @@ function ManagerDashboard() {
             label={t("manager.sidebar.peopleTeams")}
           />
           <NavItem
+            active={activeTab === 'user-management'}
+            onClick={() => setActiveTab('user-management')}
+            icon={Users}
+            label="User Management"
+          />
+          <NavItem
+            active={activeTab === 'company-management'}
+            onClick={() => setActiveTab('company-management')}
+            icon={Database}
+            label="Company Management"
+          />
+          <NavItem
             active={activeTab === 'checklists'}
             onClick={() => setActiveTab('checklists')}
             icon={ClipboardCheck}
@@ -1521,8 +1541,8 @@ function ManagerDashboard() {
         <div className="p-4 border-t border-white/10">
           <div className="flex items-center justify-between mb-4">
             <NavItem
-              active={false}
-              onClick={() => { }}
+              active={activeTab === 'settings'}
+              onClick={() => setActiveTab('settings')}
               icon={Settings}
               label={t("manager.sidebar.settings")}
             />
@@ -1907,6 +1927,8 @@ function ManagerDashboard() {
               />
             ) : activeTab === 'subscriptions' ? (
               <SubscriptionManagement />
+            ) : activeTab === 'settings' ? (
+              <SystemSettingsTab />
             ) : activeTab === 'issues' ? (
               <IssuesTab
                 issues={getFilteredIssues()}
@@ -2007,6 +2029,18 @@ function ManagerDashboard() {
                 teams={teams}
                 allIssues={issues}
                 onRefresh={fetchDashboardData}
+              />
+            ) : activeTab === 'user-management' ? (
+              <UserManagementTab
+                users={systemUsers}
+                issues={allIssues}
+              />
+            ) : activeTab === 'company-management' ? (
+              <CompanyManagementTab
+                users={systemUsers}
+                issues={allIssues}
+                assets={assets}
+                locations={locations}
               />
             ) : activeTab === 'checklists' ? (
               <ChecklistsTab />
@@ -2313,8 +2347,11 @@ const OverviewTab = ({
   loadingAI,
   aiError,
   aiRecommendations,
+  aiSummary,
   loadingRecs,
+  loadingSummary,
   recsError,
+  summaryError,
   exportToPDF,
   exportToExcel
 }) => {
@@ -2713,7 +2750,31 @@ const RequestsTab = ({
   handleAssignTech,
   onRefresh
 }) => {
-  const selection = useBulkSelection(pendingRequests, (request) => request._id || request.id);
+  const [localSearch, setLocalSearch] = useState('');
+  const filteredRequests = React.useMemo(() => {
+    const query = localSearch.trim().toLowerCase();
+    if (!query) return pendingRequests;
+    return (pendingRequests || []).filter((request) => {
+      const haystack = [
+        request.title,
+        request.description,
+        request.assetName,
+        request.asset?.name,
+        request.location,
+        request.category,
+        request.issueType,
+        request.type,
+        request.name,
+        request.requestorName,
+        request.userName,
+        request.email,
+        request.priority,
+        request.status,
+      ].filter(Boolean).join(' ').toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [pendingRequests, localSearch]);
+  const selection = useBulkSelection(filteredRequests, (request) => request._id || request.id);
   const requestStatusColor = (status) => {
     const s = String(status || '').toUpperCase();
     if (s === 'APPROVED') return 'bg-emerald-50 text-emerald-700 border-emerald-200';
@@ -2744,6 +2805,15 @@ const RequestsTab = ({
             <p className="text-gray-600">Review and approve client maintenance requests</p>
           </div>
           <div className="flex items-center gap-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                value={localSearch}
+                onChange={(e) => setLocalSearch(e.target.value)}
+                placeholder="Search requests..."
+                className="pl-9 pr-3 py-2 rounded-lg border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
+              />
+            </div>
             <button
               onClick={() => onSubmitRequest && onSubmitRequest()}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold shadow-sm hover:bg-blue-700"
@@ -2751,7 +2821,7 @@ const RequestsTab = ({
               Submit Request
             </button>
             <div className="px-4 py-2 bg-gradient-to-r from-orange-50 to-amber-50 rounded-lg border border-orange-200">
-              <span className="text-orange-700 font-semibold">{pendingRequests.length} pending</span>
+              <span className="text-orange-700 font-semibold">{filteredRequests.length} pending</span>
             </div>
           </div>
         </div>
@@ -2759,7 +2829,7 @@ const RequestsTab = ({
 
       <BulkActionBar count={selection.selectedIds.length} label="requests" onDelete={handleDeleteSelected} />
 
-      {pendingRequests.length === 0 ? (
+      {filteredRequests.length === 0 ? (
         <GlassCard className="p-12 text-center">
           <div className="w-24 h-24 bg-gradient-to-br from-emerald-100 to-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
             <CheckCircle className="w-12 h-12 text-emerald-600" />
@@ -2796,7 +2866,7 @@ const RequestsTab = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {pendingRequests.map((request, i) => {
+                {filteredRequests.map((request, i) => {
                   const reqId = request._id || request.id;
                   const title = request.title || request.items?.[0]?.title || 'Untitled';
                   const imagePath = request.beforePhoto || request.photo || request.image || request.beforeImage || request.afterImage || request.afterPhoto || (Array.isArray(request.files) ? request.files[0] : null);
@@ -2933,6 +3003,7 @@ const MaterialRequestsTab = ({ materialRequests = [], onRefresh, onOpenDetails }
   const [clientEmail, setClientEmail] = useState('');
   const [forwarding, setForwarding] = useState(false);
   const [filterStatus, setFilterStatus] = useState('ALL');
+  const [searchQuery, setSearchQuery] = useState('');
   const [toast, setToast] = useState(null);
 
   const showToast = (msg, type = 'success') => {
@@ -2968,9 +3039,25 @@ const MaterialRequestsTab = ({ materialRequests = [], onRefresh, onOpenDetails }
     return <Package className="w-3.5 h-3.5" />;
   };
 
-  const filtered = filterStatus === 'ALL'
-    ? materialRequests
-    : materialRequests.filter(r => r.status === filterStatus);
+  const filtered = React.useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return (filterStatus === 'ALL'
+      ? materialRequests
+      : materialRequests.filter((r) => r.status === filterStatus)
+    ).filter((req) => {
+      if (!query) return true;
+      const haystack = [
+        req.requestId,
+        req.technicianName,
+        req.description,
+        req.issueId,
+        req.status,
+        req.urgency,
+        ...(Array.isArray(req.items) ? req.items.flatMap((item) => [item?.title, item?.name, item?.materialId]) : []),
+      ].filter(Boolean).join(' ').toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [filterStatus, materialRequests, searchQuery]);
   const selection = useBulkSelection(filtered, (req) => req.id || req._id);
 
   const counts = {
@@ -3033,12 +3120,23 @@ const MaterialRequestsTab = ({ materialRequests = [], onRefresh, onOpenDetails }
             <h2 className="text-2xl font-bold text-gray-900 mb-1">Material Requests</h2>
             <p className="text-gray-500 text-sm">Review technician material requests and forward to clients for approval</p>
           </div>
-          <button
-            onClick={onRefresh}
-            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-all shadow-sm"
-          >
-            Refresh
-          </button>
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search material requests..."
+                className="pl-9 pr-3 py-2 rounded-xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
+              />
+            </div>
+            <button
+              onClick={onRefresh}
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-all shadow-sm"
+            >
+              Refresh
+            </button>
+          </div>
         </div>
       </div>
 
@@ -4387,10 +4485,12 @@ const MetersTab = () => {
     return () => { mounted = false; };
   }, []);
 
-  const filtered = (meters || []).filter(m =>
-    (meterFilter === 'All' || m.type === meterFilter) &&
-    ((m.name || '').toLowerCase().includes(meterSearch.toLowerCase()) || (m.location || '').toLowerCase().includes(meterSearch.toLowerCase()))
-  );
+  const filtered = React.useMemo(() => (
+    (meters || []).filter(m =>
+      (meterFilter === 'All' || m.type === meterFilter) &&
+      ((m.name || '').toLowerCase().includes(meterSearch.toLowerCase()) || (m.location || '').toLowerCase().includes(meterSearch.toLowerCase()))
+    )
+  ), [meters, meterFilter, meterSearch]);
   const selection = useBulkSelection(filtered, (meter) => meter._id || meter.id);
 
   const getStatusConfig = (status) => ({
@@ -4614,10 +4714,12 @@ const EdgeTab = () => {
     } catch (e) { console.error('Device action failed', e); alert('Action failed'); }
   };
 
-  const filtered = (devices || []).filter(d =>
-    (edgeFilter === 'All' || d.status === edgeFilter) &&
-    ((d.name || '').toLowerCase().includes(edgeSearch.toLowerCase()) || (d.location || '').toLowerCase().includes(edgeSearch.toLowerCase()))
-  );
+  const filtered = React.useMemo(() => (
+    (devices || []).filter(d =>
+      (edgeFilter === 'All' || d.status === edgeFilter) &&
+      ((d.name || '').toLowerCase().includes(edgeSearch.toLowerCase()) || (d.location || '').toLowerCase().includes(edgeSearch.toLowerCase()))
+    )
+  ), [devices, edgeFilter, edgeSearch]);
   const selection = useBulkSelection(filtered, (device) => device._id || device.id);
 
   const online = (devices || []).filter(d => d.status === 'Online').length;
@@ -4827,7 +4929,24 @@ const EdgeTab = () => {
 // Assets Table Tab
 const AssetsTab = ({ assets = [], onAssetsUpdated }) => {
   const fileInputRef = React.useRef(null);
-  const selection = useBulkSelection(assets, (asset) => asset._id || asset.id);
+  const [searchQuery, setSearchQuery] = useState('');
+  const filteredAssets = React.useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return assets;
+    return (assets || []).filter((asset) => {
+      const haystack = [
+        asset.name,
+        asset.title,
+        asset.category,
+        asset.type,
+        asset.property?.name,
+        asset.propertyName,
+        asset.propertyId,
+      ].filter(Boolean).join(' ').toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [assets, searchQuery]);
+  const selection = useBulkSelection(filteredAssets, (asset) => asset._id || asset.id);
 
   const handleDeleteSelected = async () => {
     if (selection.selectedIds.length === 0) return;
@@ -4843,9 +4962,9 @@ const AssetsTab = ({ assets = [], onAssetsUpdated }) => {
   };
 
   const exportCSV = () => {
-    if (!assets || assets.length === 0) return;
+    if (!filteredAssets || filteredAssets.length === 0) return;
     const keys = ['id', 'name', 'category', 'propertyName', 'purchaseCost'];
-    const rows = assets.map(a => ({
+    const rows = filteredAssets.map(a => ({
       id: a.id || a._id || '',
       name: a.name || a.title || '',
       category: a.category || a.type || '',
@@ -4886,6 +5005,15 @@ const AssetsTab = ({ assets = [], onAssetsUpdated }) => {
           <p className="text-sm text-gray-500 mt-0.5">Inventory of tracked assets</p>
         </div>
         <div className="flex items-center gap-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search assets..."
+              className="pl-9 pr-3 py-2 rounded-xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
+            />
+          </div>
           <button onClick={exportCSV} className="px-3 py-2 bg-white border rounded-xl text-sm font-semibold hover:bg-gray-50">Export CSV</button>
           <button onClick={() => fileInputRef.current && fileInputRef.current.click()} className="px-3 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold">Import</button>
           <input ref={fileInputRef} type="file" accept=".csv,text/csv" onChange={onImport} className="hidden" />
@@ -4915,7 +5043,7 @@ const AssetsTab = ({ assets = [], onAssetsUpdated }) => {
               </tr>
             </thead>
             <tbody>
-              {assets.map((a, idx) => (
+              {filteredAssets.map((a, idx) => (
                 <tr key={a.id || a._id || `asset-${idx}`} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
                   <td className="py-4 px-4">
                     <input
@@ -4938,7 +5066,7 @@ const AssetsTab = ({ assets = [], onAssetsUpdated }) => {
                   </td>
                 </tr>
               ))}
-              {assets.length === 0 && (
+              {filteredAssets.length === 0 && (
                 <tr><td colSpan="7" className="py-20 text-center"><p className="text-gray-500">No assets found</p></td></tr>
               )}
             </tbody>
@@ -4955,8 +5083,30 @@ const LocationsTab = ({ locations = [], assets = [], onLocationUpdated, onLocati
   const [editingLocation, setEditingLocation] = useState(null);
   const [savingLocation, setSavingLocation] = useState(false);
   const locationStatusOptions = ['Active', 'Inactive', 'Under Maintenance', 'Closed'];
+  const [searchQuery, setSearchQuery] = useState('');
   const [assetNameQuery, setAssetNameQuery] = useState('');
-  const selection = useBulkSelection(locations, (loc) => loc._id || loc.id);
+  const filteredLocations = React.useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return locations;
+    return (locations || []).filter((location) => {
+      const haystack = [
+        location.name,
+        location.title,
+        location.address,
+        location.street,
+        location.city,
+        location.country,
+        location.contactName,
+        location.contact,
+        location.phone,
+        location.phoneNumber,
+        location.email,
+        location.status,
+      ].filter(Boolean).join(' ').toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [locations, searchQuery]);
+  const selection = useBulkSelection(filteredLocations, (loc) => loc._id || loc.id);
   const [editForm, setEditForm] = useState({
     name: '',
     address: '',
@@ -5069,9 +5219,9 @@ const LocationsTab = ({ locations = [], assets = [], onLocationUpdated, onLocati
   };
 
   const exportCSV = () => {
-    if (!locations || locations.length === 0) return;
+    if (!filteredLocations || filteredLocations.length === 0) return;
     const keys = ['id', 'name', 'address', 'assetCount'];
-    const rows = locations.map(l => ({ id: l.id || l._id || '', name: l.name || l.title || '', address: l.address || l.street || '', assetCount: (assets.filter(a => String(a.propertyId) === String(l._id || l.id)).length) }));
+    const rows = filteredLocations.map(l => ({ id: l.id || l._id || '', name: l.name || l.title || '', address: l.address || l.street || '', assetCount: (assets.filter(a => String(a.propertyId) === String(l._id || l.id)).length) }));
     const csv = [keys.join(',')].concat(rows.map(r => keys.map(k => (`"${String(r[k] ?? '').replace(/"/g, '""')}"`)).join(','))).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
@@ -5086,6 +5236,15 @@ const LocationsTab = ({ locations = [], assets = [], onLocationUpdated, onLocati
           <p className="text-sm text-gray-500 mt-0.5">Properties and locations</p>
         </div>
         <div className="flex items-center gap-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search locations..."
+              className="pl-9 pr-3 py-2 rounded-xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
+            />
+          </div>
           <button onClick={exportCSV} className="px-3 py-2 bg-white border rounded-xl text-sm font-semibold hover:bg-gray-50">Export CSV</button>
         </div>
       </div>
@@ -5114,7 +5273,7 @@ const LocationsTab = ({ locations = [], assets = [], onLocationUpdated, onLocati
               </tr>
             </thead>
             <tbody>
-              {locations.map((l, idx) => (
+              {filteredLocations.map((l, idx) => (
                 <tr
                   key={l._id || l.id || `loc-${idx}`}
                   onClick={() => openLocation(l)}
@@ -5146,7 +5305,7 @@ const LocationsTab = ({ locations = [], assets = [], onLocationUpdated, onLocati
                   </td>
                 </tr>
               ))}
-              {locations.length === 0 && (<tr><td colSpan="8" className="py-20 text-center"><p className="text-gray-500">No locations found</p></td></tr>)}
+              {filteredLocations.length === 0 && (<tr><td colSpan="8" className="py-20 text-center"><p className="text-gray-500">No locations found</p></td></tr>)}
             </tbody>
           </table>
         </div>
@@ -5313,10 +5472,11 @@ const LocationsTab = ({ locations = [], assets = [], onLocationUpdated, onLocati
 };
 
 // People & Teams Tab
-const PeopleTab = ({ technicians = [], allIssues = [], onRefresh }) => {
+const PeopleTab = ({ technicians = [], allIssues = [], teams = [], onRefresh }) => {
   const [loading, setLoading] = useState(false);
   const [showAddPerson, setShowAddPerson] = useState(false);
   const [showAddTeam, setShowAddTeam] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [newPerson, setNewPerson] = useState({ name: '', email: '', phone: '', role: 'Technician', password: '', specialization: '' });
   const [newTeam, setNewTeam] = useState({ name: '', members: [] });
 
@@ -5326,10 +5486,37 @@ const PeopleTab = ({ technicians = [], allIssues = [], onRefresh }) => {
     // Parent fetchDashboardData handles this.
   }, []);
 
+  const normalizedSearch = searchQuery.trim().toLowerCase();
+  const filteredTechnicians = React.useMemo(() => {
+    const externalOnly = (technicians || []).filter((t) => t.type === 'EXTERNAL');
+    if (!normalizedSearch) return externalOnly;
+    return externalOnly.filter((tech) => {
+      const haystack = [
+        tech.name,
+        tech.email,
+        tech.phone,
+        tech.type,
+        tech.specialization,
+        tech.specialty,
+      ].filter(Boolean).join(' ').toLowerCase();
+      return haystack.includes(normalizedSearch);
+    });
+  }, [normalizedSearch, technicians]);
+  const filteredTeams = React.useMemo(() => {
+    if (!normalizedSearch) return teams;
+    return (teams || []).filter((team) => {
+      const memberNames = Array.isArray(team.members)
+        ? team.members.map((member) => typeof member === 'object' ? member?.name : member)
+        : [];
+      const haystack = [team.name, ...memberNames].filter(Boolean).join(' ').toLowerCase();
+      return haystack.includes(normalizedSearch);
+    });
+  }, [normalizedSearch, teams]);
+
   const exportCSV = () => {
-    if (!technicians || technicians.length === 0) return;
+    if (!filteredTechnicians || filteredTechnicians.length === 0) return;
     const keys = ['id', 'name', 'email', 'phone', 'role'];
-    const rows = technicians.map(t => ({
+    const rows = filteredTechnicians.map(t => ({
       id: t._id || t.id || '',
       name: t.name || '',
       email: t.email || '',
@@ -5427,6 +5614,15 @@ const PeopleTab = ({ technicians = [], allIssues = [], onRefresh }) => {
           <p className="text-sm text-gray-500 mt-0.5">External Technicians and Personnel</p>
         </div>
         <div className="flex items-center gap-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search people or teams..."
+              className="pl-9 pr-3 py-2 rounded-xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
+            />
+          </div>
           <button onClick={exportCSV} className="px-3 py-2 bg-white border rounded-xl text-sm font-semibold hover:bg-gray-50">Export CSV</button>
           <button onClick={() => setShowAddTeam(true)} className="px-3 py-2 bg-white border rounded-xl text-sm font-semibold hover:bg-gray-50">Add Team</button>
           <button onClick={() => setShowAddPerson(true)} className="px-3 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700">Add Person</button>
@@ -5449,11 +5645,10 @@ const PeopleTab = ({ technicians = [], allIssues = [], onRefresh }) => {
             </thead>
             <tbody>
               {(() => {
-                const externalOnly = (technicians || []).filter(t => t.type === 'EXTERNAL');
-                if (externalOnly.length === 0) {
+                if (filteredTechnicians.length === 0) {
                   return <tr><td colSpan="7" className="py-20 text-center"><p className="text-gray-500">No external technicians found</p></td></tr>;
                 }
-                return externalOnly.map((t, idx) => (
+                return filteredTechnicians.map((t, idx) => (
                   <tr key={t._id || t.id || `person-${idx}`} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
                     <td className="py-4 px-4"><div className="text-sm font-bold text-gray-900">{t.name || 'Unnamed Tech'}</div></td>
                     <td className="py-4 px-4 text-sm text-gray-600 font-mono">{String(t._id || t.id || '').slice(-8)}</td>
@@ -5516,10 +5711,10 @@ const PeopleTab = ({ technicians = [], allIssues = [], onRefresh }) => {
               </tr>
             </thead>
             <tbody>
-              {teams.length === 0 ? (
+              {filteredTeams.length === 0 ? (
                 <tr><td colSpan="3" className="py-20 text-center"><p className="text-gray-500">No teams found</p></td></tr>
               ) : (
-                teams.map((team, idx) => (
+                filteredTeams.map((team, idx) => (
                   <tr key={team._id || team.id || `team-${idx}`} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
                     <td className="py-4 px-4"><div className="text-sm font-bold text-gray-900">{team.name}</div></td>
                     <td className="py-4 px-4">
@@ -5632,6 +5827,7 @@ const ChecklistsTab = () => {
   const [loading, setLoading] = React.useState(false);
   const [showCreate, setShowCreate] = React.useState(false);
   const [creating, setCreating] = React.useState(false);
+  const [searchQuery, setSearchQuery] = React.useState('');
   const [form, setForm] = React.useState({
     name: '',
     description: '',
@@ -5667,11 +5863,30 @@ const ChecklistsTab = () => {
   };
 
   const stepsCount = (it) => stepsFromItem(it).length;
+  const filteredItems = React.useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return items;
+    return (items || []).filter((it) => {
+      const stepText = stepsFromItem(it)
+        .map((step) => typeof step === 'string' ? step : step?.text)
+        .filter(Boolean)
+        .join(' ');
+      const haystack = [
+        it.name,
+        it.title,
+        it.description,
+        it.frequency,
+        it.interval,
+        stepText,
+      ].filter(Boolean).join(' ').toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [items, searchQuery]);
 
   const exportCSV = () => {
-    if (!items || items.length === 0) return;
+    if (!filteredItems || filteredItems.length === 0) return;
     const keys = ['id', 'name', 'description', 'frequency', 'steps'];
-    const rows = items.map(it => {
+    const rows = filteredItems.map(it => {
       const list = stepsFromItem(it);
       const stepsText = (list || [])
         .map(s => (typeof s === 'string' ? s : (s?.text || '')))
@@ -5737,6 +5952,15 @@ const ChecklistsTab = () => {
           <p className="text-sm text-gray-500 mt-0.5">Maintenance checklists and templates</p>
         </div>
         <div className="flex items-center gap-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search checklists..."
+              className="pl-9 pr-3 py-2 rounded-xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
+            />
+          </div>
           <button onClick={() => setShowCreate(true)} className="px-3 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700">New Checklist</button>
           <button onClick={exportCSV} className="px-3 py-2 bg-white border rounded-xl text-sm font-semibold hover:bg-gray-50">Export CSV</button>
         </div>
@@ -5841,7 +6065,7 @@ const ChecklistsTab = () => {
               </tr>
             </thead>
             <tbody>
-              {items.map((it, idx) => (
+              {filteredItems.map((it, idx) => (
                 <tr key={it._id || it.id || `chk-${idx}`} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
                   <td className="py-4 px-4"><div className="text-sm font-bold text-gray-900">{it.name || it.title || 'Unnamed'}</div></td>
                   <td className="py-4 px-4 text-sm text-gray-600 font-mono">{String(it._id || it.id || '').slice(-8)}</td>
@@ -5851,7 +6075,7 @@ const ChecklistsTab = () => {
                   <td className="py-4 px-4 text-right"><div className="flex items-center justify-end gap-2"><button className="p-1.5 hover:bg-gray-100 rounded-lg"><Eye className="w-4 h-4 text-blue-600" /></button></div></td>
                 </tr>
               ))}
-              {items.length === 0 && !loading && (<tr><td colSpan="6" className="py-20 text-center"><p className="text-gray-500">No checklists/templates found</p></td></tr>)}
+              {filteredItems.length === 0 && !loading && (<tr><td colSpan="6" className="py-20 text-center"><p className="text-gray-500">No checklists/templates found</p></td></tr>)}
               {loading && (<tr><td colSpan="6" className="py-20 text-center"><p className="text-gray-500">Loading checklists...</p></td></tr>)}
             </tbody>
           </table>
@@ -5867,7 +6091,7 @@ const PartsInventoryTab = () => {
   const fileRef = React.useRef(null);
   const [showAddItem, setShowAddItem] = useState(false);
   const [creatingItem, setCreatingItem] = useState(false);
-  const selection = useBulkSelection(items, (item) => item._id || item.id);
+  const [searchQuery, setSearchQuery] = useState('');
   const [newItem, setNewItem] = useState({
     name: '',
     status: 'AVAILABLE',
@@ -5878,6 +6102,23 @@ const PartsInventoryTab = () => {
     location: '',
     barcode: ''
   });
+  const filteredItems = React.useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return items;
+    return (items || []).filter((item) => {
+      const haystack = [
+        item.name,
+        item.title,
+        item.partName,
+        item.status,
+        item.location,
+        item.warehouse,
+        item.barcode,
+      ].filter(Boolean).join(' ').toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [items, searchQuery]);
+  const selection = useBulkSelection(filteredItems, (item) => item._id || item.id);
   useEffect(() => {
     (async () => {
       try {
@@ -5890,9 +6131,9 @@ const PartsInventoryTab = () => {
   }, []);
 
   const exportCSV = () => {
-    if (!items || items.length === 0) return;
+    if (!filteredItems || filteredItems.length === 0) return;
     const keys = ['id', 'name', 'status', 'availableQty', 'allocatedQty', 'onHand', 'incomingQty', 'location', 'barcode'];
-    const rows = items.map(it => ({
+    const rows = filteredItems.map(it => ({
       id: it._id || it.id || '',
       name: it.name || it.title || it.partName || '',
       status: it.status || it.state || '',
@@ -6000,6 +6241,15 @@ const PartsInventoryTab = () => {
           <p className="text-sm text-gray-500 mt-0.5">Manage parts, stock levels and locations</p>
         </div>
         <div className="flex items-center gap-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search parts..."
+              className="pl-9 pr-3 py-2 rounded-xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
+            />
+          </div>
           <button onClick={exportCSV} className="px-3 py-2 bg-white border rounded-xl text-sm font-semibold hover:bg-gray-50">Export CSV</button>
           <button onClick={downloadTemplate} className="px-3 py-2 bg-white border rounded-xl text-sm font-semibold hover:bg-gray-50">Download Template</button>
           <button onClick={() => setShowAddItem(true)} className="px-3 py-2 bg-gray-900 text-blue-600 rounded-xl text-sm font-bold">Add Person</button>
@@ -6033,7 +6283,7 @@ const PartsInventoryTab = () => {
               </tr>
             </thead>
             <tbody>
-              {items.map((it, idx) => (
+              {filteredItems.map((it, idx) => (
                 <tr key={it._id || it.id || `part-${idx}`} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
                   <td className="py-4 px-4">
                     <input
@@ -6053,7 +6303,7 @@ const PartsInventoryTab = () => {
                   <td className="py-4 px-4 text-right"><button className="p-1.5 hover:bg-gray-100 rounded-lg"><Eye className="w-4 h-4 text-blue-600" /></button></td>
                 </tr>
               ))}
-              {items.length === 0 && (<tr><td colSpan="9" className="py-20 text-center"><p className="text-gray-500">No parts or inventory found</p></td></tr>)}
+              {filteredItems.length === 0 && (<tr><td colSpan="9" className="py-20 text-center"><p className="text-gray-500">No parts or inventory found</p></td></tr>)}
             </tbody>
           </table>
         </div>
@@ -6103,6 +6353,7 @@ const PartsInventoryTab = () => {
 const PurchaseOrdersTab = () => {
   const [orders, setOrders] = useState([]);
   const [vendors, setVendors] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [showAdd, setShowAdd] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -6164,9 +6415,9 @@ const PurchaseOrdersTab = () => {
   }, []);
 
   const exportCSV = () => {
-    if (!orders || orders.length === 0) return;
+    if (!filteredOrders || filteredOrders.length === 0) return;
     const keys = ['id', 'title', 'poNumber', 'itemsCount', 'totalCost', 'vendor', 'createdBy'];
-    const rows = orders.map(o => ({ id: o._id || o.id || '', title: o.title || o.name || '', poNumber: o.poNumber || o.number || '', itemsCount: Array.isArray(o.items) ? o.items.length : '', totalCost: o.totalCost || o.cost || '', vendor: o.vendor?.name || o.vendor || '', createdBy: o.createdBy?.name || o.createdBy || '' }));
+    const rows = filteredOrders.map(o => ({ id: o._id || o.id || '', title: o.title || o.name || '', poNumber: o.poNumber || o.number || '', itemsCount: Array.isArray(o.items) ? o.items.length : '', totalCost: o.totalCost || o.cost || '', vendor: o.vendor?.name || o.vendor || '', createdBy: o.createdBy?.name || o.createdBy || '' }));
     const csv = [keys.join(',')].concat(rows.map(r => keys.map(k => (`"${String(r[k] ?? '').replace(/"/g, '""')}"`)).join(','))).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'purchase-orders.csv'; a.click(); URL.revokeObjectURL(url);
   };
@@ -6185,6 +6436,25 @@ const PurchaseOrdersTab = () => {
     if (!Array.isArray(po?.items)) return 0;
     return po.items.reduce((sum, item) => sum + ((Number(item?.quantity) || 0) * (Number(item?.unitCost || item?.cost) || 0)), 0);
   };
+  const filteredOrders = React.useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return orders;
+    return (orders || []).filter((order) => {
+      const haystack = [
+        order.title,
+        order.name,
+        order.poNumber,
+        order.number,
+        order.vendor?.name,
+        order.vendor,
+        order.createdBy?.name,
+        order.createdBy?.email,
+        order.category,
+        order.status,
+      ].filter(Boolean).join(' ').toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [orders, searchQuery]);
 
   const resetPoForm = () => setForm({
     title: '',
@@ -6354,6 +6624,15 @@ const PurchaseOrdersTab = () => {
           <p className="text-sm text-gray-500 mt-0.5">Create, view and export purchase orders</p>
         </div>
         <div className="flex items-center gap-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search purchase orders..."
+              className="pl-9 pr-3 py-2 rounded-xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
+            />
+          </div>
           <button onClick={() => setShowAdd(s => !s)} className="px-3 py-2 bg-white border rounded-xl text-sm font-semibold hover:bg-gray-50">
             {showAdd ? 'Close' : 'New PO'}
           </button>
@@ -6606,7 +6885,7 @@ const PurchaseOrdersTab = () => {
               </tr>
             </thead>
             <tbody>
-              {orders.map((o, idx) => (
+              {filteredOrders.map((o, idx) => (
                 <tr key={o._id || o.id || `po-${idx}`} className={`border-b border-gray-50 hover:bg-gray-50/50 transition-colors cursor-pointer ${selectedPo && getPoRouteId(selectedPo) === getPoRouteId(o) ? 'bg-blue-50/60' : ''}`} onClick={() => { setSelectedPo(o); setShowDetails(true); }}>
                   <td className="py-4 px-4">{o.title || o.name || 'PO'}</td>
                   <td className="py-4 px-4">{o.poNumber || o.number || '-'}</td>
@@ -6616,7 +6895,7 @@ const PurchaseOrdersTab = () => {
                   <td className="py-4 px-4 text-right"><button type="button" className="p-1.5 hover:bg-gray-100 rounded-lg" onClick={(e) => { e.stopPropagation(); setSelectedPo(o); setShowDetails(true); }}><Eye className="w-4 h-4 text-blue-600" /></button></td>
                 </tr>
               ))}
-              {orders.length === 0 && (<tr><td colSpan="6" className="py-20 text-center"><p className="text-gray-500">No purchase orders found</p></td></tr>)}
+              {filteredOrders.length === 0 && (<tr><td colSpan="6" className="py-20 text-center"><p className="text-gray-500">No purchase orders found</p></td></tr>)}
             </tbody>
           </table>
         </div>
@@ -6748,6 +7027,7 @@ const VendorsTab = ({ type = 'vendor' }) => {
   const fileRef = React.useRef(null);
   const [showAddVendor, setShowAddVendor] = useState(false);
   const [creatingVendor, setCreatingVendor] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [newVendor, setNewVendor] = useState({
     name: '',
     address: '',
@@ -6800,11 +7080,31 @@ const VendorsTab = ({ type = 'vendor' }) => {
     };
   }, []);
 
-  const filteredEntries = (vendors || []).filter((v) => {
-    const label = (v.__typeLabel || v.type || v.role || '').toLowerCase();
-    if (type === 'vendor') return label.includes('vendor');
-    return label.includes('customer') || label.includes('client') || label.includes('requestor');
-  });
+  const filteredEntries = React.useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return (vendors || []).filter((v) => {
+      const label = (v.__typeLabel || v.type || v.role || '').toLowerCase();
+      const typeMatch = type === 'vendor'
+        ? label.includes('vendor')
+        : label.includes('customer') || label.includes('client') || label.includes('requestor');
+      if (!typeMatch) return false;
+      if (!query) return true;
+      const haystack = [
+        v.name,
+        v.company,
+        v.fullName,
+        v.address,
+        v.street,
+        v.phone,
+        v.phoneNumber,
+        v.contactName,
+        v.contact,
+        v.email,
+        v.__typeLabel,
+      ].filter(Boolean).join(' ').toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [searchQuery, type, vendors]);
   const selection = useBulkSelection(filteredEntries, (vendor) => vendor._id || vendor.id);
 
   const exportCSV = () => {
@@ -6985,6 +7285,15 @@ const VendorsTab = ({ type = 'vendor' }) => {
           <p className="text-sm text-gray-500 mt-0.5">{type === 'vendor' ? 'Suppliers and service partners' : 'Customer contacts'}</p>
         </div>
         <div className="flex items-center gap-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={`Search ${type === 'vendor' ? 'vendors' : 'customers'}...`}
+              className="pl-9 pr-3 py-2 rounded-xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
+            />
+          </div>
           <button onClick={exportCSV} className="px-3 py-2 bg-white border rounded-xl text-sm font-semibold hover:bg-gray-50">Export CSV</button>
           <button onClick={downloadTemplate} className="px-3 py-2 bg-white border rounded-xl text-sm font-semibold hover:bg-gray-50">Download Template</button>
           <button onClick={() => setShowAddVendor(true)} className="px-3 py-2 bg-gray-900 text-blue-600 rounded-xl text-sm font-bold">
@@ -7186,10 +7495,12 @@ const PreventiveMaintenanceTab = ({ issues, technicians, locations, assets, onRe
     technicianId: ''
   });
 
-  const filtered = issues.filter(issue =>
-    issue.title?.toLowerCase().includes(localSearch.toLowerCase()) ||
-    issue.description?.toLowerCase().includes(localSearch.toLowerCase())
-  );
+  const filtered = React.useMemo(() => (
+    issues.filter(issue =>
+      issue.title?.toLowerCase().includes(localSearch.toLowerCase()) ||
+      issue.description?.toLowerCase().includes(localSearch.toLowerCase())
+    )
+  ), [issues, localSearch]);
   const selection = useBulkSelection(filtered, (issue) => issue._id || issue.id);
   const formatFrequency = (value) => {
     if (!value) return '—';
@@ -7533,7 +7844,7 @@ const IssuesTab = ({
   onRefresh,
   onCreateWorkOrder
 }) => {
-  const selection = useBulkSelection(issues, (issue) => issue._id || issue.id);
+  const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState('table');
   const [expandedGroups, setExpandedGroups] = useState({});
   const [calendarFilterOpen, setCalendarFilterOpen] = useState(null);
@@ -7542,6 +7853,24 @@ const IssuesTab = ({
   const [calendarAssigneeFilter, setCalendarAssigneeFilter] = useState('all');
   const [calendarDayFilter, setCalendarDayFilter] = useState('any');
   const [calendarLocationFilters, setCalendarLocationFilters] = useState([]);
+  const filteredIssues = React.useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return issues;
+    return (issues || []).filter((issue) => {
+      const haystack = [
+        issue.title,
+        issue.description,
+        issue.location,
+        issue.assetName,
+        issue.priority,
+        issue.status,
+        getAssignedTechName(issue),
+        normalizeId(issue._id || issue.id),
+      ].filter(Boolean).join(' ').toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [issues, searchQuery, getAssignedTechName]);
+  const selection = useBulkSelection(filteredIssues, (issue) => issue._id || issue.id);
 
   const getIssueDate = (issue) => normalizeDate(issue.fixDeadline || issue.dueDate || issue.createdAt || issue.date);
 
@@ -7590,7 +7919,7 @@ const IssuesTab = ({
   };
 
   const { days: calendarDays, monthLabel } = buildCalendarDays();
-  const issuesByDay = issues.reduce((acc, issue) => {
+  const issuesByDay = filteredIssues.reduce((acc, issue) => {
     const date = getIssueDate(issue);
     if (!date || Number.isNaN(date.getTime())) return acc;
     const key = date.toISOString().slice(0, 10);
@@ -7598,14 +7927,14 @@ const IssuesTab = ({
     acc[key].push(issue);
     return acc;
   }, {});
-  const statusCounts = issues.reduce((acc, issue) => {
+  const statusCounts = filteredIssues.reduce((acc, issue) => {
     const normalized = normalizeStatus(issue);
     acc[normalized] = (acc[normalized] || 0) + 1;
     return acc;
   }, {});
 
-  const allLocations = Array.from(new Set(issues.map((issue) => issue.location || issue.assetName).filter(Boolean)));
-  const calendarIssues = issues.filter((issue) => {
+  const allLocations = Array.from(new Set(filteredIssues.map((issue) => issue.location || issue.assetName).filter(Boolean)));
+  const calendarIssues = filteredIssues.filter((issue) => {
     const statusOk = calendarStatusFilters.includes(normalizeStatus(issue));
     const priority = String(issue.priority || 'NONE').toUpperCase();
     const priorityOk = calendarPriorityFilters.includes(priority);
@@ -7644,7 +7973,7 @@ const IssuesTab = ({
     return acc;
   }, {});
 
-  const groups = issues.reduce((acc, issue) => {
+  const groups = filteredIssues.reduce((acc, issue) => {
     const label = getAssigneeLabel(issue);
     if (!acc[label]) acc[label] = [];
     acc[label].push(issue);
@@ -7673,6 +8002,15 @@ const IssuesTab = ({
           <p className="text-sm text-gray-600">Manage and track active work orders</p>
         </div>
         <div className="flex items-center gap-2">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search work orders..."
+              className="pl-9 pr-3 py-2 rounded-lg border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
+            />
+          </div>
           <div className="flex items-center gap-1 rounded-lg border border-gray-200 bg-white/70 p-1">
             <button
               onClick={() => setViewMode('table')}
@@ -7728,7 +8066,7 @@ const IssuesTab = ({
             </tr>
           </thead>
           <tbody>
-            {issues.map((issue, idx) => (
+            {filteredIssues.map((issue, idx) => (
               <React.Fragment key={issue._id || issue.id || `issue-row-${idx}`}>
                 <tr
                   onClick={() => onOpenDetails && onOpenDetails('issue', issue)}
@@ -7878,7 +8216,7 @@ const IssuesTab = ({
                 )}
               </React.Fragment>
             ))}
-            {issues.length === 0 && (
+            {filteredIssues.length === 0 && (
               <tr>
                 <td colSpan="11" className="py-20 text-center">
                   <div className="flex flex-col items-center">
@@ -8521,7 +8859,23 @@ const AllIssuesTab = ({
 };
 
 // Enhanced Feedback Tab
-const FeedbackTab = ({ feedbacks, loadingFeedbacks }) => (
+const FeedbackTab = ({ feedbacks, loadingFeedbacks }) => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const filteredFeedbacks = React.useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return feedbacks;
+    return (feedbacks || []).filter((fb) => {
+      const haystack = [
+        fb.technicianName,
+        fb.title,
+        fb.evidence?.address,
+        fb.evidence?.notes,
+      ].filter(Boolean).join(' ').toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [feedbacks, searchQuery]);
+
+  return (
   <div>
     <div className="mb-6">
       <div className="flex items-center justify-between">
@@ -8529,12 +8883,23 @@ const FeedbackTab = ({ feedbacks, loadingFeedbacks }) => (
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Technician Feedback</h2>
           <p className="text-gray-600">Review completion reports and feedback from technicians</p>
         </div>
-        <GradientButton color="green" className="px-6">
-          <span className="flex items-center gap-2">
-            <MessageSquare className="w-5 h-5" />
-            Feedback Overview
-          </span>
-        </GradientButton>
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search feedback..."
+              className="pl-9 pr-3 py-2 rounded-xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-green-200"
+            />
+          </div>
+          <GradientButton color="green" className="px-6">
+            <span className="flex items-center gap-2">
+              <MessageSquare className="w-5 h-5" />
+              Feedback Overview
+            </span>
+          </GradientButton>
+        </div>
       </div>
     </div>
 
@@ -8546,7 +8911,7 @@ const FeedbackTab = ({ feedbacks, loadingFeedbacks }) => (
         </div>
         <p className="mt-4 text-gray-600 animate-pulse">Loading feedback...</p>
       </div>
-    ) : feedbacks.length === 0 ? (
+    ) : filteredFeedbacks.length === 0 ? (
       <GlassCard className="p-12 text-center">
         <div className="w-24 h-24 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full flex items-center justify-center mx-auto mb-6">
           <MessageSquare className="w-12 h-12 text-gray-400" />
@@ -8559,7 +8924,7 @@ const FeedbackTab = ({ feedbacks, loadingFeedbacks }) => (
       </GlassCard>
     ) : (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {feedbacks.map((fb, idx) => (
+        {filteredFeedbacks.map((fb, idx) => (
           <div key={fb._id || idx} className="group relative">
             <div className="absolute inset-0 bg-gradient-to-r from-emerald-500 to-green-500 rounded-2xl blur opacity-0 group-hover:opacity-10 transition-opacity duration-300" />
             <GlassCard className="relative p-6 hover:scale-[1.02] transition-all duration-300">
@@ -8624,7 +8989,994 @@ const FeedbackTab = ({ feedbacks, loadingFeedbacks }) => (
       </div>
     )}
   </div>
-);
+  );
+};
+
+const UserManagementTab = ({ users = [], issues = [] }) => {
+  const [search, setSearch] = useState('');
+  const [actionKey, setActionKey] = useState('');
+
+  const filteredUsers = React.useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return users;
+    return (users || []).filter((user) => {
+      const haystack = [
+        user.name,
+        user.email,
+        user.phone,
+        user.role,
+        user.status,
+        user.companyName,
+        user.branchName,
+      ].filter(Boolean).join(' ').toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [users, search]);
+
+  const roleCounts = React.useMemo(() => {
+    const counts = {};
+    (users || []).forEach((user) => {
+      const role = String(user.role || 'unknown').toLowerCase();
+      counts[role] = (counts[role] || 0) + 1;
+    });
+    return counts;
+  }, [users]);
+
+  const getWorkload = (user) => {
+    const userId = String(user._id || user.id || '');
+    if (!userId) return 0;
+    return (issues || []).filter((issue) => {
+      const assigned = String(issue.assignedTo || issue.assignees?.[0]?.id || issue.assignees?.[0]?._id || '');
+      return assigned === userId;
+    }).length;
+  };
+
+  const handleUserEdit = async (user) => {
+    const name = window.prompt('Update user name', user.name || '');
+    if (name === null) return;
+    const role = window.prompt('Update user role', user.role || '');
+    if (role === null) return;
+    const status = window.prompt('Update user status', user.status || 'active');
+    if (status === null) return;
+
+    try {
+      setActionKey(`edit:${user._id || user.id}`);
+      await api.patch(`/api/users/${user._id || user.id}`, {
+        name: name.trim(),
+        role: role.trim().toLowerCase(),
+        status: status.trim().toLowerCase(),
+      });
+      window.location.reload();
+    } catch (err) {
+      alert('Failed to update user: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setActionKey('');
+    }
+  };
+
+  const handleUserDelete = async (user) => {
+    if (!window.confirm(`Delete ${user.name || user.email || 'this user'}?`)) return;
+    try {
+      setActionKey(`delete:${user._id || user.id}`);
+      await api.delete(`/api/users/${user._id || user.id}`);
+      window.location.reload();
+    } catch (err) {
+      alert('Failed to delete user: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setActionKey('');
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">User Management</h2>
+          <p className="text-sm text-gray-500 mt-1">Manage platform users, roles, status, and company assignment from one place.</p>
+        </div>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search users..."
+            className="w-72 rounded-xl border border-gray-200 bg-white pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {[
+          { label: 'All Users', value: users.length, tone: 'from-blue-50 to-indigo-50 border-blue-100' },
+          { label: 'Admins', value: (roleCounts.superadmin || 0) + (roleCounts.admin || 0) + (roleCounts.manager || 0), tone: 'from-violet-50 to-purple-50 border-violet-100' },
+          { label: 'Technicians', value: roleCounts.technician || 0, tone: 'from-emerald-50 to-green-50 border-emerald-100' },
+          { label: 'Clients & Requestors', value: (roleCounts.client || 0) + (roleCounts.requestor || 0), tone: 'from-amber-50 to-yellow-50 border-amber-100' },
+        ].map((card) => (
+          <div key={card.label} className={`rounded-2xl border bg-gradient-to-br ${card.tone} p-5 shadow-sm`}>
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-gray-500">{card.label}</p>
+            <p className="mt-3 text-3xl font-black text-gray-900">{card.value}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="rounded-2xl border border-white/30 bg-white/90 p-5 shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead className="border-b border-gray-100">
+              <tr>
+                {['User', 'Role', 'Company', 'Status', 'Phone', 'Assigned Work', 'Created', 'Actions'].map((header) => (
+                  <th key={header} className="py-3 px-3 text-xs font-bold text-gray-500 uppercase tracking-wider">{header}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {filteredUsers.map((user, index) => (
+                <tr key={user._id || user.id || user.email || index} className="border-b border-gray-50 hover:bg-gray-50/70">
+                  <td className="py-3 px-3">
+                    <div>
+                      <div className="font-semibold text-gray-900">{user.name || 'Unnamed User'}</div>
+                      <div className="text-xs text-gray-500">{user.email || 'No email'}</div>
+                    </div>
+                  </td>
+                  <td className="py-3 px-3">
+                    <span className="inline-flex rounded-full bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700">
+                      {String(user.role || 'unknown').replace(/_/g, ' ')}
+                    </span>
+                  </td>
+                  <td className="py-3 px-3 text-sm text-gray-700">{user.companyName || 'No company'}</td>
+                  <td className="py-3 px-3">
+                    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${String(user.status || '').toLowerCase() === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
+                      {user.status || 'unknown'}
+                    </span>
+                  </td>
+                  <td className="py-3 px-3 text-sm text-gray-600">{user.phone || '—'}</td>
+                  <td className="py-3 px-3 text-sm font-semibold text-gray-900">{getWorkload(user)}</td>
+                  <td className="py-3 px-3 text-sm text-gray-500">{user.createdAt ? new Date(user.createdAt).toLocaleDateString() : '—'}</td>
+                  <td className="py-3 px-3">
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={() => handleUserEdit(user)}
+                        disabled={actionKey === `edit:${user._id || user.id}`}
+                        className="rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100 disabled:opacity-60"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleUserDelete(user)}
+                        disabled={actionKey === `delete:${user._id || user.id}`}
+                        className="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100 disabled:opacity-60"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {filteredUsers.length === 0 && (
+                <tr>
+                  <td colSpan="8" className="py-14 text-center text-sm text-gray-500">No users matched your search.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const CompanyManagementTab = ({ users = [], issues = [], assets = [], locations = [] }) => {
+  const [search, setSearch] = useState('');
+  const [actionKey, setActionKey] = useState('');
+
+  const companies = React.useMemo(() => {
+    const map = new globalThis.Map();
+    const ensure = (key) => {
+      if (!map.has(key)) {
+        map.set(key, {
+          name: key,
+          users: 0,
+          activeUsers: 0,
+          admins: 0,
+          technicians: 0,
+          requests: 0,
+          assets: 0,
+          locations: 0,
+        });
+      }
+      return map.get(key);
+    };
+
+    (users || []).forEach((user) => {
+      const company = String(user.companyName || 'Unassigned Company').trim() || 'Unassigned Company';
+      const entry = ensure(company);
+      entry.users += 1;
+      if (String(user.status || '').toLowerCase() === 'active') entry.activeUsers += 1;
+      if (['superadmin', 'admin', 'manager'].includes(String(user.role || '').toLowerCase())) entry.admins += 1;
+      if (String(user.role || '').toLowerCase() === 'technician') entry.technicians += 1;
+    });
+
+    (issues || []).forEach((issue) => {
+      const entry = ensure(String(issue.companyName || 'Unassigned Company').trim() || 'Unassigned Company');
+      entry.requests += 1;
+    });
+
+    (assets || []).forEach((asset) => {
+      const entry = ensure(String(asset.companyName || 'Unassigned Company').trim() || 'Unassigned Company');
+      entry.assets += 1;
+    });
+
+    (locations || []).forEach((location) => {
+      const entry = ensure(String(location.companyName || 'Unassigned Company').trim() || 'Unassigned Company');
+      entry.locations += 1;
+    });
+
+    return Array.from(map.values()).sort((a, b) => b.users - a.users || b.requests - a.requests);
+  }, [users, issues, assets, locations]);
+
+  const filteredCompanies = React.useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return companies;
+    return companies.filter((company) => {
+      const haystack = [
+        company.name,
+        company.users,
+        company.activeUsers,
+        company.admins,
+        company.technicians,
+        company.requests,
+        company.assets,
+        company.locations,
+      ].join(' ').toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [companies, search]);
+
+  const handleCompanyAction = async (action, companyName) => {
+    try {
+      setActionKey(`${action}:${companyName}`);
+      let payload = { action, companyName };
+      if (action === 'rename') {
+        const nextCompanyName = window.prompt('Enter the new company name', companyName);
+        if (!nextCompanyName || !nextCompanyName.trim() || nextCompanyName.trim() === companyName) {
+          setActionKey('');
+          return;
+        }
+        payload = { ...payload, nextCompanyName: nextCompanyName.trim() };
+      }
+      await api.patch('/api/users/company/manage', payload);
+      window.location.reload();
+    } catch (err) {
+      alert('Failed to apply company action: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setActionKey('');
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Company Management</h2>
+          <p className="text-sm text-gray-500 mt-1">View tenant companies and their platform footprint across users, issues, assets, and locations.</p>
+        </div>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search companies..."
+            className="w-72 rounded-xl border border-gray-200 bg-white pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {[
+          { label: 'Companies', value: companies.length, tone: 'from-blue-50 to-indigo-50 border-blue-100' },
+          { label: 'Users', value: users.length, tone: 'from-emerald-50 to-green-50 border-emerald-100' },
+          { label: 'Assets', value: assets.length, tone: 'from-amber-50 to-yellow-50 border-amber-100' },
+          { label: 'Locations', value: locations.length, tone: 'from-violet-50 to-purple-50 border-violet-100' },
+        ].map((card) => (
+          <div key={card.label} className={`rounded-2xl border bg-gradient-to-br ${card.tone} p-5 shadow-sm`}>
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-gray-500">{card.label}</p>
+            <p className="mt-3 text-3xl font-black text-gray-900">{card.value}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="rounded-2xl border border-white/30 bg-white/90 p-5 shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead className="border-b border-gray-100">
+              <tr>
+                {['Company', 'Users', 'Active Users', 'Admins', 'Technicians', 'Requests', 'Assets', 'Locations', 'Actions'].map((header) => (
+                  <th key={header} className="py-3 px-3 text-xs font-bold text-gray-500 uppercase tracking-wider">{header}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {filteredCompanies.map((company) => (
+                <tr key={company.name} className="border-b border-gray-50 hover:bg-gray-50/70">
+                  <td className="py-3 px-3 font-semibold text-gray-900">{company.name}</td>
+                  <td className="py-3 px-3 text-sm text-gray-700">{company.users}</td>
+                  <td className="py-3 px-3 text-sm text-gray-700">{company.activeUsers}</td>
+                  <td className="py-3 px-3 text-sm text-gray-700">{company.admins}</td>
+                  <td className="py-3 px-3 text-sm text-gray-700">{company.technicians}</td>
+                  <td className="py-3 px-3 text-sm font-semibold text-blue-700">{company.requests}</td>
+                  <td className="py-3 px-3 text-sm text-gray-700">{company.assets}</td>
+                  <td className="py-3 px-3 text-sm text-gray-700">{company.locations}</td>
+                  <td className="py-3 px-3">
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={() => handleCompanyAction('rename', company.name)}
+                        disabled={actionKey === `rename:${company.name}`}
+                        className="rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100 disabled:opacity-60"
+                      >
+                        Rename
+                      </button>
+                      <button
+                        onClick={() => handleCompanyAction('suspend', company.name)}
+                        disabled={actionKey === `suspend:${company.name}`}
+                        className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-100 disabled:opacity-60"
+                      >
+                        Suspend
+                      </button>
+                      <button
+                        onClick={() => handleCompanyAction('activate', company.name)}
+                        disabled={actionKey === `activate:${company.name}`}
+                        className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-60"
+                      >
+                        Activate
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {filteredCompanies.length === 0 && (
+                <tr>
+                  <td colSpan="9" className="py-14 text-center text-sm text-gray-500">No companies matched your search.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const SystemSettingsTab = () => {
+  const [settings, setSettings] = useState(null);
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [auditSummary, setAuditSummary] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [auditSearch, setAuditSearch] = useState('');
+  const [securityActionKey, setSecurityActionKey] = useState('');
+  const [manualBlockedIp, setManualBlockedIp] = useState('');
+  const [manualLockedEmail, setManualLockedEmail] = useState('');
+
+  const loadSettings = async () => {
+    setLoading(true);
+    try {
+      const [settingsRes, logsRes] = await Promise.all([
+        api.get('/api/system-settings'),
+        api.get('/api/audit-logs?limit=80'),
+      ]);
+      setSettings(settingsRes.data?.data || null);
+      setAuditLogs(logsRes.data?.data || []);
+      setAuditSummary(logsRes.data?.summary || null);
+    } catch (err) {
+      console.error('Failed to load system settings', err);
+      alert('Failed to load system settings: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadSettings();
+  }, []);
+
+  const updatePricingValue = (plan, cycle, value) => {
+    setSettings((prev) => ({
+      ...prev,
+      pricing: {
+        ...prev.pricing,
+        [plan]: {
+          ...prev.pricing?.[plan],
+          [cycle]: value,
+        },
+      },
+    }));
+  };
+
+  const updateSecurityValue = (key, value) => {
+    setSettings((prev) => ({
+      ...prev,
+      security: {
+        ...prev.security,
+        [key]: value,
+      },
+    }));
+  };
+
+  const updatePlatformValue = (key, value) => {
+    setSettings((prev) => ({
+      ...prev,
+      platform: {
+        ...prev.platform,
+        [key]: value,
+      },
+    }));
+  };
+
+  const saveSettings = async () => {
+    try {
+      setSaving(true);
+      const payload = {
+        pricing: settings?.pricing || {},
+        security: settings?.security || {},
+        platform: settings?.platform || {},
+      };
+      const res = await api.put('/api/system-settings', payload);
+      setSettings(res.data?.data || settings);
+      await loadSettings();
+    } catch (err) {
+      console.error('Failed to save system settings', err);
+      alert('Failed to save system settings: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const quickToggleMaintenanceMode = async () => {
+    const nextSettings = {
+      ...(settings || {}),
+      platform: {
+        ...(settings?.platform || {}),
+        maintenanceMode: !Boolean(settings?.platform?.maintenanceMode),
+      },
+    };
+
+    setSettings(nextSettings);
+
+    try {
+      setSaving(true);
+      const payload = {
+        pricing: nextSettings?.pricing || {},
+        security: nextSettings?.security || {},
+        platform: nextSettings?.platform || {},
+      };
+      const res = await api.put('/api/system-settings', payload);
+      setSettings(res.data?.data || nextSettings);
+      await loadSettings();
+    } catch (err) {
+      console.error('Failed to toggle maintenance mode', err);
+      alert('Failed to toggle maintenance mode: ' + (err.response?.data?.error || err.message));
+      setSettings(settings);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const filteredAuditLogs = React.useMemo(() => {
+    const query = auditSearch.trim().toLowerCase();
+    if (!query) return auditLogs;
+    return (auditLogs || []).filter((log) => {
+      const metadataString = (() => {
+        try {
+          return JSON.stringify(log.metadata || {});
+        } catch (error) {
+          return '';
+        }
+      })();
+      const haystack = [
+        log.actorName,
+        log.actorEmail,
+        log.actorRole,
+        log.action,
+        log.entityType,
+        log.entityId,
+        log.path,
+        log.companyName,
+        log.ipAddress,
+        log.userAgent,
+        log.severity,
+        log.statusCode,
+        log.success ? 'success' : 'failed',
+        metadataString,
+      ].filter(Boolean).join(' ').toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [auditLogs, auditSearch]);
+
+  const suspiciousAlerts = React.useMemo(() => {
+    return (auditLogs || [])
+      .filter((log) => log.action === 'security.failed_login_threshold_triggered')
+      .slice(0, 6);
+  }, [auditLogs]);
+
+  const applySecuritySearch = (value) => {
+    setAuditSearch(value);
+    const auditSection = document.getElementById('superadmin-audit-trail');
+    auditSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const applySecurityAction = async ({ actionType, email, ipAddress }) => {
+    try {
+      setSecurityActionKey(`${actionType}:${email || ipAddress || 'unknown'}`);
+      await api.post('/api/audit-logs/security-action', {
+        actionType,
+        email,
+        ipAddress,
+      });
+      if (actionType === 'block_ip' || actionType === 'unblock_ip') setManualBlockedIp('');
+      if (actionType === 'lock_account' || actionType === 'unlock_account') setManualLockedEmail('');
+      await loadSettings();
+    } catch (err) {
+      console.error('Failed to apply security action', err);
+      alert('Failed to apply security action: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setSecurityActionKey('');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20">
+        <div className="w-10 h-10 border-2 border-blue-100 border-t-blue-600 rounded-full animate-spin"></div>
+        <p className="mt-4 text-sm font-medium text-gray-500">Loading system settings...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">System Settings</h2>
+          <p className="text-sm text-gray-500 mt-1">Superadmin controls for pricing, security, platform behavior, and system monitoring.</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <button onClick={loadSettings} className="px-4 py-2 bg-white border rounded-xl text-sm font-semibold hover:bg-gray-50">Refresh</button>
+          <button onClick={saveSettings} disabled={saving} className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 disabled:opacity-60">
+            {saving ? 'Saving...' : 'Save Settings'}
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {[
+          { label: 'Audit Events', value: auditSummary?.totalEvents ?? 0, icon: Activity },
+          { label: 'Failed Logins (24h)', value: auditSummary?.failedLogins24h ?? 0, icon: Shield },
+          { label: 'Successful Logins (24h)', value: auditSummary?.successfulLogins24h ?? 0, icon: Users },
+          { label: 'Sensitive Changes (24h)', value: auditSummary?.sensitiveChanges24h ?? 0, icon: AlertCircle },
+        ].map((item) => (
+          <div key={item.label} className="rounded-2xl border border-white/30 bg-white/70 p-5 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-gray-500">{item.label}</p>
+                <p className="mt-2 text-3xl font-black text-gray-900">{item.value}</p>
+              </div>
+              <item.icon className="w-6 h-6 text-blue-600" />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <div className="rounded-2xl border border-white/30 bg-white/80 p-6 shadow-sm">
+          <div className="flex items-center gap-3 mb-5">
+            <CreditCard className="w-5 h-5 text-blue-600" />
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">Subscription Pricing</h3>
+              <p className="text-sm text-gray-500">Change plan pricing without editing backend code.</p>
+            </div>
+          </div>
+          <div className="space-y-5">
+            {['basic', 'professional', 'enterprise'].map((plan) => (
+              <div key={plan} className="rounded-xl border border-gray-100 p-4">
+                <div className="text-sm font-bold uppercase tracking-wide text-gray-700 mb-3">{plan}</div>
+                <div className="grid grid-cols-3 gap-3">
+                  {['weekly', 'monthly', 'yearly'].map((cycle) => (
+                    <label key={cycle} className="flex flex-col gap-1">
+                      <span className="text-xs font-semibold text-gray-500 capitalize">{cycle}</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={settings?.pricing?.[plan]?.[cycle] ?? 0}
+                        onChange={(e) => updatePricingValue(plan, cycle, Number(e.target.value) || 0)}
+                        className="rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                      />
+                    </label>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-white/30 bg-white/80 p-6 shadow-sm">
+          <div className="flex items-center gap-3 mb-5">
+            <Shield className="w-5 h-5 text-emerald-600" />
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">Security Controls</h3>
+              <p className="text-sm text-gray-500">Monitoring and hardening settings for the platform.</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-semibold text-gray-500">Max Login Attempts</span>
+              <input type="number" min="1" value={settings?.security?.maxLoginAttempts ?? 5} onChange={(e) => updateSecurityValue('maxLoginAttempts', Number(e.target.value) || 1)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-semibold text-gray-500">Lockout Minutes</span>
+              <input type="number" min="1" value={settings?.security?.lockoutMinutes ?? 15} onChange={(e) => updateSecurityValue('lockoutMinutes', Number(e.target.value) || 1)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-semibold text-gray-500">Session Timeout Hours</span>
+              <input type="number" min="1" value={settings?.security?.sessionTimeoutHours ?? 24} onChange={(e) => updateSecurityValue('sessionTimeoutHours', Number(e.target.value) || 1)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-semibold text-gray-500">Password Min Length</span>
+              <input type="number" min="6" value={settings?.security?.passwordMinLength ?? 8} onChange={(e) => updateSecurityValue('passwordMinLength', Number(e.target.value) || 8)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+            </label>
+            <label className="flex items-center justify-between rounded-xl border border-gray-100 px-4 py-3">
+              <span className="text-sm font-semibold text-gray-700">Audit Logging</span>
+              <input type="checkbox" checked={Boolean(settings?.security?.auditLoggingEnabled)} onChange={(e) => updateSecurityValue('auditLoggingEnabled', e.target.checked)} />
+            </label>
+            <label className="flex items-center justify-between rounded-xl border border-gray-100 px-4 py-3">
+              <span className="text-sm font-semibold text-gray-700">Notify on Failed Login</span>
+              <input type="checkbox" checked={Boolean(settings?.security?.notifyOnFailedLogin)} onChange={(e) => updateSecurityValue('notifyOnFailedLogin', e.target.checked)} />
+            </label>
+            <label className="flex items-center justify-between rounded-xl border border-gray-100 px-4 py-3">
+              <span className="text-sm font-semibold text-gray-700">Enforce MFA</span>
+              <input type="checkbox" checked={Boolean(settings?.security?.enforceMfa)} onChange={(e) => updateSecurityValue('enforceMfa', e.target.checked)} />
+            </label>
+            <label className="flex items-center justify-between rounded-xl border border-gray-100 px-4 py-3">
+              <span className="text-sm font-semibold text-gray-700">Allow Public Registration</span>
+              <input type="checkbox" checked={Boolean(settings?.security?.allowPublicRegistration)} onChange={(e) => updateSecurityValue('allowPublicRegistration', e.target.checked)} />
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-amber-200 bg-amber-50/80 p-6 shadow-sm">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <div className="flex items-center gap-3">
+              <AlertCircle className="w-5 h-5 text-amber-600" />
+              <h3 className="text-lg font-bold text-gray-900">Security Response Center</h3>
+              <span className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${
+                settings?.platform?.maintenanceMode
+                  ? 'bg-rose-100 text-rose-700'
+                  : 'bg-emerald-100 text-emerald-700'
+              }`}>
+                {settings?.platform?.maintenanceMode ? 'Maintenance is ON' : 'Maintenance is OFF'}
+              </span>
+            </div>
+            <p className="mt-2 text-sm text-gray-600">
+              Use these controls when you suspect attackers or want to monitor abnormal login activity quickly.
+            </p>
+            <p className="mt-2 text-sm font-medium text-gray-700">
+              {settings?.platform?.maintenanceMode
+                ? 'Normal users are currently blocked from logging in. Only superadmin can still access the system.'
+                : 'Normal users can log in normally right now.'}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <button
+              onClick={quickToggleMaintenanceMode}
+              disabled={saving}
+              className={`px-4 py-2 rounded-xl text-sm font-semibold ${
+                settings?.platform?.maintenanceMode
+                  ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                  : 'bg-rose-600 text-white hover:bg-rose-700'
+              } disabled:opacity-60`}
+            >
+              {settings?.platform?.maintenanceMode ? 'Disable Maintenance Mode' : 'Enable Maintenance Mode'}
+            </button>
+            <button
+              onClick={() => applySecuritySearch('security.failed_login_threshold_triggered')}
+              className="px-4 py-2 rounded-xl border border-amber-200 bg-white text-sm font-semibold text-amber-700 hover:bg-amber-100"
+            >
+              Review Security Alerts
+            </button>
+            <button
+              onClick={() => applySecuritySearch('auth.login_failed')}
+              className="px-4 py-2 rounded-xl border border-gray-200 bg-white text-sm font-semibold text-gray-700 hover:bg-gray-50"
+            >
+              Review Failed Logins
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-5 grid grid-cols-1 xl:grid-cols-2 gap-4">
+          <div className="rounded-2xl border border-white/70 bg-white/80 p-5">
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-amber-700">Recommended Response</p>
+            <div className="mt-3 space-y-3 text-sm text-gray-700">
+              <p>1. Review the latest failed-login alerts below and verify the account email and source IP.</p>
+              <p>2. If the pattern looks hostile, turn on maintenance mode and save settings to notify the whole system.</p>
+              <p>3. Keep audit logging enabled so every suspicious action is recorded for follow-up.</p>
+            </div>
+          </div>
+          <div className="rounded-2xl border border-white/70 bg-white/80 p-5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-amber-700">Recent Security Alerts</p>
+                <p className="mt-1 text-sm text-gray-500">Triggered after 3 consecutive failed logins.</p>
+              </div>
+              <span className="inline-flex rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-700">
+                {suspiciousAlerts.length} recent
+              </span>
+            </div>
+            <div className="mt-4 space-y-3">
+              {suspiciousAlerts.length ? suspiciousAlerts.map((log, index) => (
+                <div key={log._id || index} className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="font-semibold text-gray-900">{log.metadata?.attemptedEmail || log.actorEmail || 'Unknown account'}</div>
+                    <div className="text-xs text-gray-500">{log.createdAt ? new Date(log.createdAt).toLocaleString() : '-'}</div>
+                  </div>
+                  <div className="mt-1 text-sm text-gray-600">
+                    {log.metadata?.threshold || 3} failed attempts {log.ipAddress ? `from ${log.ipAddress}` : 'from an unknown IP'}.
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      onClick={() => applySecuritySearch(log.metadata?.attemptedEmail || log.actorEmail || 'security.failed_login_threshold_triggered')}
+                      className="text-sm font-semibold text-amber-700 hover:text-amber-800"
+                    >
+                      Investigate this alert
+                    </button>
+                    {log.ipAddress && (
+                      <button
+                        onClick={() => applySecurityAction({ actionType: 'block_ip', ipAddress: log.ipAddress })}
+                        disabled={securityActionKey === `block_ip:${log.ipAddress}`}
+                        className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100 disabled:opacity-60"
+                      >
+                        {securityActionKey === `block_ip:${log.ipAddress}` ? 'Blocking IP...' : 'Block IP'}
+                      </button>
+                    )}
+                    {(log.metadata?.attemptedEmail || log.actorEmail) && (
+                      <button
+                        onClick={() => applySecurityAction({ actionType: 'lock_account', email: log.metadata?.attemptedEmail || log.actorEmail })}
+                        disabled={securityActionKey === `lock_account:${log.metadata?.attemptedEmail || log.actorEmail}`}
+                        className="rounded-lg border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-200 disabled:opacity-60"
+                      >
+                        {securityActionKey === `lock_account:${log.metadata?.attemptedEmail || log.actorEmail}` ? 'Locking...' : 'Lock Account'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )) : (
+                <div className="rounded-xl border border-dashed border-amber-200 bg-white/80 px-4 py-6 text-sm text-gray-500">
+                  No suspicious failed-login threshold alerts yet.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-5 rounded-2xl border border-white/70 bg-white/85 p-5">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-amber-700">Security Actions</p>
+              <p className="mt-1 text-sm text-gray-500">Always-available controls for blocking IPs, locking accounts, and reversing those actions.</p>
+            </div>
+            <span className="text-xs font-semibold text-gray-500">
+              Support contact: {settings?.platform?.supportEmail || 'Not configured'}
+            </span>
+          </div>
+
+          <div className="mt-4 grid grid-cols-1 xl:grid-cols-2 gap-4">
+            <div className="rounded-xl border border-rose-100 bg-rose-50/70 p-4">
+              <p className="text-sm font-bold text-gray-900">IP Address Control</p>
+              <p className="mt-1 text-sm text-gray-500">Manually block or unblock a source IP.</p>
+              <div className="mt-3 space-y-3">
+                <input
+                  value={manualBlockedIp}
+                  onChange={(e) => setManualBlockedIp(e.target.value)}
+                  placeholder="Enter IP address"
+                  className="w-full rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-100"
+                />
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => applySecurityAction({ actionType: 'block_ip', ipAddress: manualBlockedIp.trim() })}
+                    disabled={!manualBlockedIp.trim() || securityActionKey === `block_ip:${manualBlockedIp.trim()}`}
+                    className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700 disabled:opacity-60"
+                  >
+                    Block IP
+                  </button>
+                  <button
+                    onClick={() => applySecurityAction({ actionType: 'unblock_ip', ipAddress: manualBlockedIp.trim() })}
+                    disabled={!manualBlockedIp.trim() || securityActionKey === `unblock_ip:${manualBlockedIp.trim()}`}
+                    className="rounded-xl border border-rose-200 bg-white px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-100 disabled:opacity-60"
+                  >
+                    Unblock IP
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-4">
+              <p className="text-sm font-bold text-gray-900">Local Account Control</p>
+              <p className="mt-1 text-sm text-gray-500">Lock a user account during suspicious activity, or unlock it after review.</p>
+              <div className="mt-3 space-y-3">
+                <input
+                  value={manualLockedEmail}
+                  onChange={(e) => setManualLockedEmail(e.target.value)}
+                  placeholder="Enter account email"
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-100"
+                />
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => applySecurityAction({ actionType: 'lock_account', email: manualLockedEmail.trim() })}
+                    disabled={!manualLockedEmail.trim() || securityActionKey === `lock_account:${manualLockedEmail.trim()}`}
+                    className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
+                  >
+                    Lock Account
+                  </button>
+                  <button
+                    onClick={() => applySecurityAction({ actionType: 'unlock_account', email: manualLockedEmail.trim() })}
+                    disabled={!manualLockedEmail.trim() || securityActionKey === `unlock_account:${manualLockedEmail.trim()}`}
+                    className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-60"
+                  >
+                    Unlock Account
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500">
+                  Locked users are shown a support message on login so they know how to get help.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-white/30 bg-white/80 p-6 shadow-sm">
+        <div className="flex items-center gap-3 mb-5">
+          <Settings className="w-5 h-5 text-violet-600" />
+          <div>
+            <h3 className="text-lg font-bold text-gray-900">Platform Settings</h3>
+            <p className="text-sm text-gray-500">Global system details visible to the whole platform.</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-semibold text-gray-500">App Name</span>
+            <input value={settings?.platform?.appName || ''} onChange={(e) => updatePlatformValue('appName', e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-semibold text-gray-500">Support Email</span>
+            <input value={settings?.platform?.supportEmail || ''} onChange={(e) => updatePlatformValue('supportEmail', e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-semibold text-gray-500">Subscription Currency</span>
+            <input value={settings?.platform?.subscriptionCurrency ?? ''} onChange={(e) => updatePlatformValue('subscriptionCurrency', e.target.value)} placeholder="USD" className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+          </label>
+          <label className="flex items-center justify-between rounded-xl border border-gray-100 px-4 py-3">
+            <span className="text-sm font-semibold text-gray-700">Maintenance Mode Enabled</span>
+            <input type="checkbox" checked={Boolean(settings?.platform?.maintenanceMode)} onChange={(e) => updatePlatformValue('maintenanceMode', e.target.checked)} />
+          </label>
+        </div>
+        <div className="mt-5 grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="rounded-xl border border-rose-100 bg-rose-50/70 p-4">
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-rose-700">Blocked IP Addresses</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {(settings?.security?.blockedIpAddresses || []).length ? (settings?.security?.blockedIpAddresses || []).map((ip) => (
+                <button
+                  key={ip}
+                  onClick={() => applySecurityAction({ actionType: 'unblock_ip', ipAddress: ip })}
+                  disabled={securityActionKey === `unblock_ip:${ip}`}
+                  className="rounded-full border border-rose-200 bg-white px-3 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100 disabled:opacity-60"
+                >
+                  {securityActionKey === `unblock_ip:${ip}` ? `Unblocking ${ip}...` : `${ip} - Unblock`}
+                </button>
+              )) : <span className="text-sm text-gray-500">No blocked IP addresses.</span>}
+            </div>
+          </div>
+          <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-4">
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-700">Locked Accounts</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {(settings?.security?.blockedAccountEmails || []).length ? (settings?.security?.blockedAccountEmails || []).map((entry) => (
+                <button
+                  key={entry}
+                  onClick={() => applySecurityAction({ actionType: 'unlock_account', email: entry })}
+                  disabled={securityActionKey === `unlock_account:${entry}`}
+                  className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-60"
+                >
+                  {securityActionKey === `unlock_account:${entry}` ? `Unlocking ${entry}...` : `${entry} - Unlock`}
+                </button>
+              )) : <span className="text-sm text-gray-500">No locked local accounts.</span>}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="superadmin-audit-trail" className="rounded-2xl border border-white/30 bg-white/80 p-6 shadow-sm">
+        <div className="flex items-center justify-between gap-4 mb-5">
+          <div>
+            <h3 className="text-lg font-bold text-gray-900">Audit Trail</h3>
+            <p className="text-sm text-gray-500">Recent activity across logins and system actions.</p>
+          </div>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              value={auditSearch}
+              onChange={(e) => setAuditSearch(e.target.value)}
+              placeholder="Search audit logs..."
+              className="pl-9 pr-3 py-2 rounded-xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
+            />
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead className="border-b border-gray-100">
+              <tr>
+                <th className="py-3 px-3 text-xs font-bold text-gray-500 uppercase">When</th>
+                <th className="py-3 px-3 text-xs font-bold text-gray-500 uppercase">Actor</th>
+                <th className="py-3 px-3 text-xs font-bold text-gray-500 uppercase">Action</th>
+                <th className="py-3 px-3 text-xs font-bold text-gray-500 uppercase">Target</th>
+                <th className="py-3 px-3 text-xs font-bold text-gray-500 uppercase">Status</th>
+                <th className="py-3 px-3 text-xs font-bold text-gray-500 uppercase">IP</th>
+                <th className="py-3 px-3 text-xs font-bold text-gray-500 uppercase">Respond</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredAuditLogs.map((log, idx) => (
+                <tr key={log._id || idx} className="border-b border-gray-50">
+                  <td className="py-3 px-3 text-sm text-gray-600">{log.createdAt ? new Date(log.createdAt).toLocaleString() : '-'}</td>
+                  <td className="py-3 px-3 text-sm text-gray-700">
+                    <div className="font-semibold">{log.actorName || log.actorEmail || 'System'}</div>
+                    <div className="text-xs text-gray-500">{log.actorRole || '-'}</div>
+                  </td>
+                  <td className="py-3 px-3 text-sm font-semibold text-gray-900">{log.action}</td>
+                  <td className="py-3 px-3 text-sm text-gray-600">{log.entityType}{log.entityId ? ` / ${log.entityId}` : ''}</td>
+                  <td className="py-3 px-3 text-sm">
+                    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${log.success ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                      {log.statusCode || (log.success ? 'OK' : 'ERROR')}
+                    </span>
+                  </td>
+                  <td className="py-3 px-3 text-sm text-gray-500">{log.ipAddress || '-'}</td>
+                  <td className="py-3 px-3 text-sm">
+                    <div className="flex flex-wrap gap-2">
+                      {log.ipAddress && (
+                        <button
+                          onClick={() => applySecurityAction({ actionType: 'block_ip', ipAddress: log.ipAddress })}
+                          disabled={securityActionKey === `block_ip:${log.ipAddress}`}
+                          className="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100 disabled:opacity-60"
+                        >
+                          Block IP
+                        </button>
+                      )}
+                      {(log.metadata?.attemptedEmail || log.actorEmail) && (
+                        <button
+                          onClick={() => applySecurityAction({ actionType: 'lock_account', email: log.metadata?.attemptedEmail || log.actorEmail })}
+                          disabled={securityActionKey === `lock_account:${log.metadata?.attemptedEmail || log.actorEmail}`}
+                          className="rounded-lg border border-slate-200 bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-200 disabled:opacity-60"
+                        >
+                          Lock Account
+                        </button>
+                      )}
+                      {!log.ipAddress && !(log.metadata?.attemptedEmail || log.actorEmail) && (
+                        <span className="text-xs text-gray-400">-</span>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {filteredAuditLogs.length === 0 && (
+                <tr><td colSpan="7" className="py-12 text-center text-sm text-gray-500">No audit events found.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const DetailsModal = ({ open, type, item, onClose, getAssignedTechName, onRefresh, technicians = [], teams = [], onPrivateMessage }) => {
   const [formData, setFormData] = useState({

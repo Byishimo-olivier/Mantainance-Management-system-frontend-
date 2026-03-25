@@ -1,9 +1,117 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MessageSquare, X, Send, Bot, User, Trash2, Maximize2, Minimize2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 
+const ASSISTANT_ACTION_STORAGE_KEY = 'mms_assistant_action';
+
+const parseMarkdownTableMessage = (content) => {
+    const text = String(content || '');
+    const parseCells = (line) => line
+        .trim()
+        .replace(/^\|/, '')
+        .replace(/\|$/, '')
+        .split('|')
+        .map((cell) => cell.trim());
+    const buildParsedTable = (intro, headers, rows) => {
+        if (!headers.length || !rows.length) return null;
+        return {
+            intro: intro.trim(),
+            headers,
+            rows,
+        };
+    };
+
+    const lines = text.split(/\r?\n/);
+    const dividerIndex = lines.findIndex((line) => /^\|\s*---/.test(line.trim()));
+
+    if (dividerIndex > 0) {
+        const introLines = lines.slice(0, Math.max(0, dividerIndex - 1)).filter((line) => line.trim().length > 0);
+        const headerLine = lines[dividerIndex - 1];
+        const rowLines = lines.slice(dividerIndex + 1).filter((line) => line.trim().startsWith('|'));
+        const headers = parseCells(headerLine);
+        const rows = rowLines
+            .map(parseCells)
+            .filter((cells) => cells.length > 0 && cells.some((cell) => cell.length > 0));
+
+        const parsed = buildParsedTable(introLines.join('\n'), headers, rows);
+        if (parsed) return parsed;
+    }
+
+    const inlineDividerMatch = text.match(/^(.*?)(\|\s*[^|]+(?:\|\s*[^|]+)+\|?)\s*(\|\s*---(?:\s*\|\s*---)+\s*\|?)\s*(.+)$/);
+    if (!inlineDividerMatch) return null;
+
+    const intro = inlineDividerMatch[1] || '';
+    const headerSegment = inlineDividerMatch[2] || '';
+    const headers = parseCells(headerSegment);
+    const remaining = (inlineDividerMatch[4] || '').trim();
+    if (!headers.length || !remaining) return null;
+
+    const rawCells = remaining
+        .split('|')
+        .map((cell) => cell.trim())
+        .filter((cell) => cell.length > 0);
+
+    const rows = [];
+    for (let index = 0; index < rawCells.length; index += headers.length) {
+        const row = rawCells.slice(index, index + headers.length);
+        if (row.length === headers.length) rows.push(row);
+    }
+
+    return buildParsedTable(intro, headers, rows);
+};
+
+const normalizeAssistantText = (value) => String(value || '').trim().toLowerCase();
+
+const buildAssistantActionResponse = (query) => {
+    const q = normalizeAssistantText(query);
+    const wantsAdd = /\b(add|create|submit|make|open|new)\b/.test(q) || /\b(how|where|can i|could i|help)\b/.test(q);
+    if (!wantsAdd) return null;
+
+    const actionForEntity = (content, label, type) => ({
+        role: 'model',
+        kind: 'action',
+        content,
+        action: { label, type },
+    });
+
+    if (/\b(assigned requests|requests assigned|issues assigned|assigned issues)\b/.test(q)) {
+        return actionForEntity('Open the Requests tab to review and manage assigned requests.', 'Open Requests', 'openRequestsTab');
+    }
+    if (/\b(request|requests|issue request|issues requests|ticket|tickets)\b/.test(q)) {
+        return actionForEntity('Open the request form to add a new request.', 'Open Request Form', 'openRequestForm');
+    }
+    if (/\btechnician|technicians|worker|workers|staff\b/.test(q)) {
+        return actionForEntity('Open People & Teams to add a technician.', 'Add Technician', 'openAddTechnician');
+    }
+    if (/\bwork\s*order|workorders|wo\b/.test(q)) {
+        return actionForEntity('Open the full work order form to create a new work order.', 'Create Work Order', 'openWorkOrderDetailsForm');
+    }
+    if (/\basset|assets\b/.test(q)) {
+        return actionForEntity('Open the Assets area to add a new asset.', 'Add Asset', 'openAddAsset');
+    }
+    if (/\blocation|locations|property|properties|site|sites\b/.test(q)) {
+        return actionForEntity('Open Locations to add a new site or property.', 'Add Location', 'openAddLocation');
+    }
+    if (/\bpreventive|preventive maintenance|pm\b/.test(q)) {
+        return actionForEntity('Open preventive maintenance to create a new PM item.', 'Create Preventive', 'openCreatePm');
+    }
+    if (/\bschedule|schedules|maintenance schedule|maintenance schedules\b/.test(q)) {
+        return actionForEntity('Open the schedule form to add a new maintenance schedule.', 'Add Schedule', 'openAddSchedule');
+    }
+    if (/\bmeter|meters\b/.test(q)) {
+        return actionForEntity('Open the Meters tab and use the Add Meter button there.', 'Open Meters', 'openMetersTab');
+    }
+    if (/\bedge|device|devices|edge device|edge devices\b/.test(q)) {
+        return actionForEntity('Open the Edge tab and use the Add Device button there.', 'Open Edge', 'openEdgeTab');
+    }
+
+    return null;
+};
+
 const AIChatbot = () => {
+    const navigate = useNavigate();
     const [isOpen, setIsOpen] = useState(false);
     const [isMaximized, setIsMaximized] = useState(false);
     const [messages, setMessages] = useState([
@@ -41,11 +149,23 @@ const AIChatbot = () => {
         fetchSummary();
     }, [isOpen, summary, loadingSummary]);
 
+    const performAssistantAction = (actionType) => {
+        if (!actionType) return;
+        try {
+            sessionStorage.setItem(ASSISTANT_ACTION_STORAGE_KEY, actionType);
+        } catch (error) {
+            console.warn('Failed to persist assistant action', error);
+        }
+        navigate('/dashboard');
+        setIsOpen(false);
+    };
+
     const handleSend = async (e) => {
         e.preventDefault();
         if (!input.trim() || isTyping) return;
 
-        const userMessage = { role: 'user', content: input };
+        const content = input.trim();
+        const userMessage = { role: 'user', content };
         const validHistory = messages.filter((msg, index) => {
             if (!msg?.content) return false;
             if (index === 0 && msg.role !== 'user') return false;
@@ -55,9 +175,16 @@ const AIChatbot = () => {
         setInput('');
         setIsTyping(true);
 
+        const actionResponse = buildAssistantActionResponse(content);
+        if (actionResponse) {
+            setMessages(prev => [...prev, actionResponse]);
+            setIsTyping(false);
+            return;
+        }
+
         try {
             const res = await api.post('/api/ai/chat', {
-                message: input,
+                message: content,
                 history: validHistory
             });
 
@@ -193,33 +320,92 @@ const AIChatbot = () => {
                                     )}
                                 </div>
                             )}
-                            {messages.map((msg, i) => (
-                                <motion.div
-                                    initial={{ opacity: 0, x: msg.role === 'user' ? 20 : -20 }}
-                                    animate={{ opacity: 1, x: 0 }}
-                                    key={i}
-                                    className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} items-end gap-2`}
-                                >
-                                    {msg.role !== 'user' && (
-                                        <div className="w-7 h-7 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0 mb-1">
-                                            <Bot className="w-4 h-4 text-indigo-600" />
-                                        </div>
-                                    )}
-                                    <div
-                                        className={`max-w-[80%] p-3.5 rounded-2xl text-sm shadow-sm ${msg.role === 'user'
-                                            ? 'bg-gradient-to-br from-indigo-600 to-purple-600 text-white rounded-br-none'
-                                            : 'bg-white text-gray-800 border border-gray-100 rounded-bl-none'
-                                            }`}
+                            {messages.map((msg, i) => {
+                                const parsedTable = parseMarkdownTableMessage(msg.content);
+                                const isTableMessage = Boolean(parsedTable);
+
+                                return (
+                                    <motion.div
+                                        initial={{ opacity: 0, x: msg.role === 'user' ? 20 : -20 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        key={i}
+                                        className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} items-end gap-2`}
                                     >
-                                        {msg.content}
-                                    </div>
-                                    {msg.role === 'user' && (
-                                        <div className="w-7 h-7 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-lg flex items-center justify-center flex-shrink-0 text-white mb-1 shadow-md">
-                                            <User className="w-4 h-4" />
+                                        {msg.role !== 'user' && (
+                                            <div className="w-7 h-7 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0 mb-1">
+                                                <Bot className="w-4 h-4 text-indigo-600" />
+                                            </div>
+                                        )}
+                                        <div
+                                            className={`max-w-[80%] p-3.5 rounded-2xl text-sm shadow-sm ${msg.role === 'user'
+                                                ? 'bg-gradient-to-br from-indigo-600 to-purple-600 text-white rounded-br-none'
+                                                : 'bg-white text-gray-800 border border-gray-100 rounded-bl-none'
+                                                } ${isTableMessage ? 'overflow-hidden' : 'whitespace-pre-wrap'}`}
+                                        >
+                                            {msg.kind === 'action' && msg.action ? (
+                                                <div className="space-y-3">
+                                                    <div className="whitespace-pre-wrap text-sm font-medium text-slate-700">
+                                                        {msg.content}
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => performAssistantAction(msg.action.type)}
+                                                        className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+                                                    >
+                                                        <Send className="w-4 h-4" />
+                                                        {msg.action.label}
+                                                    </button>
+                                                </div>
+                                            ) : isTableMessage ? (
+                                                <div className="space-y-3">
+                                                    {parsedTable?.intro ? (
+                                                        <div className="whitespace-pre-wrap text-sm font-medium text-slate-700">
+                                                            {parsedTable.intro}
+                                                        </div>
+                                                    ) : null}
+                                                    <div className="overflow-x-auto rounded-xl border border-slate-200">
+                                                        <table className="min-w-full border-collapse text-xs">
+                                                            <thead className="bg-slate-100">
+                                                                <tr>
+                                                                    {parsedTable.headers.map((header) => (
+                                                                        <th
+                                                                            key={header}
+                                                                            className="border-b border-slate-200 px-3 py-2 text-left font-semibold text-slate-700"
+                                                                        >
+                                                                            {header}
+                                                                        </th>
+                                                                    ))}
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody className="bg-white">
+                                                                {parsedTable.rows.map((row, rowIndex) => (
+                                                                    <tr key={`${i}-${rowIndex}`} className="odd:bg-white even:bg-slate-50">
+                                                                        {parsedTable.headers.map((_, cellIndex) => (
+                                                                            <td
+                                                                                key={`${i}-${rowIndex}-${cellIndex}`}
+                                                                                className="border-t border-slate-100 px-3 py-2 text-slate-600"
+                                                                            >
+                                                                                {row[cellIndex] || '-'}
+                                                                            </td>
+                                                                        ))}
+                                                                    </tr>
+                                                                ))}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                msg.content
+                                            )}
                                         </div>
-                                    )}
-                                </motion.div>
-                            ))}
+                                        {msg.role === 'user' && (
+                                            <div className="w-7 h-7 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-lg flex items-center justify-center flex-shrink-0 text-white mb-1 shadow-md">
+                                                <User className="w-4 h-4" />
+                                            </div>
+                                        )}
+                                    </motion.div>
+                                );
+                            })}
                             {isTyping && (
                                 <div className="flex items-center gap-2">
                                     <div className="w-7 h-7 bg-indigo-100 rounded-lg flex items-center justify-center">

@@ -9,7 +9,9 @@ export function WorkOrderForm({
   checklistTemplates = [],
   companyProperties = [],
   companyAssets = [],
-  companyTechnicians = []
+  companyTechnicians = [],
+  disableAutoLoad = false,
+  publicCompanySlug = '',
 }) {
   const [activeTab, setActiveTab] = useState('create');
   const [templateSearch, setTemplateSearch] = useState('');
@@ -96,7 +98,7 @@ export function WorkOrderForm({
         (Array.isArray(companyAssets) && companyAssets.length > 0) ||
         (Array.isArray(companyTechnicians) && companyTechnicians.length > 0);
 
-      if (hasProvidedData) {
+      if (disableAutoLoad || hasProvidedData) {
         if (active) {
           setTemplates(Array.isArray(checklistTemplates) ? checklistTemplates : []);
           setProperties(Array.isArray(companyProperties) ? companyProperties : []);
@@ -143,7 +145,7 @@ export function WorkOrderForm({
     return () => {
       active = false;
     };
-  }, [checklistTemplates, companyProperties, companyAssets, companyTechnicians]);
+  }, [checklistTemplates, companyProperties, companyAssets, companyTechnicians, disableAutoLoad]);
 
   const filteredTemplates = templates.filter((tpl) =>
     tpl.name.toLowerCase().includes(templateSearch.toLowerCase()) ||
@@ -243,6 +245,7 @@ export function WorkOrderForm({
       if (form.assetId) fd.append('assetId', form.assetId);
       if (getAssetLabel(selectedAsset)) fd.append('assetName', getAssetLabel(selectedAsset));
       if (form.assignedTo) fd.append('assignedTo', form.assignedTo);
+      if (publicCompanySlug) fd.append('publicCompanySlug', publicCompanySlug);
       if (Array.isArray(form.checklist) && form.checklist.length > 0) {
         fd.append('checklist', JSON.stringify(form.checklist));
       }

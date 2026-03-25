@@ -512,6 +512,7 @@ const TechnicianDashboard = () => {
   const [directMessageRecipientId, setDirectMessageRecipientId] = useState('');
   const [directMessageDraft, setDirectMessageDraft] = useState('');
   const [directMessageSending, setDirectMessageSending] = useState(false);
+  const [activeSection, setActiveSection] = useState('overview');
   const navigate = useNavigate();
   const userName = user?.name || user?.username || 'Technician';
   const currentUserId = String(user?._id || user?.id || '');
@@ -563,7 +564,8 @@ const TechnicianDashboard = () => {
       const requestData = {
         ...materialRequestData,
         technicianId: user._id || user.id,
-        technicianName: user.name
+        technicianName: user.name,
+        clientId: user._id || user.id
       };
 
       await api.post('/api/material-requests', requestData);
@@ -779,7 +781,7 @@ const TechnicianDashboard = () => {
       role: user.role || 'technician',
       timestamp: startedAt
     };
-    const chat = [...baseChat, startMessage];
+    const chat = [...baseChat, startMessage];        
     try {
       setStartingTimer(true);
       await api.put(`/api/issues/${id}`, {
@@ -1066,6 +1068,78 @@ const TechnicianDashboard = () => {
     });
   }, [jobs]);
 
+  const recentOverviewItems = useMemo(() => {
+    const recentJobs = jobs
+      .map((job) => {
+        const timestamp = job.updatedAt || job.createdAt || job.completedAt || job.fixDeadline || null;
+        return {
+          id: `job-${job._id || job.id}`,
+          type: 'work-order',
+          title: job.title || 'Untitled work order',
+          subtitle: job.location || 'No location yet',
+          status: getJobStatus(job),
+          timestamp,
+          action: () => handleViewJob(job)
+        };
+      })
+      .filter((item) => item.timestamp);
+
+    const recentMaterials = materialRequests
+      .map((request) => ({
+        id: `material-${request._id || request.id}`,
+        type: 'material',
+        title: request.title || request.items?.[0]?.title || 'Material request',
+        subtitle: request.category || request.type || request.assetName || 'Inventory request',
+        status: request.status || (request.approved ? 'APPROVED' : 'PENDING'),
+        timestamp: request.createdAt || request.submittedAt || request.date || null,
+        action: () => {
+          setActiveSection('materials');
+        }
+      }))
+      .filter((item) => item.timestamp);
+
+    return [...recentJobs, ...recentMaterials]
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      .slice(0, 6);
+  }, [jobs, materialRequests]);
+
+  const overviewJobCounts = useMemo(() => {
+    return jobs.reduce((acc, job) => {
+      const status = String(getJobStatus(job) || '').toUpperCase();
+      if (status === 'IN PROGRESS') acc.inProgress += 1;
+      else if (status === 'OVERDUE') acc.overdue += 1;
+      else if (status === 'COMPLETE' || status === 'COMPLETED') acc.completed += 1;
+      else acc.assigned += 1;
+      return acc;
+    }, { assigned: 0, inProgress: 0, overdue: 0, completed: 0 });
+  }, [jobs]);
+
+  const materialOverviewSummary = useMemo(() => {
+    const summary = {
+      total: materialRequests.length,
+      pending: 0,
+      forwarded: 0,
+      approved: 0,
+      declined: 0,
+      recent: []
+    };
+
+    const recent = [...materialRequests]
+      .sort((a, b) => new Date(b.createdAt || b.submittedAt || b.date || 0).getTime() - new Date(a.createdAt || a.submittedAt || a.date || 0).getTime())
+      .slice(0, 4);
+
+    materialRequests.forEach((request) => {
+      const status = String(request?.status || request?.clientResponse || '').toUpperCase();
+      if (status.includes('APPROVED')) summary.approved += 1;
+      else if (status.includes('DECLINED') || status.includes('REJECTED')) summary.declined += 1;
+      else if (status.includes('FORWARDED')) summary.forwarded += 1;
+      else summary.pending += 1;
+    });
+
+    summary.recent = recent;
+    return summary;
+  }, [materialRequests]);
+
   const canStartTimerForJob = (job) => {
     const status = String(getJobStatus(job) || '').toUpperCase();
     return ['PENDING', 'ASSIGNED', 'OVERDUE', 'APPROVED', 'OPEN'].includes(status);
@@ -1295,10 +1369,11 @@ const TechnicianDashboard = () => {
   };
 
   const focusMessageCenter = (recipientId = '') => {
+    setActiveSection('messages');
     if (recipientId) {
       setDirectMessageRecipientId(String(recipientId));
     }
-    requestAnimationFrame(() => {
+    setTimeout(() => {
       const section = messageSectionRef.current || document.getElementById('technician-message-center');
       if (section) {
         section.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1307,7 +1382,7 @@ const TechnicianDashboard = () => {
       if (composer) {
         composer.focus();
       }
-    });
+    }, 0);
   };
 
   const handleNotificationNavigate = (notification) => {
@@ -1315,6 +1390,19 @@ const TechnicianDashboard = () => {
     if (!type.startsWith('direct_message')) return false;
     focusMessageCenter(getDirectMessageTargetId(notification) || '');
     return true;
+  };
+
+  const technicianNavItems = [
+    { key: 'overview', label: 'Overview', description: 'Summary and activity' },
+    { key: 'workOrders', label: 'Work Orders', description: 'Assigned and active work' },
+    { key: 'tasks', label: 'Tasks', description: 'Checklists and notes' },
+    { key: 'messages', label: 'Messages', description: 'Private messages and mentions' },
+    { key: 'materials', label: 'Materials', description: 'Requests and inventory needs' },
+    { key: 'history', label: 'History', description: 'Completed work' }
+  ];
+
+  const openTechnicianSection = (key) => {
+    setActiveSection(key);
   };
 
   return (
@@ -1447,10 +1535,14 @@ const TechnicianDashboard = () => {
               Messages
             </button>
             <button
-              onClick={toggleMaterialRequestForm}
-              className="px-6 py-2 glass-surface bg-blue-500/30 text-white rounded-full font-bold uppercase tracking-widest hover:bg-blue-500/50 transition-all border border-blue-400/20 shadow-lg"
+              onClick={() => {
+                setActiveSection('materials');
+                toggleMaterialRequestForm();
+              }}
+              className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-white/85 px-5 py-2.5 text-sm font-bold text-blue-700 shadow-[0_10px_30px_rgba(37,99,235,0.14)] transition hover:-translate-y-0.5 hover:bg-blue-50"
             >
-              {t("technician.requestMaterials")}
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-base leading-none text-white">+</span>
+              <span>New Material Request</span>
             </button>
             <button
               onClick={handleLogout}
@@ -1553,28 +1645,72 @@ const TechnicianDashboard = () => {
           </div>
       )}
 
+      <div className="mx-auto mt-6 grid max-w-[1600px] grid-cols-1 gap-6 xl:grid-cols-[300px_minmax(0,1fr)]">
+        <aside className="xl:sticky xl:top-6 xl:self-start">
+          <div className="rounded-[32px] border border-white/60 bg-white/70 p-5 shadow-[0_20px_60px_rgba(37,99,235,0.12)] backdrop-blur-xl">
+            <div className="border-b border-slate-200/70 px-2 pb-5">
+              <div className="text-[11px] font-black uppercase tracking-[0.38em] text-blue-600">Technician</div>
+              <h2 className="mt-3 text-[2.15rem] font-black leading-none text-slate-900">Workspace</h2>
+              <p className="mt-3 max-w-[22ch] text-sm leading-6 text-slate-500">Navigate your technician workflow with focused tabs, just like the client dashboard.</p>
+            </div>
+            <div className="mt-5 space-y-3">
+              {technicianNavItems.map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => openTechnicianSection(item.key)}
+                  className={`group w-full rounded-[24px] border px-5 py-4 text-left transition-all duration-200 ${
+                    activeSection === item.key
+                      ? 'border-blue-200 bg-gradient-to-r from-blue-50 to-white text-blue-700 shadow-[0_12px_30px_rgba(37,99,235,0.12)]'
+                      : 'border-slate-200/70 bg-white/65 text-slate-700 hover:-translate-y-0.5 hover:border-blue-100 hover:bg-white hover:shadow-[0_12px_24px_rgba(15,23,42,0.08)]'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-base font-bold">{item.label}</div>
+                    <span className={`h-2.5 w-2.5 rounded-full transition ${
+                      activeSection === item.key ? 'bg-blue-500 shadow-[0_0_0_6px_rgba(59,130,246,0.12)]' : 'bg-slate-200 group-hover:bg-blue-200'
+                    }`} />
+                  </div>
+                  <div className="mt-2 text-sm leading-6 text-slate-500">{item.description}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </aside>
+
+        <main className="min-w-0 flex-1 space-y-8">
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+      <div id="tech-section-overview" className={`${activeSection === 'overview' ? 'grid' : 'hidden'} grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-6 mb-8 scroll-mt-24`}>
         <div className="glass-surface rounded-2xl shadow-lg p-6 border border-blue-100/60">
           <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">{t("technician.stats.assigned")}</div>
           <div className="text-3xl font-black text-slate-900 mt-2">
-            {jobs.filter(job => getJobStatus(job) !== 'COMPLETE' && getJobStatus(job) !== 'COMPLETED').length}
+            {overviewJobCounts.assigned}
           </div>
-          <p className="text-sm text-slate-500 mt-2">Total jobs assigned to you</p>
+          <p className="text-sm text-slate-500 mt-2">Open work waiting in your queue</p>
         </div>
 
         <div className="glass-surface rounded-2xl shadow-lg p-6 border border-blue-200/60">
           <div className="text-xs font-bold text-blue-500 uppercase tracking-widest">{t("technician.stats.inProgress")}</div>
           <div className="text-3xl font-black text-blue-600 mt-2">
-            {jobs.filter(job => getJobStatus(job) === 'IN PROGRESS').length}
+            {overviewJobCounts.inProgress}
           </div>
           <p className="text-sm text-slate-500 mt-2">Currently working on</p>
+        </div>
+
+        <div className="rounded-2xl border border-rose-200/70 bg-gradient-to-br from-rose-50 to-white p-6 shadow-lg">
+          <div className="text-xs font-bold uppercase tracking-widest text-rose-600">Overdue</div>
+          <div className="mt-2 text-3xl font-black text-rose-700">
+            {overviewJobCounts.overdue}
+          </div>
+          <p className="mt-2 text-sm text-rose-700/80">
+            {overviewJobCounts.overdue > 0 ? 'Needs attention now' : 'No overdue work right now'}
+          </p>
         </div>
 
         <div className="glass-surface rounded-2xl shadow-lg p-6 border border-emerald-200/60">
           <div className="text-xs font-bold text-emerald-500 uppercase tracking-widest">{t("technician.stats.completed")}</div>
           <div className="text-3xl font-black text-emerald-600 mt-2">
-            {jobs.filter(job => getJobStatus(job) === 'COMPLETE' || getJobStatus(job) === 'COMPLETED').length}
+            {overviewJobCounts.completed}
           </div>
           <p className="text-sm text-slate-500 mt-2">{t("technician.stats.finishedJobs")}</p>
         </div>
@@ -1582,12 +1718,198 @@ const TechnicianDashboard = () => {
         <div className="glass-surface rounded-2xl shadow-lg p-6 border border-blue-200/60">
           <div className="text-xs font-bold text-blue-600 uppercase tracking-widest">{t("technician.stats.materials")}</div>
           <div className="text-3xl font-black text-blue-700 mt-2">{materialRequests.length}</div>
-          <p className="text-sm text-slate-500 mt-2">{t("technician.stats.requestsSubmitted")}</p>
+          <p className="text-sm text-slate-500 mt-2">
+            {user?.companyName ? `Shared across ${user.companyName}` : t("technician.stats.requestsSubmitted")}
+          </p>
+        </div>
+
+        <div className="md:col-span-2 xl:col-span-5 rounded-[32px] border border-white/60 bg-white/72 p-8 shadow-[0_20px_60px_rgba(15,23,42,0.10)] backdrop-blur-xl">
+          {overviewJobCounts.overdue > 0 && (
+            <div className="mb-6 flex items-center justify-between gap-4 rounded-[24px] border border-rose-200 bg-rose-50 px-5 py-4">
+              <div>
+                <div className="text-[11px] font-black uppercase tracking-[0.24em] text-rose-600">Attention Needed</div>
+                <div className="mt-1 text-base font-bold text-rose-900">
+                  {overviewJobCounts.overdue} overdue {overviewJobCounts.overdue === 1 ? 'work order needs' : 'work orders need'} follow-up.
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveSection('workOrders')}
+                className="inline-flex shrink-0 items-center justify-center rounded-full bg-rose-600 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-white transition hover:bg-rose-700"
+              >
+                Open Work Orders
+              </button>
+            </div>
+          )}
+
+          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+            <div>
+              <div className="text-[11px] font-black uppercase tracking-[0.32em] text-blue-600">Recent Activity</div>
+              <h3 className="mt-2 text-3xl font-black text-slate-900">What changed most recently</h3>
+              <p className="mt-2 text-sm text-slate-500">
+                {user?.companyName
+                  ? `A quick snapshot of assigned work and material requests shared inside ${user.companyName}.`
+                  : 'A quick snapshot of your latest work orders and material requests.'}
+              </p>
+            </div>
+            <div className="rounded-full bg-blue-50 px-4 py-2 text-xs font-black uppercase tracking-[0.2em] text-blue-700">
+              {recentOverviewItems.length} recent items
+            </div>
+          </div>
+
+          <div className="mt-6 grid gap-4 lg:grid-cols-2">
+            {recentOverviewItems.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={item.action}
+                className="rounded-[26px] border border-slate-100 bg-white/90 p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-blue-100 hover:bg-white hover:shadow-[0_16px_30px_rgba(37,99,235,0.10)]"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <div className="text-[11px] font-black uppercase tracking-[0.22em] text-slate-400">
+                      {item.type === 'material' ? 'Material Request' : 'Work Order'}
+                    </div>
+                    <div className="mt-2 text-lg font-bold text-slate-900">{item.title}</div>
+                    <div className="mt-1 text-sm text-slate-500">{item.subtitle}</div>
+                  </div>
+                  <span className={`inline-flex shrink-0 rounded-full px-3 py-1.5 text-[10px] font-black uppercase ${
+                    item.status === 'IN PROGRESS'
+                      ? 'bg-blue-100 text-blue-700'
+                      : item.status === 'APPROVED' || String(item.status).includes('COMPLETE')
+                        ? 'bg-emerald-100 text-emerald-700'
+                        : item.status === 'OVERDUE' || item.status === 'REJECTED'
+                          ? 'bg-rose-100 text-rose-700'
+                          : 'bg-amber-100 text-amber-700'
+                  }`}>
+                    {String(item.status || 'Open').replace(/_/g, ' ')}
+                  </span>
+                </div>
+                <div className="mt-4 flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
+                  <div className="text-xs font-medium text-slate-500">
+                    {new Date(item.timestamp).toLocaleString()}
+                  </div>
+                  <div className="text-xs font-bold uppercase tracking-[0.16em] text-blue-700">
+                    Open
+                  </div>
+                </div>
+              </button>
+            ))}
+
+            {recentOverviewItems.length === 0 && (
+              <div className="lg:col-span-2 rounded-[26px] border border-dashed border-slate-200 bg-slate-50/80 px-6 py-12 text-center">
+                <div className="text-lg font-bold text-slate-700">No recent activity yet</div>
+                <div className="mt-2 text-sm text-slate-500">As soon as work orders or material requests update, they’ll show here.</div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="md:col-span-2 xl:col-span-5 grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+          <div className="rounded-[32px] border border-white/60 bg-white/72 p-8 shadow-[0_20px_60px_rgba(15,23,42,0.10)] backdrop-blur-xl">
+            <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+              <div>
+                <div className="text-[11px] font-black uppercase tracking-[0.32em] text-blue-600">Material Snapshot</div>
+                <h3 className="mt-2 text-2xl font-black text-slate-900">Request pipeline at a glance</h3>
+                <p className="mt-2 text-sm text-slate-500">
+                  {user?.companyName
+                    ? `These totals are based on material requests visible to your company workspace.`
+                    : 'These totals are based on the material requests visible to you.'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveSection('materials')}
+                className="inline-flex items-center justify-center rounded-full bg-blue-600 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-white transition hover:bg-blue-700"
+              >
+                Open Materials
+              </button>
+            </div>
+
+            <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-[24px] border border-amber-100 bg-amber-50/90 p-5">
+                <div className="text-[11px] font-black uppercase tracking-[0.2em] text-amber-700">Pending</div>
+                <div className="mt-3 text-3xl font-black text-amber-900">{materialOverviewSummary.pending}</div>
+                <div className="mt-2 text-sm text-amber-800/80">Waiting for action</div>
+              </div>
+              <div className="rounded-[24px] border border-sky-100 bg-sky-50/90 p-5">
+                <div className="text-[11px] font-black uppercase tracking-[0.2em] text-sky-700">Forwarded</div>
+                <div className="mt-3 text-3xl font-black text-sky-900">{materialOverviewSummary.forwarded}</div>
+                <div className="mt-2 text-sm text-sky-800/80">Sent for review</div>
+              </div>
+              <div className="rounded-[24px] border border-emerald-100 bg-emerald-50/90 p-5">
+                <div className="text-[11px] font-black uppercase tracking-[0.2em] text-emerald-700">Approved</div>
+                <div className="mt-3 text-3xl font-black text-emerald-900">{materialOverviewSummary.approved}</div>
+                <div className="mt-2 text-sm text-emerald-800/80">Ready to move forward</div>
+              </div>
+              <div className="rounded-[24px] border border-rose-100 bg-rose-50/90 p-5">
+                <div className="text-[11px] font-black uppercase tracking-[0.2em] text-rose-700">Declined</div>
+                <div className="mt-3 text-3xl font-black text-rose-900">{materialOverviewSummary.declined}</div>
+                <div className="mt-2 text-sm text-rose-800/80">Needs a follow-up</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-[32px] border border-white/60 bg-white/72 p-8 shadow-[0_20px_60px_rgba(15,23,42,0.10)] backdrop-blur-xl">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <div className="text-[11px] font-black uppercase tracking-[0.32em] text-blue-600">Recent Materials</div>
+                <h3 className="mt-2 text-2xl font-black text-slate-900">Latest requests</h3>
+              </div>
+              <div className="rounded-full bg-slate-100 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.18em] text-slate-600">
+                {materialOverviewSummary.total} total
+              </div>
+            </div>
+
+            <div className="mt-6 space-y-3">
+              {materialOverviewSummary.recent.map((request) => {
+                const status = String(request?.status || request?.clientResponse || 'PENDING').toUpperCase();
+                const badgeClass =
+                  status.includes('APPROVED')
+                    ? 'bg-emerald-100 text-emerald-700'
+                    : status.includes('DECLINED') || status.includes('REJECTED')
+                      ? 'bg-rose-100 text-rose-700'
+                      : status.includes('FORWARDED')
+                        ? 'bg-sky-100 text-sky-700'
+                        : 'bg-amber-100 text-amber-700';
+
+                return (
+                  <button
+                    key={request._id || request.id}
+                    type="button"
+                    onClick={() => setActiveSection('materials')}
+                    className="flex w-full items-start justify-between gap-4 rounded-[22px] border border-slate-100 bg-white/90 px-5 py-4 text-left transition hover:border-blue-100 hover:bg-white"
+                  >
+                    <div className="min-w-0">
+                      <div className="text-sm font-bold text-slate-900">
+                        {request.title || request.items?.[0]?.title || 'Material request'}
+                      </div>
+                      <div className="mt-1 text-sm text-slate-500">
+                        {request.technicianName || 'Technician'} • {request.description || 'Inventory request'}
+                      </div>
+                      <div className="mt-2 text-xs font-medium text-slate-400">
+                        {request.createdAt ? new Date(request.createdAt).toLocaleString() : 'No timestamp'}
+                      </div>
+                    </div>
+                    <span className={`inline-flex shrink-0 rounded-full px-3 py-1.5 text-[10px] font-black uppercase ${badgeClass}`}>
+                      {status.replace(/_/g, ' ')}
+                    </span>
+                  </button>
+                );
+              })}
+
+              {materialOverviewSummary.recent.length === 0 && (
+                <div className="rounded-[22px] border border-dashed border-slate-200 bg-slate-50/80 px-5 py-10 text-center text-sm text-slate-500">
+                  No material requests yet.
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 mb-8">
-        <div className="glass-surface rounded-3xl shadow-lg border border-white/50 p-6">
+      <div className={`${['workOrders', 'tasks', 'messages'].includes(activeSection) ? 'grid' : 'hidden'} grid-cols-1 gap-8 mb-8`}>
+        <div id="tech-section-workOrders" className={`${activeSection === 'workOrders' ? 'block' : 'hidden'} rounded-[32px] border border-white/60 bg-white/72 p-8 shadow-[0_20px_60px_rgba(15,23,42,0.10)] backdrop-blur-xl scroll-mt-24`}>
           <div className="flex items-center justify-between mb-5">
             <div>
               <h2 className="text-2xl font-black text-slate-900">My Work Orders</h2>
@@ -1597,72 +1919,102 @@ const TechnicianDashboard = () => {
               {openJobs.length} Open
             </span>
           </div>
-          <div className="space-y-3">
-            {jobs.slice(0, 5).map((job) => (
-              <button
-                key={`summary-${job._id || job.id}`}
-                onClick={() => handleViewJob(job)}
-                className="w-full text-left rounded-2xl border border-white/60 bg-white/50 px-4 py-3 hover:border-blue-200 hover:shadow-md transition"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-sm font-bold text-slate-900 truncate">{job.title || 'Untitled job'}</p>
-                    <p className="text-xs text-slate-500 mt-1 truncate">{job.location || 'No location yet'}</p>
-                  </div>
-                  <span className={`shrink-0 px-2 py-1 rounded-full text-[10px] font-black uppercase ${
-                    getJobStatus(job) === 'IN PROGRESS'
+          <div className="overflow-x-auto rounded-[28px] border border-slate-100 bg-white/88 shadow-inner">
+            <table className="min-w-[760px] w-full text-left text-sm">
+              <thead className="bg-slate-50/90 text-[11px] uppercase tracking-[0.2em] text-slate-500">
+                <tr>
+                  <th className="px-4 py-3">Work Order</th>
+                  <th className="px-4 py-3">Location</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Due</th>
+                  <th className="px-4 py-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/60">
+                {jobs.slice(0, 5).map((job) => {
+                  const status = getJobStatus(job);
+                  const statusClass =
+                    status === 'IN PROGRESS'
                       ? 'bg-blue-100 text-blue-700'
-                      : getJobStatus(job) === 'OVERDUE'
+                      : status === 'OVERDUE'
                         ? 'bg-rose-100 text-rose-700'
-                        : getJobStatus(job).includes('COMPLETE')
+                        : status.includes('COMPLETE')
                           ? 'bg-emerald-100 text-emerald-700'
-                          : 'bg-amber-100 text-amber-700'
-                  }`}>
-                    {getJobStatus(job).replace(/_/g, ' ')}
-                  </span>
-                </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {canStartTimerForJob(job) && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleStartTimer(job);
-                      }}
-                      disabled={startingTimer}
-                      className="rounded-full bg-blue-600 px-3 py-1.5 text-[11px] font-black uppercase tracking-wide text-white hover:bg-blue-700 disabled:opacity-60"
+                          : 'bg-amber-100 text-amber-700';
+
+                  return (
+                    <tr
+                      key={`summary-${job._id || job.id}`}
+                      className="cursor-pointer hover:bg-blue-50/45 transition"
+                      onClick={() => handleViewJob(job)}
                     >
-                      {startingTimer ? 'Starting...' : 'Start Timer'}
-                    </button>
-                  )}
-                  {canStopTimerForJob(job) && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleStopTimer(job);
-                      }}
-                      disabled={startingTimer}
-                      className="rounded-full bg-emerald-600 px-3 py-1.5 text-[11px] font-black uppercase tracking-wide text-white hover:bg-emerald-700 disabled:opacity-60"
-                    >
-                      {startingTimer ? 'Stopping...' : 'Stop Timer'}
-                    </button>
-                  )}
-                  <span className="rounded-full bg-white/70 px-3 py-1.5 text-[11px] font-semibold text-slate-600 border border-white/60">
-                    Open details
-                  </span>
-                </div>
-              </button>
-            ))}
+                      <td className="px-4 py-3">
+                        <div className="font-semibold text-slate-900">{job.title || 'Untitled job'}</div>
+                        <div className="mt-1 text-xs text-slate-500">{job.category || job.type || 'General work order'}</div>
+                      </td>
+                      <td className="px-4 py-3 text-slate-700">{job.location || 'No location yet'}</td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-black uppercase ${statusClass}`}>
+                          {status.replace(/_/g, ' ')}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-slate-600">
+                        {job.fixDeadline ? new Date(job.fixDeadline).toLocaleString() : 'No due date'}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex justify-end gap-2">
+                          {canStartTimerForJob(job) && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleStartTimer(job);
+                              }}
+                              disabled={startingTimer}
+                              className="rounded-full bg-blue-600 px-3 py-1.5 text-[11px] font-black uppercase tracking-wide text-white hover:bg-blue-700 disabled:opacity-60"
+                            >
+                              {startingTimer ? 'Starting...' : 'Start Timer'}
+                            </button>
+                          )}
+                          {canStopTimerForJob(job) && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleStopTimer(job);
+                              }}
+                              disabled={startingTimer}
+                              className="rounded-full bg-emerald-600 px-3 py-1.5 text-[11px] font-black uppercase tracking-wide text-white hover:bg-emerald-700 disabled:opacity-60"
+                            >
+                              {startingTimer ? 'Stopping...' : 'Stop Timer'}
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleViewJob(job);
+                            }}
+                            className="rounded-full border border-white/60 bg-white/80 px-3 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-white"
+                          >
+                            Open Details
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
             {jobs.length === 0 && (
-              <div className="rounded-2xl border-2 border-dashed border-white/70 bg-white/30 px-4 py-8 text-center text-slate-500">
+              <div className="px-4 py-8 text-center text-slate-500">
                 No assigned work orders yet.
               </div>
             )}
           </div>
         </div>
 
-        <div className="glass-surface rounded-3xl shadow-lg border border-white/50 p-6">
+        <div id="tech-section-tasks" className={`${activeSection === 'tasks' ? 'block' : 'hidden'} glass-surface rounded-3xl shadow-lg border border-white/50 p-6 scroll-mt-24`}>
           <div className="flex items-center justify-between mb-5">
             <div>
               <h2 className="text-2xl font-black text-slate-900">My Tasks</h2>
@@ -1672,7 +2024,57 @@ const TechnicianDashboard = () => {
               {myTasks.filter((task) => !task.completed).length} Active
             </span>
           </div>
-          <div className="space-y-3">
+          <div className="overflow-x-auto rounded-2xl border border-white/60 bg-white/40 mb-4">
+            <table className="min-w-[700px] w-full text-left text-sm">
+              <thead className="bg-white/70 text-[11px] uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-4 py-3">Task</th>
+                  <th className="px-4 py-3">Work Order</th>
+                  <th className="px-4 py-3">Location</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/60">
+                {myTasks.slice(0, 6).map((task) => (
+                  <tr key={`table-task-${task.id}`} className="cursor-pointer hover:bg-white/50 transition" onClick={() => handleViewJob(task.job)}>
+                    <td className="px-4 py-3 font-semibold text-slate-900">{task.title}</td>
+                    <td className="px-4 py-3 text-slate-700">{task.jobTitle}</td>
+                    <td className="px-4 py-3 text-slate-600">{task.location || 'No location yet'}</td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-black uppercase ${
+                        task.completed
+                          ? 'bg-emerald-100 text-emerald-700'
+                          : task.overdue
+                            ? 'bg-rose-100 text-rose-700'
+                            : 'bg-blue-100 text-blue-700'
+                      }`}>
+                        {task.completed ? 'Completed' : task.overdue ? 'Overdue' : 'Open'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleViewJob(task.job);
+                        }}
+                        className="rounded-full border border-white/60 bg-white/80 px-3 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-white"
+                      >
+                        Open Work Order
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {myTasks.length === 0 && (
+              <div className="px-4 py-8 text-center text-slate-500">
+                No checklist tasks yet.
+              </div>
+            )}
+          </div>
+          <div className="hidden space-y-3">
             {myTasks.slice(0, 6).map((task) => (
               <button key={task.id} type="button" onClick={() => handleViewJob(task.job)} className="w-full text-left rounded-2xl border border-white/60 bg-white/50 px-4 py-3 hover:border-blue-200 hover:shadow-md transition">
                 <div className="flex items-start justify-between gap-3">
@@ -1701,7 +2103,7 @@ const TechnicianDashboard = () => {
           </div>
         </div>
 
-        <div className="glass-surface rounded-3xl shadow-lg border border-white/50 p-6">
+        <div className={`${activeSection === 'tasks' ? 'block' : 'hidden'} glass-surface rounded-3xl shadow-lg border border-white/50 p-6`}>
           <div className="mb-5">
             <h2 className="text-2xl font-black text-slate-900">Private Notepad</h2>
             <p className="text-sm text-slate-500 mt-1">Personal reminders visible only on this technician account in this browser.</p>
@@ -1714,7 +2116,7 @@ const TechnicianDashboard = () => {
           />
         </div>
 
-        <div ref={messageSectionRef}>
+        <div id="tech-section-messages" ref={messageSectionRef} className={`${activeSection === 'messages' ? 'block' : 'hidden'} scroll-mt-24`}>
           <TechnicianMessageCenter
             id="technician-message-center"
             textareaId="technician-message-draft"
@@ -1731,7 +2133,7 @@ const TechnicianDashboard = () => {
           />
         </div>
 
-        <div className="glass-surface rounded-3xl shadow-lg border border-white/50 p-6">
+        <div className={`${activeSection === 'messages' ? 'block' : 'hidden'} glass-surface rounded-3xl shadow-lg border border-white/50 p-6`}>
           <div className="flex items-center justify-between mb-5">
             <div>
               <h2 className="text-2xl font-black text-slate-900">Comments Mentioning Me</h2>
@@ -1770,18 +2172,72 @@ const TechnicianDashboard = () => {
       </div>
 
       {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className={`${['workOrders', 'materials', 'history'].includes(activeSection) ? 'grid' : 'hidden'} grid-cols-1 gap-8`}>
         {/* Left Side: Work Columns */}
-        <div className="space-y-8">
+        <div className={`${activeSection === 'workOrders' ? 'block' : 'hidden'} space-y-8`}>
           {/* Active Work Section (If any) */}
           {jobs.filter(j => getJobStatus(j) === 'IN PROGRESS').length > 0 && (
-            <div className="glass-surface border border-blue-200/60 rounded-3xl p-6 shadow-lg">
+            <div className="rounded-[32px] border border-white/60 bg-white/72 p-8 shadow-[0_20px_60px_rgba(15,23,42,0.10)] backdrop-blur-xl">
               <h2 className="text-2xl font-black text-slate-900 mb-6 flex items-center gap-3">
                 <span className="w-2 h-8 bg-blue-600 rounded-full"></span>
                 {t("technician.activeWork")}
                 <span className="px-2 py-0.5 bg-blue-100/70 text-blue-700 text-[10px] font-bold rounded-full">LIVE</span>
               </h2>
-              <div className="space-y-4">
+              <div className="overflow-x-auto rounded-[28px] border border-slate-100 bg-white/88 shadow-inner mb-4">
+                <table className="min-w-[760px] w-full text-left text-sm">
+                  <thead className="bg-slate-50/90 text-[11px] uppercase tracking-[0.2em] text-slate-500">
+                    <tr>
+                      <th className="px-4 py-3">Work Order</th>
+                      <th className="px-4 py-3">Location</th>
+                      <th className="px-4 py-3">Due</th>
+                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/60">
+                    {jobs.filter(j => getJobStatus(j) === 'IN PROGRESS').map(job => (
+                      <tr key={`active-table-${job.id || job._id}`} className="cursor-pointer hover:bg-blue-50/45 transition" onClick={() => handleViewJob(job)}>
+                        <td className="px-4 py-3">
+                          <div className="font-semibold text-slate-900">{job.title}</div>
+                          <div className="mt-1 text-xs text-slate-500">{job.priority || 'Normal'} priority</div>
+                        </td>
+                        <td className="px-4 py-3 text-slate-700">{job.location || 'No location yet'}</td>
+                        <td className="px-4 py-3 text-slate-600">
+                          {job.fixDeadline ? new Date(job.fixDeadline).toLocaleString() : 'No due date'}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="inline-flex rounded-full bg-blue-100 px-2.5 py-1 text-[10px] font-black uppercase text-blue-700">
+                            In Progress
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); handleViewJob(job); }}
+                              className="rounded-full bg-blue-600 px-3 py-1.5 text-[11px] font-black uppercase tracking-wide text-white hover:bg-blue-700"
+                            >
+                              {t("technician.viewActions")}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedJob(job);
+                                setShowAfterForm(prev => ({ ...prev, [job.id || job._id]: true }));
+                              }}
+                              className="rounded-full bg-emerald-600 px-3 py-1.5 text-[11px] font-black uppercase tracking-wide text-white hover:bg-emerald-700"
+                            >
+                              {t("technician.completeTask")}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="hidden space-y-4">
                 {jobs.filter(j => getJobStatus(j) === 'IN PROGRESS').map(job => (
                   <div key={`active-${job.id || job._id}`} className="glass-surface border border-white/50 rounded-2xl p-5 hover:shadow-md transition cursor-pointer" onClick={() => handleViewJob(job)}>
                     <div className="flex justify-between items-start mb-2">
@@ -1816,7 +2272,7 @@ const TechnicianDashboard = () => {
           )}
 
           {/* My Queue (Assigned Issues) */}
-          <div className="glass-surface rounded-3xl shadow-lg border border-white/50 p-6">
+          <div className="rounded-[32px] border border-white/60 bg-white/72 p-8 shadow-[0_20px_60px_rgba(15,23,42,0.10)] backdrop-blur-xl">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-black text-slate-900 flex items-center gap-3">
                 <span className="w-2 h-8 bg-blue-600 rounded-full"></span>
@@ -1832,41 +2288,93 @@ const TechnicianDashboard = () => {
                 <p className="text-slate-400 font-medium">{t("technician.noPending")}</p>
               </div>
             ) : (
-              <div className="space-y-3">
-                {jobs.filter(j => getJobStatus(j) !== 'IN PROGRESS' && getJobStatus(j) !== 'COMPLETE' && getJobStatus(j) !== 'COMPLETED').map(job => (
-                  <div key={job.id || job._id} className="group glass-surface border border-white/50 rounded-2xl p-4 hover:border-blue-200/70 hover:shadow-lg transition-all cursor-pointer" onClick={() => handleViewJob(job)}>
-                    <div className="flex justify-between items-center">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className={`w-2 h-2 rounded-full ${job.priority === 'HIGH' ? 'bg-red-500' : 'bg-amber-400'}`}></span>
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{job.location}</span>
+              <><div className="overflow-x-auto rounded-[28px] border border-slate-100 bg-white/88 shadow-inner">
+                    <table className="min-w-[760px] w-full text-left text-sm">
+                      <thead className="bg-slate-50/90 text-[11px] uppercase tracking-[0.2em] text-slate-500">
+                        <tr>
+                          <th className="px-4 py-3">Issue</th>
+                          <th className="px-4 py-3">Location</th>
+                          <th className="px-4 py-3">Priority</th>
+                          <th className="px-4 py-3">Status</th>
+                          <th className="px-4 py-3 text-right">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/60">
+                        {jobs.filter(j => getJobStatus(j) !== 'IN PROGRESS' && getJobStatus(j) !== 'COMPLETE' && getJobStatus(j) !== 'COMPLETED').map(job => (
+                          <tr key={`queue-table-${job.id || job._id}`} className="cursor-pointer hover:bg-blue-50/45 transition" onClick={() => handleViewJob(job)}>
+                            <td className="px-4 py-3 font-semibold text-slate-900">{job.title}</td>
+                            <td className="px-4 py-3 text-slate-700">{job.location || 'No location yet'}</td>
+                            <td className="px-4 py-3">
+                              <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-black uppercase ${job.priority === 'HIGH'
+                                  ? 'bg-rose-100 text-rose-700'
+                                  : job.priority === 'MEDIUM'
+                                    ? 'bg-amber-100 text-amber-700'
+                                    : 'bg-slate-100 text-slate-700'}`}>
+                                {job.priority || 'Normal'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-tighter ${getJobStatus(job) === 'OVERDUE'
+                                  ? 'bg-rose-100 text-rose-700'
+                                  : getJobStatus(job) === 'PENDING'
+                                    ? 'bg-amber-100 text-amber-700'
+                                    : 'bg-blue-100/70 text-blue-700'}`}>
+                                {getJobStatus(job)}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleViewJob(job);
+                                } }
+                                className="rounded-full border border-white/60 bg-white/80 px-3 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-white"
+                              >
+                                Open Details
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div><div className="hidden space-y-3">
+                      {jobs.filter(j => getJobStatus(j) !== 'IN PROGRESS' && getJobStatus(j) !== 'COMPLETE' && getJobStatus(j) !== 'COMPLETED').map(job => (
+                        <div key={job.id || job._id} className="group glass-surface border border-white/50 rounded-2xl p-4 hover:border-blue-200/70 hover:shadow-lg transition-all cursor-pointer" onClick={() => handleViewJob(job)}>
+                          <div className="flex justify-between items-center">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className={`w-2 h-2 rounded-full ${job.priority === 'HIGH' ? 'bg-red-500' : 'bg-amber-400'}`}></span>
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{job.location}</span>
+                              </div>
+                              <h3 className="text-base font-bold text-slate-900 group-hover:text-blue-700 transition-colors">{job.title}</h3>
+                            </div>
+                            <div className="shrink-0">
+                              <span className={`px-2 py-1 rounded text-[10px] font-black uppercase tracking-tighter ${getJobStatus(job) === 'OVERDUE' ? 'bg-rose-100 text-rose-700' :
+                                getJobStatus(job) === 'PENDING' ? 'bg-amber-100 text-amber-700' :
+                                  'bg-blue-100/70 text-blue-700'}`}>
+                                {getJobStatus(job)}
+                              </span>
+                            </div>
+                          </div>
                         </div>
-                        <h3 className="text-base font-bold text-slate-900 group-hover:text-blue-700 transition-colors">{job.title}</h3>
-                      </div>
-                      <div className="shrink-0">
-                        <span className={`px-2 py-1 rounded text-[10px] font-black uppercase tracking-tighter ${getJobStatus(job) === 'OVERDUE' ? 'bg-rose-100 text-rose-700' :
-                          getJobStatus(job) === 'PENDING' ? 'bg-amber-100 text-amber-700' :
-                            'bg-blue-100/70 text-blue-700'
-                          }`}>
-                          {getJobStatus(job)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                      ))}
+                    </div></>
             )}
           </div>
         </div>
 
         {/* Material Requests & Work History */}
-        <div className="space-y-8">
+        <div className={`${activeSection === 'materials' || activeSection === 'history' ? 'space-y-8' : 'hidden'}`}>
           {/* Material Requests */}
-          <div className="glass-surface rounded-3xl shadow-lg border border-white/50 p-6">
+          <div id="tech-section-materials" className={`${activeSection === 'materials' ? 'block' : 'hidden'} rounded-[32px] border border-white/60 bg-white/72 p-8 shadow-[0_20px_60px_rgba(15,23,42,0.10)] backdrop-blur-xl scroll-mt-24`}>
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-black text-slate-900">{t("technician.materialRequests")}</h2>
               <button
-                onClick={toggleMaterialRequestForm}
+                onClick={() => {
+                  setActiveSection('materials');
+                  toggleMaterialRequestForm();
+                }}
                 className="px-4 py-2 bg-blue-600 text-white text-sm rounded-full hover:bg-blue-700"
               >
                 + {t("technician.newRequest")}
@@ -1996,9 +2504,45 @@ const TechnicianDashboard = () => {
           </div>
 
           {/* Recent Work History */}
-          <div className="glass-surface rounded-3xl shadow-lg border border-white/50 p-6">
+          <div id="tech-section-history" className={`${activeSection === 'history' ? 'block' : 'hidden'} rounded-[32px] border border-white/60 bg-white/72 p-8 shadow-[0_20px_60px_rgba(15,23,42,0.10)] backdrop-blur-xl scroll-mt-24`}>
             <h2 className="text-2xl font-black text-slate-900 mb-4">{t("technician.recentWorkHistory")}</h2>
-            <div className="space-y-3">
+            <div className="overflow-x-auto rounded-2xl border border-white/60 bg-white/40 mb-4">
+              <table className="min-w-[680px] w-full text-left text-sm">
+                <thead className="bg-white/70 text-[11px] uppercase tracking-wide text-slate-500">
+                  <tr>
+                    <th className="px-4 py-3">Work Order</th>
+                    <th className="px-4 py-3">Location</th>
+                    <th className="px-4 py-3">Completed</th>
+                    <th className="px-4 py-3 text-right">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/60">
+                  {jobs
+                    .filter(job => getJobStatus(job) === 'COMPLETE' || getJobStatus(job) === 'COMPLETED')
+                    .slice(0, 5)
+                    .map(job => (
+                      <tr key={`history-table-${job.id || job._id}`} className="cursor-pointer hover:bg-white/50 transition" onClick={() => handleViewJob(job)}>
+                        <td className="px-4 py-3 font-semibold text-slate-800">{job.title}</td>
+                        <td className="px-4 py-3 text-slate-600">{job.location || 'No location yet'}</td>
+                        <td className="px-4 py-3 text-slate-600">
+                          {job.completedAt || job.updatedAt ? new Date(job.completedAt || job.updatedAt).toLocaleString() : 'Recently completed'}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <span className="inline-flex rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-black uppercase text-emerald-700">
+                            Completed
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+              {jobs.filter(job => getJobStatus(job) === 'COMPLETE' || getJobStatus(job) === 'COMPLETED').length === 0 && (
+                <div className="text-center py-8 text-slate-500">
+                  No completed jobs yet
+                </div>
+              )}
+            </div>
+            <div className="hidden space-y-3">
               {jobs
                 .filter(job => getJobStatus(job) === 'COMPLETE' || getJobStatus(job) === 'COMPLETED')
                 .slice(0, 5)
@@ -2019,6 +2563,9 @@ const TechnicianDashboard = () => {
             </div>
           </div>
         </div>
+      </div>
+
+        </main>
       </div>
 
       {/* Issue Details Modal */}
@@ -2069,7 +2616,7 @@ const TechnicianDashboard = () => {
                     <h3 className="text-lg font-bold text-slate-900">Complete Work Order</h3>
                     <p className="mt-1 text-sm text-slate-600">Write the completion details and the feedback that should be sent to the requester.</p>
                   </div>
-                  <div className="space-y-4">
+                  <div className="space-y-4">                           
                     <div>
                       <label className="block text-sm font-semibold text-slate-700 mb-1">Completion Details</label>
                       <textarea

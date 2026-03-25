@@ -33,6 +33,7 @@ const SubscriptionWidget = ({ userId }) => {
   const [selectedPropertyId, setSelectedPropertyId] = useState('');
   const [properties, setProperties] = useState([]);
   const [pricing, setPricing] = useState(null);
+  const [currency, setCurrency] = useState('USD');
 
   const handleOpenCreateModal = () => {
     setModalMode('create');
@@ -82,8 +83,9 @@ const SubscriptionWidget = ({ userId }) => {
 
         // Fetch pricing
         const pricingRes = await subscriptionAPI.getPricing();
-        const pricingData = pricingRes?.data || pricingRes || null;
+        const pricingData = pricingRes?.data?.pricing || pricingRes?.data || pricingRes || null;
         setPricing(pricingData);
+        setCurrency(pricingRes?.data?.currency || 'USD');
       } catch (err) {
         console.error('Failed to fetch properties or pricing:', err);
       }
@@ -300,6 +302,15 @@ const SubscriptionWidget = ({ userId }) => {
     return 'bg-blue-50 border-blue-200';
   };
 
+  const formatMoney = (amount) => {
+    const numericAmount = Number(amount || 0);
+    try {
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(numericAmount);
+    } catch (err) {
+      return `${currency} ${numericAmount.toFixed(2)}`;
+    }
+  };
+
   return (
     <>
       <div className={`rounded-lg border p-4 ${getPlanColor()}`}>
@@ -329,7 +340,7 @@ const SubscriptionWidget = ({ userId }) => {
               )}
 
               <p className="text-gray-600 text-xs mt-1">
-                {subscription.billingCycle?.charAt(0).toUpperCase() + subscription.billingCycle?.slice(1)} cycle - ${subscription.amount?.toFixed(2)}
+                {subscription.billingCycle?.charAt(0).toUpperCase() + subscription.billingCycle?.slice(1)} cycle - {formatMoney(subscription.amount)}
               </p>
               <div className="flex items-center gap-4 mt-2 text-xs text-gray-600 flex-wrap">
                 <span className="flex items-center gap-1">
@@ -462,7 +473,7 @@ const SubscriptionModal = ({
     const cyclePrice = planPricing[billingCycle];
     if (!cyclePrice) return '';
     
-    return `$${cyclePrice.toFixed(2)}/${billingCycle}`;
+    return `${formatMoney(cyclePrice)}/${billingCycle}`;
   };
 
   return (
@@ -552,9 +563,9 @@ const SubscriptionModal = ({
                   onChange={e => setPlan(e.target.value)}
                   disabled={creating}
                 >
-                  <option value="basic">Basic {pricing?.basic && `- $${pricing.basic.monthly}/month`}</option>
-                  <option value="professional">Professional {pricing?.professional && `- $${pricing.professional.monthly}/month`}</option>
-                  <option value="enterprise">Enterprise {pricing?.enterprise && `- $${pricing.enterprise.monthly}/month`}</option>
+                  <option value="basic">Basic {pricing?.basic && `- ${formatMoney(pricing.basic.monthly)}/month`}</option>
+                  <option value="professional">Professional {pricing?.professional && `- ${formatMoney(pricing.professional.monthly)}/month`}</option>
+                  <option value="enterprise">Enterprise {pricing?.enterprise && `- ${formatMoney(pricing.enterprise.monthly)}/month`}</option>
                 </select>
               </div>
 
@@ -569,9 +580,9 @@ const SubscriptionModal = ({
                   onChange={e => setBillingCycle(e.target.value)}
                   disabled={creating}
                 >
-                  <option value="weekly">Weekly {pricing?.[plan]?.weekly && `($${pricing[plan].weekly}/week)`}</option>
-                  <option value="monthly">Monthly {pricing?.[plan]?.monthly && `($${pricing[plan].monthly}/month)`}</option>
-                  <option value="yearly">Yearly {pricing?.[plan]?.yearly && `($${pricing[plan].yearly}/year - Save 20%)`}</option>
+                  <option value="weekly">Weekly {pricing?.[plan]?.weekly && `(${formatMoney(pricing[plan].weekly)}/week)`}</option>
+                  <option value="monthly">Monthly {pricing?.[plan]?.monthly && `(${formatMoney(pricing[plan].monthly)}/month)`}</option>
+                  <option value="yearly">Yearly {pricing?.[plan]?.yearly && `(${formatMoney(pricing[plan].yearly)}/year - Save 20%)`}</option>
                 </select>
               </div>
 

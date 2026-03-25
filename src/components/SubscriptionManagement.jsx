@@ -32,6 +32,7 @@ const SubscriptionManagement = () => {
   const [filteredPlan, setFilteredPlan] = useState('all');
   const [filteredStatus, setFilteredStatus] = useState('all');
   const [pricing, setPricing] = useState(null);
+  const [currency, setCurrency] = useState('USD');
 
   // Form state
   const [formData, setFormData] = useState({
@@ -80,9 +81,19 @@ const SubscriptionManagement = () => {
   const fetchPricing = async () => {
     try {
       const response = await paymentAPI.getPricing();
-      setPricing(response.data);
+      setPricing(response.data?.pricing || response.data || null);
+      setCurrency(response.data?.currency || 'USD');
     } catch (err) {
       console.error('Error fetching pricing:', err);
+    }
+  };
+
+  const formatMoney = (amount) => {
+    const numericAmount = Number(amount || 0);
+    try {
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(numericAmount);
+    } catch (err) {
+      return `${currency} ${numericAmount.toFixed(2)}`;
     }
   };
 
@@ -146,7 +157,7 @@ const SubscriptionManagement = () => {
       return;
     }
 
-    if (!window.confirm(`Proceed to pay ${plan} (${cycle}) for $${amount}?`)) return;
+    if (!window.confirm(`Proceed to pay ${plan} (${cycle}) for ${formatMoney(amount)}?`)) return;
 
     setLoading(true);
     try {
@@ -579,7 +590,7 @@ const SubscriptionManagement = () => {
                 </select>
                 {pricing && pricing[formData.plan] && (
                   <p className="text-xs text-gray-500 mt-1">
-                    Price: ${pricing[formData.plan][formData.billingCycle]} ({formData.billingCycle})
+                    Price: {formatMoney(pricing[formData.plan][formData.billingCycle])} ({formData.billingCycle})
                   </p>
                 )}
               </div>

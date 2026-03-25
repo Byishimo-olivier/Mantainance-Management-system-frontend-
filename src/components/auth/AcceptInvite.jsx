@@ -9,6 +9,9 @@ const roleLabelFromInvite = (role, accessLevel) => {
   const base = String(role || '').toLowerCase();
   if (base === 'manager') return lvl === 'limited' ? 'Limited Administrator' : 'Administrator';
   if (base === 'technician') return lvl === 'limited' ? 'Limited Technician' : 'Technician';
+  if (base === 'requestor') return 'Requester';
+  if (base === 'client') return 'View Only';
+  if (base === 'admin') return lvl === 'limited' ? 'Limited Administrator' : 'Administrator';
   if (!base) return 'User';
   return lvl === 'limited' ? `Limited ${base}` : base;
 };

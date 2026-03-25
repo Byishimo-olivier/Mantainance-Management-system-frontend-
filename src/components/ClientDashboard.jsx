@@ -9,6 +9,8 @@ import { getImageUrl } from '../utils/imageUrl';
 import { useLanguage, useTranslation } from "../i18n/LanguageContext";
 import { Clock, Calendar, CheckCircle, X, Bell, Download, Package, ShoppingCart, Gauge, Plus, Search, Eye, MapPin, AlertCircle, Repeat, Edit, ChevronLeft, ChevronRight, ChevronDown, SlidersHorizontal, Flag, MoreHorizontal, Trash2, Image as ImageIcon, Tag, Paperclip, MessageSquare, Send, Navigation } from 'lucide-react';
 
+const ASSISTANT_ACTION_STORAGE_KEY = 'mms_assistant_action';
+
 const createEmptyPropertyForm = () => ({
   name: '',
   type: '',
@@ -58,6 +60,12 @@ const buildDirectionsUrl = (latitude, longitude) => {
   if (Number.isNaN(lat) || Number.isNaN(lng)) return '';
   return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
 };
+
+const slugifyCompanyName = (value) => String(value || '')
+  .trim()
+  .toLowerCase()
+  .replace(/[^a-z0-9]+/g, '-')
+  .replace(/^-+|-+$/g, '');
 
 const buildMentionHandle = (person) => {
   const emailLocal = String(person?.email || '').split('@')[0].trim().toLowerCase();
@@ -907,7 +915,19 @@ const INVITE_ROLE_OPTIONS = [
     value: 'technician',
     label: 'Technician',
     paidSeat: true,
-    description: 'Technicians can create and close work orders, update statuses, and manage assigned tasks.'
+    description: 'Technicians can create and close work orders, assets and locations. Able to edit and delete only what they have created.'
+  },
+  {
+    value: 'requestor',
+    label: 'Requester',
+    paidSeat: false,
+    description: 'Requesters can only submit work requests and view their status.'
+  },
+  {
+    value: 'client',
+    label: 'View Only',
+    paidSeat: false,
+    description: 'View Only users have full view access, but cannot edit anything.'
   },
 ];
 
@@ -916,11 +936,16 @@ const getInviteRole = (value) => INVITE_ROLE_OPTIONS.find((r) => r.value === val
 function InviteUsersModal({ open, onClose, onInvite, unusedSeats = '—', busy = false }) {
   const [rows, setRows] = React.useState([{ email: '', role: 'administrator' }]);
   const [rolePickerForRow, setRolePickerForRow] = React.useState(null);
+  const [rolePickerPlacement, setRolePickerPlacement] = React.useState('bottom');
+  const [rolePickerMaxHeight, setRolePickerMaxHeight] = React.useState(448);
+  const roleButtonRefs = React.useRef({});
 
   React.useEffect(() => {
     if (!open) return;
     setRows([{ email: '', role: 'administrator' }]);
     setRolePickerForRow(null);
+    setRolePickerPlacement('bottom');
+    setRolePickerMaxHeight(448);
   }, [open]);
 
   React.useEffect(() => {
@@ -947,6 +972,29 @@ function InviteUsersModal({ open, onClose, onInvite, unusedSeats = '—', busy =
     setRows((prev) => [...prev, { email: '', role: 'administrator' }]);
   };
 
+  const toggleRolePicker = (idx) => {
+    if (rolePickerForRow === idx) {
+      setRolePickerForRow(null);
+      return;
+    }
+
+    const trigger = roleButtonRefs.current[idx];
+    if (trigger && typeof window !== 'undefined') {
+      const rect = trigger.getBoundingClientRect();
+      const viewportHeight = window.innerHeight || 800;
+      const spaceBelow = viewportHeight - rect.bottom - 16;
+      const spaceAbove = rect.top - 16;
+      const openUpward = spaceBelow < 320 && spaceAbove > spaceBelow;
+      setRolePickerPlacement(openUpward ? 'top' : 'bottom');
+      setRolePickerMaxHeight(Math.max(180, Math.min(448, openUpward ? spaceAbove : spaceBelow)));
+    } else {
+      setRolePickerPlacement('bottom');
+      setRolePickerMaxHeight(448);
+    }
+
+    setRolePickerForRow(idx);
+  };
+
   const cleanEmail = (email) => String(email || '').trim().toLowerCase();
   const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail(email));
 
@@ -971,7 +1019,7 @@ function InviteUsersModal({ open, onClose, onInvite, unusedSeats = '—', busy =
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/50">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl overflow-visible">
         <div className="flex items-start justify-between p-6 border-b border-gray-200">
           <div>
             <h3 className="text-3xl font-bold text-gray-900">Invite Users</h3>
@@ -1017,7 +1065,10 @@ function InviteUsersModal({ open, onClose, onInvite, unusedSeats = '—', busy =
                   <label className="block text-sm font-semibold text-gray-700 mb-1">Role</label>
                   <button
                     type="button"
-                    onClick={() => setRolePickerForRow((prev) => (prev === idx ? null : idx))}
+                    ref={(node) => {
+                      if (node) roleButtonRefs.current[idx] = node;
+                    }}
+                    onClick={() => toggleRolePicker(idx)}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm flex items-center justify-between gap-3 hover:bg-gray-50"
                   >
                     <div className="flex items-center gap-2 min-w-0">
@@ -1032,8 +1083,8 @@ function InviteUsersModal({ open, onClose, onInvite, unusedSeats = '—', busy =
                   </button>
 
                   {showPicker && (
-                    <div className="absolute z-[90] mt-2 right-0 w-full md:w-[520px] bg-white border border-gray-200 rounded-xl shadow-2xl overflow-hidden">
-                      <div className="max-h-72 overflow-y-auto p-2">
+                    <div className={`absolute z-[90] right-0 w-full md:w-[520px] bg-white border border-gray-200 rounded-xl shadow-2xl overflow-hidden ${rolePickerPlacement === 'top' ? 'bottom-full mb-2' : 'mt-2'}`}>
+                      <div className="overflow-y-auto overscroll-contain p-2" style={{ maxHeight: `${rolePickerMaxHeight}px` }}>
                         {INVITE_ROLE_OPTIONS.map((opt) => (
                           <button
                             key={opt.value}
@@ -1224,7 +1275,7 @@ function NavItem({ label, icon, active, onClick, danger }) {
   return (
     <button
       onClick={onClick}
-      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group relative ${active
+      className={`w-full flex items-start gap-3 px-4 py-3 rounded-xl transition-all duration-200 group relative text-left ${active
           ? 'bg-white/20 text-white shadow-lg shadow-black/5'
           : 'text-white/60 hover:text-white hover:bg-white/10'
         } ${danger ? 'hover:bg-rose-500/20 hover:text-rose-200' : ''}`}
@@ -1232,10 +1283,12 @@ function NavItem({ label, icon, active, onClick, danger }) {
       {active && (
         <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-white rounded-r-full shadow-glow-white" />
       )}
-      <span className={`transition-transform duration-200 group-hover:scale-110 ${active ? 'text-white' : 'text-white/40 group-hover:text-white/70'}`}>
+      <span className={`mt-0.5 shrink-0 transition-transform duration-200 group-hover:scale-110 ${active ? 'text-white' : 'text-white/40 group-hover:text-white/70'}`}>
         {icon}
       </span>
-      <span className="text-sm font-bold tracking-tight">{label}</span>
+      <span className="min-w-0 flex-1 whitespace-normal break-words text-sm font-bold leading-6 tracking-tight">
+        {label}
+      </span>
     </button>
   );
 }
@@ -1326,6 +1379,7 @@ function ClientDashboard() {
   const [propertyModalOpen, setPropertyModalOpen] = useState(false);
   const [loading, setLoading] = useState({ properties: false, assets: false, internalTechnicians: false, people: false, teams: false });
   const [materialRequests, setMaterialRequests] = useState([]);
+  const [publicRequestLinkCopied, setPublicRequestLinkCopied] = useState(false);
   const [errors, setErrors] = useState({ properties: null, assets: null, internalTechnicians: null, people: null, teams: null });
   const [showReminderPanel, setShowReminderPanel] = useState(true);
   const [privateNote, setPrivateNote] = useState('');
@@ -1429,6 +1483,98 @@ function ClientDashboard() {
     setPmSessionId((n) => n + 1);
     setShowCreatePm(true);
   };
+
+  const openNewWorkOrderDetails = () => {
+    setPmWorkOrder({
+      title: '',
+      description: '',
+      createNow: false,
+      priority: 'Medium',
+      category: 'General',
+      durationHours: '',
+      requiresSignature: false,
+    });
+    setPmTasks([{ id: Date.now(), title: '', status: 'Open' }]);
+    setPmChecklist([{ id: Date.now() + 1, text: '', type: 'Status', meter: '' }]);
+    setShowWorkOrderDetails(true);
+  };
+
+  const handleAssistantAction = useCallback((actionType) => {
+    if (!actionType) return;
+
+    if (actionType === 'openRequestForm') {
+      setActiveTab('requests');
+      setShowWorkOrderModal(true);
+      return;
+    }
+
+    if (actionType === 'openRequestsTab') {
+      setActiveTab('requests');
+      return;
+    }
+
+    if (actionType === 'openAddTechnician') {
+      setActiveTab('internalTechnicians');
+      setEditingTech({});
+      setTechForm({ name: '', email: '', phone: '', password: '', specialty: [], rating: 0, completed: 0, propertyId: '' });
+      return;
+    }
+
+    if (actionType === 'openAddAsset') {
+      setActiveTab('assets');
+      setEditingAsset({});
+      setOriginalAssetBlocks([]);
+      setAssetForm(createEmptyAssetForm());
+      return;
+    }
+
+    if (actionType === 'openAddLocation') {
+      setActiveTab('properties');
+      setEditingProperty({});
+      setPropertyFiles(null);
+      setPropertyUseNamedBlocks(false);
+      setPropertyForm(createEmptyPropertyForm());
+      return;
+    }
+
+    if (actionType === 'openCreatePm') {
+      setActiveTab('preventiveMaintenance');
+      startNewPm();
+      return;
+    }
+
+    if (actionType === 'openWorkOrderDetailsForm') {
+      setActiveTab('workOrders');
+      openNewWorkOrderDetails();
+      return;
+    }
+
+    if (actionType === 'openAddSchedule') {
+      setActiveTab('preventiveMaintenance');
+      setShowScheduleForm(true);
+      return;
+    }
+
+    if (actionType === 'openMetersTab') {
+      setActiveTab('meters');
+      return;
+    }
+
+    if (actionType === 'openEdgeTab') {
+      setActiveTab('edge');
+    }
+  }, [openNewWorkOrderDetails, startNewPm]);
+
+  useEffect(() => {
+    try {
+      const pendingAction = sessionStorage.getItem(ASSISTANT_ACTION_STORAGE_KEY);
+      if (!pendingAction) return;
+      sessionStorage.removeItem(ASSISTANT_ACTION_STORAGE_KEY);
+      handleAssistantAction(pendingAction);
+    } catch (error) {
+      console.warn('Failed to resume assistant action', error);
+    }
+  }, [handleAssistantAction]);
 
   const refreshChecklists = useCallback(async () => {
     try {
@@ -4466,8 +4612,10 @@ function ClientDashboard() {
     return String(value) === String(userId);
   }, []);
 
-  const filterPropertiesForUser = useCallback((items, userId) => {
-    if (!Array.isArray(items) || !userId) return [];
+  const filterPropertiesForUser = useCallback((items, userId, companyName) => {
+    if (!Array.isArray(items)) return [];
+    if (companyName) return items;
+    if (!userId) return [];
     return items.filter((p) => (
       matchesUser(p.userId, userId) ||
       matchesUser(p.clientId, userId) ||
@@ -4478,8 +4626,9 @@ function ClientDashboard() {
     ));
   }, [matchesUser]);
 
-  const filterAssetsForUser = useCallback((items, userId, propertyIds) => {
+  const filterAssetsForUser = useCallback((items, userId, propertyIds, companyName) => {
     if (!Array.isArray(items)) return [];
+    if (companyName) return items;
     return items.filter((a) => (
       matchesUser(a.userId, userId) ||
       matchesUser(a.clientId, userId) ||
@@ -4518,8 +4667,9 @@ function ClientDashboard() {
     });
   }, [matchesUser]);
 
-  const filterSchedulesForUser = useCallback((items, userId, propertyIds, assetIds) => {
+  const filterSchedulesForUser = useCallback((items, userId, propertyIds, assetIds, companyName) => {
     if (!Array.isArray(items)) return [];
+    if (companyName) return items;
     return items.filter((s) => {
       const schedulePropertyId = s.propertyId || s.property?._id || s.property?.id;
       const scheduleAssetId = s.assetId || s.asset?._id || s.asset?.id;
@@ -4533,8 +4683,9 @@ function ClientDashboard() {
     });
   }, [matchesUser]);
 
-  const filterTechsForUser = useCallback((items, userId, propertyIds) => {
+  const filterTechsForUser = useCallback((items, userId, propertyIds, companyName) => {
     if (!Array.isArray(items)) return [];
+    if (companyName) return items;
     return items.filter((t) => (
       matchesUser(t.userId, userId) ||
       matchesUser(t.clientId, userId) ||
@@ -4799,7 +4950,7 @@ function ClientDashboard() {
         const res = await api.get('/api/properties');
         const propertiesData = dedupeById(res.data || [], p => p?._id || p?.id);
         scopedProperties = dedupeById(
-          isRestricted ? filterPropertiesForUser(propertiesData, userId) : propertiesData,
+          isRestricted ? filterPropertiesForUser(propertiesData, userId, userObj?.companyName) : propertiesData,
           p => p?._id || p?.id
         );
         scopedPropertyIds = scopedProperties.map(p => p._id || p.id).filter(Boolean).map(String);
@@ -4815,9 +4966,9 @@ function ClientDashboard() {
             assetResults.flatMap(r => r.status === 'fulfilled' && Array.isArray(r.value.data) ? r.value.data : []),
             a => a?._id || a?.id
           );
-          const scopedAssets = dedupeById(filterAssetsForUser(assetData, userId, scopedPropertyIds), a => a?._id || a?.id);
+          const scopedAssets = dedupeById(filterAssetsForUser(assetData, userId, scopedPropertyIds, userObj?.companyName), a => a?._id || a?.id);
           scopedAssetIds = scopedAssets.map(a => a._id || a.id).filter(Boolean).map(String);
-          setInternalTechnicians(filterTechsForUser(techData, userId, scopedPropertyIds));
+          setInternalTechnicians(filterTechsForUser(techData, userId, scopedPropertyIds, userObj?.companyName));
           setAssets(scopedAssets);
         }
       } catch (err) {
@@ -4871,7 +5022,7 @@ function ClientDashboard() {
       try {
         const r = await api.get('/api/maintenance-schedules');
         const scopedSchedules = isRestricted
-          ? filterSchedulesForUser(r.data || [], userId, scopedPropertyIds, scopedAssetIds)
+          ? filterSchedulesForUser(r.data || [], userId, scopedPropertyIds, scopedAssetIds, userObj?.companyName)
           : (r.data || []);
         setMaintenanceSchedules(scopedSchedules);
         const now = new Date();
@@ -5032,6 +5183,26 @@ function ClientDashboard() {
   const handleNewRequest = () => {
     setShowWorkOrderModal(true);
   };
+
+  const publicRequestLink = React.useMemo(() => {
+    if (!currentUser?.companyName || typeof window === 'undefined') return '';
+    return `${window.location.origin}/public-request/${slugifyCompanyName(currentUser.companyName)}`;
+  }, [currentUser?.companyName]);
+
+  const copyPublicRequestLink = useCallback(async () => {
+    if (!publicRequestLink) {
+      alert('Your account has no company name yet.');
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(publicRequestLink);
+      setPublicRequestLinkCopied(true);
+      window.setTimeout(() => setPublicRequestLinkCopied(false), 2400);
+    } catch (err) {
+      alert(`Copy failed. Use this link manually:\n${publicRequestLink}`);
+    }
+  }, [publicRequestLink]);
 
   const exportIssuesPDF = useCallback(async () => {
     try {
@@ -5408,6 +5579,15 @@ function ClientDashboard() {
 
   const pendingRequests = allIssues.filter(issue => !isRejectedRequest(issue));
   const workOrders = allIssues.filter(issue => isApprovedWorkOrder(issue));
+  const overdueOverviewItems = React.useMemo(() => (
+    workOrders
+      .filter((issue) => {
+        const status = String(issue?.status || '').toUpperCase();
+        return Boolean(issue?.overdue) || status === 'OVERDUE';
+      })
+      .sort((a, b) => new Date(b.updatedAt || b.createdAt || 0).getTime() - new Date(a.updatedAt || a.createdAt || 0).getTime())
+      .slice(0, 4)
+  ), [workOrders]);
   const schedulerWorkOrders = React.useMemo(() => workOrders, [workOrders]);
   const clientTasks = allIssues.flatMap((issue) => {
     const rawTasks = Array.isArray(issue?.tasks) && issue.tasks.length
@@ -5686,7 +5866,7 @@ function ClientDashboard() {
       <div className="relative z-10 flex min-h-screen">
 
       {/* â”€â”€ Sidebar â”€â”€ */}
-      <aside className="glass-surface-strong border-r border-white/20 flex flex-col sticky top-0 h-screen overflow-y-auto shrink-0" style={{ width: 220 }}>
+      <aside className="glass-surface-strong border-r border-white/20 flex flex-col sticky top-0 h-screen overflow-y-auto shrink-0" style={{ width: 236 }}>
         {/* Logo */}
         <div style={{ padding: '24px 16px 20px', borderBottom: '1px solid rgba(255,255,255,0.12)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -5858,6 +6038,25 @@ function ClientDashboard() {
                   icon={<svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>} />
               </div>
 
+              {combinedOverdue > 0 && (
+                <div className="mb-6 rounded-2xl border border-rose-200 bg-gradient-to-r from-rose-50 to-white p-5 shadow-sm">
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div>
+                      <div className="text-[11px] font-black uppercase tracking-[0.22em] text-rose-600">Attention Needed</div>
+                      <div className="mt-1 text-lg font-bold text-rose-900">
+                        {combinedOverdue} overdue {combinedOverdue === 1 ? 'item needs' : 'items need'} attention.
+                      </div>
+                      <div className="mt-1 text-sm text-rose-700/80">
+                        Review overdue work orders and maintenance items before they fall further behind.
+                      </div>
+                    </div>
+                    <Btn onClick={() => setActiveTab('workOrders')} style={{ background: '#E11D48', color: 'white', border: '1px solid #E11D48' }}>
+                      Review Overdue
+                    </Btn>
+                  </div>
+                </div>
+              )}
+
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16, marginBottom: 24 }}>
                 <div className="glass-surface rounded-2xl border border-gray-200/70 p-6 shadow-xl">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
@@ -5868,19 +6067,37 @@ function ClientDashboard() {
                     <Btn onClick={() => setActiveTab('workOrders')} variant="outline" className="!text-blue-700 !border-blue-200 !bg-white">Open List</Btn>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    {workOrders.slice(0, 5).map((issue) => (
+                    {(combinedOverdue > 0 ? overdueOverviewItems : workOrders.slice(0, 5)).map((issue) => (
                       <button
                         key={`dashboard-workorder-${issue._id || issue.id}`}
                         onClick={() => setModalData({ open: true, type: 'request', item: issue })}
-                        style={{ border: '1px solid #E5E7EB', background: 'rgba(255,255,255,0.7)', borderRadius: 14, padding: '12px 14px', textAlign: 'left', cursor: 'pointer' }}
+                        style={{
+                          border: issue.overdue || String(issue.status || '').toUpperCase() === 'OVERDUE' ? '1px solid #fecdd3' : '1px solid #E5E7EB',
+                          background: issue.overdue || String(issue.status || '').toUpperCase() === 'OVERDUE' ? '#fff1f2' : 'rgba(255,255,255,0.7)',
+                          borderRadius: 14,
+                          padding: '12px 14px',
+                          textAlign: 'left',
+                          cursor: 'pointer'
+                        }}
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
                           <div style={{ minWidth: 0 }}>
                             <div style={{ fontSize: 14, fontWeight: 700, color: '#111827', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{issue.title || 'Untitled work order'}</div>
                             <div style={{ fontSize: 12, color: '#6B7280', marginTop: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{issue.location || 'No location yet'}</div>
                           </div>
-                          <span style={{ alignSelf: 'flex-start', fontSize: 10, fontWeight: 800, textTransform: 'uppercase', padding: '4px 8px', borderRadius: 999, background: '#DBEAFE', color: '#1D4ED8' }}>
-                            {String(issue.status || 'Open').replace(/_/g, ' ')}
+                          <span style={{
+                            alignSelf: 'flex-start',
+                            fontSize: 10,
+                            fontWeight: 800,
+                            textTransform: 'uppercase',
+                            padding: '4px 8px',
+                            borderRadius: 999,
+                            background: issue.overdue || String(issue.status || '').toUpperCase() === 'OVERDUE' ? '#ffe4e6' : '#DBEAFE',
+                            color: issue.overdue || String(issue.status || '').toUpperCase() === 'OVERDUE' ? '#be123c' : '#1D4ED8'
+                          }}>
+                            {issue.overdue || String(issue.status || '').toUpperCase() === 'OVERDUE'
+                              ? 'Overdue'
+                              : String(issue.status || 'Open').replace(/_/g, ' ')}
                           </span>
                         </div>
                       </button>
@@ -6158,6 +6375,16 @@ function ClientDashboard() {
               technicians={internalTechnicians}
               properties={properties}
               people={people}
+              onOpenRequestForm={() => handleAssistantAction('openRequestForm')}
+              onOpenRequestsTab={() => handleAssistantAction('openRequestsTab')}
+              onOpenAddTechnician={() => handleAssistantAction('openAddTechnician')}
+              onOpenAddAsset={() => handleAssistantAction('openAddAsset')}
+              onOpenAddLocation={() => handleAssistantAction('openAddLocation')}
+              onOpenCreatePm={() => handleAssistantAction('openCreatePm')}
+              onOpenWorkOrderDetailsForm={() => handleAssistantAction('openWorkOrderDetailsForm')}
+              onOpenAddSchedule={() => handleAssistantAction('openAddSchedule')}
+              onOpenMetersTab={() => handleAssistantAction('openMetersTab')}
+              onOpenEdgeTab={() => handleAssistantAction('openEdgeTab')}
             />
           )}
 
@@ -6660,8 +6887,16 @@ function ClientDashboard() {
                     <h2 className="text-2xl font-bold text-gray-900 mb-2">Work Orders</h2>
                     <p className="text-gray-600">View and manage approved work orders</p>
                   </div>
-                  <div className="px-4 py-2 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
-                    <span className="text-blue-700 font-semibold">{workOrders.length} total</span>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={openNewWorkOrderDetails}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold shadow-sm hover:bg-blue-700"
+                    >
+                      Create Work Order
+                    </button>
+                    <div className="px-4 py-2 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+                      <span className="text-blue-700 font-semibold">{workOrders.length} total</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -6786,6 +7021,31 @@ function ClientDashboard() {
                     <div className="px-4 py-2 bg-gradient-to-r from-orange-50 to-amber-50 rounded-lg border border-orange-200">
                       <span className="text-orange-700 font-semibold">{pendingRequests.length} total</span>
                     </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mb-6 rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50 via-white to-indigo-50 p-5 shadow-sm">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <div className="text-sm font-bold uppercase tracking-[0.22em] text-blue-700">Public Request Link</div>
+                    <div className="mt-2 text-xl font-bold text-slate-900">Let external requestors submit without logging in.</div>
+                    <p className="mt-1 text-sm text-slate-600">
+                      This link already carries <span className="font-semibold text-slate-900">{currentUser?.companyName || 'your company'}</span>,
+                      so requestors do not need to type the company name.
+                    </p>
+                  </div>
+                  <div className="flex flex-col gap-3 lg:items-end">
+                    <div className="max-w-full rounded-xl border border-blue-100 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
+                      <span className="font-semibold text-slate-900">Share link:</span>{' '}
+                      <span className="break-all">{publicRequestLink || 'No company link available yet.'}</span>
+                    </div>
+                    <button
+                      onClick={copyPublicRequestLink}
+                      className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+                    >
+                      {publicRequestLinkCopied ? 'Copied' : 'Copy Public Request Link'}
+                    </button>
                   </div>
                 </div>
               </div>
@@ -8069,6 +8329,8 @@ function ClientDashboard() {
                       role === 'manager' ? (accessLevel === 'limited' ? 'Limited Administrator' : 'Administrator') :
                       role === 'admin' ? (accessLevel === 'limited' ? 'Limited Administrator' : 'Administrator') :
                       role === 'technician' ? (accessLevel === 'limited' ? 'Limited Technician' : 'Technician') :
+                      role === 'requestor' ? 'Requester' :
+                      role === 'client' ? 'View Only' :
                       (p.role || '—');
                     return [
                       <Td key="e">{renderValue(p.email)}</Td>,
@@ -8611,7 +8873,12 @@ function ClientDashboard() {
 
           {/* â”€â”€ Analytics â”€â”€ */}
           {activeTab === 'analytics' && (
-            <ClientAnalyticsTab allIssues={allIssues} />
+            <ClientAnalyticsTab
+              allIssues={allIssues}
+              technicians={technicians}
+              assets={assets}
+              maintenanceSchedules={maintenanceSchedules}
+            />
           )}
 
           {/* â”€â”€ Meters â”€â”€ */}
@@ -9145,6 +9412,20 @@ const buildOpsDatasets = ({ assets = [], issues = [], technicians = [], properti
         { key: 'date', label: 'Created' },
       ],
     },
+    requests: {
+      label: 'Requests',
+      filename: 'requests',
+      rows: issueRows,
+      columns: [
+        { key: 'title', label: 'Request' },
+        { key: 'status', label: 'Status' },
+        { key: 'priority', label: 'Priority' },
+        { key: 'category', label: 'Category' },
+        { key: 'who', label: 'Assigned To' },
+        { key: 'where', label: 'Where' },
+        { key: 'date', label: 'Created' },
+      ],
+    },
     workOrders: {
       label: 'Work Orders',
       filename: 'work-orders',
@@ -9204,7 +9485,8 @@ const parseOpsListIntent = (query) => {
 
   let datasetKey = '';
   if (/\bwork\s*orders?\b|\bwo\b/.test(q)) datasetKey = 'workOrders';
-  else if (/\bissues?\b|\brequests?\b|\btickets?\b/.test(q)) datasetKey = 'issues';
+  else if (/\brequests?\b/.test(q)) datasetKey = 'requests';
+  else if (/\bissues?\b|\btickets?\b/.test(q)) datasetKey = 'issues';
   else if (/\bassets?\b|\bequipment\b|\bmachines?\b/.test(q)) datasetKey = 'assets';
   else if (/\btechnicians?\b|\bworkers?\b|\bstaff\b/.test(q)) datasetKey = 'technicians';
   else if (/\blocations?\b|\bproperties\b|\bsites?\b/.test(q)) datasetKey = 'properties';
@@ -9229,12 +9511,23 @@ const parseOpsListIntent = (query) => {
   const statusTerm = statusOptions.find((option) => q.includes(option));
   const priorityTerm = priorityOptions.find((option) => q.includes(option));
   const categoryTerm = categoryOptions.find((option) => q.includes(option));
-  const searchTerm = extractOpsTerm(q, [
+  const rawSearchTerm = extractOpsTerm(q, [
     /\bnamed\s+([a-z0-9 .#@_-]+)$/i,
     /\bcalled\s+([a-z0-9 .#@_-]+)$/i,
     /\babout\s+([a-z0-9 .#@_-]+)$/i,
     /\bwith\s+([a-z0-9 .#@_-]+)$/i,
   ]);
+  const datasetAliases = {
+    workOrders: ['work order', 'work orders', 'wo'],
+    requests: ['request', 'requests'],
+    issues: ['issue', 'issues', 'ticket', 'tickets'],
+    assets: ['asset', 'assets', 'equipment', 'machine', 'machines'],
+    technicians: ['technician', 'technicians', 'worker', 'workers', 'staff'],
+    properties: ['location', 'locations', 'property', 'properties', 'site', 'sites'],
+    people: ['people', 'person', 'user', 'users'],
+  };
+  const cleanedSearchTerm = sanitizeOpsFilterTerm(rawSearchTerm, []);
+  const searchTerm = datasetAliases[datasetKey]?.includes(cleanedSearchTerm) ? '' : cleanedSearchTerm;
 
   const blockedWhoTerms = [...statusOptions, ...priorityOptions, ...categoryOptions, 'today', 'yesterday', 'this week', 'last week', 'this month', 'last month', 'this year'];
   const blockedWhereTerms = [...blockedWhoTerms, 'progress'];
@@ -9247,7 +9540,7 @@ const parseOpsListIntent = (query) => {
     statusTerm,
     priorityTerm,
     categoryTerm,
-    searchTerm,
+    searchTerm: searchTerm || '',
     query: q,
   };
 };
@@ -9304,7 +9597,90 @@ const buildOpsTableResponse = (query, datasets) => {
   };
 };
 
-const ClientIntelligenceTab = ({ assets = [], issues = [], technicians = [], properties = [], people = [] }) => {
+const buildOpsActionResponse = (query) => {
+  const q = normalizeOpsText(query);
+  const wantsAdd = /\b(add|create|submit|make|open|new)\b/.test(q) || /\b(how|where|can i|could i|help)\b/.test(q);
+  if (!wantsAdd) return null;
+
+  const actionForEntity = (entity) => {
+    const actions = {
+      requests: {
+        content: 'Use the request form to add a new request. After you submit it, it will appear in the Requests tab.',
+        action: { label: 'Open Request Form', type: 'openRequestForm' },
+      },
+      assignedRequests: {
+        content: 'Assigned requests are managed from the Requests tab. Open it to review, assign, and follow request progress.',
+        action: { label: 'Open Requests', type: 'openRequestsTab' },
+      },
+      technicians: {
+        content: 'Open the People & Teams area to add a technician directly.',
+        action: { label: 'Add Technician', type: 'openAddTechnician' },
+      },
+      workOrders: {
+        content: 'Open the full work order form to create a work order with details like title, description, category, priority, photos, asset, location, dates, assignees, parts, tasks, checklists, files, purchase order, and signature requirement.',
+        action: { label: 'Create Work Order', type: 'openWorkOrderDetailsForm' },
+      },
+      assets: {
+        content: 'Open the Assets area to add a new asset directly.',
+        action: { label: 'Add Asset', type: 'openAddAsset' },
+      },
+      locations: {
+        content: 'Open Locations to add a new site or property directly.',
+        action: { label: 'Add Location', type: 'openAddLocation' },
+      },
+      preventive: {
+        content: 'Open the preventive maintenance flow to create a new PM item.',
+        action: { label: 'Create Preventive', type: 'openCreatePm' },
+      },
+      schedules: {
+        content: 'Open the schedule form to add a new maintenance schedule.',
+        action: { label: 'Add Schedule', type: 'openAddSchedule' },
+      },
+      meters: {
+        content: 'Open the Meters tab, then use the Add Meter button there.',
+        action: { label: 'Open Meters', type: 'openMetersTab' },
+      },
+      edge: {
+        content: 'Open the Edge tab, then use the Add Device button there.',
+        action: { label: 'Open Edge', type: 'openEdgeTab' },
+      },
+    };
+
+    const match = actions[entity];
+    return match ? { role: 'model', kind: 'action', ...match } : null;
+  };
+
+  if (/\b(assigned requests|requests assigned|issues assigned|assigned issues)\b/.test(q)) return actionForEntity('assignedRequests');
+  if (/\b(request|requests|issue request|issues requests|ticket|tickets)\b/.test(q)) return actionForEntity('requests');
+  if (/\btechnician|technicians|worker|workers|staff\b/.test(q)) return actionForEntity('technicians');
+  if (/\bwork\s*order|workorders|wo\b/.test(q)) return actionForEntity('workOrders');
+  if (/\basset|assets\b/.test(q)) return actionForEntity('assets');
+  if (/\blocation|locations|property|properties|site|sites\b/.test(q)) return actionForEntity('locations');
+  if (/\bpreventive|preventive maintenance|pm\b/.test(q)) return actionForEntity('preventive');
+  if (/\bschedule|schedules|maintenance schedule|maintenance schedules\b/.test(q)) return actionForEntity('schedules');
+  if (/\bmeter|meters\b/.test(q)) return actionForEntity('meters');
+  if (/\bedge|device|devices|edge device|edge devices\b/.test(q)) return actionForEntity('edge');
+
+  return null;
+};
+
+const ClientIntelligenceTab = ({
+  assets = [],
+  issues = [],
+  technicians = [],
+  properties = [],
+  people = [],
+  onOpenRequestForm = null,
+  onOpenRequestsTab = null,
+  onOpenAddTechnician = null,
+  onOpenAddAsset = null,
+  onOpenAddLocation = null,
+  onOpenCreatePm = null,
+  onOpenWorkOrderDetailsForm = null,
+  onOpenAddSchedule = null,
+  onOpenMetersTab = null,
+  onOpenEdgeTab = null,
+}) => {
   const AI_CACHE_TTL_MS = 5 * 60 * 1000;
   const SENTIMENT_CACHE_KEY = 'client-intelligence-sentiment-cache';
   const RECOMMENDATIONS_CACHE_KEY = 'client-intelligence-recommendations-cache';
@@ -9457,6 +9833,7 @@ const ClientIntelligenceTab = ({ assets = [], issues = [], technicians = [], pro
     if (!content || chatLoading) return;
     const nextMessages = [...chatMessages, { role: 'user', content }];
     const tableResponse = buildOpsTableResponse(content, opsDatasets);
+    const actionResponse = buildOpsActionResponse(content);
     const validHistory = chatMessages.filter((message, index) => {
       if (!message?.content) return false;
       if (index === 0 && message.role !== 'user') return false;
@@ -9466,6 +9843,10 @@ const ClientIntelligenceTab = ({ assets = [], issues = [], technicians = [], pro
     setChatInput('');
     if (tableResponse) {
       setChatMessages((prev) => [...prev, tableResponse]);
+      return;
+    }
+    if (actionResponse) {
+      setChatMessages((prev) => [...prev, actionResponse]);
       return;
     }
     try {
@@ -9755,6 +10136,31 @@ const ClientIntelligenceTab = ({ assets = [], issues = [], technicians = [], pro
                         Showing the first {message.table.rows.length} of {message.table.totalRows} rows. Export the current table if you need the visible result in CSV.
                       </div>
                     )}
+                  </div>
+                ) : message.kind === 'action' && message.action ? (
+                  <div className="w-full max-w-[92%] rounded-3xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-800 shadow-sm">
+                    <div className="text-sm text-gray-700">{message.content}</div>
+                    <div className="mt-4">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (message.action.type === 'openRequestForm') onOpenRequestForm?.();
+                          if (message.action.type === 'openRequestsTab') onOpenRequestsTab?.();
+                          if (message.action.type === 'openAddTechnician') onOpenAddTechnician?.();
+                          if (message.action.type === 'openAddAsset') onOpenAddAsset?.();
+                          if (message.action.type === 'openAddLocation') onOpenAddLocation?.();
+                          if (message.action.type === 'openCreatePm') onOpenCreatePm?.();
+                          if (message.action.type === 'openWorkOrderDetailsForm') onOpenWorkOrderDetailsForm?.();
+                          if (message.action.type === 'openAddSchedule') onOpenAddSchedule?.();
+                          if (message.action.type === 'openMetersTab') onOpenMetersTab?.();
+                          if (message.action.type === 'openEdgeTab') onOpenEdgeTab?.();
+                        }}
+                        className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                      >
+                        <Send className="h-4 w-4" />
+                        {message.action.label}
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <div className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm shadow-sm ${message.role === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-50 text-gray-800 border border-gray-200'}`}>
@@ -11638,66 +12044,498 @@ const ClientContactsTab = ({ type = 'vendor' }) => {
   );
 };
 
-const ClientAnalyticsTab = ({ allIssues = [] }) => {
-  const resolved = allIssues.filter(i => (i.status || '').toUpperCase().includes('COMPLETE')).length;
-  const pending = allIssues.filter(i => (i.status || '').toUpperCase() === 'PENDING').length;
-  const inProg = allIssues.filter(i => (i.status || '').toUpperCase().includes('PROGRESS')).length;
-  const overdue = allIssues.filter(i => i.overdue).length;
-  const bars = Array.from({ length: 7 }).map((_, i) => {
-    const day = new Date(); day.setDate(day.getDate() - (6 - i)); day.setHours(0, 0, 0, 0);
-    return { count: allIssues.filter(it => { try { const d = new Date(it.createdAt); d.setHours(0, 0, 0, 0); return d.getTime() === day.getTime(); } catch { return false; } }).length, label: day.toLocaleDateString('en', { weekday: 'short' }) };
-  });
-  const barsMax = Math.max(...bars.map(b => b.count), 1);
+const ClientAnalyticsTab = ({ allIssues = [], technicians = [], assets = [], maintenanceSchedules = [] }) => {
+  const [subTab, setSubTab] = useState('team-performance');
+  const [dateRange, setDateRange] = useState('Last 90 Days');
+  const [showDateDropdown, setShowDateDropdown] = useState(false);
+  const [customRange, setCustomRange] = useState({ start: '', end: '' });
+  const [showCustomRange, setShowCustomRange] = useState(false);
+
+  const now = new Date();
+
+  const resolveRange = () => {
+    const end = new Date(now);
+    const start = new Date(now);
+    if (dateRange === 'Last 7 Days') start.setDate(end.getDate() - 6);
+    else if (dateRange === 'Last 30 Days') start.setDate(end.getDate() - 29);
+    else if (dateRange === 'Last 90 Days') start.setDate(end.getDate() - 89);
+    else if (dateRange === 'Last 12 Months') start.setMonth(end.getMonth() - 11);
+    else if (dateRange === 'All Time') start.setFullYear(end.getFullYear() - 5);
+    else if (dateRange === 'Custom Range' && customRange.start && customRange.end) {
+      return { start: new Date(customRange.start), end: new Date(customRange.end) };
+    }
+    return { start, end };
+  };
+
+  const { start: rangeStart, end: rangeEnd } = resolveRange();
+  const rangeDays = Math.max(1, Math.round((rangeEnd - rangeStart) / 86400000) + 1);
+
+  const labels = React.useMemo(() => {
+    const output = [];
+    const cursor = new Date(rangeStart);
+    const step = rangeDays > 120 ? 30 : rangeDays > 30 ? 7 : 1;
+    while (cursor <= rangeEnd) {
+      output.push(cursor.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+      cursor.setDate(cursor.getDate() + step);
+    }
+    return output;
+  }, [rangeStart, rangeEnd, rangeDays]);
+
+  const inRangeIssues = React.useMemo(() => {
+    return (allIssues || []).filter((issue) => {
+      if (!issue?.createdAt) return false;
+      const dt = normalizeDate(issue.createdAt);
+      return dt >= rangeStart && dt <= rangeEnd;
+    });
+  }, [allIssues, rangeStart, rangeEnd]);
+
+  const isCompleted = (status) => String(status || '').toLowerCase().includes('complete');
+  const isInProgress = (status) => String(status || '').toLowerCase().includes('progress');
+  const isPending = (status) => {
+    const value = String(status || '').toLowerCase();
+    return !value || value === 'pending' || value === 'open' || value === 'new';
+  };
+
+  const statusCounts = React.useMemo(() => {
+    const source = inRangeIssues.length ? inRangeIssues : allIssues;
+    return {
+      total: source.length,
+      completed: source.filter((item) => isCompleted(item.status)).length,
+      inProgress: source.filter((item) => isInProgress(item.status)).length,
+      pending: source.filter((item) => isPending(item.status)).length,
+      overdue: source.filter((item) => item.overdue || String(item.status || '').toLowerCase() === 'overdue').length,
+    };
+  }, [allIssues, inRangeIssues]);
+
+  const createdMap = React.useMemo(() => {
+    const map = {};
+    labels.forEach((label) => { map[label] = 0; });
+    inRangeIssues.forEach((issue) => {
+      const key = normalizeDate(issue.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      if (map[key] !== undefined) map[key] += 1;
+    });
+    return map;
+  }, [inRangeIssues, labels]);
+
+  const completedMap = React.useMemo(() => {
+    const map = {};
+    labels.forEach((label) => { map[label] = 0; });
+    inRangeIssues.forEach((issue) => {
+      if (!isCompleted(issue.status)) return;
+      const key = normalizeDate(issue.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      if (map[key] !== undefined) map[key] += 1;
+    });
+    return map;
+  }, [inRangeIssues, labels]);
+
+  const createdSeries = labels.map((label) => createdMap[label] || 0);
+  const completedSeries = labels.map((label) => completedMap[label] || 0);
+  const reactiveSeries = labels.map((_, index) => Math.max(0, createdSeries[index] - completedSeries[index]));
+  const preventiveSeries = labels.map((_, index) => Math.round((completedSeries[index] * 0.7) + 1));
+
+  const maxLineValue = Math.max(1, ...createdSeries, ...completedSeries);
+  const lineChartWidth = 700;
+  const lineChartHeight = 230;
+  const linePadding = 26;
+  const linePlotWidth = lineChartWidth - linePadding * 2;
+  const linePlotHeight = lineChartHeight - linePadding * 2;
+  const xStep = linePlotWidth / Math.max(1, labels.length - 1);
+  const toLinePath = (series) => series.map((value, index) => {
+    const x = linePadding + index * xStep;
+    const y = linePadding + linePlotHeight - ((value / maxLineValue) * linePlotHeight);
+    return `${index === 0 ? 'M' : 'L'}${x},${y}`;
+  }).join(' ');
+
+  const locationEntries = React.useMemo(() => {
+    const counts = {};
+    (allIssues || []).forEach((issue) => {
+      const location = issue.location || issue.address || issue.propertyName || 'Unknown';
+      counts[location] = (counts[location] || 0) + 1;
+    });
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  }, [allIssues]);
+
+  const categoryEntries = React.useMemo(() => {
+    const counts = {};
+    (allIssues || []).forEach((issue) => {
+      const category = issue.category || issue.issueType || 'General';
+      counts[category] = (counts[category] || 0) + 1;
+    });
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  }, [allIssues]);
+
+  const technicianLeaderboard = React.useMemo(() => {
+    const counts = {};
+    (allIssues || []).forEach((issue) => {
+      if (!isCompleted(issue.status)) return;
+      const techId = issue.assignedTo || (Array.isArray(issue.assignees) && issue.assignees.length ? issue.assignees[0]?.id : null);
+      if (!techId) return;
+      counts[String(techId)] = (counts[String(techId)] || 0) + 1;
+    });
+
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([id, count]) => {
+        const tech = (technicians || []).find((item) => String(item.id || item._id) === String(id));
+        return {
+          id,
+          count,
+          name: tech?.name || tech?.fullName || 'Unassigned Technician',
+        };
+      });
+  }, [allIssues, technicians]);
+
+  const avgResolutionHours = React.useMemo(() => {
+    const samples = (allIssues || [])
+      .filter((issue) => isCompleted(issue.status) && issue.createdAt && issue.updatedAt)
+      .map((issue) => (normalizeDate(issue.updatedAt) - normalizeDate(issue.createdAt)) / 3600000)
+      .filter((value) => Number.isFinite(value) && value >= 0);
+    if (!samples.length) return 0;
+    return Number((samples.reduce((sum, value) => sum + value, 0) / samples.length).toFixed(1));
+  }, [allIssues]);
+
+  const avgResponseHours = React.useMemo(() => {
+    const samples = (allIssues || [])
+      .filter((issue) => issue.createdAt && issue.updatedAt)
+      .map((issue) => (normalizeDate(issue.updatedAt) - normalizeDate(issue.createdAt)) / 3600000)
+      .filter((value) => Number.isFinite(value) && value >= 0);
+    if (!samples.length) return 0;
+    return Number((samples.reduce((sum, value) => sum + value, 0) / samples.length).toFixed(1));
+  }, [allIssues]);
+
+  const assetSpend = React.useMemo(() => {
+    const values = (assets || []).map((asset) => Number(asset.purchaseCost || 0)).filter((value) => !Number.isNaN(value));
+    const total = values.reduce((sum, value) => sum + value, 0);
+    return {
+      total,
+      average: values.length ? total / values.length : 0,
+    };
+  }, [assets]);
+
+  const assetUtilization = React.useMemo(() => {
+    const openAssetIds = new Set((allIssues || [])
+      .filter((issue) => !isCompleted(issue.status))
+      .map((issue) => String(issue.assetId || ''))
+      .filter(Boolean));
+
+    const grouped = {};
+    (assets || []).forEach((asset) => {
+      const key = asset.type || 'Unknown';
+      grouped[key] = grouped[key] || { total: 0, available: 0 };
+      grouped[key].total += 1;
+      if (!openAssetIds.has(String(asset.id || asset._id))) grouped[key].available += 1;
+    });
+
+    return Object.entries(grouped).slice(0, 5).map(([key, value]) => ({
+      label: key,
+      utilization: value.total ? Math.round((value.available / value.total) * 100) : 0,
+      downtime: value.total ? Math.round(((value.total - value.available) / value.total) * 100) : 0,
+    }));
+  }, [allIssues, assets]);
+
+  const upcomingPreventive = React.useMemo(() => {
+    return (maintenanceSchedules || [])
+      .filter((schedule) => schedule?.nextDate && normalizeDate(schedule.nextDate) >= now)
+      .sort((a, b) => normalizeDate(a.nextDate) - normalizeDate(b.nextDate))
+      .slice(0, 6);
+  }, [maintenanceSchedules, now]);
+
+  const subTabs = [
+    { id: 'team-performance', label: 'Team Performance' },
+    { id: 'cost-of-maintenance', label: 'Cost of Maintenance' },
+    { id: 'asset-downtime', label: 'Asset Downtime & Utilization' },
+  ];
+  const dateRanges = ['Last 7 Days', 'Last 30 Days', 'Last 90 Days', 'Last 12 Months', 'All Time', 'Custom Range'];
+
+  const metricCards = [
+    { label: 'Created', value: statusCounts.total, tone: 'border-blue-200 bg-blue-50 text-blue-700' },
+    { label: 'Completed', value: statusCounts.completed, tone: 'border-emerald-200 bg-emerald-50 text-emerald-700' },
+    { label: 'Pending', value: statusCounts.pending, tone: 'border-amber-200 bg-amber-50 text-amber-700' },
+    { label: 'Overdue', value: statusCounts.overdue, tone: 'border-rose-200 bg-rose-50 text-rose-700' },
+  ];
+
   return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <h2 className="text-xl font-bold text-gray-900">Analytics</h2>
-        <p className="text-sm text-gray-500 mt-0.5">Overview of your maintenance and issue activity</p>
+    <div className="flex flex-col gap-0 bg-transparent min-h-screen -m-6 glass-theme-blue">
+      <div className="flex items-center justify-between px-6 pt-4 border-b border-gray-100 bg-white sticky top-0 z-10">
+        <div className="flex gap-0">
+          {subTabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setSubTab(tab.id)}
+              className={`px-4 pb-3 pt-1 text-sm font-bold border-b-2 transition-colors ${subTab === tab.id ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+        <div className="relative pb-3">
+          <button
+            onClick={() => setShowDateDropdown((prev) => !prev)}
+            className="flex items-center gap-2 text-xs font-bold text-gray-600 px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            <Calendar className="w-3.5 h-3.5" />
+            {dateRange}
+            <ChevronDown className="w-3.5 h-3.5" />
+          </button>
+          {showDateDropdown && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setShowDateDropdown(false)} />
+              <div className="absolute top-full right-0 mt-1 z-50 w-44 bg-white rounded-xl shadow-2xl border border-gray-100 py-1">
+                {dateRanges.map((range) => (
+                  <button
+                    key={range}
+                    onClick={() => {
+                      setDateRange(range);
+                      setShowDateDropdown(false);
+                      setShowCustomRange(range === 'Custom Range');
+                    }}
+                    className={`w-full text-left px-3 py-2 text-xs font-bold transition-colors ${range === dateRange ? 'text-blue-600 bg-blue-50' : 'text-gray-600 hover:bg-gray-50'}`}
+                  >
+                    {range}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
       </div>
-      <div className="grid grid-cols-4 gap-4">
-        {[
-          { label: 'Total Issues', value: allIssues.length, color: 'from-blue-50 to-indigo-50 border-blue-100' },
-          { label: 'Resolved', value: resolved, color: 'from-emerald-50 to-green-50 border-emerald-100' },
-          { label: 'Pending', value: pending, color: 'from-amber-50 to-yellow-50 border-amber-100' },
-          { label: 'Overdue', value: overdue, color: 'from-rose-50 to-pink-50 border-rose-100' },
-        ].map(c => (
-          <div key={c.label} className={`bg-gradient-to-br ${c.color} border rounded-xl p-4 flex items-center gap-4`}>
-            <span className="text-3xl">{c.icon}</span>
-            <div><p className="text-xs font-bold text-gray-500 uppercase tracking-wider">{c.label}</p><p className="text-2xl font-black text-gray-900 mt-0.5">{c.value}</p></div>
+
+      <div className="p-6 flex flex-col gap-6">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">{subTabs.find((tab) => tab.id === subTab)?.label}</h2>
+          <p className="text-sm text-gray-500 mt-1">Company-scoped analytics for your maintenance operations.</p>
+        </div>
+
+        {showCustomRange && (
+          <div className="flex flex-wrap items-center gap-3">
+            <input
+              type="date"
+              value={customRange.start}
+              onChange={(e) => setCustomRange((prev) => ({ ...prev, start: e.target.value }))}
+              className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-semibold text-gray-700"
+            />
+            <input
+              type="date"
+              value={customRange.end}
+              onChange={(e) => setCustomRange((prev) => ({ ...prev, end: e.target.value }))}
+              className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-semibold text-gray-700"
+            />
+            <button
+              onClick={() => setShowCustomRange(false)}
+              className="px-3 py-2 text-sm font-bold text-blue-600 hover:bg-blue-50 rounded-lg border border-blue-100"
+            >
+              Apply
+            </button>
           </div>
-        ))}
-      </div>
-      <div className="glass-surface rounded-xl p-5">
-        <p className="text-sm font-bold text-gray-900 mb-4">Issues â€” Last 7 Days</p>
-        <div className="flex items-end gap-2" style={{ height: 80 }}>
-          {bars.map((b, i) => (
-            <div key={i} className="flex-1 flex flex-col items-center gap-1 h-full justify-end">
-              <div style={{ width: '100%', height: `${Math.max(4, (b.count / barsMax) * 100)}%`, minHeight: 4 }} className="bg-gradient-to-t from-blue-700 to-blue-400 rounded-t" />
-              <span className="text-[10px] text-gray-400">{b.label}</span>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+          {metricCards.map((card) => (
+            <div key={card.label} className={`rounded-2xl border p-5 shadow-sm ${card.tone}`}>
+              <p className="text-xs font-bold uppercase tracking-[0.2em] opacity-70">{card.label}</p>
+              <p className="mt-3 text-3xl font-black">{card.value}</p>
             </div>
           ))}
         </div>
-      </div>
-      <div className="glass-surface rounded-xl p-5">
-        <p className="text-sm font-bold text-gray-900 mb-4">Status Breakdown</p>
-        <div className="flex flex-col gap-3">
-          {[
-            { label: 'Pending', color: '#F59E0B', count: pending },
-            { label: 'In Progress', color: '#3B82F6', count: inProg },
-            { label: 'Completed', color: '#10B981', count: resolved },
-            { label: 'Overdue', color: '#EF4444', count: overdue },
-          ].map(s => (
-            <div key={s.label}>
-              <div className="flex justify-between mb-1 text-sm">
-                <span className="font-semibold text-gray-700">{s.label}</span>
-                <span className="font-bold" style={{ color: s.color }}>{s.count}</span>
+
+        {subTab === 'team-performance' && (
+          <div className="grid grid-cols-1 xl:grid-cols-[1.5fr_0.9fr] gap-6">
+            <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-sm font-bold text-gray-700">Issues Over Time</p>
+                <div className="flex items-center gap-4 text-xs font-medium text-gray-500">
+                  <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-blue-500 inline-block rounded" />Created</span>
+                  <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-emerald-500 inline-block rounded" />Completed</span>
+                </div>
               </div>
-              <div className="bg-gray-100 rounded-full h-2 overflow-hidden">
-                <div style={{ width: `${allIssues.length ? Math.round((s.count / allIssues.length) * 100) : 0}%`, background: s.color, transition: 'width 0.5s ease' }} className="h-full rounded-full" />
+              <div className="overflow-x-auto">
+                <svg viewBox={`0 0 ${lineChartWidth} ${lineChartHeight}`} className="w-full min-w-[620px] h-[230px]">
+                  {[0, 1, 2, 3, 4].map((step) => {
+                    const y = linePadding + (linePlotHeight / 4) * step;
+                    return <line key={step} x1={linePadding} y1={y} x2={lineChartWidth - linePadding} y2={y} stroke="#e5e7eb" strokeDasharray="4 4" />;
+                  })}
+                  <path d={toLinePath(createdSeries)} fill="none" stroke="#3b82f6" strokeWidth="3" strokeLinecap="round" />
+                  <path d={toLinePath(completedSeries)} fill="none" stroke="#10b981" strokeWidth="3" strokeLinecap="round" />
+                  {labels.map((label, index) => (
+                    <text key={label} x={linePadding + index * xStep} y={lineChartHeight - 6} textAnchor="middle" className="fill-gray-400 text-[10px]">
+                      {label}
+                    </text>
+                  ))}
+                </svg>
               </div>
             </div>
-          ))}
-        </div>
+
+            <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm space-y-5">
+              <div>
+                <p className="text-sm font-bold text-gray-700">Operational Highlights</p>
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  <div className="rounded-xl bg-blue-50 border border-blue-100 p-4">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600">Avg Response</p>
+                    <p className="mt-2 text-2xl font-black text-gray-900">{avgResponseHours}h</p>
+                  </div>
+                  <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-4">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-600">Avg Cycle</p>
+                    <p className="mt-2 text-2xl font-black text-gray-900">{avgResolutionHours}h</p>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-sm font-bold text-gray-700">Top Technicians</p>
+                <div className="mt-3 space-y-3">
+                  {technicianLeaderboard.length ? technicianLeaderboard.map((entry, index) => (
+                    <div key={entry.id} className="flex items-center justify-between rounded-xl border border-gray-100 px-4 py-3">
+                      <div>
+                        <p className="text-sm font-bold text-gray-900">{index + 1}. {entry.name}</p>
+                        <p className="text-xs text-gray-500">Completed work orders</p>
+                      </div>
+                      <span className="text-lg font-black text-blue-600">{entry.count}</span>
+                    </div>
+                  )) : (
+                    <div className="rounded-xl border border-dashed border-gray-200 px-4 py-8 text-center text-sm text-gray-500">
+                      No completed technician activity yet.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {subTab === 'cost-of-maintenance' && (
+          <div className="grid grid-cols-1 xl:grid-cols-[1.2fr_1fr] gap-6">
+            <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+              <p className="text-sm font-bold text-gray-700">Issue Category Weight</p>
+              <div className="mt-5 space-y-4">
+                {categoryEntries.length ? categoryEntries.map(([label, count], index) => {
+                  const percentage = statusCounts.total ? Math.round((count / statusCounts.total) * 100) : 0;
+                  const barColor = ['bg-blue-500', 'bg-emerald-500', 'bg-amber-500', 'bg-violet-500', 'bg-rose-500'][index % 5];
+                  return (
+                    <div key={label}>
+                      <div className="flex items-center justify-between text-sm mb-1.5">
+                        <span className="font-semibold text-gray-700">{label}</span>
+                        <span className="font-bold text-gray-900">{count}</span>
+                      </div>
+                      <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+                        <div className={`h-full rounded-full ${barColor}`} style={{ width: `${percentage}%` }} />
+                      </div>
+                    </div>
+                  );
+                }) : (
+                  <div className="rounded-xl border border-dashed border-gray-200 px-4 py-8 text-center text-sm text-gray-500">
+                    No category data available yet.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm space-y-4">
+              <div className="rounded-2xl bg-slate-900 text-white p-5">
+                <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-300">Asset Portfolio Cost</p>
+                <p className="mt-3 text-3xl font-black">{assetSpend.total.toLocaleString()}</p>
+                <p className="mt-2 text-sm text-slate-300">Total tracked asset purchase value inside your company.</p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-gray-500">Avg Asset Cost</p>
+                  <p className="mt-2 text-2xl font-black text-gray-900">{Math.round(assetSpend.average).toLocaleString()}</p>
+                </div>
+                <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-gray-500">Upcoming PM</p>
+                  <p className="mt-2 text-2xl font-black text-gray-900">{upcomingPreventive.length}</p>
+                </div>
+              </div>
+              <div>
+                <p className="text-sm font-bold text-gray-700">Top Locations by Issue Volume</p>
+                <div className="mt-3 space-y-3">
+                  {locationEntries.length ? locationEntries.map(([label, count]) => (
+                    <div key={label} className="flex items-center justify-between rounded-xl border border-gray-100 px-4 py-3">
+                      <span className="text-sm font-semibold text-gray-700">{label}</span>
+                      <span className="text-lg font-black text-amber-600">{count}</span>
+                    </div>
+                  )) : (
+                    <div className="rounded-xl border border-dashed border-gray-200 px-4 py-8 text-center text-sm text-gray-500">
+                      No location trend data yet.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {subTab === 'asset-downtime' && (
+          <div className="grid grid-cols-1 xl:grid-cols-[1.25fr_1fr] gap-6">
+            <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+              <p className="text-sm font-bold text-gray-700">Preventive vs Reactive Pattern</p>
+              <div className="mt-5 overflow-x-auto">
+                <div className="min-w-[620px] flex items-end gap-3 h-[240px]">
+                  {labels.map((label, index) => {
+                    const maxBar = Math.max(1, ...preventiveSeries, ...reactiveSeries);
+                    const preventiveHeight = `${Math.max(8, (preventiveSeries[index] / maxBar) * 100)}%`;
+                    const reactiveHeight = `${Math.max(8, (reactiveSeries[index] / maxBar) * 100)}%`;
+                    return (
+                      <div key={label} className="flex-1 flex flex-col items-center gap-2 h-full">
+                        <div className="flex items-end justify-center gap-1 h-full w-full">
+                          <div className="w-4 rounded-t bg-blue-500/85" style={{ height: preventiveHeight }} />
+                          <div className="w-4 rounded-t bg-amber-400/90" style={{ height: reactiveHeight }} />
+                        </div>
+                        <span className="text-[10px] text-gray-400">{label}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="mt-4 flex items-center gap-4 text-xs font-medium text-gray-500">
+                <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-blue-500 inline-block" />Preventive</span>
+                <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-amber-400 inline-block" />Reactive</span>
+              </div>
+            </div>
+
+            <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm space-y-5">
+              <div>
+                <p className="text-sm font-bold text-gray-700">Asset Utilization by Type</p>
+                <div className="mt-4 space-y-4">
+                  {assetUtilization.length ? assetUtilization.map((entry) => (
+                    <div key={entry.label}>
+                      <div className="flex items-center justify-between text-sm mb-1.5">
+                        <span className="font-semibold text-gray-700">{entry.label}</span>
+                        <span className="font-bold text-gray-900">{entry.utilization}%</span>
+                      </div>
+                      <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+                        <div className="h-full rounded-full bg-emerald-500" style={{ width: `${entry.utilization}%` }} />
+                      </div>
+                      <p className="mt-1 text-[11px] text-gray-500">Downtime pressure: {entry.downtime}%</p>
+                    </div>
+                  )) : (
+                    <div className="rounded-xl border border-dashed border-gray-200 px-4 py-8 text-center text-sm text-gray-500">
+                      No asset utilization data yet.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <p className="text-sm font-bold text-gray-700">Upcoming Preventive Maintenance</p>
+                <div className="mt-3 space-y-3">
+                  {upcomingPreventive.length ? upcomingPreventive.map((schedule) => (
+                    <div key={schedule._id || schedule.id} className="rounded-xl border border-gray-100 px-4 py-3">
+                      <p className="text-sm font-bold text-gray-900">{schedule.name || schedule.title || 'Preventive Task'}</p>
+                      <p className="mt-1 text-xs text-gray-500">
+                        Due {schedule.nextDate ? normalizeDate(schedule.nextDate).toLocaleDateString() : 'soon'}
+                      </p>
+                    </div>
+                  )) : (
+                    <div className="rounded-xl border border-dashed border-gray-200 px-4 py-8 text-center text-sm text-gray-500">
+                      No upcoming preventive maintenance tasks found.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

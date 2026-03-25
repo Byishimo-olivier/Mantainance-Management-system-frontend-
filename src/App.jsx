@@ -12,7 +12,6 @@ import LandingPage from './components/LandingPage';
 import AllIssues from './components/AllIssues';
 import NewIssue from './components/NewIssue';
 import WorkOrder from './components/WorkOrder';
-import AdminDashboard from './components/AdminDashboard';
 import ManagerDashboard from './components/ManagerDashboard';
 import ClientDashboard from './components/ClientDashboard';
 import Analytics from './components/Analytics';
@@ -24,6 +23,7 @@ import PropertiesPage from './components/PropertiesPage';
 import PropertyPublicView from './components/PropertyPublicView';
 import PropertiesCards from './components/PropertiesCards';
 import PropertyDetails from './components/PropertyDetails';
+import PublicRequestForm from './components/PublicRequestForm';
 
 import RequestsPage from './components/RequestsPage';
 
@@ -32,6 +32,13 @@ import ManagerFeedback from './components/ManagerFeedback';
 import AIChatbot from './components/AIChatbot';
 import { LanguageProvider } from './i18n/LanguageContext';
 
+const getHomeRouteForRole = (role) => {
+  const normalizedRole = String(role || '').trim().toLowerCase();
+  if (normalizedRole === 'superadmin' || normalizedRole === 'super-admin') return '/manager-dashboard';
+  if (normalizedRole === 'admin' || normalizedRole === 'manager') return '/dashboard';
+  if (normalizedRole === 'technician') return '/technician-dashboard';
+  return '/dashboard';
+};
 
 function App() {
   const [auth, setAuth] = useState(() => {
@@ -46,17 +53,7 @@ function App() {
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(user));
     setAuth({ token, user });
-    if (user.role === 'admin') {
-      navigate('/admin-dashboard');
-    } else if (user.role === 'manager') {
-      navigate('/manager-dashboard');
-    } else if (user.role === 'technician') {
-      navigate('/technician-dashboard');
-    } else if (user.role === 'client') {
-      navigate('/dashboard');
-    } else {
-      navigate('/dashboard');
-    }
+    navigate(getHomeRouteForRole(user?.role));
   };
 
   return (
@@ -71,21 +68,19 @@ function App() {
           <Route path="/accept-invite" element={<AcceptInvite />} />
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/dashboard" element={auth ? (
-            auth.user?.role === 'admin' ? (
-              <Navigate to="/admin-dashboard" replace />
-            ) : auth.user?.role === 'manager' ? (
-              <Navigate to="/manager-dashboard" replace />
-            ) : auth.user?.role === 'technician' ? (
-              <Navigate to="/technician-dashboard" replace />
-            ) : <Dashboard user={auth.user} />
+            <Dashboard user={auth.user} />
           ) : <Login onLogin={handleLogin} />} />
           <Route path="/issues" element={auth ? <AllIssues /> : <Login onLogin={handleLogin} />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password/:token" element={<ResetPassword />} />
           <Route path="/new-issue" element={<NewIssue />} />
           <Route path="/requests" element={auth ? <RequestsPage /> : <Login onLogin={handleLogin} />} />
-          <Route path="/admin-dashboard" element={auth ? <AdminDashboard /> : <Login onLogin={handleLogin} />} />
-          <Route path="/manager-dashboard" element={auth ? <ManagerDashboard /> : <Login onLogin={handleLogin} />} />
+          <Route path="/admin-dashboard" element={auth ? <Navigate to={getHomeRouteForRole(auth.user?.role)} replace /> : <Login onLogin={handleLogin} />} />
+          <Route path="/manager-dashboard" element={auth ? (
+            (String(auth.user?.role || '').toLowerCase() === 'superadmin' || String(auth.user?.role || '').toLowerCase() === 'super-admin')
+              ? <ManagerDashboard />
+              : <Navigate to={getHomeRouteForRole(auth.user?.role)} replace />
+          ) : <Login onLogin={handleLogin} />} />
           <Route path="/analytics" element={auth ? <Analytics /> : <Login onLogin={handleLogin} />} />
           <Route path="/technicians" element={auth ? <TechnicianManagement /> : <Login onLogin={handleLogin} />} />
           <Route path="/technician-dashboard" element={auth ? <TechnicianDashboard /> : <Login onLogin={handleLogin} />} />
@@ -95,6 +90,7 @@ function App() {
           <Route path="/property-details/:id" element={<PropertyDetails />} />
           <Route path="/property/:id" element={<PropertyPublicView />} />
           <Route path="/property/:id" element={<PropertyPublicView />} />
+          <Route path="/public-request/:companySlug" element={<PublicRequestForm />} />
           <Route path="/feedback" element={auth ? <Feedback /> : <Login onLogin={handleLogin} />} />
           <Route path="/manager-feedback" element={auth ? <ManagerFeedback /> : <Login onLogin={handleLogin} />} />
         </Routes>
