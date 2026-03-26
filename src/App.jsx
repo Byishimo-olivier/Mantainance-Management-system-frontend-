@@ -91,7 +91,7 @@ function App() {
           <Route path="/property/:id" element={<PropertyPublicView />} />
           <Route path="/property/:id" element={<PropertyPublicView />} />
           <Route path="/public-request/:companySlug" element={<PublicRequestForm />} />
-          <Route path="/feedback" element={auth ? <Feedback /> : <Login onLogin={handleLogin} />} />
+          <Route path="/feedback" element={<Feedback />} />
           <Route path="/manager-feedback" element={auth ? <ManagerFeedback /> : <Login onLogin={handleLogin} />} />
         </Routes>
         <AIChatbot />

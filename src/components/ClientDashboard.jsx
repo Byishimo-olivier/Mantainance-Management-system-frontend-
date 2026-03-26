@@ -1,5 +1,6 @@
 ﻿import React, { useState, useEffect, useRef, useCallback } from "react";
 import backgroundVideo from "../assets/136906-765457769_small.mp4";
+import { createPortal } from "react-dom";
 import api from "../api/axios";
 import { useNavigate } from "react-router-dom";
 import { WorkOrderForm } from './WorkOrder';
@@ -7,7 +8,7 @@ import SubscriptionWidget from './SubscriptionWidget';
 import SubscriptionManagement from './SubscriptionManagement';
 import { getImageUrl } from '../utils/imageUrl';
 import { useLanguage, useTranslation } from "../i18n/LanguageContext";
-import { Clock, Calendar, CheckCircle, X, Bell, Download, Package, ShoppingCart, Gauge, Plus, Search, Eye, MapPin, AlertCircle, Repeat, Edit, ChevronLeft, ChevronRight, ChevronDown, SlidersHorizontal, Flag, MoreHorizontal, Trash2, Image as ImageIcon, Tag, Paperclip, MessageSquare, Send, Navigation } from 'lucide-react';
+import { Clock, Calendar, CheckCircle, X, Bell, Download, Package, ShoppingCart, Gauge, Plus, Search, Eye, MapPin, AlertCircle, Repeat, Edit, ChevronLeft, ChevronRight, ChevronDown, SlidersHorizontal, Flag, MoreHorizontal, Trash2, Image as ImageIcon, Tag, Paperclip, MessageSquare, Send, Navigation, DollarSign, Bookmark, Link2, FileText, Copy, Archive, ArrowUpDown, ArrowRight, LayoutDashboard, Settings, Users, RotateCcw, Zap } from 'lucide-react';
 
 const ASSISTANT_ACTION_STORAGE_KEY = 'mms_assistant_action';
 
@@ -597,6 +598,12 @@ const formatDateForInput = (val) => {
   return d.toISOString().slice(0, 10);
 };
 
+const toNumber = (val) => {
+  if (val === null || val === undefined || val === '') return 0;
+  const num = Number(String(val).replace(/[^0-9.-]/g, ''));
+  return Number.isFinite(num) ? num : 0;
+};
+
 const getWorkOrderDisplayStatus = (issue) => {
   const raw = String(issue?.status || '').toUpperCase().replace(/_/g, ' ').trim();
   if (raw.includes('COMPLETE')) return 'COMPLETED';
@@ -781,8 +788,56 @@ function SectionHeader({ title, count, action }) {
 
 // â”€â”€ Table â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Centralized Popover (manager parity)
-const FilterPopover = ({ isOpen, onClose, title, children, className = "" }) => {
+const FilterPopover = ({ isOpen, onClose, title, children, className = "", anchorRef = null }) => {
+  const [position, setPosition] = useState({ top: 0, left: 0, width: null });
+
+  useEffect(() => {
+    if (!isOpen || !anchorRef?.current) return undefined;
+
+    const updatePosition = () => {
+      const rect = anchorRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      setPosition({
+        top: rect.bottom + 8,
+        left: rect.left,
+        width: rect.width,
+      });
+    };
+
+    updatePosition();
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [anchorRef, isOpen]);
+
   if (!isOpen) return null;
+  if (anchorRef?.current && typeof document !== 'undefined') {
+    return createPortal(
+      <>
+        <div className="fixed inset-0 z-[1190]" onClick={onClose} />
+        <div
+          className={`fixed z-[1200] glass-surface-strong rounded-xl min-w-[240px] animate-in fade-in zoom-in duration-200 ${className}`}
+          style={{ top: position.top, left: position.left, minWidth: position.width || undefined }}
+        >
+          <div className="flex items-center justify-between p-4 border-b border-gray-50">
+            <span className="text-sm font-bold text-gray-900">{title}</span>
+            <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg transition-colors">
+              <X className="w-4 h-4 text-gray-400" />
+            </button>
+          </div>
+          <div className="max-h-[320px] overflow-y-auto p-2">
+            {children}
+          </div>
+        </div>
+      </>,
+      document.body
+    );
+  }
+
   return (
     <>
       <div className="fixed inset-0 z-40" onClick={onClose} />
@@ -800,6 +855,23 @@ const FilterPopover = ({ isOpen, onClose, title, children, className = "" }) => 
     </>
   );
 };
+
+const FilterButton = ({ icon: Icon, label, active, count, onClick }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={`inline-flex h-11 items-center gap-2 rounded-2xl border px-4 text-[15px] font-medium shadow-sm transition ${
+      active
+        ? 'border-blue-300 bg-blue-50 text-blue-700'
+        : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+    }`}
+  >
+    {Icon ? <Icon className="h-4 w-4" /> : null}
+    <span>{label}</span>
+    {typeof count === 'number' && count > 0 ? <span className="text-[13px] font-semibold">({count})</span> : null}
+    <ChevronDown className="h-4 w-4" />
+  </button>
+);
 
 function Table({ heads, rows, empty = 'No data found.' }) {
   return (
@@ -1320,6 +1392,7 @@ function ClientDashboard() {
   const [internalTechnicians, setInternalTechnicians] = useState([]);
   const [technicians, setTechnicians] = useState([]);
   const [people, setPeople] = useState([]);
+  const [contactPeople, setContactPeople] = useState([]);
   const [teams, setTeams] = useState([]);
   const [maintenanceSchedules, setMaintenanceSchedules] = useState([]);
   const [editingProperty, setEditingProperty] = useState(null);
@@ -1357,6 +1430,20 @@ function ClientDashboard() {
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
   }, []);
+  const closeDashboardConfirmDialog = useCallback(() => {
+    setDashboardConfirmDialog((prev) => ({ ...prev, open: false, onConfirm: null }));
+  }, []);
+  const openDashboardConfirmDialog = useCallback((config) => {
+    setDashboardConfirmDialog({
+      open: true,
+      title: config.title || '',
+      message: config.message || '',
+      confirmLabel: config.confirmLabel || 'Confirm',
+      cancelLabel: config.cancelLabel || 'Cancel',
+      tone: config.tone || 'danger',
+      onConfirm: config.onConfirm || null,
+    });
+  }, []);
   const [scheduleDetailTab, setScheduleDetailTab] = useState('assets');
   const [reminders, setReminders] = useState([]);
   const [issues, setIssues] = useState([]);
@@ -1374,8 +1461,44 @@ function ClientDashboard() {
   const [issueAssignModalOpen, setIssueAssignModalOpen] = useState(false);
   const [selectedIssueToAssign, setSelectedIssueToAssign] = useState(null);
   const [selectedInternalTechForIssue, setSelectedInternalTechForIssue] = useState('');
+  const [workOrderOpenPopover, setWorkOrderOpenPopover] = useState(null);
+  const [workOrderSearchQuery, setWorkOrderSearchQuery] = useState('');
+  const [workOrderLocationSearch, setWorkOrderLocationSearch] = useState('');
+  const [workOrderAssetSearch, setWorkOrderAssetSearch] = useState('');
+  const [selectedWorkOrderStatuses, setSelectedWorkOrderStatuses] = useState([]);
+  const [selectedWorkOrderPriorities, setSelectedWorkOrderPriorities] = useState([]);
+  const [selectedWorkOrderLocations, setSelectedWorkOrderLocations] = useState([]);
+  const [selectedWorkOrderAssets, setSelectedWorkOrderAssets] = useState([]);
+  const [selectedWorkOrderAssignedTo, setSelectedWorkOrderAssignedTo] = useState([]);
+  const [workOrderSortDirection, setWorkOrderSortDirection] = useState('desc');
+  const [savedWorkOrderViews, setSavedWorkOrderViews] = useState([]);
+  const workOrderStatusFilterRef = useRef(null);
+  const workOrderPriorityFilterRef = useRef(null);
+  const workOrderLocationFilterRef = useRef(null);
+  const workOrderAssetFilterRef = useRef(null);
+  const workOrderAssignedFilterRef = useRef(null);
+  const [pmOpenPopover, setPmOpenPopover] = useState(null);
+  const [pmSearchQuery, setPmSearchQuery] = useState('');
+  const [pmLocationSearch, setPmLocationSearch] = useState('');
+  const [selectedPmAssignedTo, setSelectedPmAssignedTo] = useState([]);
+  const [selectedPmLocations, setSelectedPmLocations] = useState([]);
+  const [selectedPmPriorities, setSelectedPmPriorities] = useState([]);
+  const [pmSortDirection, setPmSortDirection] = useState('desc');
+  const [savedPmViews, setSavedPmViews] = useState([]);
+  const pmAssignedFilterRef = useRef(null);
+  const pmLocationFilterRef = useRef(null);
+  const pmPriorityFilterRef = useRef(null);
   const [assignableIssues, setAssignableIssues] = useState([]);
   const [showWorkOrderModal, setShowWorkOrderModal] = useState(false);
+  const [dashboardConfirmDialog, setDashboardConfirmDialog] = useState({
+    open: false,
+    title: '',
+    message: '',
+    confirmLabel: 'Confirm',
+    cancelLabel: 'Cancel',
+    tone: 'danger',
+    onConfirm: null,
+  });
   const [propertyModalOpen, setPropertyModalOpen] = useState(false);
   const [loading, setLoading] = useState({ properties: false, assets: false, internalTechnicians: false, people: false, teams: false });
   const [materialRequests, setMaterialRequests] = useState([]);
@@ -1416,12 +1539,16 @@ function ClientDashboard() {
   const inviteEmailRef = useRef(null);
   const inviteRoleRef = useRef(null);
   const inviteLocationRef = useRef(null);
+  const selectedScheduleMenuRef = useRef(null);
+  const selectedScheduleAssetLocationFilterRef = useRef(null);
+  const selectedScheduleAssetAssignedFilterRef = useRef(null);
   const [inviteUsersOpen, setInviteUsersOpen] = useState(false);
   const [createTeamOpen, setCreateTeamOpen] = useState(false);
   const [inviteUsersBusy, setInviteUsersBusy] = useState(false);
   const [createTeamBusy, setCreateTeamBusy] = useState(false);
   const [pmTasks, setPmTasks] = useState([{ id: 1, title: '', status: 'Open' }]);
   const [pmWorkOrder, setPmWorkOrder] = useState({
+    pmTitle: '',
     title: '',
     description: '',
     createNow: false,
@@ -1447,11 +1574,29 @@ function ClientDashboard() {
   });
   const [pmSessionId, setPmSessionId] = useState(0);
   const [showCreatePm, setShowCreatePm] = useState(false);
+  const [pmModalMode, setPmModalMode] = useState('create');
+  const [editingPmScheduleId, setEditingPmScheduleId] = useState('');
+  const [pmAssetRowsSeed, setPmAssetRowsSeed] = useState([{ id: 1, assetId: '', locationId: '', startDate: '', endDate: '', timezone: '(UTC+02:00) Africa/Kigali', assignee: '' }]);
   const [showWorkOrderDetails, setShowWorkOrderDetails] = useState(false);
+  const [workOrderDetailsMode, setWorkOrderDetailsMode] = useState('create');
+  const [editingWorkOrderId, setEditingWorkOrderId] = useState('');
   const [launchChecklistBuilderFromMain, setLaunchChecklistBuilderFromMain] = useState(false);
   const [showCalendarSchedule, setShowCalendarSchedule] = useState(false);
   const [showMeterSchedule, setShowMeterSchedule] = useState(false);
   const [showCombinedSchedule, setShowCombinedSchedule] = useState(false);
+  const [pmScheduleEditorMode, setPmScheduleEditorMode] = useState('add');
+  const [pmDetailsExpanded, setPmDetailsExpanded] = useState(true);
+  const [expandedPmChecklistGroups, setExpandedPmChecklistGroups] = useState({});
+  const [selectedScheduleAssetPopover, setSelectedScheduleAssetPopover] = useState(null);
+  const [selectedScheduleAssetLocationSearch, setSelectedScheduleAssetLocationSearch] = useState('');
+  const [selectedScheduleAssetAssignedSearch, setSelectedScheduleAssetAssignedSearch] = useState('');
+  const [selectedScheduleAssetLocations, setSelectedScheduleAssetLocations] = useState([]);
+  const [selectedScheduleAssetAssignedTo, setSelectedScheduleAssetAssignedTo] = useState([]);
+  const [selectedScheduleAssetRowKeys, setSelectedScheduleAssetRowKeys] = useState([]);
+  const [showSelectedScheduleBulkAssign, setShowSelectedScheduleBulkAssign] = useState(false);
+  const [selectedScheduleBulkAssignee, setSelectedScheduleBulkAssignee] = useState('');
+  const [showSelectedScheduleMenu, setShowSelectedScheduleMenu] = useState(false);
+  const [openSelectedScheduleRowMenuKey, setOpenSelectedScheduleRowMenuKey] = useState('');
   const [modalData, setModalData] = useState({ open: false, type: '', item: null });
   const [commentModal, setCommentModal] = useState({ open: false, item: null });
   const [directMessageModal, setDirectMessageModal] = useState({
@@ -1465,9 +1610,34 @@ function ClientDashboard() {
   });
   const [directMessageThreads, setDirectMessageThreads] = useState({});
   const [directMessageNotifications, setDirectMessageNotifications] = useState([]);
+  useEffect(() => {
+    if (!showSelectedScheduleMenu) return undefined;
+    const handlePointerDown = (event) => {
+      if (selectedScheduleMenuRef.current && !selectedScheduleMenuRef.current.contains(event.target)) {
+        setShowSelectedScheduleMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => document.removeEventListener('mousedown', handlePointerDown);
+  }, [showSelectedScheduleMenu]);
+  useEffect(() => {
+    setShowSelectedScheduleMenu(false);
+    setOpenSelectedScheduleRowMenuKey('');
+    setSelectedScheduleAssetPopover(null);
+    setSelectedScheduleAssetLocationSearch('');
+    setSelectedScheduleAssetAssignedSearch('');
+    setSelectedScheduleAssetLocations([]);
+    setSelectedScheduleAssetAssignedTo([]);
+    setSelectedScheduleAssetRowKeys([]);
+    setShowSelectedScheduleBulkAssign(false);
+    setSelectedScheduleBulkAssignee('');
+  }, [selectedSchedule]);
 
   const startNewPm = () => {
+    setPmModalMode('create');
+    setEditingPmScheduleId('');
     setPmWorkOrder({
+      pmTitle: '',
       title: '',
       description: '',
       createNow: false,
@@ -1480,12 +1650,16 @@ function ClientDashboard() {
     setPmChecklist([{ id: Date.now() + 1, text: '', type: 'Status', meter: '' }]);
     // keep library across sessions
     setPmSchedule({ scheduleType: null, calendarRule: null });
+    setPmAssetRowsSeed([{ id: 1, assetId: '', locationId: '', startDate: '', endDate: '', timezone: '(UTC+02:00) Africa/Kigali', assignee: '' }]);
     setPmSessionId((n) => n + 1);
     setShowCreatePm(true);
   };
 
   const openNewWorkOrderDetails = () => {
+    setWorkOrderDetailsMode('create');
+    setEditingWorkOrderId('');
     setPmWorkOrder({
+      pmTitle: '',
       title: '',
       description: '',
       createNow: false,
@@ -1498,6 +1672,248 @@ function ClientDashboard() {
     setPmChecklist([{ id: Date.now() + 1, text: '', type: 'Status', meter: '' }]);
     setShowWorkOrderDetails(true);
   };
+
+  const openEditWorkOrderDetails = useCallback((issue) => {
+    if (!issue) return;
+    setWorkOrderDetailsMode('edit');
+    setEditingWorkOrderId(issue?.id || issue?._id || '');
+
+    const taskSource = (Array.isArray(issue?.tasks) && issue.tasks.length)
+      ? issue.tasks
+      : (Array.isArray(issue?.taskList) && issue.taskList.length)
+        ? issue.taskList
+        : [];
+
+    const checklistSource = Array.isArray(issue?.checklist)
+      ? issue.checklist
+      : (Array.isArray(issue?.tasks) && issue.tasks.length === 0 ? issue.tasks : []);
+
+    setPmWorkOrder({
+      pmTitle: issue?.name || issue?.title || '',
+      title: issue?.title || issue?.name || '',
+      description: issue?.description || '',
+      createNow: false,
+      priority: issue?.priority || 'Medium',
+      category: issue?.category || 'General',
+      durationHours: issue?.durationHours || issue?.estimatedTime || '',
+      requiresSignature: !!(issue?.requiresSignature || issue?.signature),
+      assetId: issue?.assetId || issue?.asset?._id || issue?.asset?.id || '',
+      assetName: issue?.assetName || issue?.asset?.name || '',
+      location: issue?.location || issue?.address || '',
+      dueDate: issue?.fixDeadline || issue?.dueDate || issue?.nextDate || '',
+      startDate: issue?.startDate || issue?.createdAt || '',
+      assignedTo: issue?.assignedTo || issue?.assignedToName || '',
+      additionalResponsibleWorkers: issue?.additionalResponsibleWorkers || '',
+      team: issue?.team || '',
+      lineItems: Array.isArray(issue?.lineItems)
+        ? issue.lineItems
+        : (Array.isArray(issue?.parts) ? issue.parts : []),
+      imageFiles: [],
+      attachmentFiles: [],
+    });
+
+    setPmTasks(
+      taskSource.length
+        ? taskSource.map((task, idx) => ({
+            id: task?.id || task?._id || `${Date.now()}-${idx}`,
+            title: task?.title || task?.text || task?.name || '',
+            status: task?.status || (task?.completed ? 'Done' : 'Open'),
+          }))
+        : [{ id: Date.now(), title: '', status: 'Open' }]
+    );
+
+    setPmChecklist(
+      checklistSource.length
+        ? checklistSource.map((item, idx) => ({
+            id: item?.id || item?._id || `${Date.now()}-${idx}`,
+            text: item?.text || item?.title || item?.label || '',
+            type: item?.type || 'Status',
+            meter: item?.meter || '',
+            required: !!item?.required,
+          }))
+        : [{ id: Date.now() + 1, text: '', type: 'Status', meter: '' }]
+    );
+
+    setModalData({ open: false, type: '', item: null });
+    setLaunchChecklistBuilderFromMain(false);
+    setShowWorkOrderDetails(true);
+  }, []);
+
+  const openEditPmDetails = useCallback((schedule) => {
+    if (!schedule) return;
+    setWorkOrderDetailsMode('edit-pm');
+    setEditingWorkOrderId(schedule?.id || schedule?._id || '');
+
+    const taskSource = Array.isArray(schedule?.tasks) ? schedule.tasks : [];
+    const checklistSource = Array.isArray(schedule?.checklist)
+      ? schedule.checklist
+      : (Array.isArray(schedule?.tasks) ? schedule.tasks : []);
+    const firstAssetRow = Array.isArray(schedule?.assetsRows) ? schedule.assetsRows[0] || {} : {};
+
+    setPmWorkOrder({
+      pmTitle: schedule?.name || schedule?.title || schedule?.workOrderTitle || '',
+      title: schedule?.workOrderTitle || schedule?.title || schedule?.name || '',
+      description: schedule?.workOrderDescription || schedule?.description || '',
+      createNow: !!schedule?.createFirstWorkOrder,
+      priority: schedule?.priority || 'Medium',
+      category: schedule?.category || 'General',
+      durationHours: schedule?.durationHours || schedule?.estimatedTime || '',
+      requiresSignature: !!(schedule?.requiresSignature || schedule?.signature),
+      assetId: firstAssetRow?.assetId || '',
+      assetName: schedule?.assetName || '',
+      location: schedule?.location || schedule?.propertyName || schedule?.branchLocation || schedule?.building || '',
+      dueDate: schedule?.nextDate || schedule?.date || '',
+      startDate: firstAssetRow?.startDate || schedule?.startDate || '',
+      assignedTo: schedule?.assignedTo || firstAssetRow?.assignee || '',
+      additionalResponsibleWorkers: schedule?.additionalResponsibleWorkers || '',
+      team: schedule?.team || '',
+      lineItems: Array.isArray(schedule?.lineItems)
+        ? schedule.lineItems
+        : (Array.isArray(schedule?.parts) ? schedule.parts : []),
+      imageFiles: [],
+      attachmentFiles: [],
+      checklistTemplateName: schedule?.checklistTemplateName || schedule?.checklistName || schedule?.templateName || '',
+      checklistTemplateDescription: schedule?.checklistTemplateDescription || '',
+    });
+
+    setPmTasks(
+      taskSource.length
+        ? taskSource.map((task, idx) => ({
+            id: task?.id || task?._id || `${Date.now()}-${idx}`,
+            title: task?.title || task?.text || task?.name || '',
+            status: task?.status || (task?.completed ? 'Done' : 'Open'),
+          }))
+        : [{ id: Date.now(), title: '', status: 'Open' }]
+    );
+
+    setPmChecklist(
+      checklistSource.length
+        ? checklistSource.map((item, idx) => ({
+            id: item?.id || item?._id || `${Date.now()}-${idx}`,
+            text: item?.text || item?.title || item?.label || item?.name || '',
+            type: item?.type || 'Status',
+            meter: item?.meter || '',
+            required: !!item?.required,
+          }))
+        : [{ id: Date.now() + 1, text: '', type: 'Status', meter: '' }]
+    );
+
+    setPmSchedule({
+      scheduleType: schedule?.scheduleType || null,
+      calendarRule: schedule?.calendarRule || null,
+      meterRule: schedule?.meterRule || null,
+      combinedRule: schedule?.combinedRule || null,
+    });
+
+    setSelectedSchedule(schedule);
+    setShowScheduleForm(false);
+    setEditingSchedule(schedule);
+    setLaunchChecklistBuilderFromMain(false);
+    setShowWorkOrderDetails(true);
+  }, []);
+
+  const openEditPmAssets = useCallback((schedule) => {
+    if (!schedule) return;
+    setPmModalMode('assets');
+    setEditingPmScheduleId(schedule?.id || schedule?._id || '');
+
+    const taskSource = Array.isArray(schedule?.tasks) ? schedule.tasks : [];
+    const checklistSource = Array.isArray(schedule?.checklist)
+      ? schedule.checklist
+      : (Array.isArray(schedule?.tasks) ? schedule.tasks : []);
+    const assetRows = Array.isArray(schedule?.assetsRows) && schedule.assetsRows.length
+      ? schedule.assetsRows.map((row, idx) => ({
+          id: row?.id || idx + 1,
+          assetId: String(extractId(row?.assetId || row?.asset) || ''),
+          locationId: String(extractId(row?.locationId || row?.location) || row?.propertyId || ''),
+          startDate: row?.startDate || '',
+          endDate: row?.endDate || '',
+          timezone: row?.timezone || '(UTC+02:00) Africa/Kigali',
+          assignee: row?.assignee || row?.assignedTo || row?.technicianId || '',
+        }))
+      : [{
+          id: 1,
+          assetId: String(extractId(schedule?.assetId || schedule?.asset) || ''),
+          locationId: '',
+          startDate: schedule?.startDate || '',
+          endDate: schedule?.nextDate || schedule?.date || '',
+          timezone: '(UTC+02:00) Africa/Kigali',
+          assignee: String(schedule?.assignedTo || ''),
+        }];
+
+    setPmWorkOrder({
+      pmTitle: schedule?.name || schedule?.title || schedule?.workOrderTitle || '',
+      title: schedule?.workOrderTitle || schedule?.title || schedule?.name || '',
+      description: schedule?.workOrderDescription || schedule?.description || '',
+      createNow: !!schedule?.createFirstWorkOrder,
+      priority: schedule?.priority || 'Medium',
+      category: schedule?.category || 'General',
+      durationHours: schedule?.durationHours || schedule?.estimatedTime || '',
+      requiresSignature: !!(schedule?.requiresSignature || schedule?.signature),
+      lineItems: Array.isArray(schedule?.lineItems)
+        ? schedule.lineItems
+        : (Array.isArray(schedule?.parts) ? schedule.parts : []),
+      imageFiles: [],
+      attachmentFiles: [],
+      checklistTemplateName: schedule?.checklistTemplateName || schedule?.checklistName || schedule?.templateName || '',
+      checklistTemplateDescription: schedule?.checklistTemplateDescription || '',
+    });
+
+    setPmTasks(
+      taskSource.length
+        ? taskSource.map((task, idx) => ({
+            id: task?.id || task?._id || `${Date.now()}-${idx}`,
+            title: task?.title || task?.text || task?.name || '',
+            status: task?.status || (task?.completed ? 'Done' : 'Open'),
+          }))
+        : [{ id: Date.now(), title: '', status: 'Open' }]
+    );
+
+    setPmChecklist(
+      checklistSource.length
+        ? checklistSource.map((item, idx) => ({
+            id: item?.id || item?._id || `${Date.now()}-${idx}`,
+            text: item?.text || item?.title || item?.label || item?.name || '',
+            type: item?.type || 'Status',
+            meter: item?.meter || '',
+            required: !!item?.required,
+          }))
+        : [{ id: Date.now() + 1, text: '', type: 'Status', meter: '' }]
+    );
+
+    setPmSchedule({
+      scheduleType: schedule?.scheduleType || null,
+      calendarRule: schedule?.calendarRule || null,
+      meterRule: schedule?.meterRule || null,
+      combinedRule: schedule?.combinedRule || null,
+    });
+
+    setPmAssetRowsSeed(assetRows);
+    setEditingSchedule(schedule);
+    setSelectedSchedule(schedule);
+    setShowScheduleForm(false);
+    setShowWorkOrderDetails(false);
+    setShowCreatePm(true);
+  }, []);
+  const openEditPmRecord = useCallback((schedule) => {
+    if (!schedule) return;
+    setPmSchedule({
+      scheduleType: schedule?.scheduleType || (schedule?.meterRule ? 'meter' : (schedule?.combinedRule ? 'combined' : 'calendar')),
+      calendarRule: schedule?.calendarRule || null,
+      meterRule: schedule?.meterRule || null,
+      combinedRule: schedule?.combinedRule || null,
+    });
+    setPmScheduleEditorMode('edit');
+    if (schedule?.combinedRule) {
+      setShowCombinedSchedule(true);
+      return;
+    }
+    if (schedule?.meterRule && !schedule?.calendarRule) {
+      setShowMeterSchedule(true);
+      return;
+    }
+    setShowCalendarSchedule(true);
+  }, []);
 
   const handleAssistantAction = useCallback((actionType) => {
     if (!actionType) return;
@@ -1685,7 +2101,7 @@ function ClientDashboard() {
   }, [allWorkers, internalTechnicians]);
 
   // New Detail Modal Implementation (manager parity)
-  const DetailsModal = useCallback(function DetailsModal({ open, type, item, onClose, getAssignedTechName, onRefresh, technicians = [], teams = [], workOrders = [], people = [], onPrivateMessage }) {
+  const DetailsModal = useCallback(function DetailsModal({ open, type, item, onClose, getAssignedTechName, onRefresh, technicians = [], teams = [], workOrders = [], people = [], contacts = [], onPrivateMessage, onEditWorkOrder }) {
     const normalizeTaskArray = (value) => {
       if (!value) return [];
       if (Array.isArray(value)) return value;
@@ -1737,13 +2153,70 @@ function ClientDashboard() {
     const [timerNow, setTimerNow] = useState(Date.now());
     const [linkRelation, setLinkRelation] = useState('relates to');
     const [linkedWorkOrders, setLinkedWorkOrders] = useState('');
+    const [showLinkWorkOrdersModal, setShowLinkWorkOrdersModal] = useState(false);
+    const [showMoreActions, setShowMoreActions] = useState(false);
+    const [moreActionsPosition, setMoreActionsPosition] = useState({ top: 0, left: 0 });
+    const [processingMoreAction, setProcessingMoreAction] = useState('');
+    const [actionDialog, setActionDialog] = useState({
+      open: false,
+      title: '',
+      message: '',
+      confirmLabel: 'OK',
+      cancelLabel: 'Cancel',
+      tone: 'primary',
+      showCancel: false,
+      onConfirm: null,
+    });
     const [providerEnabled, setProviderEnabled] = useState(false);
     const [providerPortalUrl, setProviderPortalUrl] = useState('');
+    const [isBookmarked, setIsBookmarked] = useState(Boolean(item?.bookmarked || item?.saved || item?.isBookmarked));
     const [localActivity, setLocalActivity] = useState([]);
     const [addCostOpen, setAddCostOpen] = useState(false);
     const [costForm, setCostForm] = useState({ description: '', category: '', cost: '', assignedTo: '', date: '' });
+    const [costCategoryOpen, setCostCategoryOpen] = useState(false);
+    const [costCategorySearch, setCostCategorySearch] = useState('');
+    const [costAssignedToOpen, setCostAssignedToOpen] = useState(false);
+    const [costAssignedToSearch, setCostAssignedToSearch] = useState('');
     const [localCosts, setLocalCosts] = useState([]);
     const [addPartOpen, setAddPartOpen] = useState(false);
+    const [addPrintPdfOpen, setAddPrintPdfOpen] = useState(false);
+    const [printPdfOptions, setPrintPdfOptions] = useState({
+      images: true,
+      partsAndCosts: true,
+      activity: false,
+      comments: false,
+    });
+    const [addInvoiceOpen, setAddInvoiceOpen] = useState(false);
+    const [showInvoicePartsActions, setShowInvoicePartsActions] = useState(false);
+    const [invoiceCustomParts, setInvoiceCustomParts] = useState([]);
+    const [invoiceForm, setInvoiceForm] = useState({
+      invoiceNumber: '',
+      invoiceDate: '',
+      paymentDue: '',
+      title: '',
+      description: '',
+      currency: 'USD - United States Dollar - $',
+      useCompanyAddress: false,
+      companyFullName: '',
+      companyAddress1: '',
+      companyAddress2: '',
+      companyAddress3: '',
+      customerId: '',
+      customerName: '',
+      customerEmail: '',
+      customerAddress1: '',
+      customerAddress2: '',
+      customerAddress3: '',
+      useCompanyLogo: false,
+      shippingCosts: '0',
+      salesTax: '0',
+      partsOtherCosts: '0',
+      additionalOtherCosts: '0',
+      paid: '0',
+      signatureDate: '',
+      signatureFile: null,
+    });
+    const [partModalTab, setPartModalTab] = useState('parts');
     const [partForm, setPartForm] = useState({ name: '', status: '', cost: '', quantity: 1, location: '' });
     const [inventoryParts, setInventoryParts] = useState([]);
     const [inventoryLoading, setInventoryLoading] = useState(false);
@@ -1754,6 +2227,15 @@ function ClientDashboard() {
     const [laborForm, setLaborForm] = useState({ worker: '', rate: 0, startedAt: '', hours: 0, minutes: 0, category: '' });
     const [localLabor, setLocalLabor] = useState([]);
     const fileInputRef = useRef(null);
+    const invoiceSignatureInputRef = useRef(null);
+    const invoicePartsActionsRef = useRef(null);
+    const moreActionsRef = useRef(null);
+    const moreActionsButtonRef = useRef(null);
+    const moreActionsMenuRef = useRef(null);
+    const costCategoryRef = useRef(null);
+    const costAssignedToRef = useRef(null);
+    const laborStartedAtInputRef = useRef(null);
+    const costDateInputRef = useRef(null);
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     const userName = user.name || user.username || 'Manager';
     const userRole = String(user.role || user.userRole || user.type || user.accountType || '').toLowerCase();
@@ -1763,6 +2245,28 @@ function ClientDashboard() {
     const isMaterial = type === 'material';
     const isRequest = type === 'request';
     const isIssue = type === 'issue';
+    const costCategoryOptions = ['Tax', 'Labor Cost', 'Parts Cost', 'Travel Cost', 'Other'];
+    const filteredCostCategoryOptions = costCategoryOptions.filter((option) =>
+      option.toLowerCase().includes(String(costCategorySearch || '').trim().toLowerCase())
+    );
+    const costAssignablePeople = React.useMemo(() => {
+      const currentUserEntry = {
+        id: user?.id || user?._id || user?.email || userName,
+        name: userName,
+        role: user?.role || user?.userRole || user?.type || user?.accountType || 'Administrator'
+      };
+      return dedupeById(
+        [currentUserEntry, ...allWorkers, ...(people || []), ...(contacts || [])],
+        (person) => person?._id || person?.id || person?.userId || person?.email || person?.phone || `${person?.name}-${person?.__source || person?.role || ''}`
+      );
+    }, [allWorkers, contacts, people, user, userName]);
+    const filteredCostAssignablePeople = costAssignablePeople.filter((person) => {
+      const searchValue = String(costAssignedToSearch || '').trim().toLowerCase();
+      if (!searchValue) return true;
+      const label = String(person?.name || person?.fullName || person?.email || person?.phone || '').toLowerCase();
+      const roleLabel = String(person?.__typeLabel || person?.role || person?.kind || person?.type || person?.accountType || '').toLowerCase();
+      return label.includes(searchValue) || roleLabel.includes(searchValue);
+    });
 
     useEffect(() => {
       if (item) {
@@ -1787,6 +2291,59 @@ function ClientDashboard() {
         setTimerStartedAt(item.fixTime || item.startedAt || null);
       }
     }, [item]);
+
+    useEffect(() => {
+      if (!costCategoryOpen && !costAssignedToOpen) return undefined;
+      const handlePointerDown = (event) => {
+        if (costCategoryOpen && costCategoryRef.current && !costCategoryRef.current.contains(event.target)) {
+          setCostCategoryOpen(false);
+        }
+        if (costAssignedToOpen && costAssignedToRef.current && !costAssignedToRef.current.contains(event.target)) {
+          setCostAssignedToOpen(false);
+        }
+      };
+      document.addEventListener('mousedown', handlePointerDown);
+      return () => document.removeEventListener('mousedown', handlePointerDown);
+    }, [costAssignedToOpen, costCategoryOpen]);
+
+    useEffect(() => {
+      if (!showMoreActions) return undefined;
+      const handlePointerDown = (event) => {
+        const clickedInsideTrigger = moreActionsRef.current?.contains(event.target);
+        const clickedInsideMenu = moreActionsMenuRef.current?.contains(event.target);
+        if (!clickedInsideTrigger && !clickedInsideMenu) {
+          setShowMoreActions(false);
+        }
+      };
+      const updateMenuPosition = () => {
+        const rect = moreActionsButtonRef.current?.getBoundingClientRect();
+        if (!rect) return;
+        setMoreActionsPosition({
+          top: rect.bottom + 8,
+          left: Math.max(16, rect.left - 12),
+        });
+      };
+      updateMenuPosition();
+      window.addEventListener('resize', updateMenuPosition);
+      window.addEventListener('scroll', updateMenuPosition, true);
+      document.addEventListener('mousedown', handlePointerDown);
+      return () => {
+        document.removeEventListener('mousedown', handlePointerDown);
+        window.removeEventListener('resize', updateMenuPosition);
+        window.removeEventListener('scroll', updateMenuPosition, true);
+      };
+    }, [showMoreActions]);
+
+    useEffect(() => {
+      if (!showInvoicePartsActions) return undefined;
+      const handlePointerDown = (event) => {
+        if (invoicePartsActionsRef.current && !invoicePartsActionsRef.current.contains(event.target)) {
+          setShowInvoicePartsActions(false);
+        }
+      };
+      document.addEventListener('mousedown', handlePointerDown);
+      return () => document.removeEventListener('mousedown', handlePointerDown);
+    }, [showInvoicePartsActions]);
 
     useEffect(() => {
       if (open && itemId) {
@@ -2218,7 +2775,15 @@ function ClientDashboard() {
       return Number.isNaN(t) ? 0 : t;
     };
     const combinedFileItems = [...localFiles, ...normalizedFileItems];
-    const combinedLinkItems = [...localLinks, ...normalizedLinkItems];
+    const combinedLinkItems = [...localLinks, ...normalizedLinkItems].filter((link, idx, arr) => {
+      const currentId = String(link?.id || link?._id || '');
+      const currentKey = `${link?.title || ''}|${link?.url || ''}|${link?.workOrderId || ''}|${link?.relationship || ''}`;
+      return arr.findIndex((entry) => {
+        const entryId = String(entry?.id || entry?._id || '');
+        const entryKey = `${entry?.title || ''}|${entry?.url || ''}|${entry?.workOrderId || ''}|${entry?.relationship || ''}`;
+        return (currentId && entryId && currentId === entryId) || entryKey === currentKey;
+      }) === idx;
+    });
     const combinedActivityItems = [...localActivity, ...normalizedActivityItems]
       .sort((a, b) => toMillis(b.timestamp) - toMillis(a.timestamp));
     const coreImageItems = [
@@ -2232,6 +2797,10 @@ function ClientDashboard() {
     const availableWorkOrders = Array.isArray(workOrders)
       ? workOrders.filter(wo => String(wo._id || wo.id) !== String(itemId))
       : [];
+    const invoiceCustomerOptions = dedupeById(
+      [...(Array.isArray(contacts) ? contacts : []), ...(Array.isArray(people) ? people : [])],
+      (entry) => entry?._id || entry?.id || entry?.userId || entry?.email || entry?.phone || entry?.name
+    );
     const localCostsTotal = localCosts.reduce((sum, entry) => sum + (Number(entry.cost) || 0), 0);
     const normalizedParts = partsItems.map((part, idx) => {
       const name = typeof part === 'string' ? part : (part.name || part.title || part.materialId || `Part ${idx + 1}`);
@@ -2288,6 +2857,28 @@ function ClientDashboard() {
     const partsDisplayCost = combinedParts.length ? partsTotal : partsCost;
     const baseTotalCost = totalCost || (laborCost + partsDisplayCost + otherCost);
     const fullTotalCost = baseTotalCost + localCostsTotal;
+    const invoiceLineItems = [
+      ...combinedParts.map((part, index) => ({
+        id: part.id || `invoice-part-${index}`,
+        name: part.name || 'Part',
+        cost: toNumber(part.cost),
+        quantity: toNumber(part.quantity || 1) || 1,
+        source: 'inventory'
+      })),
+      ...invoiceCustomParts.map((part, index) => ({
+        id: part.id || `invoice-custom-${index}`,
+        name: part.name || '',
+        cost: toNumber(part.cost),
+        quantity: toNumber(part.quantity || 0),
+        source: 'custom'
+      }))
+    ];
+    const invoicePartsSubtotal = invoiceLineItems.reduce((sum, entry) => sum + (toNumber(entry.cost) * toNumber(entry.quantity || 0)), 0);
+    const invoiceLaborSubtotal = laborTotal || laborCost;
+    const invoicePartsExtraCosts = toNumber(invoiceForm.shippingCosts) + toNumber(invoiceForm.salesTax) + toNumber(invoiceForm.partsOtherCosts);
+    const invoiceAdditionalSubtotal = localCostsTotal;
+    const invoiceAdditionalGrand = invoiceAdditionalSubtotal + toNumber(invoiceForm.additionalOtherCosts);
+    const invoiceTotal = invoicePartsSubtotal + invoicePartsExtraCosts + invoiceAdditionalGrand + invoiceLaborSubtotal;
 
     const formatDateTime = (val) => {
       if (!val) return 'Not set';
@@ -2333,6 +2924,23 @@ function ClientDashboard() {
     const workOrderTitle = rawWorkOrderLabel
       ? (rawWorkOrderLabel.toUpperCase().includes('WO') ? rawWorkOrderLabel : `WO #${rawWorkOrderLabel}`)
       : 'Work Order';
+
+    const closeActionDialog = useCallback(() => {
+      setActionDialog((prev) => ({ ...prev, open: false, onConfirm: null }));
+    }, []);
+
+    const openActionDialog = useCallback((config) => {
+      setActionDialog({
+        open: true,
+        title: config.title || '',
+        message: config.message || '',
+        confirmLabel: config.confirmLabel || 'OK',
+        cancelLabel: config.cancelLabel || 'Cancel',
+        tone: config.tone || 'primary',
+        showCancel: Boolean(config.showCancel),
+        onConfirm: config.onConfirm || null,
+      });
+    }, []);
 
     const handleFileImport = async (fileList) => {
       if (!fileList || fileList.length === 0) return;
@@ -2387,6 +2995,22 @@ function ClientDashboard() {
       }
     };
 
+    const handleToggleBookmark = () => {
+      setIsBookmarked((prev) => {
+        const next = !prev;
+        logActivity(next ? 'Bookmarked work order' : 'Removed bookmark', workOrderTitle);
+        return next;
+      });
+    };
+
+    const handleEditWorkOrder = () => {
+      if (onEditWorkOrder) {
+        onEditWorkOrder(item);
+        return;
+      }
+      setActiveTab('overview');
+    };
+
     const handleFileDrop = (event) => {
       event.preventDefault();
       handleFileImport(event.dataTransfer?.files);
@@ -2425,6 +3049,11 @@ function ClientDashboard() {
       setLinkedWorkOrders(event.target.value);
     };
 
+    const handleOpenLinkWorkOrders = () => {
+      setActiveTab('links');
+      setShowLinkWorkOrdersModal(true);
+    };
+
     const handleLinkWorkOrders = async () => {
       if (!itemId || !linkedWorkOrders) return;
       const selection = Array.isArray(workOrders)
@@ -2448,9 +3077,21 @@ function ClientDashboard() {
         };
         setLocalLinks(prev => [entry, ...prev]);
         setLinkedWorkOrders('');
+        setShowLinkWorkOrdersModal(false);
         logActivity('Linked work order', `${linkRelation}: ${payload.title}`);
       } catch (err) {
         console.error('Failed to link work order', err);
+      }
+    };
+
+    const handleUnlinkItem = async (link) => {
+      if (!itemId || !link?.id) return;
+      try {
+        await api.delete(`/api/issues/${itemId}/links/${link.id}`);
+        setLocalLinks(prev => prev.filter((entry) => String(entry.id || entry._id) !== String(link.id)));
+        logActivity('Removed link', link.title || link.name || 'Linked item');
+      } catch (err) {
+        console.error('Failed to remove link', err);
       }
     };
 
@@ -2489,6 +3130,489 @@ function ClientDashboard() {
       }
     };
 
+    const handlePrintPdf = () => {
+      setShowMoreActions(false);
+      setPrintPdfOptions({
+        images: true,
+        partsAndCosts: true,
+        activity: false,
+        comments: false,
+      });
+      setAddPrintPdfOpen(true);
+    };
+
+    const updatePrintPdfOption = (key) => {
+      setPrintPdfOptions((prev) => ({ ...prev, [key]: !prev[key] }));
+    };
+
+    const handleExportPdf = () => {
+      const previewWindow = typeof window !== 'undefined' ? window.open('', '_blank', 'width=1000,height=800') : null;
+      if (!previewWindow) return;
+
+      const imagesSection = printPdfOptions.images
+        ? `
+          <section style="margin-top:24px;">
+            <h2>Images</h2>
+            ${(coreImageItems || []).map((img) => `
+              <div style="margin-bottom:16px;">
+                <div style="font-weight:600; margin-bottom:6px;">${img.label || 'Image'}</div>
+                <img src="${getImageUrl(img.url)}" alt="${img.label || 'Image'}" style="max-width:100%; border-radius:8px; border:1px solid #e5e7eb;" />
+              </div>
+            `).join('') || '<div>No attached images.</div>'}
+          </section>
+        `
+        : '';
+
+      const partsCostsSection = printPdfOptions.partsAndCosts
+        ? `
+          <section style="margin-top:24px;">
+            <h2>Parts & Costs</h2>
+            <table style="width:100%; border-collapse:collapse; margin-top:12px;">
+              <thead>
+                <tr>
+                  <th style="text-align:left; padding:8px; border-bottom:1px solid #d1d5db;">Part</th>
+                  <th style="text-align:left; padding:8px; border-bottom:1px solid #d1d5db;">Qty</th>
+                  <th style="text-align:left; padding:8px; border-bottom:1px solid #d1d5db;">Cost</th>
+                  <th style="text-align:left; padding:8px; border-bottom:1px solid #d1d5db;">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${(combinedParts || []).map((part) => `
+                  <tr>
+                    <td style="padding:8px; border-bottom:1px solid #e5e7eb;">${part.name || 'Part'}</td>
+                    <td style="padding:8px; border-bottom:1px solid #e5e7eb;">${part.quantity || 1}</td>
+                    <td style="padding:8px; border-bottom:1px solid #e5e7eb;">${formatMoney(toNumber(part.cost))}</td>
+                    <td style="padding:8px; border-bottom:1px solid #e5e7eb;">${formatMoney(toNumber(part.cost) * toNumber(part.quantity || 1))}</td>
+                  </tr>
+                `).join('') || '<tr><td colspan="4" style="padding:8px;">No parts added.</td></tr>'}
+              </tbody>
+            </table>
+            <div style="margin-top:16px;">Labor: ${formatMoney(invoiceLaborSubtotal)}</div>
+            <div>Additional Costs: ${formatMoney(localCostsTotal)}</div>
+            <div style="font-weight:700;">Total Cost: ${formatMoney(fullTotalCost)}</div>
+          </section>
+        `
+        : '';
+
+      const activitySection = printPdfOptions.activity
+        ? `
+          <section style="margin-top:24px;">
+            <h2>Activity</h2>
+            ${combinedActivityItems.map((entry) => `
+              <div style="padding:10px 0; border-bottom:1px solid #e5e7eb;">
+                <div style="font-weight:600;">${entry.action || 'Update'}</div>
+                <div style="color:#6b7280;">${entry.detail || ''}</div>
+              </div>
+            `).join('') || '<div>No activity.</div>'}
+          </section>
+        `
+        : '';
+
+      const commentsSection = printPdfOptions.comments
+        ? `
+          <section style="margin-top:24px;">
+            <h2>Comments</h2>
+            ${(Array.isArray(formData.chat) ? formData.chat : []).map((msg) => `
+              <div style="padding:10px 0; border-bottom:1px solid #e5e7eb;">
+                <div style="font-weight:600;">${msg.sender || 'User'}</div>
+                <div style="color:#374151;">${msg.text || ''}</div>
+              </div>
+            `).join('') || '<div>No comments.</div>'}
+          </section>
+        `
+        : '';
+
+      previewWindow.document.write(`
+        <html>
+          <head>
+            <title>${workOrderTitle} - PDF Export</title>
+            <style>
+              body { font-family: Arial, sans-serif; padding: 24px; color: #111827; }
+              h1, h2 { margin: 0 0 12px; }
+              .card { border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; margin-top: 20px; }
+            </style>
+          </head>
+          <body>
+            <h1>${workOrderTitle}</h1>
+            <div class="card">
+              <div><strong>Status:</strong> ${formData.status || item?.status || 'Open'}</div>
+              <div><strong>Description:</strong> ${formData.description || item?.description || ''}</div>
+              <div><strong>Location:</strong> ${formData.location || item?.location || item?.address || 'N/A'}</div>
+            </div>
+            ${imagesSection}
+            ${partsCostsSection}
+            ${activitySection}
+            ${commentsSection}
+          </body>
+        </html>
+      `);
+      previewWindow.document.close();
+      previewWindow.focus();
+      previewWindow.print();
+      setAddPrintPdfOpen(false);
+    };
+
+    const handleGenerateInvoice = () => {
+      setShowMoreActions(false);
+      const userCompany = JSON.parse(localStorage.getItem('user') || '{}');
+      const today = new Date();
+      const pad = (value) => String(value).padStart(2, '0');
+      const dateValue = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+      const invoiceNumber = String(item?.workOrderNumber || item?.number || itemId || '010').replace(/\D/g, '').slice(-6) || '010';
+      setInvoiceForm({
+        invoiceNumber,
+        invoiceDate: dateValue,
+        paymentDue: '',
+        title: item?.title || item?.name || '',
+        description: item?.description || '',
+        currency: 'USD - United States Dollar - $',
+        useCompanyAddress: false,
+        companyFullName: userCompany?.companyName || userCompany?.name || '',
+        companyAddress1: userCompany?.address || '',
+        companyAddress2: '',
+        companyAddress3: '',
+        customerId: '',
+        customerName: '',
+        customerEmail: '',
+        customerAddress1: item?.location || item?.address || '',
+        customerAddress2: '',
+        customerAddress3: '',
+        useCompanyLogo: false,
+        shippingCosts: '0',
+        salesTax: '0',
+        partsOtherCosts: '0',
+        additionalOtherCosts: '0',
+        paid: '0',
+        signatureDate: '',
+        signatureFile: null,
+      });
+      setAddInvoiceOpen(true);
+      logActivity('Opened invoice draft', workOrderTitle);
+    };
+
+    const updateInvoiceField = (key, value) => {
+      setInvoiceForm((prev) => ({ ...prev, [key]: value }));
+    };
+
+    const handleSelectInvoiceCustomer = (event) => {
+      const selectedId = event.target.value;
+      const selectedCustomer = invoiceCustomerOptions.find((entry) => String(entry?._id || entry?.id || entry?.userId || '') === String(selectedId));
+      setInvoiceForm((prev) => ({
+        ...prev,
+        customerId: selectedId,
+        customerName: selectedCustomer?.name || selectedCustomer?.fullName || '',
+        customerEmail: selectedCustomer?.email || prev.customerEmail,
+        customerAddress1: selectedCustomer?.address || selectedCustomer?.location || prev.customerAddress1,
+      }));
+    };
+
+    const handleAddInvoiceCustomLineItem = () => {
+      setInvoiceCustomParts((prev) => [
+        ...prev,
+        {
+          id: `custom-line-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          name: '',
+          cost: '0',
+          quantity: '0'
+        }
+      ]);
+      setShowInvoicePartsActions(false);
+    };
+
+    const updateInvoiceCustomLineItem = (id, key, value) => {
+      setInvoiceCustomParts((prev) => prev.map((entry) => (
+        entry.id === id ? { ...entry, [key]: value } : entry
+      )));
+    };
+
+    const removeInvoiceCustomLineItem = (id) => {
+      setInvoiceCustomParts((prev) => prev.filter((entry) => entry.id !== id));
+    };
+
+    const openInvoicePreview = () => {
+      const previewWindow = typeof window !== 'undefined' ? window.open('', '_blank', 'width=1000,height=800') : null;
+      if (!previewWindow) return null;
+      const partRows = invoiceLineItems.map((part) => `
+        <tr>
+          <td>${part.name || 'Part'}</td>
+          <td>${part.quantity || 1}</td>
+          <td>${formatMoney(toNumber(part.cost))}</td>
+          <td>${formatMoney(toNumber(part.cost) * toNumber(part.quantity || 1))}</td>
+        </tr>
+      `).join('');
+      previewWindow.document.write(`
+        <html>
+          <head>
+            <title>Invoice Preview</title>
+            <style>
+              body { font-family: Arial, sans-serif; padding: 24px; color: #111827; }
+              h1, h2, h3 { margin: 0 0 12px; }
+              .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px; }
+              .card { border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; }
+              table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+              th, td { border-bottom: 1px solid #e5e7eb; padding: 10px 8px; text-align: left; }
+              .total { font-weight: 700; }
+            </style>
+          </head>
+          <body>
+            <h1>New Invoice</h1>
+            <div class="grid">
+              <div class="card">
+                <h3>Invoice Details</h3>
+                <div>Invoice Number: ${invoiceForm.invoiceNumber || ''}</div>
+                <div>Date: ${invoiceForm.invoiceDate || ''}</div>
+                <div>Title: ${invoiceForm.title || ''}</div>
+                <div>Description: ${invoiceForm.description || ''}</div>
+              </div>
+              <div class="card">
+                <h3>Bill To</h3>
+                <div>${invoiceForm.customerName || ''}</div>
+                <div>${invoiceForm.customerAddress1 || ''}</div>
+                <div>${invoiceForm.customerAddress2 || ''}</div>
+                <div>${invoiceForm.customerAddress3 || ''}</div>
+              </div>
+            </div>
+            <div class="card">
+              <h3>Parts</h3>
+              <table>
+                <thead>
+                  <tr><th>Part</th><th>Qty</th><th>Unit Cost</th><th>Total</th></tr>
+                </thead>
+                <tbody>${partRows || '<tr><td colspan="4">No line items have been added yet</td></tr>'}</tbody>
+              </table>
+            </div>
+            <div class="card" style="margin-top: 24px;">
+              <h3>Invoice Summary</h3>
+              <div>Parts: ${formatMoney(invoicePartsSubtotal + invoicePartsExtraCosts)}</div>
+              <div>Additional Costs: ${formatMoney(invoiceAdditionalGrand)}</div>
+              <div>Labor Costs: ${formatMoney(invoiceLaborSubtotal)}</div>
+              <div class="total">Total: ${formatMoney(invoiceTotal)}</div>
+            </div>
+          </body>
+        </html>
+      `);
+      previewWindow.document.close();
+      previewWindow.focus();
+      return previewWindow;
+    };
+
+    const handleSendInvoiceEmail = async () => {
+      if (!invoiceForm.customerEmail) return;
+      try {
+        await api.post('/api/email/invoice', {
+          to: invoiceForm.customerEmail,
+          invoiceNumber: invoiceForm.invoiceNumber,
+          title: invoiceForm.title,
+          customerName: invoiceForm.customerName,
+          companyName: invoiceForm.companyFullName,
+          invoiceDate: invoiceForm.invoiceDate,
+          paymentDue: invoiceForm.paymentDue,
+          currency: invoiceForm.currency,
+          description: invoiceForm.description,
+          lineItems: invoiceLineItems.map((item) => ({
+            name: item.name,
+            quantity: item.quantity,
+            costLabel: formatMoney(toNumber(item.cost)),
+            totalLabel: formatMoney(toNumber(item.cost) * toNumber(item.quantity || 0)),
+          })),
+          totals: {
+            parts: formatMoney(invoicePartsSubtotal + invoicePartsExtraCosts),
+            additional: formatMoney(invoiceAdditionalGrand),
+            labor: formatMoney(invoiceLaborSubtotal),
+            total: formatMoney(invoiceTotal),
+          }
+        });
+        logActivity('Sent invoice email', `${invoiceForm.invoiceNumber || 'Draft'} to ${invoiceForm.customerEmail}`);
+      } catch (err) {
+        console.error('Failed to send invoice email', err);
+      }
+    };
+
+    const handleSubmitInvoice = async () => {
+      if (invoiceForm.customerEmail) {
+        await handleSendInvoiceEmail();
+      }
+      const previewWindow = openInvoicePreview();
+      if (previewWindow) {
+        previewWindow.print();
+      }
+      setAddInvoiceOpen(false);
+      setShowMoreActions(false);
+      logActivity('Generated invoice', `${invoiceForm.invoiceNumber || 'Draft'} for ${workOrderTitle}`);
+    };
+
+    const handleDuplicateWorkOrder = async () => {
+      if (!itemId) return;
+      setProcessingMoreAction('duplicate');
+      try {
+        const payload = {
+          title: `${formData.title || item?.title || item?.name || 'Work Order'} Copy`,
+          description: formData.description || item?.description || '',
+          category: formData.category || item?.category || '',
+          priority: formData.priority || item?.priority || 'MEDIUM',
+          location: formData.location || item?.location || item?.address || '',
+          assetName: formData.assetName || item?.assetName || '',
+          assignedTo: formData.assignedTo || item?.assignedTo || '',
+          additionalResponsibleWorkers: formData.additionalResponsibleWorkers || item?.additionalResponsibleWorkers || '',
+          team: formData.team || item?.team || '',
+          checklist: Array.isArray(formData.checklist) ? formData.checklist : [],
+          fixDeadline: formData.fixDeadline || item?.fixDeadline || '',
+          estimatedTime: formData.estimatedTime || item?.estimatedTime || '',
+        };
+        const createdRes = await api.post('/api/issues', payload);
+        const createdId = createdRes?.data?.id || createdRes?.data?._id;
+        if (createdId) {
+          await api.put(`/api/issues/${createdId}`, { approved: true, status: 'APPROVED' });
+        }
+        setShowMoreActions(false);
+        await onRefresh?.();
+        openActionDialog({
+          title: 'Work Order Duplicated',
+          message: 'A duplicate work order was created successfully and added to the work order list.',
+          confirmLabel: 'OK',
+          tone: 'primary',
+        });
+        logActivity('Duplicated work order', workOrderTitle);
+      } catch (err) {
+        console.error('Failed to duplicate work order', err);
+        openActionDialog({
+          title: 'Duplicate Failed',
+          message: err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Failed to duplicate work order.',
+          confirmLabel: 'OK',
+          tone: 'danger',
+        });
+      } finally {
+        setProcessingMoreAction('');
+      }
+    };
+
+    const handleConvertToTemplate = async () => {
+      setProcessingMoreAction('template');
+      try {
+        const templateName = String(formData.title || item?.title || item?.name || 'Work Order Template').trim();
+        const templateType = String(formData.category || item?.category || 'Work Order').trim() || 'Work Order';
+        const templateFrequency = String(formData.frequency || item?.frequency || item?.interval || 'custom').trim() || 'custom';
+        await api.post('/api/maintenance-templates', {
+          name: templateName,
+          type: templateType,
+          frequency: templateFrequency,
+        });
+        setShowMoreActions(false);
+        openActionDialog({
+          title: 'Template Saved',
+          message: 'This work order was successfully converted to a template.',
+          confirmLabel: 'OK',
+          tone: 'primary',
+        });
+        logActivity('Converted work order to template', `${templateName} • ${templateType} • ${templateFrequency}`);
+      } catch (err) {
+        console.error('Failed to convert work order to template', err);
+        openActionDialog({
+          title: 'Template Save Failed',
+          message: err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Failed to convert work order to template.',
+          confirmLabel: 'OK',
+          tone: 'danger',
+        });
+      } finally {
+        setProcessingMoreAction('');
+      }
+    };
+
+    const handleCopyFeedbackLink = async () => {
+      const origin = typeof window !== 'undefined' ? window.location.origin : '';
+      const feedbackLink = `${origin}/feedback?issueId=${itemId}`;
+      try {
+        await navigator.clipboard.writeText(feedbackLink);
+        setShowMoreActions(false);
+        openActionDialog({
+          title: 'Feedback Link Copied',
+          message: `The feedback form link was copied successfully.\n\n${feedbackLink}`,
+          confirmLabel: 'OK',
+          tone: 'primary',
+        });
+        logActivity('Copied feedback link', feedbackLink);
+      } catch (err) {
+        console.error('Failed to copy feedback link', err);
+        openActionDialog({
+          title: 'Copy Failed',
+          message: `Copy failed. Use this link manually:\n\n${feedbackLink}`,
+          confirmLabel: 'OK',
+          tone: 'danger',
+        });
+      }
+    };
+
+    const executeArchiveWorkOrder = async () => {
+      if (!itemId) return;
+      setProcessingMoreAction('archive');
+      try {
+        await api.put(`/api/issues/${itemId}`, { status: 'ARCHIVED' });
+        setFormData(prev => ({ ...prev, status: 'ARCHIVED' }));
+        setShowMoreActions(false);
+        onRefresh?.();
+        logActivity('Archived work order', workOrderTitle);
+        closeActionDialog();
+      } catch (err) {
+        console.error('Failed to archive work order', err);
+        openActionDialog({
+          title: 'Archive Failed',
+          message: err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Failed to archive work order.',
+          confirmLabel: 'OK',
+          tone: 'danger',
+        });
+      } finally {
+        setProcessingMoreAction('');
+      }
+    };
+
+    const handleArchiveWorkOrder = () => {
+      setShowMoreActions(false);
+      openActionDialog({
+        title: 'Archive Work Order?',
+        message: 'Archiving a work order hides it from visibility unless you filter to display them. You can always unarchive work orders.',
+        confirmLabel: 'Archive',
+        cancelLabel: 'Cancel',
+        tone: 'danger',
+        showCancel: true,
+        onConfirm: executeArchiveWorkOrder,
+      });
+    };
+
+    const executeDeleteWorkOrder = async () => {
+      if (!itemId) return;
+      setProcessingMoreAction('delete');
+      try {
+        await api.delete(`/api/issues/${itemId}`);
+        setShowMoreActions(false);
+        closeActionDialog();
+        onClose?.();
+        onRefresh?.();
+      } catch (err) {
+        console.error('Failed to delete work order', err);
+        openActionDialog({
+          title: 'Delete Failed',
+          message: err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Failed to delete work order.',
+          confirmLabel: 'OK',
+          tone: 'danger',
+        });
+      } finally {
+        setProcessingMoreAction('');
+      }
+    };
+
+    const handleDeleteWorkOrder = () => {
+      setShowMoreActions(false);
+      openActionDialog({
+        title: 'Delete Work Order?',
+        message: 'Deleting a work order permanently removes it. This action cannot be undone.',
+        confirmLabel: 'Delete',
+        cancelLabel: 'Cancel',
+        tone: 'danger',
+        showCancel: true,
+        onConfirm: executeDeleteWorkOrder,
+      });
+    };
+
     const handleOpenAddCost = () => {
       const now = new Date();
       const pad = (n) => String(n).padStart(2, '0');
@@ -2497,9 +3621,13 @@ function ClientDashboard() {
         description: '',
         category: '',
         cost: '',
-        assignedTo: '',
+        assignedTo: userName || '',
         date: localDate
       });
+      setCostCategorySearch('');
+      setCostCategoryOpen(false);
+      setCostAssignedToSearch('');
+      setCostAssignedToOpen(false);
       setAddCostOpen(true);
     };
 
@@ -2558,6 +3686,7 @@ function ClientDashboard() {
     const handleOpenAddPart = () => {
       setPartForm({ name: '', status: '', cost: '', quantity: 1, location: '' });
       setSelectedInventoryParts({});
+      setPartModalTab('parts');
       setAddPartOpen(true);
       fetchInventoryParts();
     };
@@ -2620,6 +3749,30 @@ function ClientDashboard() {
       });
       setAddLaborOpen(true);
     };
+
+    const filteredInventoryParts = inventoryParts
+      .filter((part) => {
+        const q = inventorySearch.toLowerCase();
+        if (!q) return true;
+        return (part.name || '').toLowerCase().includes(q)
+          || (part.partNumber || '').toLowerCase().includes(q)
+          || (part.category || '').toLowerCase().includes(q)
+          || String(part.id || part._id || '').toLowerCase().includes(q);
+      })
+      .slice(0, 100);
+
+    const selectedLaborWorker = allWorkers.find((worker) => {
+      const workerName = worker?.name || worker?.fullName || worker?.email || worker?.phone || '';
+      const workerValue = worker?._id || worker?.id || worker?.userId || workerName;
+      return String(workerValue) === String(laborForm.worker) || String(workerName) === String(laborForm.worker);
+    });
+    const selectedLaborWorkerName = selectedLaborWorker?.name
+      || selectedLaborWorker?.fullName
+      || selectedLaborWorker?.email
+      || selectedLaborWorker?.phone
+      || laborForm.worker
+      || 'Select worker';
+    const selectedLaborWorkerInitial = String(selectedLaborWorkerName || 'W').trim().charAt(0).toUpperCase();
 
     const handleConfirmLabor = async () => {
       if (!laborForm.worker || !laborForm.startedAt || (laborForm.hours === 0 && laborForm.minutes === 0)) return;
@@ -2861,15 +4014,15 @@ function ClientDashboard() {
 
     return (
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4 text-gray-900">
-        <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 w-full max-w-6xl max-h-[90vh] flex flex-col md:flex-row overflow-hidden">
+        <div className="bg-white rounded-[6px] shadow-2xl border border-gray-200 w-full max-w-6xl max-h-[90vh] flex flex-col md:flex-row overflow-visible">
 
           {/* Left Side: Fields Form */}
-          <div className="flex-1 flex flex-col overflow-hidden border-r border-gray-100">
-            <div className={`px-6 py-4 border-b border-gray-100 flex-shrink-0 ${isIssue ? 'bg-white' : 'bg-gray-50'}`}>
+          <div className="flex-1 flex min-w-0 flex-col overflow-visible border-r border-gray-100">
+            <div className={`border-b border-gray-200 flex-shrink-0 ${isIssue ? 'bg-white' : 'bg-gray-50'}`}>
               {isIssue ? (
                 <div className="flex flex-col gap-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-xl font-bold text-gray-900">{workOrderTitle}</h3>
+                  <div className="flex items-center justify-between px-6 py-5">
+                    <h3 className="text-[26px] font-bold tracking-tight text-gray-900">{workOrderTitle}</h3>
                     <div className="flex items-center gap-2">
                       {!!privateRecipientId && (
                         <button
@@ -2885,38 +4038,115 @@ function ClientDashboard() {
                           Private Message
                         </button>
                       )}
-                      <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                        <X className="w-5 h-5 text-gray-400" />
+                      <button onClick={onClose} className="p-1 text-gray-700 hover:text-gray-900 transition-colors">
+                        <X className="w-8 h-8" strokeWidth={1.75} />
                       </button>
                     </div>
                   </div>
-                  <div className="flex flex-wrap items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                      <select
-                        value={formData.status || 'OPEN'}
-                        onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
-                        className="border border-gray-300 rounded-lg px-4 py-2 text-sm font-semibold text-gray-800 bg-white"
-                      >
-                        <option value="OPEN">Open</option>
-                        <option value="IN PROGRESS">In Progress</option>
-                        <option value="COMPLETED">Completed</option>
-                        <option value="ON HOLD">On Hold</option>
-                      </select>
-                      <div className="flex items-center gap-3 text-gray-500">
-                        <button className="p-1.5 hover:bg-gray-100 rounded">
-                          <Clock className="w-4 h-4" />
+                  <div className="flex flex-wrap items-center justify-between gap-4 border-t border-gray-100 px-6 py-5">
+                    <div className="flex flex-wrap items-center gap-4">
+                      <div className="flex items-center gap-4 border-r border-gray-200 pr-4">
+                        <div className="relative">
+                          <AlertCircle className="pointer-events-none absolute left-4 top-1/2 h-6 w-6 -translate-y-1/2 text-gray-500" strokeWidth={1.8} />
+                          <select
+                            value={formData.status || 'OPEN'}
+                            onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
+                            className="min-w-[198px] appearance-none rounded-md border border-gray-300 bg-white py-3 pl-14 pr-12 text-[15px] font-medium text-gray-800 shadow-sm"
+                          >
+                            <option value="OPEN">Open</option>
+                            <option value="IN PROGRESS">In Progress</option>
+                            <option value="COMPLETED">Completed</option>
+                            <option value="ON HOLD">On Hold</option>
+                          </select>
+                          <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-600" strokeWidth={2} />
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-gray-700">
+                        <button type="button" onClick={handleOpenAddLabor} className="rounded-md p-2 hover:bg-gray-100" aria-label="Clock">
+                          <Clock className="h-6 w-6" strokeWidth={1.9} />
                         </button>
-                        <button className="p-1.5 hover:bg-gray-100 rounded text-sm font-semibold">$</button>
-                        <button className="p-1.5 hover:bg-gray-100 rounded">
-                          <Repeat className="w-4 h-4" />
+                        <button type="button" onClick={handleOpenAddCost} className="rounded-md p-2 hover:bg-gray-100" aria-label="Costs">
+                          <DollarSign className="h-6 w-6" strokeWidth={1.9} />
                         </button>
+                        <button type="button" onClick={handleOpenAddPart} className="rounded-md p-2 hover:bg-gray-100" aria-label="Add parts">
+                          <Repeat className="h-6 w-6" strokeWidth={1.9} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleToggleBookmark}
+                          className={`rounded-md p-2 hover:bg-gray-100 ${isBookmarked ? 'text-amber-500' : 'text-gray-700'}`}
+                          aria-label="Bookmark"
+                        >
+                          <Bookmark className="h-6 w-6" strokeWidth={1.9} fill={isBookmarked ? 'currentColor' : 'none'} />
+                        </button>
+                        <button type="button" onClick={handleEditWorkOrder} className="rounded-md p-2 hover:bg-gray-100" aria-label="Edit work order">
+                          <Edit className="h-6 w-6" strokeWidth={1.9} />
+                        </button>
+                        <button type="button" onClick={handleOpenLinkWorkOrders} className="rounded-md p-2 hover:bg-gray-100" aria-label="Link">
+                          <Link2 className="h-6 w-6" strokeWidth={1.9} />
+                        </button>
+                        <div ref={moreActionsRef} className="relative">
+                          <button
+                            ref={moreActionsButtonRef}
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setShowMoreActions((prev) => !prev);
+                            }}
+                            className="rounded-md p-2 hover:bg-gray-100"
+                            aria-label="More actions"
+                          >
+                            <MoreHorizontal className="h-6 w-6" strokeWidth={1.9} />
+                          </button>
+                          {showMoreActions && typeof document !== 'undefined' && createPortal(
+                            <div
+                              ref={moreActionsMenuRef}
+                              onClick={(event) => event.stopPropagation()}
+                              className="fixed z-[1000] w-[378px] rounded-2xl border border-gray-200 bg-white p-4 shadow-2xl"
+                              style={{ top: `${moreActionsPosition.top}px`, left: `${moreActionsPosition.left}px` }}
+                            >
+                              <div className="space-y-1">
+                                <button type="button" onClick={handlePrintPdf} className="flex w-full items-center gap-4 rounded-xl px-4 py-3 text-left text-[18px] text-gray-700 hover:bg-gray-50">
+                                  <Download className="h-7 w-7 text-gray-700" strokeWidth={1.8} />
+                                  <span>Print PDF</span>
+                                </button>
+                                <button type="button" onClick={handleGenerateInvoice} className="flex w-full items-center gap-4 rounded-xl px-4 py-3 text-left text-[18px] text-gray-700 hover:bg-gray-50">
+                                  <FileText className="h-7 w-7 text-gray-700" strokeWidth={1.8} />
+                                  <span>Generate Invoice</span>
+                                </button>
+                                <button type="button" onClick={handleDuplicateWorkOrder} disabled={processingMoreAction === 'duplicate'} className="flex w-full items-center gap-4 rounded-xl px-4 py-3 text-left text-[18px] text-gray-700 hover:bg-gray-50 disabled:opacity-60">
+                                  <Copy className="h-7 w-7 text-gray-700" strokeWidth={1.8} />
+                                  <span>Duplicate</span>
+                                </button>
+                                <button type="button" onClick={handleConvertToTemplate} disabled={processingMoreAction === 'template'} className="flex w-full items-center gap-4 rounded-xl px-4 py-3 text-left text-[18px] text-gray-700 hover:bg-gray-50 disabled:opacity-60">
+                                  <Plus className="h-7 w-7 text-gray-700" strokeWidth={1.8} />
+                                  <span>Convert to Template</span>
+                                </button>
+                                <button type="button" onClick={handleCopyFeedbackLink} className="flex w-full items-center gap-4 rounded-xl px-4 py-3 text-left text-[18px] text-gray-700 hover:bg-gray-50">
+                                  <Copy className="h-7 w-7 text-gray-700" strokeWidth={1.8} />
+                                  <span>Copy Feedback Link</span>
+                                </button>
+                                <button type="button" onClick={handleArchiveWorkOrder} disabled={processingMoreAction === 'archive'} className="flex w-full items-center gap-4 rounded-xl px-4 py-3 text-left text-[18px] text-gray-700 hover:bg-gray-50 disabled:opacity-60">
+                                  <Archive className="h-7 w-7 text-gray-700" strokeWidth={1.8} />
+                                  <span>Archive</span>
+                                </button>
+                                <button type="button" onClick={handleDeleteWorkOrder} disabled={processingMoreAction === 'delete'} className="flex w-full items-center gap-4 rounded-xl px-4 py-3 text-left text-[18px] text-rose-600 hover:bg-rose-50 disabled:opacity-60">
+                                  <Trash2 className="h-7 w-7 text-rose-600" strokeWidth={1.8} />
+                                  <span>Delete</span>
+                                </button>
+                              </div>
+                            </div>,
+                            document.body
+                          )}
+                        </div>
                       </div>
                     </div>
                     <button
                       onClick={handleStartWorkOrder}
                       disabled={startingWorkOrder || String(formData.status || '').toUpperCase().includes('PROGRESS')}
-                      className="px-4 py-2 border border-blue-200 text-blue-700 rounded-lg text-sm font-semibold hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-5 py-3 text-[15px] font-medium text-blue-600 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
                     >
+                      <Clock className="h-4 w-4" strokeWidth={2} />
                       {String(formData.status || '').toUpperCase().includes('PROGRESS')
                         ? 'Started'
                         : (startingWorkOrder ? 'Starting...' : 'Start Timer')}
@@ -2940,15 +4170,59 @@ function ClientDashboard() {
               )}
             </div>
 
+            {actionDialog.open && (
+              <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/30 px-4">
+                <div className="w-full max-w-[660px] rounded-[22px] border border-gray-200 bg-white shadow-2xl">
+                  <div className="flex items-center justify-between border-b border-gray-100 px-8 py-7">
+                    <h3 className="text-[28px] font-bold text-gray-900">{actionDialog.title}</h3>
+                    <button type="button" onClick={closeActionDialog} className="rounded-md p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-700">
+                      <X className="h-8 w-8" strokeWidth={1.8} />
+                    </button>
+                  </div>
+                  <div className="px-8 py-10">
+                    <p className="whitespace-pre-line text-[18px] leading-10 text-gray-700">{actionDialog.message}</p>
+                  </div>
+                  <div className="flex justify-end gap-3 px-8 pb-8">
+                    {actionDialog.showCancel && (
+                      <button
+                        type="button"
+                        onClick={closeActionDialog}
+                        className="rounded-lg border border-gray-300 bg-white px-7 py-3 text-[16px] font-medium text-gray-800 hover:bg-gray-50"
+                      >
+                        {actionDialog.cancelLabel}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (typeof actionDialog.onConfirm === 'function') {
+                          await actionDialog.onConfirm();
+                        } else {
+                          closeActionDialog();
+                        }
+                      }}
+                      className={`rounded-lg px-7 py-3 text-[16px] font-semibold text-white ${
+                        actionDialog.tone === 'danger'
+                          ? 'bg-rose-600 hover:bg-rose-700'
+                          : 'bg-blue-600 hover:bg-blue-700'
+                      }`}
+                    >
+                      {actionDialog.confirmLabel}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="p-6 overflow-y-auto flex-1 space-y-5">
               {showTabs && (
                 isIssue ? (
-                  <div className="flex items-center gap-6 border-b border-gray-200 pb-2">
+                  <div className="-mx-6 -mt-6 mb-2 flex items-center gap-8 border-b border-gray-200 px-6">
                     {tabs.map(tab => (
                       <button
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id)}
-                        className={`text-sm font-semibold pb-2 border-b-2 transition-colors ${activeTabId === tab.id
+                        className={`border-b-2 py-4 text-[15px] font-semibold transition-colors ${activeTabId === tab.id
                           ? 'border-blue-600 text-gray-900'
                           : 'border-transparent text-gray-500 hover:text-gray-700'
                           }`}
@@ -3671,15 +4945,11 @@ function ClientDashboard() {
                     </div>
                     <div className="flex items-center gap-2">
                       <button
-                        className="px-3 py-2 rounded-lg border border-gray-200 text-gray-700 text-xs font-semibold hover:bg-gray-50"
-                      >
-                        Edit
-                      </button>
-                      <button
                         onClick={handleOpenAddCost}
-                        className="px-3 py-2 rounded-lg border border-gray-200 text-gray-700 text-xs font-semibold hover:bg-gray-50"
+                        className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
                       >
-                        $ Add Cost
+                        <DollarSign className="h-4 w-4" strokeWidth={2} />
+                        Add Cost
                       </button>
                     </div>
                   </div>
@@ -3849,58 +5119,17 @@ function ClientDashboard() {
 
               {activeTabId === 'links' && (
                 <div className="space-y-6">
-                  <div>
-                    <h4 className="text-sm font-bold text-gray-900">Links</h4>
-                    <p className="text-xs text-gray-500">Related resources, linked work orders, and reference URLs.</p>
-                  </div>
-
-                  <div className="border border-gray-200 rounded-xl p-4 bg-white/70 space-y-3">
-                    <div className="text-sm font-semibold text-gray-900">Link Work Orders</div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs font-semibold text-gray-600 mb-1">Link Relationship</label>
-                        <select
-                          value={linkRelation}
-                          onChange={(e) => setLinkRelation(e.target.value)}
-                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                        >
-                          <option value="relates to">Relates to</option>
-                          <option value="blocks">Blocks</option>
-                          <option value="is blocked by">Is blocked by</option>
-                          <option value="duplicates">Duplicates</option>
-                          <option value="parent of">Parent of</option>
-                          <option value="child of">Child of</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-gray-600 mb-1">Work Order(s) to Link</label>
-                        <select
-                          value={linkedWorkOrders}
-                          onChange={handleSelectLinkedWorkOrders}
-                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                        >
-                          <option value="">Select work order</option>
-                          {availableWorkOrders.length === 0 ? (
-                            <option disabled>No other work orders available</option>
-                          ) : (
-                            availableWorkOrders.map((wo, idx) => (
-                              <option key={`${wo._id || wo.id || 'workorder'}-${idx}`} value={String(wo._id || wo.id)}>
-                                {wo.title || wo.name || wo.workOrderNumber || wo._id || wo.id}
-                              </option>
-                            ))
-                          )}
-                        </select>
-                      </div>
+                  <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <h4 className="text-[20px] font-bold text-gray-900">Links</h4>
                     </div>
-                    <div className="flex justify-end">
-                      <button
-                        onClick={handleLinkWorkOrders}
-                        disabled={!linkedWorkOrders}
-                        className="px-3 py-2 rounded-lg bg-blue-600 text-white text-xs font-semibold disabled:opacity-60"
-                      >
-                        Link
-                      </button>
-                    </div>
+                    <button
+                      onClick={handleOpenLinkWorkOrders}
+                      className="inline-flex items-center justify-center gap-3 self-start rounded-md border border-gray-300 bg-white px-5 py-3 text-[15px] font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <Link2 className="h-6 w-6" strokeWidth={1.9} />
+                      Link Work Orders
+                    </button>
                   </div>
 
                   <div className="border border-gray-200 rounded-xl p-4 bg-white/70 space-y-3">
@@ -3943,16 +5172,116 @@ function ClientDashboard() {
                               <div className="text-sm font-semibold text-gray-800">{title}</div>
                               {relationship && <div className="text-[11px] text-gray-400">Relationship: {relationship}</div>}
                             </div>
-                            {url ? (
-                              <a href={url} target="_blank" rel="noreferrer" className="text-xs text-blue-600 font-semibold">Open</a>
-                            ) : (
-                              <span className="text-xs text-gray-400">Linked</span>
-                            )}
+                            <div className="flex items-center gap-3">
+                              {url ? (
+                                <a href={url} target="_blank" rel="noreferrer" className="text-xs text-blue-600 font-semibold">Open</a>
+                              ) : (
+                                <span className="text-xs text-gray-400">Linked</span>
+                              )}
+                              {link.id && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleUnlinkItem(link)}
+                                  className="text-xs font-semibold text-rose-600 hover:text-rose-700"
+                                >
+                                  Unlink
+                                </button>
+                              )}
+                            </div>
                           </div>
                         );
                       })}
                     </div>
                   )}
+                </div>
+              )}
+
+              {showLinkWorkOrdersModal && (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/40 p-4">
+                  <div className="w-full max-w-[626px] rounded-2xl border border-gray-200 bg-white shadow-2xl">
+                    <div className="flex items-center justify-between px-8 py-7">
+                      <h3 className="text-[28px] font-bold tracking-tight text-gray-900">Link Work Orders</h3>
+                      <button
+                        type="button"
+                        onClick={() => setShowLinkWorkOrdersModal(false)}
+                        className="p-1 text-gray-700 hover:text-gray-900"
+                      >
+                        <X className="h-8 w-8" strokeWidth={1.75} />
+                      </button>
+                    </div>
+
+                    <div className="space-y-8 px-8 pb-8">
+                      <div className="space-y-5">
+                        <p className="max-w-[480px] text-[16px] leading-8 text-gray-800">
+                          Select a link relationship and choose one or more work orders to link to the current one:
+                        </p>
+                        <div className="inline-flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+                          <span className="rounded-lg bg-gray-100 px-3 py-1 text-[16px] font-bold text-gray-900">
+                            #{String(item?.workOrderNumber || item?.number || item?.code || itemId || '').slice(-3) || '010'}
+                          </span>
+                          <span className="max-w-[280px] truncate text-[16px] font-semibold text-gray-900">
+                            {item?.title || item?.name || 'Current Work Order'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="border-t border-gray-200 pt-8 space-y-6">
+                        <div className="space-y-2">
+                          <label className="block text-[15px] font-medium text-gray-900">Link Relationship</label>
+                          <select
+                            value={linkRelation}
+                            onChange={(e) => setLinkRelation(e.target.value)}
+                            className="w-full rounded-lg border border-gray-300 px-4 py-3 text-[16px] text-gray-800"
+                          >
+                            <option value="is blocked by">Is blocked by</option>
+                            <option value="blocks">Blocks</option>
+                            <option value="relates to">Relates to</option>
+                            <option value="duplicates">Duplicates</option>
+                            <option value="parent of">Parent of</option>
+                            <option value="child of">Child of</option>
+                          </select>
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="block text-[15px] font-medium text-gray-900">Work Order(s) to Link</label>
+                          <select
+                            value={linkedWorkOrders}
+                            onChange={handleSelectLinkedWorkOrders}
+                            className="w-full rounded-lg border border-gray-300 px-4 py-3 text-[16px] text-gray-800"
+                          >
+                            <option value="">Select work order</option>
+                            {availableWorkOrders.length === 0 ? (
+                              <option disabled>No other work orders available</option>
+                            ) : (
+                              availableWorkOrders.map((wo, idx) => (
+                                <option key={`${wo._id || wo.id || 'workorder'}-${idx}`} value={String(wo._id || wo.id)}>
+                                  {wo.workOrderNumber ? `#${wo.workOrderNumber} ` : ''}{wo.title || wo.name || wo._id || wo.id}
+                                </option>
+                              ))
+                            )}
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-end gap-3 pt-2">
+                        <button
+                          type="button"
+                          onClick={() => setShowLinkWorkOrdersModal(false)}
+                          className="rounded-md border border-gray-300 bg-white px-5 py-3 text-[16px] font-medium text-gray-800 hover:bg-gray-50"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleLinkWorkOrders}
+                          disabled={!linkedWorkOrders}
+                          className="rounded-md bg-gray-100 px-5 py-3 text-[16px] font-medium text-gray-700 hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          Link
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
               {activeTabId === 'provider' && (
@@ -4176,91 +5505,205 @@ function ClientDashboard() {
 
         {addCostOpen && (
           <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 w-full max-w-xl">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-                <h3 className="text-xl font-bold text-gray-900">Add Cost</h3>
-                <button onClick={() => setAddCostOpen(false)} className="p-1.5 hover:bg-gray-100 rounded-lg">
-                  <X className="w-5 h-5 text-gray-400" />
+            <div className="w-full max-w-[760px] rounded-2xl border border-gray-200 bg-white shadow-2xl">
+              <div className="flex items-center justify-between px-8 py-7">
+                <h3 className="text-[28px] font-bold tracking-tight text-gray-900">Add Cost</h3>
+                <button onClick={() => { setAddCostOpen(false); setCostCategoryOpen(false); setCostCategorySearch(''); setCostAssignedToOpen(false); setCostAssignedToSearch(''); }} className="p-1 text-gray-700 hover:text-gray-900">
+                  <X className="h-8 w-8" strokeWidth={1.75} />
                 </button>
               </div>
-              <div className="p-6 space-y-4">
+              <div className="px-8 pb-8 space-y-6">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">Description <span className="text-rose-500">*</span></label>
+                  <label className="mb-2 block text-[15px] font-medium text-gray-700">Description <span className="text-rose-500">*</span></label>
                   <textarea
-                    rows="3"
+                    rows="2"
                     value={costForm.description}
                     onChange={(e) => setCostForm(prev => ({ ...prev, description: e.target.value }))}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                    className="w-full rounded-md border border-gray-300 px-4 py-3 text-[15px] text-gray-800 shadow-sm"
                   />
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1">Category <span className="text-rose-500">*</span></label>
-                    <select
-                      value={costForm.category}
-                      onChange={(e) => setCostForm(prev => ({ ...prev, category: e.target.value }))}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                    >
-                      <option value="">Select category</option>
-                      <option value="Tax">Tax</option>
-                      <option value="Labor Cost">Labor Cost</option>
-                      <option value="Parts Cost">Parts Cost</option>
-                      <option value="Travel Cost">Travel Cost</option>
-                      <option value="Other">Other</option>
-                    </select>
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                  <div ref={costCategoryRef}>
+                    <label className="mb-2 block text-[15px] font-medium text-gray-700">Category <span className="text-rose-500">*</span></label>
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setCostCategoryOpen((prev) => !prev)}
+                        className="flex w-full items-center justify-between rounded-md border border-gray-300 bg-white px-4 py-3 text-left text-[15px] text-gray-800 shadow-sm"
+                      >
+                        <span className={costForm.category ? 'text-gray-800' : 'text-gray-400'}>
+                          {costForm.category || 'Select category'}
+                        </span>
+                        <ChevronDown className={`h-5 w-5 text-gray-600 transition-transform ${costCategoryOpen ? 'rotate-180' : ''}`} strokeWidth={2} />
+                      </button>
+                      {costCategoryOpen && (
+                        <div className="absolute left-0 top-full z-20 mt-2 w-full overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl">
+                          <div className="p-4 pb-2">
+                            <div className="relative">
+                              <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+                              <input
+                                value={costCategorySearch}
+                                onChange={(e) => setCostCategorySearch(e.target.value)}
+                                placeholder="Search"
+                                className="w-full rounded-lg border border-blue-500 px-11 py-3 text-[15px] text-gray-800 outline-none ring-2 ring-blue-100"
+                                autoFocus
+                              />
+                            </div>
+                          </div>
+                          <div className="max-h-64 overflow-y-auto px-4 pb-3">
+                            {filteredCostCategoryOptions.length === 0 ? (
+                              <div className="px-2 py-3 text-[15px] text-gray-400">No categories found</div>
+                            ) : (
+                              filteredCostCategoryOptions.map((option) => (
+                                <button
+                                  key={option}
+                                  type="button"
+                                  onClick={() => {
+                                    setCostForm((prev) => ({ ...prev, category: option }));
+                                    setCostCategorySearch('');
+                                    setCostCategoryOpen(false);
+                                  }}
+                                  className="block w-full rounded-lg px-2 py-2.5 text-left text-[15px] text-gray-800 hover:bg-gray-50"
+                                >
+                                  {option}
+                                </button>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1">Cost <span className="text-rose-500">*</span></label>
-                    <div className="flex items-center border border-gray-300 rounded-lg px-3 py-2">
-                      <span className="text-gray-400 mr-2">$</span>
+                    <label className="mb-2 block text-[15px] font-medium text-gray-700">Cost <span className="text-rose-500">*</span></label>
+                    <div className="flex overflow-hidden rounded-md border border-gray-300 shadow-sm">
+                      <div className="flex items-center border-r border-gray-300 px-4 text-[18px] text-gray-500">$</div>
                       <input
                         type="number"
                         min="0"
                         step="0.01"
                         value={costForm.cost}
                         onChange={(e) => setCostForm(prev => ({ ...prev, cost: e.target.value }))}
-                        className="w-full text-sm outline-none"
+                        className="w-full px-4 py-3 text-[15px] text-gray-800 outline-none"
                       />
                     </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1">Assigned To <span className="text-rose-500">*</span></label>
-                    <select
-                      value={costForm.assignedTo}
-                      onChange={(e) => setCostForm(prev => ({ ...prev, assignedTo: e.target.value }))}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                    >
-                      <option value="">Select assignee</option>
-                      <option value={userName}>{userName}</option>
-                      {technicians.map((t, idx) => (
-                        <option key={`${t._id || t.id || 'tech'}-${idx}`} value={t.name || t.email || t._id || t.id}>
-                          {t.name || t.email || t._id || t.id}
-                        </option>
-                      ))}
-                    </select>
+                  <div ref={costAssignedToRef}>
+                    <label className="mb-2 block text-[15px] font-medium text-gray-700">Assigned To <span className="text-rose-500">*</span></label>
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setCostAssignedToOpen((prev) => !prev)}
+                        className="flex w-full items-center justify-between rounded-md border border-gray-300 bg-white px-4 py-3 text-left text-[15px] text-gray-800 shadow-sm"
+                      >
+                        <span className="flex min-w-0 items-center gap-3">
+                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-sm font-bold text-white">
+                            {String(costForm.assignedTo || userName || 'U').trim().charAt(0).toUpperCase()}
+                          </span>
+                          <span className={costForm.assignedTo ? 'truncate text-gray-800' : 'truncate text-gray-400'}>
+                            {costForm.assignedTo || 'Select assignee'}
+                          </span>
+                        </span>
+                        <ChevronDown className={`h-5 w-5 shrink-0 text-gray-600 transition-transform ${costAssignedToOpen ? 'rotate-180' : ''}`} strokeWidth={2} />
+                      </button>
+                      {costAssignedToOpen && (
+                        <div className="absolute left-0 top-full z-20 mt-2 w-full overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl">
+                          <div className="p-4 pb-2">
+                            <div className="relative">
+                              <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+                              <input
+                                value={costAssignedToSearch}
+                                onChange={(e) => setCostAssignedToSearch(e.target.value)}
+                                placeholder="Search"
+                                className="w-full rounded-lg border border-blue-500 px-11 py-3 text-[15px] text-gray-800 outline-none ring-2 ring-blue-100"
+                                autoFocus
+                              />
+                            </div>
+                          </div>
+                          <div className="max-h-64 overflow-y-auto px-4 pb-3">
+                            {filteredCostAssignablePeople.length === 0 ? (
+                              <div className="px-2 py-3 text-[15px] text-gray-400">No people found</div>
+                            ) : (
+                              filteredCostAssignablePeople.map((person, idx) => {
+                                const displayName = person?.name || person?.fullName || person?.email || person?.phone || `Person ${idx + 1}`;
+                                const roleLabel = person?.__typeLabel || person?.role || person?.kind || person?.type || person?.accountType || '';
+                                const initial = String(displayName).trim().charAt(0).toUpperCase();
+                                const isSelected = String(costForm.assignedTo) === String(displayName);
+                                return (
+                                  <button
+                                    key={`${displayName}-${idx}`}
+                                    type="button"
+                                    onClick={() => {
+                                      setCostForm((prev) => ({ ...prev, assignedTo: displayName }));
+                                      setCostAssignedToSearch('');
+                                      setCostAssignedToOpen(false);
+                                    }}
+                                    className="flex w-full items-center justify-between rounded-lg px-2 py-2.5 text-left hover:bg-gray-50"
+                                  >
+                                    <span className="flex min-w-0 items-center gap-3">
+                                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-sm font-bold text-white">
+                                        {initial}
+                                      </span>
+                                      <span className="block truncate text-[15px] text-gray-800">{displayName}</span>
+                                      {roleLabel && (
+                                        <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs text-gray-700">
+                                          {roleLabel}
+                                        </span>
+                                      )}
+                                    </span>
+                                    <span className={`text-blue-600 ${isSelected ? 'opacity-100' : 'opacity-0'}`}>✓</span>
+                                  </button>
+                                );
+                              })
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1">Date <span className="text-rose-500">*</span></label>
-                    <input
-                      type="datetime-local"
-                      value={costForm.date}
-                      onChange={(e) => setCostForm(prev => ({ ...prev, date: e.target.value }))}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                    />
+                    <label className="mb-2 block text-[15px] font-medium text-gray-700">Date <span className="text-rose-500">*</span></label>
+                    <div className="relative">
+                      <input
+                        ref={costDateInputRef}
+                        type="datetime-local"
+                        value={costForm.date}
+                        onChange={(e) => setCostForm(prev => ({ ...prev, date: e.target.value }))}
+                        className="w-full rounded-md border border-gray-300 px-4 py-3 pr-20 text-[15px] text-gray-800 shadow-sm"
+                      />
+                      <div className="absolute inset-y-0 right-0 flex items-center gap-2 pr-4 text-gray-400">
+                        <button
+                          type="button"
+                          onClick={() => costDateInputRef.current?.focus()}
+                          className="text-gray-400 hover:text-gray-600"
+                          aria-label="Open calendar"
+                        >
+                          <Calendar className="h-5 w-5" strokeWidth={2} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => costDateInputRef.current?.focus()}
+                          className="text-gray-400 hover:text-gray-600"
+                          aria-label="Open time picker"
+                        >
+                          <Clock className="h-5 w-5" strokeWidth={2} />
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
-              <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200">
+              <div className="flex items-center justify-end gap-3 px-8 pb-8">
                 <button
-                  onClick={() => setAddCostOpen(false)}
-                  className="px-4 py-2 rounded-lg border border-gray-300 text-sm font-semibold text-gray-700"
+                  onClick={() => { setAddCostOpen(false); setCostCategoryOpen(false); setCostCategorySearch(''); setCostAssignedToOpen(false); setCostAssignedToSearch(''); }}
+                  className="rounded-md border border-gray-300 bg-white px-5 py-3 text-[16px] font-medium text-gray-800 hover:bg-gray-50"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleConfirmCost}
                   disabled={!costForm.description || !costForm.category || !costForm.cost || !costForm.assignedTo || !costForm.date}
-                  className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold disabled:opacity-60"
+                  className="rounded-md bg-gray-200 px-5 py-3 text-[16px] font-medium text-gray-600 hover:bg-gray-300 disabled:cursor-not-allowed disabled:opacity-80"
                 >
                   Confirm
                 </button>
@@ -4269,149 +5712,473 @@ function ClientDashboard() {
           </div>
         )}
 
-        {addPartOpen && (
-          <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 w-full max-w-5xl">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-                <h3 className="text-xl font-bold text-gray-900">Add Parts</h3>
-                <button onClick={() => setAddPartOpen(false)} className="p-1.5 hover:bg-gray-100 rounded-lg">
-                  <X className="w-5 h-5 text-gray-400" />
+        {addPrintPdfOpen && (
+          <div className="fixed inset-0 z-[115] flex items-center justify-center bg-black/40 p-4">
+            <div className="w-full max-w-[820px] rounded-2xl border border-gray-200 bg-white shadow-2xl">
+              <div className="flex items-center justify-between px-10 py-10">
+                <div>
+                  <h3 className="text-[30px] font-bold text-gray-900">Print PDF</h3>
+                  <p className="mt-4 text-[18px] text-gray-700">Customize the content of your PDF.</p>
+                </div>
+                <button type="button" onClick={() => setAddPrintPdfOpen(false)} className="p-1 text-gray-700 hover:text-gray-900">
+                  <X className="h-8 w-8" strokeWidth={1.75} />
                 </button>
               </div>
-              <div className="px-6 pt-4 pb-2">
-                <div className="flex gap-3 items-center">
-                  <div className="flex-1 relative">
+
+              <div className="space-y-10 px-10 pb-10">
+                {[
+                  ['images', 'Images', 'Include all attached images (tasks, parts, etc.)'],
+                  ['partsAndCosts', 'Parts & Costs', 'Include a breakdown of items and total cost.'],
+                  ['activity', 'Activity', 'Include a log of all updates and changes.'],
+                  ['comments', 'Comments', 'Include all work order comments and notes.'],
+                ].map(([key, title, description]) => (
+                  <div key={key} className="flex items-center justify-between gap-6">
+                    <div>
+                      <div className="text-[18px] font-medium text-gray-900">{title}</div>
+                      <div className="text-[17px] text-gray-500">{description}</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => updatePrintPdfOption(key)}
+                      className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${printPdfOptions[key] ? 'bg-blue-600' : 'bg-gray-300'}`}
+                    >
+                      <span className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${printPdfOptions[key] ? 'translate-x-7' : 'translate-x-1'}`} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex items-center justify-end gap-4 px-10 pb-10">
+                <button type="button" onClick={() => setAddPrintPdfOpen(false)} className="rounded-lg border border-gray-300 bg-white px-7 py-3 text-[16px] text-gray-700">Cancel</button>
+                <button type="button" onClick={handleExportPdf} className="rounded-lg bg-blue-600 px-7 py-3 text-[16px] font-medium text-white hover:bg-blue-700">Export</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {addInvoiceOpen && (
+          <div className="fixed inset-0 z-[115] flex items-center justify-center bg-black/40 p-4">
+            <div className="flex max-h-[92vh] w-full max-w-[1120px] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl">
+              <div className="flex items-center justify-between border-b border-gray-200 px-6 py-5">
+                <h3 className="text-[26px] font-bold text-gray-900">New Invoice</h3>
+                <button type="button" onClick={() => setAddInvoiceOpen(false)} className="p-1 text-gray-700 hover:text-gray-900">
+                  <X className="h-8 w-8" strokeWidth={1.75} />
+                </button>
+              </div>
+
+              <div className="overflow-y-auto px-6 py-6 space-y-10">
+                <section className="space-y-5 border-b border-gray-100 pb-8">
+                  <h4 className="text-[20px] font-bold text-gray-900">Invoice Details</h4>
+                  <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <label className="text-[15px] text-gray-700">Invoice Number</label>
+                      <input value={invoiceForm.invoiceNumber} onChange={(e) => updateInvoiceField('invoiceNumber', e.target.value)} className="w-full rounded-lg border border-gray-300 px-4 py-3 text-[16px]" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[15px] text-gray-700">Invoice Date</label>
+                      <input type="date" value={invoiceForm.invoiceDate} onChange={(e) => updateInvoiceField('invoiceDate', e.target.value)} className="w-full rounded-lg border border-gray-300 px-4 py-3 text-[16px]" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[15px] text-gray-700">Title</label>
+                      <input value={invoiceForm.title} onChange={(e) => updateInvoiceField('title', e.target.value)} className="w-full rounded-lg border border-gray-300 px-4 py-3 text-[16px]" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[15px] text-gray-700">Payment Due</label>
+                      <input type="date" value={invoiceForm.paymentDue} onChange={(e) => updateInvoiceField('paymentDue', e.target.value)} className="w-full rounded-lg border border-gray-300 px-4 py-3 text-[16px]" />
+                    </div>
+                    <div className="space-y-2 md:col-span-1">
+                      <label className="text-[15px] text-gray-700">Description</label>
+                      <textarea value={invoiceForm.description} onChange={(e) => updateInvoiceField('description', e.target.value)} className="min-h-[102px] w-full rounded-lg border border-gray-300 px-4 py-3 text-[16px]" />
+                    </div>
+                    <div className="space-y-2 md:col-span-1">
+                      <label className="text-[15px] text-gray-700">Currency</label>
+                      <select value={invoiceForm.currency} onChange={(e) => updateInvoiceField('currency', e.target.value)} className="w-full rounded-lg border border-gray-300 px-4 py-3 text-[16px]">
+                        <option>USD - United States Dollar - $</option>
+                        <option>RWF - Rwandan Franc - FRw</option>
+                        <option>EUR - Euro - €</option>
+                      </select>
+                    </div>
+                  </div>
+                </section>
+
+                <section className="grid grid-cols-1 gap-8 border-b border-gray-100 pb-8 md:grid-cols-2">
+                  <div className="space-y-4">
+                    <h4 className="text-[20px] font-bold text-gray-900">Company Information</h4>
+                    <label className="flex items-center gap-3 text-[15px] text-gray-700">
+                      <input type="checkbox" checked={invoiceForm.useCompanyAddress} onChange={(e) => updateInvoiceField('useCompanyAddress', e.target.checked)} className="h-6 w-6 rounded border-gray-300" />
+                      Use Company Address
+                    </label>
+                    <input placeholder="Full Name" value={invoiceForm.companyFullName} onChange={(e) => updateInvoiceField('companyFullName', e.target.value)} className="w-full rounded-lg border border-gray-300 px-4 py-3 text-[16px]" />
+                    <input placeholder="Address Line 1" value={invoiceForm.companyAddress1} onChange={(e) => updateInvoiceField('companyAddress1', e.target.value)} className="w-full rounded-lg border border-gray-300 px-4 py-3 text-[16px]" />
+                    <input placeholder="Address Line 2" value={invoiceForm.companyAddress2} onChange={(e) => updateInvoiceField('companyAddress2', e.target.value)} className="w-full rounded-lg border border-gray-300 px-4 py-3 text-[16px]" />
+                    <input placeholder="Address Line 3" value={invoiceForm.companyAddress3} onChange={(e) => updateInvoiceField('companyAddress3', e.target.value)} className="w-full rounded-lg border border-gray-300 px-4 py-3 text-[16px]" />
+                    <label className="flex items-center gap-3 text-[15px] text-gray-700">
+                      <input type="checkbox" checked={invoiceForm.useCompanyLogo} onChange={(e) => updateInvoiceField('useCompanyLogo', e.target.checked)} className="h-6 w-6 rounded border-gray-300" />
+                      Use Company Logo
+                    </label>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h4 className="text-[20px] font-bold text-gray-900">Customer Information (Bill To)</h4>
+                    <select value={invoiceForm.customerId} onChange={handleSelectInvoiceCustomer} className="w-full rounded-lg border border-gray-300 px-4 py-3 text-[16px]">
+                      <option value="">Customer</option>
+                      {invoiceCustomerOptions.map((entry, index) => (
+                        <option key={`${entry?._id || entry?.id || entry?.userId || entry?.email || index}`} value={entry?._id || entry?.id || entry?.userId || ''}>
+                          {entry?.name || entry?.fullName || entry?.email || `Customer ${index + 1}`}
+                        </option>
+                      ))}
+                    </select>
+                    <input placeholder="Full Name" value={invoiceForm.customerName} onChange={(e) => updateInvoiceField('customerName', e.target.value)} className="w-full rounded-lg border border-gray-300 px-4 py-3 text-[16px]" />
+                    <input placeholder="Email" value={invoiceForm.customerEmail} onChange={(e) => updateInvoiceField('customerEmail', e.target.value)} className="w-full rounded-lg border border-gray-300 px-4 py-3 text-[16px]" />
+                    <input placeholder="Address Line 1" value={invoiceForm.customerAddress1} onChange={(e) => updateInvoiceField('customerAddress1', e.target.value)} className="w-full rounded-lg border border-gray-300 px-4 py-3 text-[16px]" />
+                    <input placeholder="Address Line 2" value={invoiceForm.customerAddress2} onChange={(e) => updateInvoiceField('customerAddress2', e.target.value)} className="w-full rounded-lg border border-gray-300 px-4 py-3 text-[16px]" />
+                    <input placeholder="Address Line 3" value={invoiceForm.customerAddress3} onChange={(e) => updateInvoiceField('customerAddress3', e.target.value)} className="w-full rounded-lg border border-gray-300 px-4 py-3 text-[16px]" />
+                  </div>
+                </section>
+
+                <section className="space-y-5 border-b border-gray-100 pb-8">
+                  <h4 className="text-[20px] font-bold text-gray-900">Parts</h4>
+                  <div className="flex items-center justify-between">
+                    <div className="text-[18px] font-bold text-gray-900">Parts ({invoiceLineItems.length}) <span className="text-rose-500">*</span></div>
+                    <div className="flex items-center gap-3">
+                      <div ref={invoicePartsActionsRef} className="relative">
+                        <button
+                          type="button"
+                          onClick={() => setShowInvoicePartsActions((prev) => !prev)}
+                          className="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-[16px] text-gray-700"
+                        >
+                          More Actions
+                          <ChevronDown className="ml-2 inline h-4 w-4" strokeWidth={2} />
+                        </button>
+                        {showInvoicePartsActions && (
+                          <div className="absolute right-0 top-full z-20 mt-2 min-w-[252px] rounded-xl border border-gray-200 bg-white py-2 shadow-xl">
+                            <button
+                              type="button"
+                              onClick={handleAddInvoiceCustomLineItem}
+                              className="block w-full px-5 py-3 text-left text-[16px] text-gray-700 hover:bg-gray-50"
+                            >
+                              Create Custom Line Item
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      <button type="button" onClick={handleOpenAddPart} className="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-[16px] text-gray-700">Add Parts</button>
+                    </div>
+                  </div>
+                  {invoiceLineItems.length === 0 ? (
+                    <div className="border-t border-gray-200 pt-10 text-center text-[16px] text-gray-500">No line items have been added yet</div>
+                  ) : (
+                    <div className="overflow-hidden rounded-xl border border-gray-200">
+                      <table className="w-full text-sm">
+                        <thead className="bg-gray-50 text-gray-600">
+                          <tr>
+                            <th className="px-4 py-3 text-left font-semibold">Item</th>
+                            <th className="px-4 py-3 text-left font-semibold">Cost</th>
+                            <th className="px-4 py-3 text-left font-semibold">Quantity</th>
+                            <th className="px-4 py-3 text-left font-semibold">Total</th>
+                            <th className="px-4 py-3 text-left font-semibold"></th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 bg-white">
+                          {invoiceLineItems.map((part, index) => (
+                            <tr key={part.id || index}>
+                              {part.source === 'custom' ? (
+                                <>
+                                  <td className="px-4 py-3">
+                                    <input
+                                      value={part.name}
+                                      onChange={(e) => updateInvoiceCustomLineItem(part.id, 'name', e.target.value)}
+                                      className="w-full rounded-lg border border-gray-300 px-4 py-3 text-[16px] text-gray-900"
+                                    />
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <div className="flex w-full items-center overflow-hidden rounded-lg border border-gray-300">
+                                      <span className="border-r border-gray-300 px-4 py-3 text-[16px] text-gray-500">RF</span>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        value={part.cost}
+                                        onChange={(e) => updateInvoiceCustomLineItem(part.id, 'cost', e.target.value)}
+                                        className="w-full px-4 py-3 text-right text-[16px] text-gray-900 outline-none"
+                                      />
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      step="1"
+                                      value={part.quantity}
+                                      onChange={(e) => updateInvoiceCustomLineItem(part.id, 'quantity', e.target.value)}
+                                      className="w-full rounded-lg border border-gray-300 px-4 py-3 text-[16px] text-gray-900"
+                                    />
+                                  </td>
+                                  <td className="px-4 py-3 text-[16px] text-gray-700">
+                                    {`RF${(toNumber(part.cost) * toNumber(part.quantity || 0)).toFixed(2)}`}
+                                  </td>
+                                  <td className="px-4 py-3 text-right">
+                                    <button
+                                      type="button"
+                                      onClick={() => removeInvoiceCustomLineItem(part.id)}
+                                      className="text-[28px] leading-none text-gray-600 hover:text-rose-600"
+                                    >
+                                      ×
+                                    </button>
+                                  </td>
+                                </>
+                              ) : (
+                                <>
+                                  <td className="px-4 py-3 text-gray-900">{part.name || 'Part'}</td>
+                                  <td className="px-4 py-3 text-gray-700">{formatMoney(toNumber(part.cost))}</td>
+                                  <td className="px-4 py-3 text-gray-700">{part.quantity || 1}</td>
+                                  <td className="px-4 py-3 text-gray-700">{formatMoney(toNumber(part.cost) * toNumber(part.quantity || 1))}</td>
+                                  <td className="px-4 py-3"></td>
+                                </>
+                              )}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_430px]">
+                    <div />
+                    <div className="space-y-3 text-[16px] text-gray-700">
+                      <div className="flex items-center justify-between"><span>Subtotal</span><span>{formatMoney(invoicePartsSubtotal)}</span></div>
+                      <div className="flex items-center justify-between gap-4"><span>Shipping Costs</span><input value={invoiceForm.shippingCosts} onChange={(e) => updateInvoiceField('shippingCosts', e.target.value)} className="w-[186px] rounded-lg border border-gray-300 px-4 py-2.5 text-right" /></div>
+                      <div className="flex items-center justify-between gap-4"><span>Sales Tax</span><input value={invoiceForm.salesTax} onChange={(e) => updateInvoiceField('salesTax', e.target.value)} className="w-[186px] rounded-lg border border-gray-300 px-4 py-2.5 text-right" /></div>
+                      <div className="flex items-center justify-between gap-4"><span>Other Costs</span><input value={invoiceForm.partsOtherCosts} onChange={(e) => updateInvoiceField('partsOtherCosts', e.target.value)} className="w-[186px] rounded-lg border border-gray-300 px-4 py-2.5 text-right" /></div>
+                      <div className="flex items-center justify-between font-medium text-gray-900"><span>Total Parts Cost</span><span>{formatMoney(invoicePartsSubtotal + invoicePartsExtraCosts)}</span></div>
+                    </div>
+                  </div>
+                </section>
+
+                <section className="space-y-5 border-b border-gray-100 pb-8">
+                  <h4 className="text-[20px] font-bold text-gray-900">Additional Costs</h4>
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_430px]">
+                    <div />
+                    <div className="space-y-3 text-[16px] text-gray-700">
+                      <div className="flex items-center justify-between"><span>Subtotal</span><span>{formatMoney(invoiceAdditionalSubtotal)}</span></div>
+                      <div className="flex items-center justify-between gap-4"><span>Other Costs</span><input value={invoiceForm.additionalOtherCosts} onChange={(e) => updateInvoiceField('additionalOtherCosts', e.target.value)} className="w-[186px] rounded-lg border border-gray-300 px-4 py-2.5 text-right" /></div>
+                      <div className="flex items-center justify-between gap-4"><span>Paid</span><input value={invoiceForm.paid} onChange={(e) => updateInvoiceField('paid', e.target.value)} className="w-[186px] rounded-lg border border-gray-300 px-4 py-2.5 text-right" /></div>
+                      <div className="flex items-center justify-between font-medium text-gray-900"><span>Total Additional Cost</span><span>{formatMoney(invoiceAdditionalGrand)}</span></div>
+                    </div>
+                  </div>
+                </section>
+
+                <section className="space-y-5 border-b border-gray-100 pb-8">
+                  <h4 className="text-[20px] font-bold text-gray-900">Signature</h4>
+                  <input ref={invoiceSignatureInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => updateInvoiceField('signatureFile', e.target.files?.[0] || null)} />
+                  <div className="rounded-lg border border-dashed border-gray-300 px-6 py-8 text-center text-[16px] text-gray-500">
+                    <button type="button" onClick={() => invoiceSignatureInputRef.current?.click()} className="rounded-lg border border-gray-300 bg-white px-6 py-2.5 text-[16px] text-gray-700">Upload</button> or Drop Image
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[15px] text-gray-700">Signature Date</label>
+                    <input type="date" value={invoiceForm.signatureDate} onChange={(e) => updateInvoiceField('signatureDate', e.target.value)} className="w-full rounded-lg border border-gray-300 px-4 py-3 text-[16px]" />
+                  </div>
+                </section>
+
+                <section className="space-y-4">
+                  <h4 className="text-[20px] font-bold text-gray-900">Invoice Summary</h4>
+                  <div className="space-y-4 text-[16px] text-gray-700">
+                    <div className="flex items-center justify-between"><span>Parts</span><span>{formatMoney(invoicePartsSubtotal + invoicePartsExtraCosts)}</span></div>
+                    <div className="flex items-center justify-between"><span>Additional Costs</span><span>{formatMoney(invoiceAdditionalGrand)}</span></div>
+                    <div className="flex items-center justify-between"><span>Labor Costs</span><span>{formatMoney(invoiceLaborSubtotal)}</span></div>
+                    <div className="flex items-center justify-between text-[18px] font-bold text-gray-900"><span>Total</span><span>{formatMoney(invoiceTotal)}</span></div>
+                  </div>
+                </section>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 border-t border-gray-200 px-6 py-4">
+                <button type="button" onClick={() => setAddInvoiceOpen(false)} className="rounded-lg border border-gray-300 bg-white px-5 py-3 text-[16px] text-gray-700">Cancel</button>
+                <button type="button" onClick={openInvoicePreview} className="rounded-lg border border-gray-300 bg-white px-5 py-3 text-[16px] text-gray-700">Preview</button>
+                <button type="button" onClick={handleSubmitInvoice} className="rounded-lg bg-blue-600 px-5 py-3 text-[16px] font-medium text-white hover:bg-blue-700">Submit</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {addPartOpen && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 p-4">
+            <div className="w-full max-w-[1320px] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl">
+              <div className="flex items-center justify-between px-8 py-5">
+                <h3 className="text-[28px] font-bold tracking-tight text-gray-900">Add Parts</h3>
+                <button onClick={() => setAddPartOpen(false)} className="p-1 text-gray-700 hover:text-gray-900">
+                  <X className="h-8 w-8" strokeWidth={1.75} />
+                </button>
+              </div>
+              <div className="border-t border-gray-100">
+                <div className="flex items-center gap-8 border-b border-gray-200 px-8">
+                  <button
+                    type="button"
+                    onClick={() => setPartModalTab('parts')}
+                    className={`border-b-2 py-4 text-[15px] font-semibold transition-colors ${partModalTab === 'parts' ? 'border-blue-600 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                  >
+                    Parts
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPartModalTab('sets')}
+                    className={`border-b-2 py-4 text-[15px] font-semibold transition-colors ${partModalTab === 'sets' ? 'border-blue-600 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                  >
+                    Sets
+                  </button>
+                </div>
+
+                <div className="px-8 py-5">
+                  <div ref={workOrderStatusFilterRef} className="relative">
+                    <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
                     <input
                       value={inventorySearch}
                       onChange={e => setInventorySearch(e.target.value)}
-                      placeholder="Search inventory parts..."
-                      className="w-full border border-blue-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Search"
+                      className="w-full rounded-lg border border-gray-200 bg-gray-50 px-11 py-3 text-[15px] text-gray-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
                     />
                   </div>
-                  <button type="button" onClick={fetchInventoryParts} className="px-3 py-2 text-sm font-semibold border border-gray-200 rounded-lg hover:bg-gray-50">
-                    Refresh
-                  </button>
                 </div>
               </div>
-              <div className="px-6 pb-2 max-h-[55vh] overflow-y-auto">
-                <table className="w-full text-sm">
-                  <thead className="text-xs text-gray-500 uppercase border-b">
-                    <tr>
-                      <th className="w-10 px-2 py-2"></th>
-                      <th className="text-left px-2 py-2">Name</th>
-                      <th className="text-left px-2 py-2">ID</th>
-                      <th className="text-left px-2 py-2">Location</th>
-                      <th className="text-left px-2 py-2">Area</th>
-                      <th className="text-left px-2 py-2">Cost</th>
-                      <th className="text-left px-2 py-2">Available Qty</th>
-                      <th className="text-left px-2 py-2">Maximum Qty</th>
-                      <th className="text-left px-2 py-2">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {inventoryLoading ? (
-                      <tr><td colSpan="9" className="py-6 text-center text-gray-500">Loading inventory…</td></tr>
-                    ) : (
-                      inventoryParts
-                        .filter(p => {
-                          const q = inventorySearch.toLowerCase();
-                          if (!q) return true;
-                          return (p.name || '').toLowerCase().includes(q)
-                            || (p.partNumber || '').toLowerCase().includes(q)
-                            || (p.category || '').toLowerCase().includes(q)
-                            || (p.id || '').toLowerCase().includes(q);
-                        })
-                        .slice(0, 100)
-                        .map((part, idx) => {
-                          const pid = part._id || part.id || idx;
-                        const selected = Boolean(selectedInventoryParts[part._id || part.id || idx]);
-                        const stock = getAvailableQty(part);
-                        const maxQty = getMaxQty(part);
-                        const price = part.cost ?? part.unitCost ?? part.price ?? 0;
-                        return (
-                          <tr key={pid} className={`${selected ? 'bg-blue-50' : ''} hover:bg-gray-50`}>
-                            <td className="px-2 py-2">
-                              <input
-                                type="checkbox"
-                                checked={selected}
-                                onChange={(e) => {
-                                  const checked = e.target.checked;
-                                  setSelectedInventoryParts(prev => {
-                                    const key = part._id || part.id || idx;
-                                    if (checked) {
-                                      return {
-                                        ...prev,
-                                        [key]: { part, quantity: 1 }
-                                      };
-                                    }
-                                    const clone = { ...prev };
-                                    delete clone[key];
-                                    return clone;
-                                  });
-                                }}
-                              />
-                            </td>
-                            <td className="px-2 py-2">
-                              <div className="font-semibold text-gray-900">{part.name || 'Part'}</div>
-                              <div className="text-xs text-gray-500">{part.category || ''}</div>
-                            </td>
-                              <td className="px-2 py-2 font-mono text-xs text-gray-600">{part.partNumber || part.id || part._id || '—'}</td>
-                              <td className="px-2 py-2 text-gray-700">{part.location || '—'}</td>
-                              <td className="px-2 py-2 text-gray-700">{getAreaLabel(part) || '—'}</td>
-                              <td className="px-2 py-2 text-gray-800">{price ? formatMoney(price) : '—'}</td>
-                              <td className="px-2 py-2 text-gray-800">
-                                <div className="flex items-center gap-2">
-                                  <span>{stock}</span>
-                                  {selected && (
-                                    <input
-                                      type="number"
-                                      min="1"
-                                      max={stock || undefined}
-                                      value={selectedInventoryParts[part._id || part.id || idx]?.quantity || 1}
-                                      onChange={e => {
-                                        const val = Number(e.target.value) || 1;
-                                        const key = part._id || part.id || idx;
-                                        setSelectedInventoryParts(prev => ({
-                                          ...prev,
-                                          [key]: { part, quantity: val }
-                                        }));
-                                      }}
-                                      className="w-16 border border-gray-200 rounded px-2 py-1 text-xs"
-                                    />
-                                  )}
-                                </div>
-                              </td>
-                              <td className="px-2 py-2 text-gray-800">{maxQty}</td>
-                              <td className="px-2 py-2">
-                                <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${getStockBadge(part.status)}`}>
-                                  {part.status || 'In stock'}
-                                </span>
-                              </td>
-                            </tr>
-                          );
-                        })
-                    )}
-                    {!inventoryLoading && inventoryParts.length === 0 && (
-                      <tr><td colSpan="9" className="py-6 text-center text-gray-500">No inventory parts found.</td></tr>
-                    )}
-                  </tbody>
-                </table>
+              <div className="border-t border-gray-100">
+                {partModalTab === 'parts' ? (
+                  <div className="max-h-[54vh] overflow-auto">
+                    <table className="w-full min-w-[1180px] text-sm">
+                      <thead className="border-b border-gray-200 bg-white">
+                        <tr className="text-left text-[14px] font-semibold text-gray-900">
+                          <th className="w-12 px-8 py-4">
+                            <input
+                              type="checkbox"
+                              checked={filteredInventoryParts.length > 0 && filteredInventoryParts.every((part, idx) => Boolean(selectedInventoryParts[part._id || part.id || idx]))}
+                              onChange={(e) => {
+                                const checked = e.target.checked;
+                                if (!checked) {
+                                  setSelectedInventoryParts({});
+                                  return;
+                                }
+                                const next = {};
+                                filteredInventoryParts.forEach((part, idx) => {
+                                  const key = part._id || part.id || idx;
+                                  next[key] = { part, quantity: selectedInventoryParts[key]?.quantity || 1 };
+                                });
+                                setSelectedInventoryParts(next);
+                              }}
+                            />
+                          </th>
+                          <th className="px-6 py-4">
+                            <div className="flex items-center gap-2">
+                              <span>Name</span>
+                              <ChevronDown className="h-4 w-4 -rotate-90 text-gray-700" />
+                            </div>
+                          </th>
+                          <th className="px-6 py-4">ID</th>
+                          <th className="px-6 py-4">Location</th>
+                          <th className="px-6 py-4">Area</th>
+                          <th className="px-6 py-4">Cost</th>
+                          <th className="px-6 py-4">Available Qty</th>
+                          <th className="px-6 py-4">Maximum Qty</th>
+                          <th className="px-6 py-4">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {inventoryLoading ? (
+                          <tr>
+                            <td colSpan="9" className="px-8 py-8 text-center text-[15px] text-gray-500">Loading inventory...</td>
+                          </tr>
+                        ) : filteredInventoryParts.length === 0 ? (
+                          <tr>
+                            <td colSpan="9" className="px-8 py-8 text-center text-[15px] text-gray-500">No inventory parts found.</td>
+                          </tr>
+                        ) : (
+                          filteredInventoryParts.map((part, idx) => {
+                            const key = part._id || part.id || idx;
+                            const selected = Boolean(selectedInventoryParts[key]);
+                            const stock = getAvailableQty(part);
+                            const maxQty = getMaxQty(part);
+                            const price = part.cost ?? part.unitCost ?? part.price ?? 0;
+                            return (
+                              <tr key={key} className={`${selected ? 'bg-blue-50/60' : 'bg-white'} hover:bg-gray-50`}>
+                                <td className="px-8 py-6 align-middle">
+                                  <input
+                                    type="checkbox"
+                                    checked={selected}
+                                    onChange={(e) => {
+                                      const checked = e.target.checked;
+                                      setSelectedInventoryParts((prev) => {
+                                        if (checked) {
+                                          return {
+                                            ...prev,
+                                            [key]: { part, quantity: prev[key]?.quantity || 1 }
+                                          };
+                                        }
+                                        const clone = { ...prev };
+                                        delete clone[key];
+                                        return clone;
+                                      });
+                                    }}
+                                  />
+                                </td>
+                                <td className="px-6 py-6 align-middle text-[15px] text-gray-900">
+                                  <div className="max-w-[180px] truncate font-medium">{part.name || 'Part'}</div>
+                                </td>
+                                <td className="px-6 py-6 align-middle text-[15px] text-gray-800">{part.partNumber || part.id || part._id || '—'}</td>
+                                <td className="px-6 py-6 align-middle text-[15px] text-gray-800">{part.location || '—'}</td>
+                                <td className="px-6 py-6 align-middle text-[15px] text-gray-800">{getAreaLabel(part) || '—'}</td>
+                                <td className="px-6 py-6 align-middle text-[15px] text-gray-900">{price ? formatMoney(price) : '—'}</td>
+                                <td className="px-6 py-6 align-middle text-[15px] text-gray-900">
+                                  <div className="flex items-center gap-3">
+                                    <span>{Number(stock).toFixed(2)}</span>
+                                    {selected && (
+                                      <input
+                                        type="number"
+                                        min="1"
+                                        max={stock || undefined}
+                                        value={selectedInventoryParts[key]?.quantity || 1}
+                                        onChange={(e) => {
+                                          const val = Number(e.target.value) || 1;
+                                          setSelectedInventoryParts((prev) => ({
+                                            ...prev,
+                                            [key]: { part, quantity: val }
+                                          }));
+                                        }}
+                                        className="w-16 rounded border border-gray-300 px-2 py-1 text-xs"
+                                      />
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-6 align-middle text-[15px] text-gray-900">{maxQty}</td>
+                                <td className="px-6 py-6 align-middle">
+                                  <span className={`inline-flex rounded-lg px-3 py-1 text-[14px] font-medium ${getStockBadge(part.status)}`}>
+                                    {part.status || 'In stock'}
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="flex min-h-[380px] items-center justify-center px-8 py-12 text-[15px] text-gray-500">
+                    No part sets available yet.
+                  </div>
+                )}
               </div>
-              <div className="px-6 py-3 border-t border-gray-200 flex flex-wrap items-center gap-4 justify-between">
-                <div className="text-sm text-gray-700">
-                  Selected: {Object.keys(selectedInventoryParts).length} part(s)
+              <div className="flex flex-wrap items-center justify-between gap-4 border-t border-gray-200 px-8 py-4">
+                <div className="text-[15px] text-gray-500">
+                  {Object.keys(selectedInventoryParts).length} {Object.keys(selectedInventoryParts).length === 1 ? 'Part' : 'Parts'} selected
                 </div>
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => setAddPartOpen(false)}
-                    className="px-4 py-2 rounded-lg border border-gray-300 text-sm font-semibold text-gray-700"
+                    className="rounded-md border border-gray-300 bg-white px-5 py-3 text-[16px] font-medium text-gray-800 hover:bg-gray-50"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={handleConfirmPart}
                     disabled={Object.keys(selectedInventoryParts).length === 0}
-                    className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold disabled:opacity-60"
+                    className="rounded-md bg-blue-600 px-5 py-3 text-[16px] font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     Add
                   </button>
@@ -4423,21 +6190,25 @@ function ClientDashboard() {
         
         {addLaborOpen && (
           <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 w-full max-w-xl">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-                <h3 className="text-xl font-bold text-gray-900">Add Labor Time</h3>
-                <button onClick={() => setAddLaborOpen(false)} className="p-1.5 hover:bg-gray-100 rounded-lg">
-                  <X className="w-5 h-5 text-gray-400" />
+            <div className="w-full max-w-[690px] rounded-2xl border border-gray-200 bg-white shadow-2xl">
+              <div className="flex items-center justify-between px-8 py-7">
+                <h3 className="text-[28px] font-bold tracking-tight text-gray-900">Add Time</h3>
+                <button onClick={() => setAddLaborOpen(false)} className="p-1 text-gray-700 hover:text-gray-900">
+                  <X className="h-8 w-8" strokeWidth={1.75} />
                 </button>
               </div>
-              <div className="p-6 space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="px-8 pb-8">
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-[1.15fr_0.55fr]">
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1">Worker <span className="text-rose-500">*</span></label>
+                    <label className="mb-2 block text-[15px] font-medium text-gray-700">Worker <span className="text-rose-500">*</span></label>
+                    <div className="relative">
+                      <div className="pointer-events-none absolute left-5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-emerald-500 text-sm font-bold text-white">
+                        {selectedLaborWorkerInitial}
+                      </div>
                       <select
                         value={laborForm.worker}
                         onChange={(e) => setLaborForm(prev => ({ ...prev, worker: e.target.value }))}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                        className="w-full appearance-none rounded-md border border-gray-300 bg-white py-3 pl-16 pr-11 text-[15px] text-gray-800 shadow-sm"
                       >
                         <option value="">Select worker</option>
                         {allWorkers.map((t, idx) => {
@@ -4450,80 +6221,112 @@ function ClientDashboard() {
                           );
                         })}
                       </select>
+                      <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-600" strokeWidth={2} />
+                    </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1">Rate ($/hr)</label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={laborForm.rate}
-                      onChange={(e) => setLaborForm(prev => ({ ...prev, rate: e.target.value }))}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                    />
+                    <label className="mb-2 block text-[15px] font-medium text-gray-700">Hourly Rate</label>
+                    <div className="flex overflow-hidden rounded-md border border-gray-300 shadow-sm">
+                      <div className="flex items-center border-r border-gray-300 px-4 text-[18px] text-gray-500">$</div>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={laborForm.rate}
+                        onChange={(e) => setLaborForm(prev => ({ ...prev, rate: e.target.value }))}
+                        className="w-full px-4 py-3 text-right text-[15px] text-gray-800 outline-none"
+                      />
+                    </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1">Time (Hours)</label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="1"
-                      value={laborForm.hours}
-                      onChange={(e) => setLaborForm(prev => ({ ...prev, hours: e.target.value }))}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                    />
+                    <label className="mb-2 block text-[15px] font-medium text-gray-700">Work Started at <span className="text-rose-500">*</span></label>
+                    <div className="relative">
+                      <input
+                        ref={laborStartedAtInputRef}
+                        type="datetime-local"
+                        value={laborForm.startedAt}
+                        onChange={(e) => setLaborForm(prev => ({ ...prev, startedAt: e.target.value }))}
+                        className="w-full rounded-md border border-gray-300 bg-white px-4 py-3 pr-20 text-[15px] text-gray-800 shadow-sm"
+                      />
+                      <div className="absolute inset-y-0 right-0 flex items-center gap-2 pr-4 text-gray-400">
+                        <button
+                          type="button"
+                          onClick={() => laborStartedAtInputRef.current?.focus()}
+                          className="text-gray-400 hover:text-gray-600"
+                          aria-label="Open calendar"
+                        >
+                          <Calendar className="h-5 w-5" strokeWidth={2} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => laborStartedAtInputRef.current?.focus()}
+                          className="text-gray-400 hover:text-gray-600"
+                          aria-label="Open time picker"
+                        >
+                          <Clock className="h-5 w-5" strokeWidth={2} />
+                        </button>
+                      </div>
+                    </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1">Time (Minutes)</label>
-                    <input
-                      type="number"
-                      min="0"
-                      max="59"
-                      step="5"
-                      value={laborForm.minutes}
-                      onChange={(e) => setLaborForm(prev => ({ ...prev, minutes: e.target.value }))}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                    />
+                    <label className="mb-2 block text-[15px] font-semibold text-gray-700">Duration <span className="text-rose-500">*</span></label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={laborForm.hours}
+                          onChange={(e) => setLaborForm(prev => ({ ...prev, hours: e.target.value }))}
+                          className="w-full rounded-md border border-gray-300 px-4 py-3 text-[15px] text-gray-800 shadow-sm"
+                        />
+                        <div className="mt-2 text-[15px] text-gray-500">Hours</div>
+                      </div>
+                      <div>
+                        <input
+                          type="number"
+                          min="0"
+                          max="59"
+                          step="5"
+                          value={laborForm.minutes}
+                          onChange={(e) => setLaborForm(prev => ({ ...prev, minutes: e.target.value }))}
+                          className="w-full rounded-md border border-gray-300 px-4 py-3 text-[15px] text-gray-800 shadow-sm"
+                        />
+                        <div className="mt-2 text-[15px] text-gray-500">Minutes</div>
+                      </div>
+                    </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1">Date <span className="text-rose-500">*</span></label>
-                    <input
-                      type="datetime-local"
-                      value={laborForm.startedAt}
-                      onChange={(e) => setLaborForm(prev => ({ ...prev, startedAt: e.target.value }))}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1">Category</label>
+                    <label className="mb-2 block text-[15px] font-medium text-gray-700">Category <span className="text-rose-500">*</span></label>
                     <select
                       value={laborForm.category}
                       onChange={(e) => setLaborForm(prev => ({ ...prev, category: e.target.value }))}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                      className="w-full appearance-none rounded-md border border-gray-300 bg-white px-4 py-3 text-[15px] text-gray-800 shadow-sm"
                     >
-                      <option value="Maintenance">Maintenance</option>
-                      <option value="Repair">Repair</option>
-                      <option value="Inspection">Inspection</option>
-                      <option value="Installation">Installation</option>
-                      <option value="Travel">Travel</option>
+                      <option value="Drive Time">Drive Time</option>
+                      <option value="Wrench time">Wrench Time</option>
+                      <option value="Other Time">Other Time</option>
+                      <option value="Vender Time">Vender Time</option>
+                      <option value="Inspection Time">Inspection Time</option>
                     </select>
                   </div>
+                  <div />
                 </div>
-              </div>
-              <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200">
-                <button
-                  onClick={() => setAddLaborOpen(false)}
-                  className="px-4 py-2 rounded-lg border border-gray-300 text-sm font-semibold text-gray-700"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleConfirmLabor}
-                  disabled={!laborForm.worker || !laborForm.startedAt || (laborForm.hours === 0 && laborForm.minutes === 0)}
-                  className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold disabled:opacity-60"
-                >
-                  Confirm
-                </button>
+                <div className="mt-14 flex items-center justify-end gap-3">
+                  <button
+                    onClick={() => setAddLaborOpen(false)}
+                    className="rounded-md border border-gray-300 bg-white px-5 py-3 text-[16px] font-medium text-gray-800 hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleConfirmLabor}
+                    disabled={!laborForm.worker || !laborForm.startedAt || (laborForm.hours === 0 && laborForm.minutes === 0)}
+                    className="rounded-md bg-gray-200 px-5 py-3 text-[16px] font-medium text-gray-600 hover:bg-gray-300 disabled:cursor-not-allowed disabled:opacity-80"
+                  >
+                    Confirm
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -4834,6 +6637,39 @@ function ClientDashboard() {
     }
   }, []);
 
+  const refreshContactPeople = useCallback(async () => {
+    const normalizeEntry = (item, source) => {
+      const roleLabel = item.role === 'requestor' ? 'Requestor' : item.role === 'client' ? 'Client' : '';
+      const typeLabel = source === 'vendor' ? 'Vendor' : source === 'client' ? 'Customer' : roleLabel || 'Customer';
+      return {
+        ...item,
+        __source: source,
+        __typeLabel: typeLabel,
+        name: item.name || item.company || item.fullName || item.contactName || item.email || 'Unnamed',
+      };
+    };
+
+    try {
+      const [vendorsRes, clientsRes, usersRes] = await Promise.allSettled([
+        api.get('/api/vendors'),
+        api.get('/api/clients'),
+        api.get('/api/users/clients-requestors'),
+      ]);
+
+      const vendorItems = vendorsRes.status === 'fulfilled' ? vendorsRes.value.data || [] : [];
+      const clientItems = clientsRes.status === 'fulfilled' ? clientsRes.value.data || [] : [];
+      const userItems = usersRes.status === 'fulfilled' ? usersRes.value.data || [] : [];
+
+      setContactPeople([
+        ...vendorItems.map((item) => normalizeEntry(item, 'vendor')),
+        ...clientItems.map((item) => normalizeEntry(item, 'client')),
+        ...userItems.map((item) => normalizeEntry(item, 'user')),
+      ]);
+    } catch (err) {
+      console.error('Failed to load contact people', err);
+    }
+  }, []);
+
   const refreshTeams = useCallback(async () => {
     setLoading(l => ({ ...l, teams: true }));
     try {
@@ -4859,6 +6695,10 @@ function ClientDashboard() {
       refreshTeams();
     }
   }, [activeTab, refreshPeople, refreshTeams]);
+
+  useEffect(() => {
+    refreshContactPeople();
+  }, [refreshContactPeople]);
 
   const handleInviteUsers = useCallback(async (invites) => {
     if (!Array.isArray(invites) || invites.length === 0) return;
@@ -4895,25 +6735,43 @@ function ClientDashboard() {
 
   const handleDeletePerson = useCallback(async (id) => {
     if (!id) return;
-    if (!window.confirm('Delete this invitation?')) return;
-    try {
-      await api.delete(`/api/users/invites/${id}`);
-      await refreshPeople();
-    } catch (err) {
-      alert('Delete failed: ' + (err?.response?.data?.error || err?.response?.data?.message || err.message));
-    }
-  }, [refreshPeople]);
+    openDashboardConfirmDialog({
+      title: 'Delete Invitation?',
+      message: 'Deleting this invitation removes it permanently. This action cannot be undone.',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      tone: 'danger',
+      onConfirm: async () => {
+        try {
+          await api.delete(`/api/users/invites/${id}`);
+          await refreshPeople();
+          closeDashboardConfirmDialog();
+        } catch (err) {
+          alert('Delete failed: ' + (err?.response?.data?.error || err?.response?.data?.message || err.message));
+        }
+      },
+    });
+  }, [closeDashboardConfirmDialog, openDashboardConfirmDialog, refreshPeople]);
 
   const handleDeleteTeam = useCallback(async (id) => {
     if (!id) return;
-    if (!window.confirm('Delete this team?')) return;
-    try {
-      await api.delete(`/api/teams/${id}`);
-      await refreshTeams();
-    } catch (err) {
-      alert('Delete failed: ' + (err?.response?.data?.error || err?.response?.data?.message || err.message));
-    }
-  }, [refreshTeams]);
+    openDashboardConfirmDialog({
+      title: 'Delete Team?',
+      message: 'Deleting this team removes it permanently. This action cannot be undone.',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      tone: 'danger',
+      onConfirm: async () => {
+        try {
+          await api.delete(`/api/teams/${id}`);
+          await refreshTeams();
+          closeDashboardConfirmDialog();
+        } catch (err) {
+          alert('Delete failed: ' + (err?.response?.data?.error || err?.response?.data?.message || err.message));
+        }
+      },
+    });
+  }, [closeDashboardConfirmDialog, openDashboardConfirmDialog, refreshTeams]);
 
   const fetchMaterialRequests = useCallback(async () => {
     try {
@@ -5571,14 +7429,111 @@ function ClientDashboard() {
     return st === 'REJECTED' || st === 'DECLINED';
   };
 
+  const isPmLinkedIssue = (issue) => {
+    return Boolean(
+      issue?.scheduleId ||
+      issue?.pmId ||
+      issue?.pmTrigger ||
+      issue?.preventiveMaintenanceName ||
+      issue?.scheduleName ||
+      issue?.pmName
+    );
+  };
+
   const isApprovedWorkOrder = (issue) => {
     const st = String(issue?.status || '').toUpperCase();
     const hasWorkOrderRef = !!(issue?.workOrderId || issue?.workOrder || issue?.workOrderNumber || issue?.workOrderNo || issue?.workOrderCode || issue?.workOrderRef);
-    return Boolean(issue?.approved) || hasWorkOrderRef || st === 'APPROVED' || st.includes('IN PROGRESS') || st.includes('COMPLETE');
+    return Boolean(issue?.approved)
+      || hasWorkOrderRef
+      || isPmLinkedIssue(issue)
+      || st === 'APPROVED'
+      || st === 'OPEN'
+      || st.includes('IN PROGRESS')
+      || st.includes('COMPLETE');
   };
 
-  const pendingRequests = allIssues.filter(issue => !isRejectedRequest(issue));
+  const isRequestIssue = (issue) => {
+    if (!issue || isRejectedRequest(issue)) return false;
+    return !isApprovedWorkOrder(issue);
+  };
+
+  const pendingRequests = allIssues.filter((issue) => isRequestIssue(issue));
   const workOrders = allIssues.filter(issue => isApprovedWorkOrder(issue));
+  const workOrderStatusOptions = ['OPEN', 'IN PROGRESS', 'ON HOLD', 'COMPLETED'];
+  const workOrderPriorityOptions = ['HIGH', 'MEDIUM', 'LOW', 'NONE'];
+  const workOrderLocationOptions = React.useMemo(
+    () => Array.from(new Set(
+      workOrders
+        .map((issue) => issue.location || issue.property?.name || issue.propertyName || issue.assetLocation || '')
+        .filter(Boolean)
+    )).sort((a, b) => String(a).localeCompare(String(b))),
+    [workOrders]
+  );
+  const workOrderAssetOptions = React.useMemo(
+    () => Array.from(new Set(
+      workOrders
+        .map((issue) => issue.assetName || issue.asset?.name || '')
+        .filter(Boolean)
+    )).sort((a, b) => String(a).localeCompare(String(b))),
+    [workOrders]
+  );
+  const workOrderAssignedOptions = React.useMemo(
+    () => Array.from(new Set(
+      workOrders
+        .map((issue) => getAssignedName(issue))
+        .filter(Boolean)
+    )).sort((a, b) => String(a).localeCompare(String(b))),
+    [getAssignedName, workOrders]
+  );
+  const totalActiveWorkOrderFilters =
+    selectedWorkOrderStatuses.length +
+    selectedWorkOrderPriorities.length +
+    selectedWorkOrderLocations.length +
+    selectedWorkOrderAssets.length +
+    selectedWorkOrderAssignedTo.length;
+  const filteredClientWorkOrders = React.useMemo(() => {
+    const query = String(workOrderSearchQuery || '').trim().toLowerCase();
+    const filtered = workOrders.filter((issue) => {
+      const status = getWorkOrderDisplayStatus(issue);
+      const location = String(issue.location || issue.property?.name || issue.propertyName || issue.assetLocation || '').trim();
+      const asset = String(issue.assetName || issue.asset?.name || '').trim();
+      const assignedTo = String(getAssignedName(issue) || '').trim();
+      const priority = String(issue.priority || 'NONE').toUpperCase();
+
+      if (selectedWorkOrderStatuses.length > 0 && !selectedWorkOrderStatuses.includes(status)) return false;
+      if (selectedWorkOrderPriorities.length > 0 && !selectedWorkOrderPriorities.includes(priority)) return false;
+      if (selectedWorkOrderLocations.length > 0 && !selectedWorkOrderLocations.includes(location)) return false;
+      if (selectedWorkOrderAssets.length > 0 && !selectedWorkOrderAssets.includes(asset)) return false;
+      if (selectedWorkOrderAssignedTo.length > 0 && !selectedWorkOrderAssignedTo.includes(assignedTo)) return false;
+
+      if (!query) return true;
+      const haystack = [
+        issue.title,
+        issue.description,
+        status,
+        location,
+        asset,
+        assignedTo,
+        priority,
+      ].join(' ').toLowerCase();
+      return haystack.includes(query);
+    });
+    return [...filtered].sort((a, b) => {
+      const aTime = new Date(a.createdAt || a.updatedAt || 0).getTime();
+      const bTime = new Date(b.createdAt || b.updatedAt || 0).getTime();
+      return workOrderSortDirection === 'asc' ? aTime - bTime : bTime - aTime;
+    });
+  }, [
+    getAssignedName,
+    selectedWorkOrderAssets,
+    selectedWorkOrderAssignedTo,
+    selectedWorkOrderLocations,
+    selectedWorkOrderPriorities,
+    selectedWorkOrderStatuses,
+    workOrderSortDirection,
+    workOrderSearchQuery,
+    workOrders,
+  ]);
   const overdueOverviewItems = React.useMemo(() => (
     workOrders
       .filter((issue) => {
@@ -5588,7 +7543,64 @@ function ClientDashboard() {
       .sort((a, b) => new Date(b.updatedAt || b.createdAt || 0).getTime() - new Date(a.updatedAt || a.createdAt || 0).getTime())
       .slice(0, 4)
   ), [workOrders]);
-  const schedulerWorkOrders = React.useMemo(() => workOrders, [workOrders]);
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('mms_client_work_order_views');
+      const parsed = raw ? JSON.parse(raw) : [];
+      setSavedWorkOrderViews(Array.isArray(parsed) ? parsed : []);
+    } catch {
+      setSavedWorkOrderViews([]);
+    }
+  }, []);
+
+  const saveCurrentWorkOrderView = useCallback(() => {
+    const nextView = {
+      id: `view-${Date.now()}`,
+      name: `View ${savedWorkOrderViews.length + 1}`,
+      createdAt: new Date().toISOString(),
+      filters: {
+        statuses: selectedWorkOrderStatuses,
+        priorities: selectedWorkOrderPriorities,
+        locations: selectedWorkOrderLocations,
+        assets: selectedWorkOrderAssets,
+        assignedTo: selectedWorkOrderAssignedTo,
+        search: workOrderSearchQuery,
+        sortDirection: workOrderSortDirection,
+      },
+    };
+    const nextViews = [nextView, ...savedWorkOrderViews].slice(0, 10);
+    setSavedWorkOrderViews(nextViews);
+    localStorage.setItem('mms_client_work_order_views', JSON.stringify(nextViews));
+    openDashboardConfirmDialog({
+      title: 'View Saved',
+      message: `${nextView.name} was saved for the Work Orders table filters.`,
+      confirmLabel: 'OK',
+      cancelLabel: 'Close',
+      tone: 'primary',
+      onConfirm: closeDashboardConfirmDialog,
+    });
+  }, [
+    closeDashboardConfirmDialog,
+    openDashboardConfirmDialog,
+    savedWorkOrderViews,
+    selectedWorkOrderAssets,
+    selectedWorkOrderAssignedTo,
+    selectedWorkOrderLocations,
+    selectedWorkOrderPriorities,
+    selectedWorkOrderStatuses,
+    workOrderSearchQuery,
+    workOrderSortDirection,
+  ]);
+  const schedulerWorkOrders = React.useMemo(() => {
+    const seen = new Set();
+    return [...pendingRequests, ...workOrders].filter((issue) => {
+      const issueId = String(issue?._id || issue?.id || '');
+      if (!issueId) return true;
+      if (seen.has(issueId)) return false;
+      seen.add(issueId);
+      return true;
+    });
+  }, [pendingRequests, workOrders]);
   const clientTasks = allIssues.flatMap((issue) => {
     const rawTasks = Array.isArray(issue?.tasks) && issue.tasks.length
       ? issue.tasks
@@ -5618,6 +7630,10 @@ function ClientDashboard() {
     const ids = new Set(parseIdList(selectedSchedule.assets));
     const directAssetId = extractId(selectedSchedule.assetId || selectedSchedule.asset);
     if (directAssetId) ids.add(String(directAssetId));
+    (Array.isArray(selectedSchedule.assetsRows) ? selectedSchedule.assetsRows : []).forEach((row) => {
+      const rowAssetId = extractId(row?.assetId);
+      if (rowAssetId) ids.add(String(rowAssetId));
+    });
     return Array.from(ids);
   })() : [];
 
@@ -5626,6 +7642,145 @@ function ClientDashboard() {
       ? assets.filter(a => selectedScheduleAssetIds.includes(String(extractId(a))))
       : [])
     : [];
+
+  const getPmAssignedNames = useCallback((schedule) => {
+    const names = [];
+    const workerPool = [...allWorkers, ...internalTechnicians, ...people];
+    const resolvePersonName = (value) => {
+      const raw = String(value || '').trim();
+      if (!raw) return '';
+      if (!/^[a-f0-9]{24}$/i.test(raw)) return raw;
+      const match = workerPool.find((worker) => String(worker?._id || worker?.id) === raw);
+      return match?.name || '';
+    };
+
+    if (schedule?.technician?.name) names.push(schedule.technician.name);
+    if (schedule?.assignedToName) names.push(schedule.assignedToName);
+    if (schedule?.assignedTo) {
+      const resolved = resolvePersonName(schedule.assignedTo);
+      if (resolved) names.push(resolved);
+    }
+
+    parseIdList(schedule?.employees).forEach((id) => {
+      const resolved = resolvePersonName(id);
+      if (resolved) names.push(resolved);
+    });
+
+    (Array.isArray(schedule?.assetsRows) ? schedule.assetsRows : []).forEach((row) => {
+      const resolved = resolvePersonName(row?.assignee || row?.assignedTo || row?.technicianId);
+      if (resolved) names.push(resolved);
+    });
+
+    return Array.from(new Set(names.filter(Boolean)));
+  }, [allWorkers, internalTechnicians, people]);
+
+  const getPmLocationLabel = useCallback((schedule) => {
+    const assetIds = [
+      ...parseIdList(schedule?.assets),
+      ...(Array.isArray(schedule?.assetsRows) ? schedule.assetsRows.map((row) => extractId(row?.assetId)).filter(Boolean) : []),
+    ];
+    const matchedAsset = assetIds.length
+      ? assets.find((asset) => assetIds.includes(String(extractId(asset))))
+      : null;
+
+    const locationIds = Array.isArray(schedule?.assetsRows)
+      ? schedule.assetsRows.map((row) => String(extractId(row?.locationId) || '')).filter(Boolean)
+      : [];
+    const matchedProperty = locationIds.length
+      ? properties.find((property) => locationIds.includes(String(property?._id || property?.id)))
+      : null;
+
+    return (
+      matchedProperty?.name ||
+      matchedProperty?.title ||
+      matchedProperty?.address ||
+      matchedAsset?.property?.name ||
+      matchedAsset?.propertyName ||
+      matchedAsset?.location?.branchName ||
+      matchedAsset?.location?.building ||
+      matchedAsset?.location ||
+      schedule?.location ||
+      schedule?.propertyName ||
+      schedule?.branchLocation ||
+      schedule?.building ||
+      ''
+    );
+  }, [assets, properties]);
+
+  const selectedScheduleAssetRows = React.useMemo(() => {
+    if (!selectedSchedule) return [];
+    const rows = Array.isArray(selectedSchedule.assetsRows) ? selectedSchedule.assetsRows : [];
+    if (rows.length > 0) {
+      return rows.map((row, idx) => {
+        const assetMatch = assets.find((asset) => String(asset?._id || asset?.id) === String(extractId(row?.assetId) || ''));
+        const locationMatch = properties.find((property) => String(property?._id || property?.id) === String(extractId(row?.locationId) || ''));
+        const assigneeMatch = [...allWorkers, ...internalTechnicians, ...people].find(
+          (person) => String(person?._id || person?.id) === String(row?.assignee || row?.assignedTo || row?.technicianId || '')
+        );
+        return {
+          key: row?.id || `${selectedSchedule?._id || selectedSchedule?.id || 'schedule'}-row-${idx}`,
+          asset: assetMatch || null,
+          assetName: assetMatch?.name || assetMatch?.title || '—',
+          locationName: locationMatch?.name || locationMatch?.title || locationMatch?.address || getPmLocationLabel(selectedSchedule) || '—',
+          rowId: row?.id || row?.locationId || row?.assetId || '—',
+          meter: assetMatch?.meter || assetMatch?.meterReading || assetMatch?.meterValue || '—',
+          startDate: row?.startDate || '',
+          endDate: row?.endDate || '',
+          assigneeName: assigneeMatch?.name || row?.assigneeName || row?.assignee || '—',
+        };
+      });
+    }
+
+    return selectedScheduleAssets.map((asset, idx) => {
+      const property = properties.find((p) => String(p?._id || p?.id) === String(asset?.propertyId || asset?.property?._id || asset?.property?.id || ''));
+      return {
+        key: asset?._id || asset?.id || `${selectedSchedule?._id || selectedSchedule?.id || 'schedule'}-asset-${idx}`,
+        asset,
+        assetName: asset?.name || asset?.title || '—',
+        locationName: property?.name || asset?.property?.name || asset?.propertyName || asset?.location?.branchName || asset?.location?.building || asset?.location || '—',
+        rowId: asset?._id || asset?.id || '—',
+        meter: asset?.meter || asset?.meterReading || asset?.meterValue || '—',
+        startDate: selectedSchedule?.startDate || selectedSchedule?.date || '',
+        endDate: selectedSchedule?.endDate || '',
+        assigneeName: getPmAssignedNames(selectedSchedule).join(', ') || '—',
+      };
+    });
+  }, [allWorkers, assets, getPmAssignedNames, getPmLocationLabel, internalTechnicians, people, properties, selectedSchedule, selectedScheduleAssets]);
+  const selectedScheduleAssetLocationOptions = React.useMemo(
+    () => Array.from(new Set(selectedScheduleAssetRows.map((row) => String(row.locationName || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    [selectedScheduleAssetRows]
+  );
+  const selectedScheduleAssetAssignedOptions = React.useMemo(
+    () => Array.from(new Set(selectedScheduleAssetRows.map((row) => String(row.assigneeName || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    [selectedScheduleAssetRows]
+  );
+  const filteredSelectedScheduleAssetRows = React.useMemo(() => {
+    return selectedScheduleAssetRows.filter((row) => {
+      const location = String(row.locationName || '').trim();
+      const assignedTo = String(row.assigneeName || '').trim();
+      if (selectedScheduleAssetLocations.length > 0 && !selectedScheduleAssetLocations.includes(location)) return false;
+      if (selectedScheduleAssetAssignedTo.length > 0 && !selectedScheduleAssetAssignedTo.includes(assignedTo)) return false;
+      return true;
+    });
+  }, [selectedScheduleAssetAssignedTo, selectedScheduleAssetLocations, selectedScheduleAssetRows]);
+  const selectedScheduleBulkAssigneeOptions = React.useMemo(
+    () => Array.from(
+      new Map(
+        [...allWorkers, ...internalTechnicians, ...people]
+          .map((person) => {
+            const id = String(person?._id || person?.id || person?.userId || '').trim();
+            const name = String(person?.name || person?.fullName || person?.email || '').trim();
+            return id && name ? [id, { id, name }] : null;
+          })
+          .filter(Boolean)
+      ).values()
+    ),
+    [allWorkers, internalTechnicians, people]
+  );
+  const allFilteredSelectedScheduleRowsSelected = React.useMemo(
+    () => filteredSelectedScheduleAssetRows.length > 0 && filteredSelectedScheduleAssetRows.every((row) => selectedScheduleAssetRowKeys.includes(String(row.key))),
+    [filteredSelectedScheduleAssetRows, selectedScheduleAssetRowKeys]
+  );
 
   const selectedScheduleEmployeeIds = selectedSchedule ? parseIdList(selectedSchedule.employees) : [];
   const selectedScheduleAssignees = selectedSchedule ? (() => {
@@ -5642,15 +7797,413 @@ function ClientDashboard() {
     const issueAssetId = extractId(issue.assetId || issue.asset);
     const matchesAsset = issueAssetId && selectedScheduleAssetIds.includes(String(issueAssetId));
     const scheduleName = String(selectedSchedule.name || '').toLowerCase();
+    const scheduleWorkOrderTitle = String(selectedSchedule.workOrderTitle || '').toLowerCase();
     const matchesName = scheduleName
       ? String(issue.title || '').toLowerCase().includes(scheduleName) || String(issue.description || '').toLowerCase().includes(scheduleName)
       : false;
-    return matchesAsset || matchesName;
+    const matchesWorkOrderTitle = scheduleWorkOrderTitle
+      ? String(issue.title || '').toLowerCase().includes(scheduleWorkOrderTitle)
+      : false;
+    return matchesAsset || matchesName || matchesWorkOrderTitle;
   }) : [];
   const selectedScheduleFrequency = selectedSchedule ? formatScheduleFrequency(selectedSchedule) : '';
   const selectedScheduleNextDate = selectedSchedule ? normalizeDate(selectedSchedule.nextDate || selectedSchedule.date) : null;
   const selectedScheduleStatus = selectedSchedule ? (selectedSchedule.status || 'Scheduled') : '';
   const selectedScheduleAssignedLabel = selectedScheduleAssignees.length ? selectedScheduleAssignees.join(', ') : 'Unassigned';
+  const selectedScheduleChecklistGroups = React.useMemo(() => {
+    if (!selectedSchedule) return [];
+    const rawChecklist = Array.isArray(selectedSchedule.checklist)
+      ? selectedSchedule.checklist
+      : Array.isArray(selectedSchedule.tasks)
+        ? selectedSchedule.tasks
+        : [];
+    if (rawChecklist.length === 0) return [];
+
+    const grouped = [];
+    let fallbackItems = [];
+    rawChecklist.forEach((item, idx) => {
+      const normalized = typeof item === 'string' ? { text: item } : (item || {});
+      if (Array.isArray(normalized.items) && normalized.items.length > 0) {
+        grouped.push({
+          id: normalized.id || normalized._id || `group-${idx}`,
+          title: normalized.name || normalized.title || `Checklist ${idx + 1}`,
+          items: normalized.items.map((entry, entryIdx) => typeof entry === 'string'
+            ? { text: entry, type: 'Task', id: `${idx}-${entryIdx}` }
+            : ({ ...entry, id: entry.id || entry._id || `${idx}-${entryIdx}` })),
+        });
+      } else {
+        fallbackItems.push({
+          id: normalized.id || normalized._id || `item-${idx}`,
+          text: normalized.text || normalized.title || normalized.name || `Item ${idx + 1}`,
+          type: normalized.type || 'Task',
+        });
+      }
+    });
+
+    if (fallbackItems.length > 0) {
+      grouped.unshift({
+        id: 'default-checklist',
+        title: selectedSchedule.checklistName || selectedSchedule.templateName || 'Checklist',
+        items: fallbackItems,
+      });
+    }
+    return grouped;
+  }, [selectedSchedule]);
+  useEffect(() => {
+    setPmDetailsExpanded(true);
+  }, [selectedSchedule]);
+  useEffect(() => {
+    setExpandedPmChecklistGroups(() => {
+      const next = {};
+      selectedScheduleChecklistGroups.forEach((group) => {
+        const key = String(group?.id || '');
+        if (key) next[key] = true;
+      });
+      return next;
+    });
+  }, [selectedScheduleChecklistGroups]);
+  const togglePmChecklistGroup = useCallback((groupId) => {
+    const key = String(groupId || '');
+    if (!key) return;
+    setExpandedPmChecklistGroups((prev) => ({
+      ...prev,
+      [key]: prev[key] === false ? true : false,
+    }));
+  }, []);
+  const exportSelectedScheduleAssets = useCallback(() => {
+    if (!selectedSchedule) return;
+    const rows = filteredSelectedScheduleAssetRows.map((row, idx) => ({
+      Index: idx + 1,
+      Schedule: selectedScheduleFrequency || '—',
+      Asset: row.assetName || '—',
+      Location: row.locationName || '—',
+      ID: row.rowId || '—',
+      Meter: row.meter || '—',
+      'Start Date': row.startDate || '—',
+      'End Date': row.endDate || '—',
+      'Assigned To': row.assigneeName || '—',
+    }));
+    const headers = ['Index', 'Schedule', 'Asset', 'Location', 'ID', 'Meter', 'Start Date', 'End Date', 'Assigned To'];
+    const csv = [
+      headers.join(','),
+      ...rows.map((row) => headers.map((header) => `"${String(row[header] ?? '').replace(/"/g, '""')}"`).join(',')),
+    ].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const scheduleName = String(selectedSchedule?.name || 'schedule').trim().replace(/[^a-z0-9]+/gi, '-').toLowerCase();
+    link.href = url;
+    link.download = `${scheduleName || 'schedule'}-assets.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    setShowSelectedScheduleMenu(false);
+  }, [filteredSelectedScheduleAssetRows, selectedSchedule, selectedScheduleFrequency]);
+  const handleOpenPmImportExport = useCallback(() => {
+    setShowSelectedScheduleMenu(false);
+    setSelectedSchedule(null);
+    setActiveTab('imports');
+  }, []);
+  const handleTogglePauseSelectedSchedule = useCallback(async () => {
+    if (!selectedSchedule) return;
+    const scheduleId = selectedSchedule?._id || selectedSchedule?.id;
+    if (!scheduleId) return;
+    const nextPaused = !selectedSchedule?.paused;
+    const requestPayload = {
+      ...selectedSchedule,
+      paused: nextPaused,
+      status: nextPaused
+        ? 'Paused'
+        : (selectedSchedule?.status && String(selectedSchedule.status).toLowerCase() !== 'paused'
+            ? selectedSchedule.status
+            : 'Pending'),
+    };
+    try {
+      const response = await api.put(`/api/maintenance-schedules/${scheduleId}`, requestPayload);
+      const updatedSchedule = response?.data || requestPayload;
+      setMaintenanceSchedules((prev) => prev.map((schedule) => String(schedule?._id || schedule?.id) === String(scheduleId) ? updatedSchedule : schedule));
+      setSelectedSchedule(updatedSchedule);
+      setShowSelectedScheduleMenu(false);
+    } catch (err) {
+      alert(err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Failed to update schedule.');
+    }
+  }, [selectedSchedule]);
+  const handleArchiveSelectedSchedule = useCallback(() => {
+    if (!selectedSchedule) return;
+    const scheduleId = selectedSchedule?._id || selectedSchedule?.id;
+    if (!scheduleId) return;
+    setShowSelectedScheduleMenu(false);
+    openDashboardConfirmDialog({
+      title: 'Archive Schedule?',
+      message: 'Archiving this PM schedule hides it from the active view, but keeps the record for later reference.',
+      confirmLabel: 'Archive',
+      cancelLabel: 'Cancel',
+      tone: 'danger',
+      onConfirm: async () => {
+        try {
+          const requestPayload = {
+            ...selectedSchedule,
+            archived: true,
+            status: 'ARCHIVED',
+          };
+          const response = await api.put(`/api/maintenance-schedules/${scheduleId}`, requestPayload);
+          const updatedSchedule = response?.data || requestPayload;
+          setMaintenanceSchedules((prev) => prev.map((schedule) => String(schedule?._id || schedule?.id) === String(scheduleId) ? updatedSchedule : schedule));
+          setSelectedSchedule(updatedSchedule);
+          closeDashboardConfirmDialog();
+        } catch (err) {
+          alert(err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Archive failed');
+        }
+      },
+    });
+  }, [closeDashboardConfirmDialog, openDashboardConfirmDialog, selectedSchedule]);
+  const handleDeleteSelectedSchedule = useCallback(() => {
+    if (!selectedSchedule) return;
+    const scheduleId = selectedSchedule?._id || selectedSchedule?.id;
+    if (!scheduleId) return;
+    setShowSelectedScheduleMenu(false);
+    openDashboardConfirmDialog({
+      title: 'Delete Schedule?',
+      message: 'Deleting this schedule removes it permanently. This action cannot be undone.',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      tone: 'danger',
+      onConfirm: async () => {
+        try {
+          await api.delete(`/api/maintenance-schedules/${scheduleId}`);
+          setMaintenanceSchedules((prev) => prev.filter((schedule) => String(schedule?._id || schedule?.id) !== String(scheduleId)));
+          setSelectedSchedule(null);
+          closeDashboardConfirmDialog();
+        } catch (err) {
+          alert(err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Delete failed');
+        }
+      },
+    });
+  }, [closeDashboardConfirmDialog, openDashboardConfirmDialog, selectedSchedule]);
+  const handleDeleteSelectedScheduleRow = useCallback((rowKey) => {
+    if (!selectedSchedule) return;
+    const scheduleId = selectedSchedule?._id || selectedSchedule?.id;
+    if (!scheduleId) return;
+    const currentRows = Array.isArray(selectedSchedule?.assetsRows) ? selectedSchedule.assetsRows : [];
+    if (currentRows.length <= 1) {
+      alert('Keep at least one asset row on this PM schedule.');
+      return;
+    }
+    setOpenSelectedScheduleRowMenuKey('');
+    openDashboardConfirmDialog({
+      title: 'Delete Asset Row?',
+      message: 'This removes the selected asset assignment from the PM schedule.',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      tone: 'danger',
+      onConfirm: async () => {
+        try {
+          const nextRows = currentRows.filter((row, idx) => {
+            const key = String(row?.id || `${scheduleId}-row-${idx}`);
+            return key !== String(rowKey);
+          });
+          const requestPayload = {
+            ...selectedSchedule,
+            assetsRows: nextRows,
+            assetsCount: nextRows.length,
+          };
+          const response = await api.put(`/api/maintenance-schedules/${scheduleId}`, requestPayload);
+          const updatedSchedule = response?.data || requestPayload;
+          setMaintenanceSchedules((prev) => prev.map((schedule) => String(schedule?._id || schedule?.id) === String(scheduleId) ? updatedSchedule : schedule));
+          setSelectedSchedule(updatedSchedule);
+          closeDashboardConfirmDialog();
+        } catch (err) {
+          alert(err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Failed to delete asset row.');
+        }
+      },
+    });
+  }, [closeDashboardConfirmDialog, openDashboardConfirmDialog, selectedSchedule]);
+  const applyBulkSelectedScheduleAssignee = useCallback(async () => {
+    if (!selectedSchedule || !selectedScheduleBulkAssignee) return;
+    const scheduleId = selectedSchedule?._id || selectedSchedule?.id;
+    if (!scheduleId) return;
+    const currentRows = Array.isArray(selectedSchedule?.assetsRows) ? selectedSchedule.assetsRows : [];
+    if (currentRows.length === 0 || selectedScheduleAssetRowKeys.length === 0) return;
+    try {
+      const nextRows = currentRows.map((row, idx) => {
+        const key = String(row?.id || `${scheduleId}-row-${idx}`);
+        if (!selectedScheduleAssetRowKeys.includes(key)) return row;
+        return {
+          ...row,
+          assignee: selectedScheduleBulkAssignee,
+          assignedTo: selectedScheduleBulkAssignee,
+          technicianId: selectedScheduleBulkAssignee,
+        };
+      });
+      const requestPayload = {
+        ...selectedSchedule,
+        assetsRows: nextRows,
+        assetsCount: nextRows.length,
+      };
+      const response = await api.put(`/api/maintenance-schedules/${scheduleId}`, requestPayload);
+      const updatedSchedule = response?.data || requestPayload;
+      setMaintenanceSchedules((prev) => prev.map((schedule) => String(schedule?._id || schedule?.id) === String(scheduleId) ? updatedSchedule : schedule));
+      setSelectedSchedule(updatedSchedule);
+      setShowSelectedScheduleBulkAssign(false);
+      setSelectedScheduleBulkAssignee('');
+      setSelectedScheduleAssetRowKeys([]);
+    } catch (err) {
+      alert(err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Failed to update assignee.');
+    }
+  }, [selectedSchedule, selectedScheduleAssetRowKeys, selectedScheduleBulkAssignee]);
+
+  const selectedScheduleActivityEntries = React.useMemo(() => {
+    if (!selectedSchedule) return [];
+    return [
+      {
+        id: 'created',
+        actor: selectedSchedule.createdByName || selectedSchedule.createdBy || userName || 'User',
+        action: 'Created PM',
+        timestamp: selectedSchedule.createdAt || selectedSchedule.updatedAt || null,
+      },
+      ...(Array.isArray(selectedSchedule.activity) ? selectedSchedule.activity.map((entry, idx) => ({
+        id: entry.id || entry._id || `activity-${idx}`,
+        actor: entry.actor || entry.user || entry.name || 'User',
+        action: entry.action || entry.message || 'Updated PM',
+        timestamp: entry.timestamp || entry.createdAt || entry.date || null,
+      })) : []),
+    ];
+  }, [selectedSchedule, userName]);
+  const getPmChecklistLabel = useCallback((schedule) => {
+    return (
+      schedule?.checklistName ||
+      schedule?.checklist?.name ||
+      schedule?.checklistTitle ||
+      schedule?.templateName ||
+      '-'
+    );
+  }, []);
+
+  const getPmChecklistId = useCallback((schedule) => {
+    return (
+      schedule?.checklistId ||
+      schedule?.checklist?.id ||
+      schedule?.checklist?._id ||
+      schedule?.templateId ||
+      '-'
+    );
+  }, []);
+
+  const pmPriorityOptions = ['HIGH', 'MEDIUM', 'LOW', 'NONE'];
+  const pmAssignedOptions = React.useMemo(
+    () => Array.from(new Set(
+      [...allWorkers, ...internalTechnicians, ...people]
+        .map((person) => String(person?.name || '').trim())
+        .filter(Boolean)
+    )).sort((a, b) => String(a).localeCompare(String(b))),
+    [allWorkers, internalTechnicians, people]
+  );
+  const pmLocationOptions = React.useMemo(
+    () => Array.from(new Set(
+      [
+        ...properties.map((property) => String(property?.name || property?.title || property?.address || '').trim()),
+        ...assets.map((asset) => String(asset?.property?.name || asset?.propertyName || asset?.location?.branchName || asset?.location?.building || '').trim()),
+      ].filter(Boolean)
+    )).sort((a, b) => String(a).localeCompare(String(b))),
+    [properties, assets]
+  );
+  const totalActivePmFilters =
+    selectedPmAssignedTo.length +
+    selectedPmLocations.length +
+    selectedPmPriorities.length;
+  const filteredMaintenanceSchedules = React.useMemo(() => {
+    const query = String(pmSearchQuery || '').trim().toLowerCase();
+    const filtered = maintenanceSchedules.filter((schedule) => {
+      const assignedNames = getPmAssignedNames(schedule);
+      const location = getPmLocationLabel(schedule);
+      const priority = String(schedule?.priority || 'NONE').toUpperCase();
+      const checklistLabel = getPmChecklistLabel(schedule);
+      const checklistId = getPmChecklistId(schedule);
+
+      if (selectedPmAssignedTo.length > 0 && !assignedNames.some((name) => selectedPmAssignedTo.includes(name))) return false;
+      if (selectedPmLocations.length > 0 && !selectedPmLocations.includes(location)) return false;
+      if (selectedPmPriorities.length > 0 && !selectedPmPriorities.includes(priority)) return false;
+
+      if (!query) return true;
+      const haystack = [
+        schedule?.name,
+        schedule?.title,
+        schedule?.workOrderTitle,
+        schedule?.description,
+        schedule?.category,
+        priority,
+        location,
+        assignedNames.join(' '),
+        checklistLabel,
+        checklistId,
+      ].join(' ').toLowerCase();
+      return haystack.includes(query);
+    });
+
+    return [...filtered].sort((a, b) => {
+      const aTime = new Date(a.createdAt || a.updatedAt || 0).getTime();
+      const bTime = new Date(b.createdAt || b.updatedAt || 0).getTime();
+      return pmSortDirection === 'asc' ? aTime - bTime : bTime - aTime;
+    });
+  }, [
+    getPmAssignedNames,
+    getPmChecklistId,
+    getPmChecklistLabel,
+    getPmLocationLabel,
+    maintenanceSchedules,
+    pmSearchQuery,
+    pmSortDirection,
+    selectedPmAssignedTo,
+    selectedPmLocations,
+    selectedPmPriorities,
+  ]);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('mms_client_pm_views');
+      const parsed = raw ? JSON.parse(raw) : [];
+      setSavedPmViews(Array.isArray(parsed) ? parsed : []);
+    } catch {
+      setSavedPmViews([]);
+    }
+  }, []);
+
+  const saveCurrentPmView = useCallback(() => {
+    const nextView = {
+      id: `pm-view-${Date.now()}`,
+      name: `View ${savedPmViews.length + 1}`,
+      createdAt: new Date().toISOString(),
+      filters: {
+        assignedTo: selectedPmAssignedTo,
+        locations: selectedPmLocations,
+        priorities: selectedPmPriorities,
+        search: pmSearchQuery,
+        sortDirection: pmSortDirection,
+      },
+    };
+    const nextViews = [nextView, ...savedPmViews].slice(0, 10);
+    setSavedPmViews(nextViews);
+    localStorage.setItem('mms_client_pm_views', JSON.stringify(nextViews));
+    openDashboardConfirmDialog({
+      title: 'View Saved',
+      message: `${nextView.name} was saved for the Preventive Maintenance table filters.`,
+      confirmLabel: 'OK',
+      cancelLabel: 'Close',
+      tone: 'primary',
+      onConfirm: closeDashboardConfirmDialog,
+    });
+  }, [
+    closeDashboardConfirmDialog,
+    openDashboardConfirmDialog,
+    pmSearchQuery,
+    pmSortDirection,
+    savedPmViews,
+    selectedPmAssignedTo,
+    selectedPmLocations,
+    selectedPmPriorities,
+  ]);
+
   const startEditingAsset = useCallback((asset) => {
     if (!asset) return;
     const blocksSource = asset.blocks ?? asset.block ?? asset.location?.block;
@@ -6748,79 +9301,868 @@ function ClientDashboard() {
 
           {activeTab === 'preventiveMaintenance' && (
             <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div className="text-2xl font-bold text-gray-900">Preventive Maintenance</div>
-                <div className="flex items-center gap-3 flex-wrap justify-end">
-                  <button className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold shadow hover:bg-blue-700" onClick={startNewPm}>Create PM</button>
-                </div>
-              </div>
+              {selectedSchedule && (
+                <div className="overflow-hidden rounded-[24px] border border-gray-200 bg-white shadow-sm">
+                  <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+                    <div className="flex items-center gap-4">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedSchedule(null);
+                          setScheduleDetailTab('assets');
+                        }}
+                        className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50"
+                      >
+                        <ChevronLeft className="h-5 w-5" />
+                      </button>
+                      <div className="text-2xl font-bold text-gray-900">{selectedSchedule.name || 'Preventive Maintenance'}</div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        className="rounded-xl border border-gray-300 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                        onClick={() => openEditPmDetails(selectedSchedule)}
+                      >
+                        Edit Details
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
+                        onClick={() => openEditPmAssets(selectedSchedule)}
+                      >
+                        Add Asset
+                      </button>
+                      <div className="relative" ref={selectedScheduleMenuRef}>
+                        <button
+                          type="button"
+                          className="rounded-lg p-2 text-gray-500 hover:bg-gray-100"
+                          onClick={() => setShowSelectedScheduleMenu((prev) => !prev)}
+                        >
+                          <MoreHorizontal className="h-5 w-5" />
+                        </button>
+                        {showSelectedScheduleMenu && (
+                          <div className="absolute right-0 top-11 z-30 w-64 overflow-hidden rounded-2xl border border-gray-200 bg-white py-2 shadow-2xl">
+                            <button type="button" onClick={handleOpenPmImportExport} className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50">
+                              <ArrowUpDown className="h-4 w-4 text-gray-500" />
+                              <span>Import/Export</span>
+                            </button>
+                            <button type="button" onClick={exportSelectedScheduleAssets} className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50">
+                              <Download className="h-4 w-4 text-gray-500" />
+                              <span>Export Filtered View</span>
+                            </button>
+                            <div className="my-1 border-t border-gray-100" />
+                            <button type="button" onClick={handleTogglePauseSelectedSchedule} className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50">
+                              <Clock className="h-4 w-4 text-gray-500" />
+                              <span>{selectedSchedule?.paused ? 'Resume' : 'Pause'}</span>
+                            </button>
+                            <button type="button" onClick={handleArchiveSelectedSchedule} className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50">
+                              <Archive className="h-4 w-4 text-gray-500" />
+                              <span>Archive</span>
+                            </button>
+                            <button type="button" onClick={handleDeleteSelectedSchedule} className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-rose-600 hover:bg-rose-50">
+                              <Trash2 className="h-4 w-4 text-rose-600" />
+                              <span>Delete</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
 
-              <div className="flex items-center gap-3 flex-wrap">
-                {['Filters', 'Assigned To', 'Location', 'Priority'].map(label => (
-                  <button key={label} className="inline-flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 bg-white hover:bg-gray-50 shadow-sm">
-                    <SlidersHorizontal className="w-4 h-4 text-gray-500" />
-                    {label}
-                    <ChevronDown className="w-3 h-3 text-gray-400" />
-                  </button>
-                ))}
-                <button className="text-sm font-semibold text-blue-700">Reset Filters</button>
-                <div className="flex items-center gap-2 text-sm text-gray-600 ml-auto">
-                  <button className="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg hover:bg-gray-50">Sort: Date Created</button>
-                  <button className="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg hover:bg-gray-50">Columns</button>
-                  <div className="relative">
-                    <input placeholder="Search" className="pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg bg-gray-50 w-48" />
-                    <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <div className="flex items-center gap-8 border-b border-gray-200 px-6">
+                    {[
+                      { key: 'assets', label: 'Assets & Locations' },
+                      { key: 'details', label: 'Details' },
+                      { key: 'work-orders', label: 'Work Orders' },
+                    ].map((tab) => (
+                      <button
+                        key={tab.key}
+                        type="button"
+                        onClick={() => setScheduleDetailTab(tab.key)}
+                        className={`border-b-2 py-5 text-sm font-semibold transition-colors ${
+                          scheduleDetailTab === tab.key
+                            ? 'border-blue-600 text-gray-900'
+                            : 'border-transparent text-gray-500 hover:text-gray-900'
+                        }`}
+                      >
+                        {tab.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {scheduleDetailTab === 'assets' && (
+                    <div className="space-y-5 p-6">
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm font-semibold text-gray-900">{filteredSelectedScheduleAssetRows.length} Results Returned</div>
+                        <button type="button" className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                          <LayoutDashboard className="h-4 w-4" />
+                          Columns
+                        </button>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-3">
+                        <button type="button" className="inline-flex h-11 items-center gap-2 rounded-2xl border border-gray-300 bg-white px-4 text-[15px] font-medium text-gray-700 shadow-sm hover:bg-gray-50">
+                          <SlidersHorizontal className="h-4 w-4" />
+                          Filters
+                        </button>
+                        <div ref={selectedScheduleAssetLocationFilterRef} className="relative">
+                          <FilterButton
+                            icon={MapPin}
+                            label="Location"
+                            active={selectedScheduleAssetLocations.length > 0}
+                            count={selectedScheduleAssetLocations.length || undefined}
+                            onClick={() => setSelectedScheduleAssetPopover(selectedScheduleAssetPopover === 'location' ? null : 'location')}
+                          />
+                          <FilterPopover
+                            anchorRef={selectedScheduleAssetLocationFilterRef}
+                            isOpen={selectedScheduleAssetPopover === 'location'}
+                            onClose={() => setSelectedScheduleAssetPopover(null)}
+                            title="Location"
+                            className="w-80"
+                          >
+                            <div className="space-y-3">
+                              <div className="relative">
+                                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                                <input
+                                  value={selectedScheduleAssetLocationSearch}
+                                  onChange={(e) => setSelectedScheduleAssetLocationSearch(e.target.value)}
+                                  placeholder="Search"
+                                  className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-3 text-sm outline-none focus:border-blue-500"
+                                />
+                              </div>
+                              <div className="max-h-[220px] space-y-1 overflow-y-auto">
+                                {selectedScheduleAssetLocationOptions
+                                  .filter((location) => location.toLowerCase().includes(selectedScheduleAssetLocationSearch.toLowerCase()))
+                                  .map((location) => (
+                                    <label key={location} className="flex items-center gap-3 rounded-lg p-2 hover:bg-gray-50">
+                                      <input
+                                        type="checkbox"
+                                        checked={selectedScheduleAssetLocations.includes(location)}
+                                        onChange={(e) => {
+                                          const next = e.target.checked
+                                            ? [...selectedScheduleAssetLocations, location]
+                                            : selectedScheduleAssetLocations.filter((value) => value !== location);
+                                          setSelectedScheduleAssetLocations(next);
+                                        }}
+                                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                      />
+                                      <span className="text-sm font-medium text-gray-700">{location}</span>
+                                    </label>
+                                  ))}
+                              </div>
+                            </div>
+                          </FilterPopover>
+                        </div>
+                        <div ref={selectedScheduleAssetAssignedFilterRef} className="relative">
+                          <FilterButton
+                            icon={Send}
+                            label="Assigned To"
+                            active={selectedScheduleAssetAssignedTo.length > 0}
+                            count={selectedScheduleAssetAssignedTo.length || undefined}
+                            onClick={() => setSelectedScheduleAssetPopover(selectedScheduleAssetPopover === 'assigned' ? null : 'assigned')}
+                          />
+                          <FilterPopover
+                            anchorRef={selectedScheduleAssetAssignedFilterRef}
+                            isOpen={selectedScheduleAssetPopover === 'assigned'}
+                            onClose={() => setSelectedScheduleAssetPopover(null)}
+                            title="Assigned To"
+                            className="w-80"
+                          >
+                            <div className="space-y-3">
+                              <div className="relative">
+                                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                                <input
+                                  value={selectedScheduleAssetAssignedSearch}
+                                  onChange={(e) => setSelectedScheduleAssetAssignedSearch(e.target.value)}
+                                  placeholder="Search"
+                                  className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-3 text-sm outline-none focus:border-blue-500"
+                                />
+                              </div>
+                              <div className="max-h-[220px] space-y-1 overflow-y-auto">
+                                {selectedScheduleAssetAssignedOptions
+                                  .filter((assignedTo) => assignedTo.toLowerCase().includes(selectedScheduleAssetAssignedSearch.toLowerCase()))
+                                  .map((assignedTo) => (
+                                    <label key={assignedTo} className="flex items-center gap-3 rounded-lg p-2 hover:bg-gray-50">
+                                      <input
+                                        type="checkbox"
+                                        checked={selectedScheduleAssetAssignedTo.includes(assignedTo)}
+                                        onChange={(e) => {
+                                          const next = e.target.checked
+                                            ? [...selectedScheduleAssetAssignedTo, assignedTo]
+                                            : selectedScheduleAssetAssignedTo.filter((value) => value !== assignedTo);
+                                          setSelectedScheduleAssetAssignedTo(next);
+                                        }}
+                                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                      />
+                                      <span className="text-sm font-medium text-gray-700">{assignedTo}</span>
+                                    </label>
+                                  ))}
+                              </div>
+                            </div>
+                          </FilterPopover>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedScheduleAssetPopover(null);
+                            setSelectedScheduleAssetLocationSearch('');
+                            setSelectedScheduleAssetAssignedSearch('');
+                            setSelectedScheduleAssetLocations([]);
+                            setSelectedScheduleAssetAssignedTo([]);
+                          }}
+                          className="text-[15px] font-medium text-blue-600 hover:text-blue-700"
+                        >
+                          Reset Filters
+                        </button>
+                        {selectedScheduleAssetRowKeys.length > 0 && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => openEditPmRecord(selectedSchedule)}
+                              className="inline-flex h-11 items-center gap-2 rounded-2xl border border-blue-300 bg-blue-50 px-4 text-[15px] font-medium text-blue-700 shadow-sm hover:bg-blue-100"
+                            >
+                              <Edit className="h-4 w-4" />
+                              Update Schedule
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setShowSelectedScheduleBulkAssign((prev) => !prev)}
+                              className="inline-flex h-11 items-center gap-2 rounded-2xl border border-gray-300 bg-white px-4 text-[15px] font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+                            >
+                              <Send className="h-4 w-4" />
+                              Assign To
+                            </button>
+                          </>
+                        )}
+                        <button type="button" className="ml-auto text-[15px] font-medium text-gray-700 hover:text-gray-900">Save View</button>
+                      </div>
+                      {selectedScheduleAssetRowKeys.length > 0 && showSelectedScheduleBulkAssign && (
+                        <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
+                          <div className="text-sm font-semibold text-gray-700">{selectedScheduleAssetRowKeys.length} selected</div>
+                          <select
+                            value={selectedScheduleBulkAssignee}
+                            onChange={(e) => setSelectedScheduleBulkAssignee(e.target.value)}
+                            className="h-11 min-w-[220px] rounded-xl border border-gray-300 bg-white px-4 text-sm text-gray-700"
+                          >
+                            <option value="">Select assignee...</option>
+                            {selectedScheduleBulkAssigneeOptions.map((person) => (
+                              <option key={person.id} value={person.id}>{person.name}</option>
+                            ))}
+                          </select>
+                          <button
+                            type="button"
+                            onClick={applyBulkSelectedScheduleAssignee}
+                            disabled={!selectedScheduleBulkAssignee}
+                            className="inline-flex h-11 items-center rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+                          >
+                            Apply Assignee
+                          </button>
+                        </div>
+                      )}
+
+                      <div className="overflow-hidden rounded-2xl border border-gray-200">
+                        <div className="overflow-x-auto">
+                          <table className="min-w-[1100px] w-full text-sm">
+                            <thead className="border-b border-gray-200 bg-white">
+                              <tr className="text-left text-gray-900">
+                                <th className="px-6 py-4 w-10">
+                                  <input
+                                    type="checkbox"
+                                    className="h-4 w-4 rounded border-gray-300"
+                                    checked={allFilteredSelectedScheduleRowsSelected}
+                                    onChange={(e) => {
+                                      const filteredKeys = filteredSelectedScheduleAssetRows.map((row) => String(row.key));
+                                      if (e.target.checked) {
+                                        setSelectedScheduleAssetRowKeys((prev) => Array.from(new Set([...prev, ...filteredKeys])));
+                                      } else {
+                                        setSelectedScheduleAssetRowKeys((prev) => prev.filter((key) => !filteredKeys.includes(key)));
+                                      }
+                                    }}
+                                  />
+                                </th>
+                                <th className="px-6 py-4 font-bold">Schedule</th>
+                                <th className="px-6 py-4 font-bold">Last Work Order</th>
+                                <th className="px-6 py-4 font-bold">Next Due Date</th>
+                                <th className="px-6 py-4 font-bold">Next Trigger</th>
+                                <th className="px-6 py-4 font-bold">Start Date</th>
+                                <th className="px-6 py-4 font-bold">End Date</th>
+                                <th className="px-6 py-4 font-bold">Assigned To</th>
+                                <th className="px-6 py-4 w-12"></th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-200">
+                              {filteredSelectedScheduleAssetRows.length === 0 ? (
+                                <tr>
+                                  <td colSpan="9" className="px-6 py-12 text-center text-sm text-gray-500">No assets assigned yet.</td>
+                                </tr>
+                              ) : (
+                                filteredSelectedScheduleAssetRows.map((row) => {
+                                  const lastWorkOrder = selectedScheduleWorkOrders.find((issue) => {
+                                    const issueAssetId = extractId(issue.assetId || issue.asset);
+                                    const rowAssetId = extractId(row.asset?._id || row.asset?.id || row.asset);
+                                    return rowAssetId ? String(issueAssetId || '') === String(rowAssetId) : true;
+                                  }) || selectedScheduleWorkOrders[0];
+                                  const nextDueDate = normalizeDate(row.endDate || selectedSchedule.nextDate || selectedSchedule.date);
+                                  const nextTriggerDate = normalizeDate(
+                                    lastWorkOrder?.createdAt ||
+                                    lastWorkOrder?.fixDeadline ||
+                                    lastWorkOrder?.dueDate ||
+                                    row.startDate ||
+                                    selectedSchedule.startDate ||
+                                    selectedSchedule.date
+                                  );
+                                  return (
+                                    <tr key={row.key} className="hover:bg-gray-50/70">
+                                      <td className="px-6 py-5">
+                                        <input
+                                          type="checkbox"
+                                          className="h-4 w-4 rounded border-gray-300"
+                                          checked={selectedScheduleAssetRowKeys.includes(String(row.key))}
+                                          onChange={(e) => {
+                                            const key = String(row.key);
+                                            setSelectedScheduleAssetRowKeys((prev) => e.target.checked ? [...prev, key] : prev.filter((entry) => entry !== key));
+                                          }}
+                                        />
+                                      </td>
+                                      <td className="px-6 py-5 text-[15px] text-gray-800">{selectedScheduleFrequency || 'Every 1 day'}</td>
+                                      <td className="px-6 py-5 text-[15px] text-blue-600">
+                                        {lastWorkOrder ? (
+                                          <button
+                                            type="button"
+                                            onClick={() => setModalData({ open: true, type: 'issue', item: lastWorkOrder })}
+                                            className="hover:underline"
+                                          >
+                                            {normalizeDate(lastWorkOrder.fixDeadline || lastWorkOrder.dueDate || lastWorkOrder.createdAt)?.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' }) || (lastWorkOrder.woNumber ? `#${lastWorkOrder.woNumber}` : String(lastWorkOrder._id || lastWorkOrder.id || '').slice(-3))}
+                                          </button>
+                                        ) : '-'}
+                                      </td>
+                                      <td className="px-6 py-5 text-[15px] text-gray-800">
+                                        {nextDueDate ? nextDueDate.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' }) : '-'}
+                                      </td>
+                                      <td className="px-6 py-5 text-[15px] text-gray-800">
+                                        {nextTriggerDate ? nextTriggerDate.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' }) : '-'}
+                                      </td>
+                                      <td className="px-6 py-5 text-[15px] text-gray-800">
+                                        {normalizeDate(row.startDate)?.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' }) || '-'}
+                                      </td>
+                                      <td className="px-6 py-5 text-[15px] text-gray-800">
+                                        {normalizeDate(row.endDate)?.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' }) || '-'}
+                                      </td>
+                                      <td className="px-6 py-5 text-[15px] text-gray-800">{row.assigneeName || '-'}</td>
+                                      <td className="px-6 py-5 text-right text-gray-500">
+                                        <div className="relative inline-block text-left">
+                                          <button
+                                            type="button"
+                                            className="rounded-md p-1 hover:bg-gray-100"
+                                            onClick={() => setOpenSelectedScheduleRowMenuKey((prev) => prev === String(row.key) ? '' : String(row.key))}
+                                          >
+                                            <MoreHorizontal className="h-5 w-5" />
+                                          </button>
+                                          {openSelectedScheduleRowMenuKey === String(row.key) && (
+                                            <div className="absolute right-0 top-9 z-20 w-64 overflow-hidden rounded-2xl border border-gray-200 bg-white py-2 shadow-2xl">
+                                              <button
+                                                type="button"
+                                                onClick={() => {
+                                                  setOpenSelectedScheduleRowMenuKey('');
+                                                  openEditPmRecord(selectedSchedule);
+                                                }}
+                                                className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50"
+                                              >
+                                                <Edit className="h-4 w-4 text-gray-500" />
+                                                <span>Edit</span>
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={async () => {
+                                                  setOpenSelectedScheduleRowMenuKey('');
+                                                  await handleTogglePauseSelectedSchedule();
+                                                }}
+                                                className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50"
+                                              >
+                                                <Clock className="h-4 w-4 text-gray-500" />
+                                                <span>{selectedSchedule?.paused ? 'Resume' : 'Pause'}</span>
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={() => {
+                                                  setOpenSelectedScheduleRowMenuKey('');
+                                                  handleDeleteSelectedScheduleRow(row.key);
+                                                }}
+                                                className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-rose-600 hover:bg-rose-50"
+                                              >
+                                                <Trash2 className="h-4 w-4 text-rose-600" />
+                                                <span>Delete</span>
+                                              </button>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  );
+                                })
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {scheduleDetailTab === 'details' && (
+                    <div className="grid gap-6 p-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+                      <div className="space-y-6">
+                        <div className="rounded-2xl border border-gray-200 bg-white p-6">
+                          <div className="flex items-start justify-between gap-4">
+                            <div>
+                              <div className="text-[32px] font-semibold text-gray-900">{selectedSchedule.name || 'Preventive Maintenance'}</div>
+                              <div className="mt-2 text-xl text-gray-500">{selectedSchedule.description || selectedSchedule.workOrderDescription || '-'}</div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className="inline-flex items-center rounded-lg border border-rose-300 bg-rose-50 px-4 py-1.5 text-[15px] font-medium text-rose-600">
+                                {String(selectedSchedule.priority || 'Medium').replace(/^./, (char) => char.toUpperCase())}
+                              </span>
+                              <button
+                                type="button"
+                                className="inline-flex items-center gap-2 text-[15px] font-medium text-gray-800 hover:text-gray-900"
+                                onClick={() => openEditPmDetails(selectedSchedule)}
+                              >
+                                <Edit className="h-5 w-5" />
+                                Edit Details
+                              </button>
+                              <button
+                                type="button"
+                                aria-label={pmDetailsExpanded ? 'Collapse details' : 'Expand details'}
+                                className="rounded-lg p-2 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                                onClick={() => setPmDetailsExpanded((prev) => !prev)}
+                              >
+                                <ChevronDown className={`h-5 w-5 transition-transform ${pmDetailsExpanded ? '' : '-rotate-90'}`} />
+                              </button>
+                            </div>
+                          </div>
+
+                          {pmDetailsExpanded && (
+                            <div className="mt-8 border-t border-gray-200 pt-6">
+                              <div className="grid gap-4 md:grid-cols-2">
+                                <div>
+                                  <div className="text-sm text-gray-500">Category</div>
+                                  <div className="mt-2 text-[15px] font-medium text-gray-900">{selectedSchedule.category || 'Preventive'}</div>
+                                </div>
+                                <div>
+                                  <div className="text-sm text-gray-500">Estimate Time</div>
+                                  <div className="mt-2 text-[15px] font-medium text-gray-900">
+                                    {toNumber(selectedSchedule.durationHours) > 0
+                                      ? `${toNumber(selectedSchedule.durationHours)} hour${toNumber(selectedSchedule.durationHours) === 1 ? '' : 's'} 0 minutes`
+                                      : '—'}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {selectedScheduleChecklistGroups.length > 0 ? selectedScheduleChecklistGroups.map((group) => (
+                          <div key={group.id} className="rounded-2xl border border-gray-200 bg-white p-6">
+                            <div className="flex items-center justify-between gap-4">
+                              <div className="text-[18px] font-semibold text-gray-900">{group.title}</div>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  className="inline-flex items-center gap-2 text-[15px] font-medium text-gray-800 hover:text-gray-900"
+                                  onClick={() => openEditPmDetails(selectedSchedule)}
+                                >
+                                  <Edit className="h-5 w-5" />
+                                  Edit Checklist
+                                </button>
+                                <button
+                                  type="button"
+                                  aria-label={(expandedPmChecklistGroups[String(group.id)] ?? true) ? 'Collapse checklist' : 'Expand checklist'}
+                                  className="rounded-lg p-2 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                                  onClick={() => togglePmChecklistGroup(group.id)}
+                                >
+                                  <ChevronDown className={`h-5 w-5 transition-transform ${(expandedPmChecklistGroups[String(group.id)] ?? true) ? '' : '-rotate-90'}`} />
+                                </button>
+                              </div>
+                            </div>
+                            {(expandedPmChecklistGroups[String(group.id)] ?? true) && (
+                              <div className="mt-6 divide-y divide-gray-200 border-t border-gray-200">
+                                {group.items.map((item, itemIndex) => (
+                                  <div key={item.id || `${group.id}-${itemIndex}`} className="grid grid-cols-[1fr_auto] gap-4 py-4">
+                                    <div className="text-[15px] font-medium text-gray-900">
+                                      {itemIndex + 1}. {item.text || item.title || item.name || `Item ${itemIndex + 1}`}
+                                    </div>
+                                    <div className="text-[15px] font-semibold text-gray-500">{item.type || 'Task'}</div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )) : (
+                          <div className="rounded-2xl border border-gray-200 bg-white p-6 text-sm text-gray-500">No checklist details available.</div>
+                        )}
+                      </div>
+
+                      <div className="rounded-2xl border border-gray-200 bg-white p-6">
+                        <div className="text-[18px] font-semibold text-gray-900">Activity</div>
+                        <div className="mt-6 space-y-6">
+                          {selectedScheduleActivityEntries.length === 0 ? (
+                            <div className="text-sm text-gray-500">No activity yet.</div>
+                          ) : (
+                            selectedScheduleActivityEntries.map((entry) => (
+                              <div key={entry.id} className="flex items-start gap-4">
+                                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500 text-xl font-semibold text-white">
+                                  {String(entry.actor || 'U').trim().charAt(0).toUpperCase()}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <div className="text-[15px] font-semibold text-gray-900">{entry.actor}</div>
+                                    <div className="text-[15px] text-gray-500">
+                                      {entry.timestamp ? new Date(entry.timestamp).toLocaleString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''}
+                                    </div>
+                                  </div>
+                                  <div className="mt-1 text-[15px] text-gray-800">{entry.action}</div>
+                                </div>
+                                <button type="button" className="text-rose-500 hover:text-rose-600">
+                                  <Trash2 className="h-5 w-5" />
+                                </button>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {scheduleDetailTab === 'work-orders' && (
+                    <div className="space-y-5 p-6">
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm font-semibold text-gray-900">{selectedScheduleWorkOrders.length} Results Returned</div>
+                        <div className="flex items-center gap-4">
+                          <button type="button" className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                            <ArrowUpDown className="h-4 w-4" />
+                            Sort: Date Created
+                          </button>
+                          <button type="button" className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                            <LayoutDashboard className="h-4 w-4" />
+                            Columns
+                          </button>
+                          <div className="relative">
+                            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                            <input
+                              readOnly
+                              placeholder="Search"
+                              className="h-10 w-72 rounded-lg border border-gray-200 bg-white pl-10 pr-4 text-sm text-gray-700 outline-none"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-3">
+                        <button type="button" className="inline-flex h-11 items-center gap-2 rounded-2xl border border-gray-300 bg-white px-4 text-[15px] font-medium text-gray-700 shadow-sm hover:bg-gray-50">
+                          <SlidersHorizontal className="h-4 w-4" />
+                          Filters
+                        </button>
+                        <button type="button" className="inline-flex h-11 items-center gap-2 rounded-2xl border border-gray-300 bg-white px-4 text-[15px] font-medium text-gray-700 shadow-sm hover:bg-gray-50">
+                          <AlertCircle className="h-4 w-4" />
+                          Status
+                          <ChevronDown className="h-4 w-4" />
+                        </button>
+                        <button type="button" className="inline-flex h-11 items-center gap-2 rounded-2xl border border-gray-300 bg-white px-4 text-[15px] font-medium text-gray-700 shadow-sm hover:bg-gray-50">
+                          <Flag className="h-4 w-4" />
+                          Priority
+                          <ChevronDown className="h-4 w-4" />
+                        </button>
+                        <button type="button" className="inline-flex h-11 items-center gap-2 rounded-2xl border border-gray-300 bg-white px-4 text-[15px] font-medium text-gray-700 shadow-sm hover:bg-gray-50">
+                          <MapPin className="h-4 w-4" />
+                          Location
+                          <ChevronDown className="h-4 w-4" />
+                        </button>
+                        <button type="button" className="inline-flex h-11 items-center gap-2 rounded-2xl border border-gray-300 bg-white px-4 text-[15px] font-medium text-gray-700 shadow-sm hover:bg-gray-50">
+                          <Package className="h-4 w-4" />
+                          Asset
+                          <ChevronDown className="h-4 w-4" />
+                        </button>
+                        <button type="button" className="inline-flex h-11 items-center gap-2 rounded-2xl border border-gray-300 bg-white px-4 text-[15px] font-medium text-gray-700 shadow-sm hover:bg-gray-50">
+                          <AlertCircle className="h-4 w-4" />
+                          Assigned To
+                          <ChevronDown className="h-4 w-4" />
+                        </button>
+                        <button type="button" className="text-[15px] font-medium text-blue-600 hover:text-blue-700">Reset Filters</button>
+                        <button type="button" className="ml-auto text-[15px] font-medium text-gray-700 hover:text-gray-900">Save View</button>
+                      </div>
+
+                      <div className="overflow-hidden rounded-2xl border border-gray-200">
+                        <div className="overflow-x-auto">
+                          <table className="min-w-[1280px] w-full text-sm">
+                            <thead className="border-b border-gray-200 bg-white">
+                              <tr className="text-left text-gray-900">
+                                <th className="px-6 py-4 font-bold">WO #</th>
+                                <th className="px-6 py-4 font-bold">Work Order Title</th>
+                                <th className="px-6 py-4 font-bold">Image</th>
+                                <th className="px-6 py-4 font-bold">Due Date</th>
+                                <th className="px-6 py-4 font-bold">Status</th>
+                                <th className="px-6 py-4 font-bold">Priority</th>
+                                <th className="px-6 py-4 font-bold">Cost</th>
+                                <th className="px-6 py-4 font-bold">Assignees</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-200">
+                              {selectedScheduleWorkOrders.length === 0 ? (
+                                <tr>
+                                  <td colSpan="8" className="px-6 py-12 text-center text-sm text-gray-500">No work orders linked to this schedule yet.</td>
+                                </tr>
+                              ) : (
+                                selectedScheduleWorkOrders.map((issue) => {
+                                  const dueDate = normalizeDate(issue.fixDeadline || issue.dueDate || issue.nextDate);
+                                  const statusLabel = getWorkOrderDisplayStatus(issue);
+                                  const statusColor = statusLabel === 'COMPLETED'
+                                    ? 'bg-emerald-50 text-emerald-700'
+                                    : statusLabel === 'IN PROGRESS'
+                                      ? 'bg-blue-50 text-blue-700'
+                                      : 'bg-white text-gray-700';
+                                  const priorityLabel = String(issue.priority || 'Medium');
+                                  const issueImage = getImageUrl(issue.photo || issue.image || issue.beforeImage || '');
+                                  return (
+                                    <tr
+                                      key={issue._id || issue.id}
+                                      className="cursor-pointer hover:bg-gray-50/70"
+                                      onClick={() => setModalData({ open: true, type: 'issue', item: issue })}
+                                    >
+                                      <td className="px-6 py-4 text-[32px] leading-none text-blue-600">{String(issue.woNumber || issue.sequenceNumber || issue._id || issue.id || '').slice(-3)}</td>
+                                      <td className="px-6 py-4 text-[15px] text-gray-900">{issue.title || 'Work Order'}</td>
+                                      <td className="px-6 py-4">
+                                        {issueImage ? (
+                                          <img src={issueImage} alt={issue.title || 'Work order'} className="h-12 w-12 rounded border border-gray-200 object-cover" />
+                                        ) : (
+                                          <div className="flex h-12 w-12 items-center justify-center rounded border border-gray-200 bg-gray-50 text-gray-300">
+                                            <ImageIcon className="h-6 w-6" />
+                                          </div>
+                                        )}
+                                      </td>
+                                      <td className="px-6 py-4 text-[15px] text-gray-900">
+                                        {dueDate ? `${dueDate.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' })} - ${dueDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}` : '-'}
+                                      </td>
+                                      <td className="px-6 py-4">
+                                        <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-[15px] font-medium ${statusColor}`}>
+                                          {statusLabel === 'IN PROGRESS' ? <ArrowRight className="h-4 w-4" /> : <Clock className="h-4 w-4" />}
+                                          {statusLabel.replace(/_/g, ' ')}
+                                        </span>
+                                      </td>
+                                      <td className="px-6 py-4 text-[15px] text-gray-900">{priorityLabel}</td>
+                                      <td className="px-6 py-4 text-[15px] text-gray-900">-</td>
+                                      <td className="px-6 py-4 text-[15px] text-gray-900">{getAssignedName(issue) || issue.assignedToName || '—'}</td>
+                                    </tr>
+                                  );
+                                })
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+              {!selectedSchedule && (
+                <div className="space-y-6">
+                  <div className="overflow-visible rounded-[24px] border border-gray-200 bg-white shadow-sm">
+                    <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+                      <h2 className="text-2xl font-bold text-gray-900">Preventive Maintenance</h2>
+                      <div className="flex items-center gap-3">
+                        <button className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700" onClick={startNewPm}>Create PM</button>
+                        <button type="button" className="rounded-lg p-2 text-gray-500 hover:bg-gray-100">
+                          <MoreHorizontal className="h-5 w-5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between border-b border-gray-200 px-6 py-3">
+                      <div className="text-sm font-semibold text-gray-900">{filteredMaintenanceSchedules.length} Results Returned</div>
+                      <div className="flex items-center gap-4">
+                        <button type="button" onClick={() => setPmSortDirection((prev) => (prev === 'desc' ? 'asc' : 'desc'))} className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                          <ArrowUpDown className="h-4 w-4" />
+                          Sort: Date Created {pmSortDirection === 'desc' ? '(Newest)' : '(Oldest)'}
+                        </button>
+                        <button type="button" className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                          <LayoutDashboard className="h-4 w-4" />
+                          Columns
+                        </button>
+                        <div className="relative">
+                          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                          <input value={pmSearchQuery} onChange={(e) => setPmSearchQuery(e.target.value)} placeholder="Search" className="h-10 w-72 rounded-lg border border-gray-200 bg-gray-50 pl-10 pr-4 text-sm text-gray-700 outline-none transition focus:border-blue-500" />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="relative z-20 flex flex-wrap items-center gap-3 overflow-visible px-6 py-4">
+                      <button type="button" className={`inline-flex h-11 items-center gap-2 rounded-2xl border px-4 text-[15px] font-medium shadow-sm transition ${totalActivePmFilters > 0 ? 'border-blue-300 bg-blue-50 text-blue-700' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'}`}>
+                        <SlidersHorizontal className="h-4 w-4" />
+                        Filters ({totalActivePmFilters})
+                      </button>
+                      <div ref={pmAssignedFilterRef} className="relative">
+                        <FilterButton icon={Send} label="Assigned To" active={selectedPmAssignedTo.length > 0} count={selectedPmAssignedTo.length || undefined} onClick={() => setPmOpenPopover(pmOpenPopover === 'assigned' ? null : 'assigned')} />
+                        <FilterPopover anchorRef={pmAssignedFilterRef} isOpen={pmOpenPopover === 'assigned'} onClose={() => setPmOpenPopover(null)} title="Assigned To">
+                          <div className="space-y-1">
+                            {pmAssignedOptions.map((assignedTo) => (
+                              <label key={assignedTo} className="flex items-center gap-3 rounded-lg p-2 hover:bg-gray-50">
+                                <input type="checkbox" checked={selectedPmAssignedTo.includes(assignedTo)} onChange={(e) => setSelectedPmAssignedTo(e.target.checked ? [...selectedPmAssignedTo, assignedTo] : selectedPmAssignedTo.filter((value) => value !== assignedTo))} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                                <span className="text-sm font-medium text-gray-700">{assignedTo}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </FilterPopover>
+                      </div>
+                      <div ref={pmLocationFilterRef} className="relative">
+                        <FilterButton icon={MapPin} label="Location" active={selectedPmLocations.length > 0} count={selectedPmLocations.length || undefined} onClick={() => setPmOpenPopover(pmOpenPopover === 'location' ? null : 'location')} />
+                        <FilterPopover anchorRef={pmLocationFilterRef} isOpen={pmOpenPopover === 'location'} onClose={() => setPmOpenPopover(null)} title="Location" className="w-80">
+                          <div className="space-y-3">
+                            <div className="relative">
+                              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                              <input value={pmLocationSearch} onChange={(e) => setPmLocationSearch(e.target.value)} placeholder="Search" className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-3 text-sm outline-none focus:border-blue-500" />
+                            </div>
+                            <div className="max-h-[220px] space-y-1 overflow-y-auto">
+                              {pmLocationOptions.filter((location) => location.toLowerCase().includes(pmLocationSearch.toLowerCase())).map((location) => (
+                                <label key={location} className="flex items-center gap-3 rounded-lg p-2 hover:bg-gray-50">
+                                  <input type="checkbox" checked={selectedPmLocations.includes(location)} onChange={(e) => setSelectedPmLocations(e.target.checked ? [...selectedPmLocations, location] : selectedPmLocations.filter((value) => value !== location))} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                                  <span className="text-sm font-medium text-gray-700">{location}</span>
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        </FilterPopover>
+                      </div>
+                      <div ref={pmPriorityFilterRef} className="relative">
+                        <FilterButton icon={Flag} label="Priority" active={selectedPmPriorities.length > 0} count={selectedPmPriorities.length || undefined} onClick={() => setPmOpenPopover(pmOpenPopover === 'priority' ? null : 'priority')} />
+                        <FilterPopover anchorRef={pmPriorityFilterRef} isOpen={pmOpenPopover === 'priority'} onClose={() => setPmOpenPopover(null)} title="Priority">
+                          <div className="space-y-1">
+                            {pmPriorityOptions.map((priority) => (
+                              <label key={priority} className="flex items-center gap-3 rounded-lg p-2 hover:bg-gray-50">
+                                <input type="checkbox" checked={selectedPmPriorities.includes(priority)} onChange={(e) => setSelectedPmPriorities(e.target.checked ? [...selectedPmPriorities, priority] : selectedPmPriorities.filter((value) => value !== priority))} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                                <span className="text-sm font-medium text-gray-700">{priority}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </FilterPopover>
+                      </div>
+                      <button type="button" onClick={() => { setSelectedPmAssignedTo([]); setSelectedPmLocations([]); setSelectedPmPriorities([]); setPmSearchQuery(''); setPmLocationSearch(''); setPmOpenPopover(null); }} className="text-[15px] font-medium text-blue-600 hover:text-blue-700">Reset Filters</button>
+                      <button type="button" onClick={saveCurrentPmView} className="ml-auto text-[15px] font-medium text-gray-700 hover:text-gray-900">Save View{savedPmViews.length > 0 ? ` (${savedPmViews.length})` : ''}</button>
+                    </div>
+                  </div>
+
+              {filteredMaintenanceSchedules.length === 0 ? (
+                <div className="glass-surface rounded-xl p-12 text-center">
+                  <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-400 text-xl">
+                    <Icon.Templates />
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">No Preventive Maintenance</h3>
+                  <p className="text-gray-600">No preventive maintenance items match the current filters.</p>
+                </div>
+              ) : (
+                <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="min-w-[1280px] w-full text-sm">
+                      <thead className="bg-gray-50 border-b border-gray-200 text-gray-700">
+                        <tr>
+                          <th className="px-4 py-4 text-left w-10"><input type="checkbox" className="rounded border-gray-300" /></th>
+                          <th className="px-4 py-4 text-left font-bold">Name</th>
+                          <th className="px-4 py-4 text-left font-bold">Image</th>
+                          <th className="px-4 py-4 text-left font-bold">Assets & Locations</th>
+                          <th className="px-4 py-4 text-left font-bold">Category</th>
+                          <th className="px-4 py-4 text-left font-bold">Priority</th>
+                          <th className="px-4 py-4 text-left font-bold">Paused</th>
+                          <th className="px-4 py-4 text-left font-bold">Checklist</th>
+                          <th className="px-4 py-4 text-left font-bold">Checklist ID</th>
+                          <th className="px-4 py-4 text-left font-bold">Date Created</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {filteredMaintenanceSchedules.map((pm, idx) => {
+                          const priority = String(pm.priority || 'NONE').toUpperCase();
+                          const checklistLabel = getPmChecklistLabel(pm);
+                          const checklistId = getPmChecklistId(pm);
+                          const assetsCount = parseIdList(pm.assets).length || pm.assetsCount || pm.locationsCount || pm.assets?.length || 1;
+                          const locationLabel = getPmLocationLabel(pm);
+                          const createdAt = pm.createdAt ? new Date(pm.createdAt) : null;
+                          const imagePath = pm.photo || pm.image || pm.assetImage || pm.beforeImage || '';
+                          const imageUrl = imagePath ? getImageUrl(imagePath) : '';
+                          const priorityClass = priority === 'HIGH'
+                            ? 'bg-rose-50 text-rose-700'
+                            : priority === 'MEDIUM'
+                              ? 'bg-amber-50 text-amber-700'
+                              : priority === 'LOW'
+                                ? 'bg-emerald-50 text-emerald-700'
+                                : 'bg-gray-100 text-gray-600';
+                          return (
+                            <tr
+                              key={pm._id || pm.id || idx}
+                              className="cursor-pointer hover:bg-gray-50/70"
+                              onClick={() => {
+                                setSelectedSchedule(pm);
+                                setScheduleDetailTab('assets');
+                              }}
+                            >
+                              <td className="px-4 py-3"><input type="checkbox" className="rounded border-gray-300" /></td>
+                              <td className="px-4 py-3 text-gray-900 font-medium">{pm.name || pm.title || 'Preventive Item'}</td>
+                              <td className="px-4 py-3">
+                                {imageUrl ? (
+                                  <img src={imageUrl} alt={pm.name || pm.title || 'PM'} className="w-14 h-12 rounded object-cover border border-gray-200" />
+                                ) : (
+                                  <div className="w-14 h-12 border border-gray-200 rounded bg-gray-50 flex items-center justify-center text-gray-300">
+                                    <ImageIcon className="w-6 h-6" />
+                                  </div>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 text-gray-700">
+                                <div className="flex items-center justify-between gap-3">
+                                  <span>{assetsCount}</span>
+                                  <ChevronDown className="w-5 h-5 text-gray-700" />
+                                </div>
+                                {locationLabel ? <div className="text-xs text-gray-400">{locationLabel}</div> : null}
+                              </td>
+                              <td className="px-4 py-3 text-gray-700">{pm.category || (pm.routine ? 'Routine' : 'Preventive')}</td>
+                              <td className="px-4 py-3">
+                                <span className={`inline-flex rounded-lg px-3 py-1 text-sm font-medium ${priorityClass}`}>
+                                  {priority.charAt(0)}{priority.slice(1).toLowerCase()}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-gray-700">{pm.paused ? 'Yes' : 'No'}</td>
+                              <td className="px-4 py-3 text-blue-600">{checklistLabel}</td>
+                              <td className="px-4 py-3 text-gray-700">{checklistId}</td>
+                              <td className="px-4 py-3 text-gray-700">
+                                {createdAt && !Number.isNaN(createdAt.getTime())
+                              ? `${createdAt.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' })} - ${createdAt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`
+                                  : '—'}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
-              </div>
-
-              <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50 border-b border-gray-200 text-gray-600">
-                    <tr>
-                      <th className="px-4 py-3 text-left w-10"><input type="checkbox" className="rounded border-gray-300" /></th>
-                      <th className="px-4 py-3 text-left font-bold">Name</th>
-                      <th className="px-4 py-3 text-left font-bold">ID</th>
-                      <th className="px-4 py-3 text-left font-bold">Work Order Title</th>
-                      <th className="px-4 py-3 text-left font-bold">Work Order Description</th>
-                      <th className="px-4 py-3 text-left font-bold">Image</th>
-                      <th className="px-4 py-3 text-left font-bold">Assets & Locations</th>
-                      <th className="px-4 py-3 text-left font-bold">Category</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {maintenanceSchedules.map((pm, idx) => (
-                      <tr key={pm._id || pm.id || idx} className="border-b border-gray-100 hover:bg-gray-50">
-                        <td className="px-4 py-3"><input type="checkbox" className="rounded border-gray-300" /></td>
-                        <td className="px-4 py-3 text-gray-800 font-semibold">{pm.name || pm.title || 'Preventive Item'}</td>
-                        <td className="px-4 py-3 text-gray-600 font-mono text-xs">{String(pm._id || pm.id || '').slice(0, 10)}...</td>
-                        <td className="px-4 py-3 text-gray-800">{pm.workOrderTitle || pm.title || '—'}</td>
-                        <td className="px-4 py-3 text-gray-600">{pm.description || pm.workOrderDescription || '—'}</td>
-                        <td className="px-4 py-3">
-                          <div className="w-10 h-10 border border-gray-200 rounded bg-gray-50 flex items-center justify-center text-gray-400">
-                            <ImageIcon className="w-5 h-5" />
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-gray-700">{pm.assetsCount || pm.locationsCount || pm.assets?.length || 1}</td>
-                        <td className="px-4 py-3 text-gray-700">{pm.category || 'Preventive'}</td>
-                      </tr>
-                    ))}
-                    {maintenanceSchedules.length === 0 && (
-                      <tr><td colSpan={8} className="text-center text-gray-500 py-8">No preventive maintenance items</td></tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
+              )}
             </div>
           )}
           <CreatePmModal
             key={`pm-${pmSessionId}`}
             open={showCreatePm}
             onClose={() => setShowCreatePm(false)}
+            mode={pmModalMode}
+            editingScheduleId={editingPmScheduleId}
+            existingSchedule={editingSchedule}
+            initialAssetRows={pmAssetRowsSeed}
             onAddWorkOrderDetails={() => setShowWorkOrderDetails(true)}
-            onAddCalendar={() => setShowCalendarSchedule(true)}
-            onAddMeter={() => setShowMeterSchedule(true)}
-            onAddCombined={() => setShowCombinedSchedule(true)}
+            onAddCalendar={() => {
+              setPmScheduleEditorMode('add');
+              setShowCalendarSchedule(true);
+            }}
+            onAddMeter={() => {
+              setPmScheduleEditorMode('add');
+              setShowMeterSchedule(true);
+            }}
+            onAddCombined={() => {
+              setPmScheduleEditorMode('add');
+              setShowCombinedSchedule(true);
+            }}
             onCreated={async () => {
               await refreshSchedules();
               setShowCreatePm(false);
@@ -6830,6 +10172,11 @@ function ClientDashboard() {
             workOrderDetails={pmWorkOrder}
             setWorkOrderDetails={setPmWorkOrder}
             scheduleConfig={pmSchedule}
+            setScheduleConfig={setPmSchedule}
+            companyAssets={assets}
+            companyProperties={properties}
+            companyPeople={allWorkers}
+            existingSchedules={maintenanceSchedules}
           />
           <WorkOrderDetailsModal
             open={showWorkOrderDetails}
@@ -6837,6 +10184,82 @@ function ClientDashboard() {
               setShowWorkOrderDetails(false);
               setLaunchChecklistBuilderFromMain(false);
             }}
+            onSave={async (payload) => {
+              if (workOrderDetailsMode === 'edit-pm' && editingWorkOrderId) {
+                const requestPayload = {
+                  name: payload?.pmTitle || payload?.title || selectedSchedule?.name || '',
+                  workOrderTitle: payload?.title || '',
+                  workOrderDescription: payload?.description || '',
+                  description: payload?.description || selectedSchedule?.description || '',
+                  category: payload?.category || selectedSchedule?.category || '',
+                  priority: payload?.priority || selectedSchedule?.priority || 'Medium',
+                  durationHours: payload?.durationHours || '',
+                  requiresSignature: !!payload?.requiresSignature,
+                  createFirstWorkOrder: !!payload?.createNow,
+                  location: payload?.location || selectedSchedule?.location || '',
+                  assetId: payload?.assetId || '',
+                  assetName: payload?.assetName || '',
+                  assignedTo: payload?.assignedTo || '',
+                  additionalResponsibleWorkers: payload?.additionalResponsibleWorkers || '',
+                  team: payload?.team || '',
+                  lineItems: Array.isArray(payload?.lineItems) ? payload.lineItems : [],
+                  tasks: Array.isArray(pmTasks) ? pmTasks : [],
+                  checklist: Array.isArray(pmChecklist) ? pmChecklist : [],
+                  checklistTemplateName: payload?.checklistTemplateName || selectedSchedule?.checklistTemplateName || selectedSchedule?.checklistName || '',
+                  checklistTemplateDescription: payload?.checklistTemplateDescription || selectedSchedule?.checklistTemplateDescription || '',
+                  assetsRows: Array.isArray(selectedSchedule?.assetsRows) ? selectedSchedule.assetsRows : [],
+                  scheduleType: selectedSchedule?.scheduleType || pmSchedule?.scheduleType || null,
+                  calendarRule: selectedSchedule?.calendarRule || pmSchedule?.calendarRule || null,
+                  meterRule: selectedSchedule?.meterRule || pmSchedule?.meterRule || null,
+                  combinedRule: selectedSchedule?.combinedRule || pmSchedule?.combinedRule || null,
+                  nextDate: selectedSchedule?.nextDate || null,
+                  date: selectedSchedule?.date || '',
+                  time: selectedSchedule?.time || '',
+                  status: selectedSchedule?.status || 'Pending',
+                  routine: selectedSchedule?.routine,
+                };
+
+                const response = await api.put(`/api/maintenance-schedules/${editingWorkOrderId}`, requestPayload);
+                const updatedSchedule = response?.data || { ...selectedSchedule, ...requestPayload };
+                setSelectedSchedule(updatedSchedule);
+                await refreshSchedules();
+                setShowWorkOrderDetails(false);
+                setLaunchChecklistBuilderFromMain(false);
+                return;
+              }
+
+              if (workOrderDetailsMode !== 'edit' || !editingWorkOrderId) {
+                setShowWorkOrderDetails(false);
+                setLaunchChecklistBuilderFromMain(false);
+                return;
+              }
+
+              const requestPayload = {
+                title: payload?.title || '',
+                description: payload?.description || '',
+                category: payload?.category || '',
+                priority: payload?.priority || 'Medium',
+                location: payload?.location || '',
+                assetId: payload?.assetId || '',
+                assetName: payload?.assetName || '',
+                dueDate: payload?.dueDate || '',
+                startDate: payload?.startDate || '',
+                assignedTo: payload?.assignedTo || '',
+                additionalResponsibleWorkers: payload?.additionalResponsibleWorkers || '',
+                team: payload?.team || '',
+                durationHours: payload?.durationHours || '',
+                requiresSignature: !!payload?.requiresSignature,
+                lineItems: Array.isArray(payload?.lineItems) ? payload.lineItems : [],
+                checklist: Array.isArray(pmChecklist) ? pmChecklist : [],
+                tasks: Array.isArray(pmTasks) ? pmTasks : [],
+              };
+
+              await api.put(`/api/issues/${editingWorkOrderId}`, requestPayload);
+              await fetchIssues();
+              setShowWorkOrderDetails(false);
+              setLaunchChecklistBuilderFromMain(false);
+            }}
+            mode={workOrderDetailsMode}
             tasks={pmTasks}
             setTasks={setPmTasks}
             workOrderDetails={pmWorkOrder}
@@ -6846,18 +10269,33 @@ function ClientDashboard() {
             checklistLibrary={pmChecklistLibrary}
             setChecklistLibrary={setPmChecklistLibrary}
             companyAssets={assets}
+            companyProperties={properties}
+            technicians={allWorkers}
+            teams={teams}
             onChecklistSaved={refreshChecklists}
             launchChecklistBuilderDirect={launchChecklistBuilderFromMain}
           />
           <CalendarScheduleModal
             resetKey={pmSessionId}
             open={showCalendarSchedule}
-            onClose={() => setShowCalendarSchedule(false)}
+            onClose={() => {
+              setShowCalendarSchedule(false);
+              setPmScheduleEditorMode('add');
+            }}
             scheduleConfig={pmSchedule}
             setScheduleConfig={setPmSchedule}
+            mode={pmScheduleEditorMode}
           />
-          <MeterScheduleModal open={showMeterSchedule} onClose={() => setShowMeterSchedule(false)} />
-          <CombinedScheduleModal open={showCombinedSchedule} onClose={() => setShowCombinedSchedule(false)} />
+          <MeterScheduleModal open={showMeterSchedule} onClose={() => {
+            setShowMeterSchedule(false);
+            setPmScheduleEditorMode('add');
+          }} mode={pmScheduleEditorMode} />
+          <CombinedScheduleModal open={showCombinedSchedule} onClose={() => {
+            setShowCombinedSchedule(false);
+            setPmScheduleEditorMode('add');
+          }} mode={pmScheduleEditorMode} />
+            </div>
+          )}
           {activeTab === 'scheduler' && (
             <ClientSchedulerTab
               workOrders={schedulerWorkOrders}
@@ -6881,33 +10319,276 @@ function ClientDashboard() {
           {/* â”€â”€ Work Orders â”€â”€ */}
           {activeTab === 'workOrders' && (
             <div>
-              <div className="mb-6">
-                <div className="flex items-center justify-between">
+              <div className="mb-6 overflow-visible rounded-[24px] border border-gray-200 bg-white shadow-sm">
+                <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
                   <div>
-                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Work Orders</h2>
-                    <p className="text-gray-600">View and manage approved work orders</p>
+                    <h2 className="text-2xl font-bold text-gray-900">Work Orders</h2>
                   </div>
                   <div className="flex items-center gap-3">
                     <button
                       onClick={openNewWorkOrderDetails}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold shadow-sm hover:bg-blue-700"
+                      className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
                     >
                       Create Work Order
                     </button>
-                    <div className="px-4 py-2 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
-                      <span className="text-blue-700 font-semibold">{workOrders.length} total</span>
+                    <button type="button" className="rounded-lg p-2 text-gray-500 hover:bg-gray-100">
+                      <MoreHorizontal className="h-5 w-5" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between border-b border-gray-200 px-6 py-3">
+                  <div className="text-sm font-semibold text-gray-900">
+                    {filteredClientWorkOrders.length} Results Returned
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <button
+                      type="button"
+                      onClick={() => setWorkOrderSortDirection((prev) => (prev === 'desc' ? 'asc' : 'desc'))}
+                      className="flex items-center gap-2 text-sm font-medium text-gray-700"
+                    >
+                      <ArrowUpDown className="h-4 w-4" />
+                      Sort: Date Created {workOrderSortDirection === 'desc' ? '(Newest)' : '(Oldest)'}
+                    </button>
+                    <button type="button" className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                      <LayoutDashboard className="h-4 w-4" />
+                      Columns
+                    </button>
+                    <div className="relative">
+                      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                      <input
+                        value={workOrderSearchQuery}
+                        onChange={(e) => setWorkOrderSearchQuery(e.target.value)}
+                        placeholder="Search"
+                        className="h-10 w-72 rounded-lg border border-gray-200 bg-gray-50 pl-10 pr-4 text-sm text-gray-700 outline-none transition focus:border-blue-500"
+                      />
                     </div>
                   </div>
                 </div>
+
+                <div className="relative z-20 flex flex-wrap items-center gap-3 overflow-visible px-6 py-4">
+                  <button
+                    type="button"
+                    className={`inline-flex h-11 items-center gap-2 rounded-2xl border px-4 text-[15px] font-medium shadow-sm transition ${
+                      totalActiveWorkOrderFilters > 0
+                        ? 'border-blue-300 bg-blue-50 text-blue-700'
+                        : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    <SlidersHorizontal className="h-4 w-4" />
+                    Filters ({totalActiveWorkOrderFilters})
+                  </button>
+
+                  <div ref={workOrderStatusFilterRef} className="relative">
+                    <FilterButton
+                      icon={AlertCircle}
+                      label={`Status: ${selectedWorkOrderStatuses.length > 0 ? (selectedWorkOrderStatuses.length > 1 ? `${selectedWorkOrderStatuses[0]} +${selectedWorkOrderStatuses.length - 1}` : selectedWorkOrderStatuses[0]) : 'All'}`}
+                      active={selectedWorkOrderStatuses.length > 0}
+                      onClick={() => setWorkOrderOpenPopover(workOrderOpenPopover === 'status' ? null : 'status')}
+                    />
+                    <FilterPopover anchorRef={workOrderStatusFilterRef} isOpen={workOrderOpenPopover === 'status'} onClose={() => setWorkOrderOpenPopover(null)} title="Status">
+                      <div className="space-y-1">
+                        {workOrderStatusOptions.map((status) => (
+                          <label key={status} className="flex items-center gap-3 rounded-lg p-2 hover:bg-gray-50">
+                            <input
+                              type="checkbox"
+                              checked={selectedWorkOrderStatuses.includes(status)}
+                              onChange={(e) => {
+                                const next = e.target.checked
+                                  ? [...selectedWorkOrderStatuses, status]
+                                  : selectedWorkOrderStatuses.filter((value) => value !== status);
+                                setSelectedWorkOrderStatuses(next);
+                              }}
+                              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            <span className="text-sm font-medium text-gray-700">{status}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </FilterPopover>
+                  </div>
+
+                  <div ref={workOrderPriorityFilterRef} className="relative">
+                    <FilterButton
+                      icon={Flag}
+                      label="Priority"
+                      active={selectedWorkOrderPriorities.length > 0}
+                      count={selectedWorkOrderPriorities.length || undefined}
+                      onClick={() => setWorkOrderOpenPopover(workOrderOpenPopover === 'priority' ? null : 'priority')}
+                    />
+                    <FilterPopover anchorRef={workOrderPriorityFilterRef} isOpen={workOrderOpenPopover === 'priority'} onClose={() => setWorkOrderOpenPopover(null)} title="Priority">
+                      <div className="space-y-1">
+                        {workOrderPriorityOptions.map((priority) => (
+                          <label key={priority} className="flex items-center gap-3 rounded-lg p-2 hover:bg-gray-50">
+                            <input
+                              type="checkbox"
+                              checked={selectedWorkOrderPriorities.includes(priority)}
+                              onChange={(e) => {
+                                const next = e.target.checked
+                                  ? [...selectedWorkOrderPriorities, priority]
+                                  : selectedWorkOrderPriorities.filter((value) => value !== priority);
+                                setSelectedWorkOrderPriorities(next);
+                              }}
+                              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            <span className="text-sm font-medium text-gray-700">{priority}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </FilterPopover>
+                  </div>
+
+                  <div ref={workOrderLocationFilterRef} className="relative">
+                    <FilterButton
+                      icon={MapPin}
+                      label="Location"
+                      active={selectedWorkOrderLocations.length > 0}
+                      count={selectedWorkOrderLocations.length || undefined}
+                      onClick={() => setWorkOrderOpenPopover(workOrderOpenPopover === 'location' ? null : 'location')}
+                    />
+                    <FilterPopover anchorRef={workOrderLocationFilterRef} isOpen={workOrderOpenPopover === 'location'} onClose={() => setWorkOrderOpenPopover(null)} title="Location" className="w-80">
+                      <div className="space-y-3">
+                        <div className="relative">
+                          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                          <input
+                            value={workOrderLocationSearch}
+                            onChange={(e) => setWorkOrderLocationSearch(e.target.value)}
+                            placeholder="Search"
+                            className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-3 text-sm outline-none focus:border-blue-500"
+                          />
+                        </div>
+                        <div className="max-h-[220px] space-y-1 overflow-y-auto">
+                          {workOrderLocationOptions
+                            .filter((location) => location.toLowerCase().includes(workOrderLocationSearch.toLowerCase()))
+                            .map((location) => (
+                              <label key={location} className="flex items-center gap-3 rounded-lg p-2 hover:bg-gray-50">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedWorkOrderLocations.includes(location)}
+                                  onChange={(e) => {
+                                    const next = e.target.checked
+                                      ? [...selectedWorkOrderLocations, location]
+                                      : selectedWorkOrderLocations.filter((value) => value !== location);
+                                    setSelectedWorkOrderLocations(next);
+                                  }}
+                                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                />
+                                <span className="text-sm font-medium text-gray-700">{location}</span>
+                              </label>
+                            ))}
+                        </div>
+                      </div>
+                    </FilterPopover>
+                  </div>
+
+                  <div ref={workOrderAssetFilterRef} className="relative">
+                    <FilterButton
+                      icon={Package}
+                      label="Asset"
+                      active={selectedWorkOrderAssets.length > 0}
+                      count={selectedWorkOrderAssets.length || undefined}
+                      onClick={() => setWorkOrderOpenPopover(workOrderOpenPopover === 'asset' ? null : 'asset')}
+                    />
+                    <FilterPopover anchorRef={workOrderAssetFilterRef} isOpen={workOrderOpenPopover === 'asset'} onClose={() => setWorkOrderOpenPopover(null)} title="Asset" className="w-80">
+                      <div className="space-y-3">
+                        <div className="relative">
+                          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                          <input
+                            value={workOrderAssetSearch}
+                            onChange={(e) => setWorkOrderAssetSearch(e.target.value)}
+                            placeholder="Search"
+                            className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-3 text-sm outline-none focus:border-blue-500"
+                          />
+                        </div>
+                        <div className="max-h-[220px] space-y-1 overflow-y-auto">
+                          {workOrderAssetOptions
+                            .filter((asset) => asset.toLowerCase().includes(workOrderAssetSearch.toLowerCase()))
+                            .map((asset) => (
+                              <label key={asset} className="flex items-center gap-3 rounded-lg p-2 hover:bg-gray-50">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedWorkOrderAssets.includes(asset)}
+                                  onChange={(e) => {
+                                    const next = e.target.checked
+                                      ? [...selectedWorkOrderAssets, asset]
+                                      : selectedWorkOrderAssets.filter((value) => value !== asset);
+                                    setSelectedWorkOrderAssets(next);
+                                  }}
+                                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                />
+                                <span className="text-sm font-medium text-gray-700">{asset}</span>
+                              </label>
+                            ))}
+                        </div>
+                      </div>
+                    </FilterPopover>
+                  </div>
+
+                  <div ref={workOrderAssignedFilterRef} className="relative">
+                    <FilterButton
+                      icon={Send}
+                      label="Assigned To"
+                      active={selectedWorkOrderAssignedTo.length > 0}
+                      count={selectedWorkOrderAssignedTo.length || undefined}
+                      onClick={() => setWorkOrderOpenPopover(workOrderOpenPopover === 'assigned' ? null : 'assigned')}
+                    />
+                    <FilterPopover anchorRef={workOrderAssignedFilterRef} isOpen={workOrderOpenPopover === 'assigned'} onClose={() => setWorkOrderOpenPopover(null)} title="Assigned To">
+                      <div className="space-y-1">
+                        {workOrderAssignedOptions.map((assignedTo) => (
+                          <label key={assignedTo} className="flex items-center gap-3 rounded-lg p-2 hover:bg-gray-50">
+                            <input
+                              type="checkbox"
+                              checked={selectedWorkOrderAssignedTo.includes(assignedTo)}
+                              onChange={(e) => {
+                                const next = e.target.checked
+                                  ? [...selectedWorkOrderAssignedTo, assignedTo]
+                                  : selectedWorkOrderAssignedTo.filter((value) => value !== assignedTo);
+                                setSelectedWorkOrderAssignedTo(next);
+                              }}
+                              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            <span className="text-sm font-medium text-gray-700">{assignedTo}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </FilterPopover>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedWorkOrderStatuses([]);
+                      setSelectedWorkOrderPriorities([]);
+                      setSelectedWorkOrderLocations([]);
+                      setSelectedWorkOrderAssets([]);
+                      setSelectedWorkOrderAssignedTo([]);
+                      setWorkOrderSearchQuery('');
+                      setWorkOrderLocationSearch('');
+                      setWorkOrderAssetSearch('');
+                      setWorkOrderOpenPopover(null);
+                    }}
+                    className="text-[15px] font-medium text-blue-600 hover:text-blue-700"
+                  >
+                    Reset Filters
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={saveCurrentWorkOrderView}
+                    className="ml-auto text-[15px] font-medium text-gray-700 hover:text-gray-900"
+                  >
+                    Save View{savedWorkOrderViews.length > 0 ? ` (${savedWorkOrderViews.length})` : ''}
+                  </button>
+                </div>
               </div>
 
-              {workOrders.length === 0 ? (
+              {filteredClientWorkOrders.length === 0 ? (
                 <div className="glass-surface rounded-xl p-12 text-center">
                   <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-400 text-xl">
                     <Icon.Requests />
                   </div>
                   <h3 className="text-xl font-bold text-gray-900 mb-2">No Work Orders</h3>
-                  <p className="text-gray-600">Approved work orders will appear here.</p>
+                  <p className="text-gray-600">No work orders match the current filters.</p>
                 </div>
               ) : (
                 <div className="glass-surface rounded-xl overflow-hidden shadow-2xl border border-gray-200">
@@ -6925,7 +10606,7 @@ function ClientDashboard() {
                         </tr>
                       </thead>
                       <tbody>
-                        {workOrders.map((issue, i) => {
+                        {filteredClientWorkOrders.map((issue, i) => {
                           const due = normalizeDate(issue.fixDeadline || issue.dueDate || issue.nextDate);
                           const isOverdue = due && due < new Date();
                           const imgSrc = imageSrc(issue.photo || issue.image || issue.beforePhoto);
@@ -7088,11 +10769,11 @@ function ClientDashboard() {
                           const isApproved = request.approved || rawStatus === 'APPROVED' || isInProgress;
                           const rawWorkOrderStatus = request.workOrderStatus || request.workOrder?.status || request.workOrderState || request.issueStatus || request.workOrderStatusLabel || '';
                           const normalizedWorkOrder = String(rawWorkOrderStatus || '').toUpperCase();
+                          const hasWorkOrderRef = !!(request.workOrderId || request.workOrderNumber || request.workOrderNo || request.workOrder);
                           const workOrderLabel = normalizedWorkOrder.includes('PROGRESS') ? 'IN PROGRESS'
                             : normalizedWorkOrder.includes('COMPLETE') ? 'COMPLETED'
-                              : normalizedWorkOrder.includes('OPEN') ? 'OPEN'
-                                : (isDeclined ? 'N/A' : 'OPEN');
-                          const hasWorkOrderRef = !!(request.workOrderId || request.workOrderNumber || request.workOrderNo || request.workOrder);
+                            : normalizedWorkOrder.includes('OPEN') ? 'OPEN'
+                                : (hasWorkOrderRef ? 'OPEN' : 'NONE');
                           const statusLabel = isDeclined
                             ? 'DECLINED'
                             : isInProgress
@@ -7107,9 +10788,9 @@ function ClientDashboard() {
                             ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                             : workOrderLabel === 'IN PROGRESS'
                               ? 'bg-blue-50 text-blue-700 border-blue-200'
-                              : workOrderLabel === 'OPEN'
+                            : workOrderLabel === 'OPEN'
                                 ? 'bg-slate-100 text-slate-700 border-slate-200'
-                                : 'bg-gray-50 text-gray-400 border-gray-200';
+                                : 'bg-gray-50 text-gray-500 border-gray-200';
 
                           return (
                             <tr
@@ -7553,15 +11234,23 @@ function ClientDashboard() {
                           <Btn size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setSelectedProperty(p); setPropertyModalOpen(true); }}>View</Btn>
                           <Btn size="sm" variant="danger" onClick={async (e) => {
                             e.stopPropagation();
-                            if (window.confirm('Delete property?')) {
-                              try {
-                                await api.delete(`/api/properties/${p._id || p.id}`);
-                                const r = await api.get('/api/properties');
-                                setProperties(r.data || []);
-                              } catch {
-                                alert('Delete failed');
-                              }
-                            }
+                            openDashboardConfirmDialog({
+                              title: 'Delete Property?',
+                              message: 'Deleting this property removes it permanently. This action cannot be undone.',
+                              confirmLabel: 'Delete',
+                              cancelLabel: 'Cancel',
+                              tone: 'danger',
+                              onConfirm: async () => {
+                                try {
+                                  await api.delete(`/api/properties/${p._id || p.id}`);
+                                  const r = await api.get('/api/properties');
+                                  setProperties(r.data || []);
+                                  closeDashboardConfirmDialog();
+                                } catch {
+                                  alert('Delete failed');
+                                }
+                              },
+                            });
                           }}>Delete</Btn>
                         </div>
                       </Td>,
@@ -8185,14 +11874,22 @@ function ClientDashboard() {
                       <Btn size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); startEditingAsset(asset); }}>Edit</Btn>
                       <Btn size="sm" variant="danger" onClick={async (e) => {
                         e.stopPropagation();
-                        if (window.confirm('Delete this asset?')) {
-                          try {
-                            await api.delete(`/api/assets/${asset._id || asset.id}`);
-                            setAssets(assets.filter(a => (a._id || a.id) !== (asset._id || asset.id)));
-                          } catch {
-                            alert('Delete failed');
-                          }
-                        }
+                        openDashboardConfirmDialog({
+                          title: 'Delete Asset?',
+                          message: 'Deleting this asset removes it permanently. This action cannot be undone.',
+                          confirmLabel: 'Delete',
+                          cancelLabel: 'Cancel',
+                          tone: 'danger',
+                          onConfirm: async () => {
+                            try {
+                              await api.delete(`/api/assets/${asset._id || asset.id}`);
+                              setAssets(assets.filter(a => (a._id || a.id) !== (asset._id || asset.id)));
+                              closeDashboardConfirmDialog();
+                            } catch {
+                              alert('Delete failed');
+                            }
+                          },
+                        });
                       }}>Delete</Btn>
                     </div>
                   </Td>,
@@ -8501,14 +12198,22 @@ function ClientDashboard() {
                       }}>Report Issue</Btn>
                       <Btn size="sm" variant="success" onClick={() => openAssignModal(tech)}>Assign</Btn>
                       <Btn size="sm" variant="danger" onClick={async () => {
-                        if (window.confirm('Delete this technician?')) {
-                          try {
-                            await api.delete(`/api/internal-technicians/${tech._id || tech.id}`);
-                            setInternalTechnicians(internalTechnicians.filter(t => (t._id || t.id) !== (tech._id || tech.id)));
-                          } catch {
-                            alert('Delete failed');
-                          }
-                        }
+                        openDashboardConfirmDialog({
+                          title: 'Delete Technician?',
+                          message: 'Deleting this technician removes it permanently. This action cannot be undone.',
+                          confirmLabel: 'Delete',
+                          cancelLabel: 'Cancel',
+                          tone: 'danger',
+                          onConfirm: async () => {
+                            try {
+                              await api.delete(`/api/internal-technicians/${tech._id || tech.id}`);
+                              setInternalTechnicians(internalTechnicians.filter(t => (t._id || t.id) !== (tech._id || tech.id)));
+                              closeDashboardConfirmDialog();
+                            } catch {
+                              alert('Delete failed');
+                            }
+                          },
+                        });
                       }}>Delete</Btn>
                     </div>
                   </Td>,
@@ -8610,26 +12315,51 @@ function ClientDashboard() {
                       <button
                         type="button"
                         className="px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-                        onClick={() => {
-                          setEditingSchedule(selectedSchedule);
-                          setShowScheduleForm(true);
-                        }}
+                        onClick={() => openEditPmDetails(selectedSchedule)}
                       >
                         Edit Details
                       </button>
                       <button
                         type="button"
                         className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700"
-                        onClick={() => {
-                          setEditingSchedule(selectedSchedule);
-                          setShowScheduleForm(true);
-                        }}
+                        onClick={() => openEditPmAssets(selectedSchedule)}
                       >
                         Add Asset
                       </button>
-                      <button className="h-9 w-9 rounded-lg border border-gray-200 flex items-center justify-center hover:bg-gray-50">
-                        <MoreHorizontal className="w-4 h-4 text-gray-500" />
-                      </button>
+                      <div className="relative" ref={selectedScheduleMenuRef}>
+                        <button
+                          type="button"
+                          className="h-9 w-9 rounded-lg border border-gray-200 flex items-center justify-center hover:bg-gray-50"
+                          onClick={() => setShowSelectedScheduleMenu((prev) => !prev)}
+                        >
+                          <MoreHorizontal className="w-4 h-4 text-gray-500" />
+                        </button>
+                        {showSelectedScheduleMenu && (
+                          <div className="absolute right-0 top-11 z-30 w-64 overflow-hidden rounded-2xl border border-gray-200 bg-white py-2 shadow-2xl">
+                            <button type="button" onClick={handleOpenPmImportExport} className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50">
+                              <ArrowUpDown className="h-4 w-4 text-gray-500" />
+                              <span>Import/Export</span>
+                            </button>
+                            <button type="button" onClick={exportSelectedScheduleAssets} className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50">
+                              <Download className="h-4 w-4 text-gray-500" />
+                              <span>Export Filtered View</span>
+                            </button>
+                            <div className="my-1 border-t border-gray-100" />
+                            <button type="button" onClick={handleTogglePauseSelectedSchedule} className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50">
+                              <Clock className="h-4 w-4 text-gray-500" />
+                              <span>{selectedSchedule?.paused ? 'Resume' : 'Pause'}</span>
+                            </button>
+                            <button type="button" onClick={handleArchiveSelectedSchedule} className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50">
+                              <Archive className="h-4 w-4 text-gray-500" />
+                              <span>Archive</span>
+                            </button>
+                            <button type="button" onClick={handleDeleteSelectedSchedule} className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-rose-600 hover:bg-rose-50">
+                              <Trash2 className="h-4 w-4 text-rose-600" />
+                              <span>Delete</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -8837,19 +12567,26 @@ function ClientDashboard() {
                             <div style={{ display: 'flex', gap: 6 }}>
                               <Btn size="sm" variant="outline" onClick={(e) => {
                                 e.stopPropagation();
-                                setEditingSchedule(schedule);
-                                setShowScheduleForm(true);
+                                openEditPmDetails(schedule);
                               }}>Edit</Btn>
                               <Btn size="sm" variant="danger" onClick={async (e) => {
                                 e.stopPropagation();
-                                if (window.confirm('Delete this schedule?')) {
-                                  try {
-                                    await api.delete(`/api/maintenance-schedules/${sid}`);
-                                    setMaintenanceSchedules(maintenanceSchedules.filter(s => (s._id || s.id) !== sid));
-                                  } catch {
-                                    alert('Delete failed');
-                                  }
-                                }
+                                openDashboardConfirmDialog({
+                                  title: 'Delete Schedule?',
+                                  message: 'Deleting this schedule removes it permanently. This action cannot be undone.',
+                                  confirmLabel: 'Delete',
+                                  cancelLabel: 'Cancel',
+                                  tone: 'danger',
+                                  onConfirm: async () => {
+                                    try {
+                                      await api.delete(`/api/maintenance-schedules/${sid}`);
+                                      setMaintenanceSchedules(maintenanceSchedules.filter(s => (s._id || s.id) !== sid));
+                                      closeDashboardConfirmDialog();
+                                    } catch {
+                                      alert('Delete failed');
+                                    }
+                                  },
+                                });
                               }}>Delete</Btn>
                             </div>
                           </Td>,
@@ -8894,9 +12631,51 @@ function ClientDashboard() {
           {activeTab === 'imports' && <ImportExportPanel />}
 
         </div>
+          
       </main>
 
+
       {/* â”€â”€ Submit Request Modal â”€â”€ */}
+      {dashboardConfirmDialog.open && (
+        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/35 p-4">
+          <div className="w-full max-w-[660px] rounded-[22px] border border-gray-200 bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-gray-100 px-8 py-7">
+              <h3 className="text-[28px] font-bold text-gray-900">{dashboardConfirmDialog.title}</h3>
+              <button type="button" onClick={closeDashboardConfirmDialog} className="rounded-md p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-700">
+                <X className="h-8 w-8" strokeWidth={1.8} />
+              </button>
+            </div>
+            <div className="px-8 py-10">
+              <p className="whitespace-pre-line text-[18px] leading-10 text-gray-700">{dashboardConfirmDialog.message}</p>
+            </div>
+            <div className="flex justify-end gap-3 px-8 pb-8">
+              <button
+                type="button"
+                onClick={closeDashboardConfirmDialog}
+                className="rounded-lg border border-gray-300 bg-white px-7 py-3 text-[16px] font-medium text-gray-800 hover:bg-gray-50"
+              >
+                {dashboardConfirmDialog.cancelLabel}
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (typeof dashboardConfirmDialog.onConfirm === 'function') {
+                    await dashboardConfirmDialog.onConfirm();
+                  } else {
+                    closeDashboardConfirmDialog();
+                  }
+                }}
+                className={`rounded-lg px-7 py-3 text-[16px] font-semibold text-white ${
+                  dashboardConfirmDialog.tone === 'danger' ? 'bg-rose-600 hover:bg-rose-700' : 'bg-blue-600 hover:bg-blue-700'
+                }`}
+              >
+                {dashboardConfirmDialog.confirmLabel}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showWorkOrderModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="glass-surface-strong rounded-3xl w-full max-w-5xl max-h-[92vh] overflow-hidden border border-white/40 shadow-2xl">
@@ -9044,7 +12823,9 @@ function ClientDashboard() {
         teams={teams}
         workOrders={workOrders}
         people={people}
+        contacts={contactPeople}
         onPrivateMessage={openPrivateMessageComposer}
+        onEditWorkOrder={openEditWorkOrderDetails}
       />
       <CommentModal
         open={commentModal.open}
@@ -11609,6 +15390,14 @@ const ClientContactsTab = ({ type = 'vendor' }) => {
   const fileRef = useRef(null);
   const [showAddEntry, setShowAddEntry] = useState(false);
   const [creatingEntry, setCreatingEntry] = useState(false);
+  const [contactsConfirmDialog, setContactsConfirmDialog] = useState({
+    open: false,
+    title: '',
+    message: '',
+    confirmLabel: 'Delete',
+    cancelLabel: 'Cancel',
+    onConfirm: null,
+  });
   const [newEntry, setNewEntry] = useState({
     name: '',
     address: '',
@@ -11668,6 +15457,21 @@ const ClientContactsTab = ({ type = 'vendor' }) => {
     return label.includes('customer') || label.includes('client') || label.includes('requestor');
   });
   const selection = useBulkSelection(filteredEntries, (entry) => entry._id || entry.id);
+
+  const closeContactsConfirmDialog = useCallback(() => {
+    setContactsConfirmDialog((prev) => ({ ...prev, open: false, onConfirm: null }));
+  }, []);
+
+  const openContactsConfirmDialog = useCallback((config) => {
+    setContactsConfirmDialog({
+      open: true,
+      title: config.title || '',
+      message: config.message || '',
+      confirmLabel: config.confirmLabel || 'Delete',
+      cancelLabel: config.cancelLabel || 'Cancel',
+      onConfirm: config.onConfirm || null,
+    });
+  }, []);
 
   const resetEntryForm = () => {
     setNewEntry({
@@ -11821,28 +15625,72 @@ const ClientContactsTab = ({ type = 'vendor' }) => {
       alert(`Skipping ${blockedItems.length} user account(s). Delete users from the Users module.`);
     }
     if (!deletableItems.length) return;
-    if (!window.confirm(`Delete ${deletableItems.length} ${type === 'vendor' ? 'vendor' : 'customer'} record(s)? This cannot be undone.`)) return;
-
-    try {
-      for (const item of deletableItems) {
-        const id = item._id || item.id;
+    openContactsConfirmDialog({
+      title: `Delete ${type === 'vendor' ? 'Vendor' : 'Customer'} Records?`,
+      message: `Delete ${deletableItems.length} ${type === 'vendor' ? 'vendor' : 'customer'} record(s)? This action cannot be undone.`,
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      onConfirm: async () => {
         try {
-          await api.delete(`/api/vendors/${id}`);
-        } catch {
-          await api.delete(`/api/clients/${id}`);
+          for (const item of deletableItems) {
+            const id = item._id || item.id;
+            try {
+              await api.delete(`/api/vendors/${id}`);
+            } catch {
+              await api.delete(`/api/clients/${id}`);
+            }
+          }
+          const removedIds = new Set(deletableItems.map((item) => String(item._id || item.id)));
+          setEntries((prev) => (prev || []).filter((entry) => !removedIds.has(String(entry._id || entry.id))));
+          selection.clear();
+          closeContactsConfirmDialog();
+        } catch (err) {
+          console.error('Failed to delete vendors/customers', err);
+          alert(`Failed to delete selected ${type === 'vendor' ? 'vendors' : 'customers'}: ` + (err.response?.data?.error || err.message));
         }
-      }
-      const removedIds = new Set(deletableItems.map((item) => String(item._id || item.id)));
-      setEntries((prev) => (prev || []).filter((entry) => !removedIds.has(String(entry._id || entry.id))));
-      selection.clear();
-    } catch (err) {
-      console.error('Failed to delete vendors/customers', err);
-      alert(`Failed to delete selected ${type === 'vendor' ? 'vendors' : 'customers'}: ` + (err.response?.data?.error || err.message));
-    }
+      },
+    });
   };
 
   return (
     <div className="flex flex-col gap-6">
+      {contactsConfirmDialog.open && (
+        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/35 p-4">
+          <div className="w-full max-w-[660px] rounded-[22px] border border-gray-200 bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-gray-100 px-8 py-7">
+              <h3 className="text-[28px] font-bold text-gray-900">{contactsConfirmDialog.title}</h3>
+              <button type="button" onClick={closeContactsConfirmDialog} className="rounded-md p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-700">
+                <X className="h-8 w-8" strokeWidth={1.8} />
+              </button>
+            </div>
+            <div className="px-8 py-10">
+              <p className="whitespace-pre-line text-[18px] leading-10 text-gray-700">{contactsConfirmDialog.message}</p>
+            </div>
+            <div className="flex justify-end gap-3 px-8 pb-8">
+              <button
+                type="button"
+                onClick={closeContactsConfirmDialog}
+                className="rounded-lg border border-gray-300 bg-white px-7 py-3 text-[16px] font-medium text-gray-800 hover:bg-gray-50"
+              >
+                {contactsConfirmDialog.cancelLabel}
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (typeof contactsConfirmDialog.onConfirm === 'function') {
+                    await contactsConfirmDialog.onConfirm();
+                  } else {
+                    closeContactsConfirmDialog();
+                  }
+                }}
+                className="rounded-lg bg-rose-600 px-7 py-3 text-[16px] font-semibold text-white hover:bg-rose-700"
+              >
+                {contactsConfirmDialog.confirmLabel}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold text-gray-900">{type === 'vendor' ? 'Vendors' : 'Customers'}</h2>
@@ -12732,6 +16580,29 @@ const ClientSchedulerTab = ({ workOrders = [], technicians = [], assignableTechn
   const [scheduleForm, setScheduleForm] = useState({ techId: '', dueDate: '' });
   const [scheduleSaving, setScheduleSaving] = useState(false);
   const [scheduleError, setScheduleError] = useState('');
+  const [smartScheduleOpen, setSmartScheduleOpen] = useState(false);
+  const [smartScheduleSaving, setSmartScheduleSaving] = useState(false);
+  const [smartScheduleError, setSmartScheduleError] = useState('');
+  const [smartScheduleSelections, setSmartScheduleSelections] = useState({ workOrders: [], techs: [] });
+  const [smartSchedulePage, setSmartSchedulePage] = useState(1);
+  const [smartScheduleSections, setSmartScheduleSections] = useState({
+    when: true,
+    team: true,
+    orders: true
+  });
+  const [smartScheduleForm, setSmartScheduleForm] = useState(() => {
+    const today = new Date();
+    const toInputDate = (date) => {
+      const pad = (n) => String(n).padStart(2, '0');
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+    };
+    return {
+      startDate: toInputDate(today),
+      endDate: toInputDate(today),
+      workdayStart: '08:00',
+      workdayEnd: '17:00'
+    };
+  });
 
   const getIssueDueDate = (issue) => {
     const raw = issue?.fixDeadline || issue?.dueDate || issue?.scheduledFor || issue?.nextDate || issue?.scheduleDate;
@@ -12774,8 +16645,22 @@ const ClientSchedulerTab = ({ workOrders = [], technicians = [], assignableTechn
 
   const totalPages = Math.ceil(filteredUnscheduled.length / cardsPerPage) || 1;
   const currentIssues = filteredUnscheduled.slice((currentPage - 1) * cardsPerPage, currentPage * cardsPerPage);
+  const smartCardsPerPage = 6;
+  const smartScheduleTotalPages = Math.ceil(filteredUnscheduled.length / smartCardsPerPage) || 1;
+  const smartScheduleIssues = filteredUnscheduled.slice((smartSchedulePage - 1) * smartCardsPerPage, smartSchedulePage * smartCardsPerPage);
+  const smartScheduleTeamMembers = (assignableTechnicians?.length ? assignableTechnicians : technicians) || [];
 
-  const timeSlots = ["4:00 PM", "5:00 PM", "6:00 PM", "7:00 PM", "8:00 PM", "9:00 PM", "10:00 PM", "11:00 PM"];
+  const timeSlots = [
+    "2:00 AM",
+    "3:00 AM",
+    "4:00 AM",
+    "5:00 AM",
+    "6:00 AM",
+    "7:00 AM",
+    "8:00 AM",
+    "9:00 AM",
+    "10:00 AM"
+  ];
   const parseSlotHour = (slotLabel) => {
     const [time, meridiem] = slotLabel.split(' ');
     const [hourStr] = time.split(':');
@@ -12849,6 +16734,97 @@ const ClientSchedulerTab = ({ workOrders = [], technicians = [], assignableTechn
   };
 
   const formatDate = (date) => date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  const formatShortDate = (value) => {
+    if (!value) return 'No date';
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return 'No date';
+    return date.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
+  };
+  const formatTimeLabel = (value) => {
+    if (!value) return '8:00 AM';
+    const [hourStr = '0', minuteStr = '00'] = String(value).split(':');
+    let hour = Number(hourStr);
+    const minute = Number(minuteStr) || 0;
+    const suffix = hour >= 12 ? 'PM' : 'AM';
+    hour = hour % 12 || 12;
+    return `${hour}:${String(minute).padStart(2, '0')} ${suffix}`;
+  };
+  const toggleSmartScheduleSelection = (type, value) => {
+    setSmartScheduleSelections((prev) => ({
+      ...prev,
+      [type]: prev[type].includes(value) ? prev[type].filter((entry) => entry !== value) : [...prev[type], value]
+    }));
+  };
+  const toggleSmartScheduleSection = (section) => {
+    setSmartScheduleSections((prev) => ({ ...prev, [section]: !prev[section] }));
+  };
+  const openSmartSchedule = () => {
+    setSmartScheduleError('');
+    setSmartScheduleOpen(true);
+  };
+  const closeSmartSchedule = () => {
+    setSmartScheduleOpen(false);
+    setSmartScheduleError('');
+  };
+  const handleSmartScheduleGenerate = async () => {
+    if (typeof onSchedule !== 'function') {
+      setSmartScheduleError('Scheduling is not available right now.');
+      return;
+    }
+    if (!smartScheduleSelections.workOrders.length) {
+      setSmartScheduleError('Select at least one work order.');
+      return;
+    }
+    if (!smartScheduleSelections.techs.length) {
+      setSmartScheduleError('Select at least one team member.');
+      return;
+    }
+
+    const startDate = new Date(`${smartScheduleForm.startDate}T${smartScheduleForm.workdayStart}:00`);
+    const endDate = new Date(`${smartScheduleForm.endDate}T${smartScheduleForm.workdayEnd}:00`);
+    if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime()) || startDate > endDate) {
+      setSmartScheduleError('Choose a valid date range and workday time window.');
+      return;
+    }
+
+    const selectedIssues = filteredUnscheduled.filter((issue) =>
+      smartScheduleSelections.workOrders.includes(String(issue._id || issue.id))
+    );
+    const selectedTechs = smartScheduleTeamMembers.filter((tech, idx) =>
+      smartScheduleSelections.techs.includes(String(tech._id || tech.id || tech.userId || `tech-${idx}`))
+    );
+    if (!selectedIssues.length || !selectedTechs.length) {
+      setSmartScheduleError('Your selections no longer match the available work orders or team members.');
+      return;
+    }
+
+    const rangeStart = startDate.getTime();
+    const rangeEnd = endDate.getTime();
+    const windowMinutes = Math.max(30, Math.floor((rangeEnd - rangeStart) / 60000));
+
+    try {
+      setSmartScheduleSaving(true);
+      setSmartScheduleError('');
+      for (let index = 0; index < selectedIssues.length; index += 1) {
+        const issue = selectedIssues[index];
+        const tech = selectedTechs[index % selectedTechs.length];
+        const durationHours = Math.max(1, Number(issue.expectedHours) || 1);
+        const offsetMinutes = Math.min(windowMinutes - 30, index * durationHours * 60);
+        const slotDate = new Date(rangeStart + Math.max(0, offsetMinutes) * 60000);
+        await onSchedule(
+          issue.id || issue._id,
+          tech._id || tech.id || tech.userId,
+          slotDate.toISOString()
+        );
+      }
+      setSmartScheduleOpen(false);
+      setSmartScheduleSelections({ workOrders: [], techs: [] });
+    } catch (err) {
+      setSmartScheduleError(err?.response?.data?.error || err?.message || 'Failed to generate schedule.');
+    } finally {
+      setSmartScheduleSaving(false);
+    }
+  };
 
   const handlePrevDate = () => setCurrentDate(d => { const nd = new Date(d); nd.setDate(nd.getDate() - 1); return nd; });
   const handleNextDate = () => setCurrentDate(d => { const nd = new Date(d); nd.setDate(nd.getDate() + 1); return nd; });
@@ -12856,24 +16832,32 @@ const ClientSchedulerTab = ({ workOrders = [], technicians = [], assignableTechn
 
   return (
     <div className="flex flex-col gap-8 bg-transparent min-h-screen glass-theme-blue">
-      {/* Scheduler Controls */}
-      <div className="flex items-center justify-between">
-        <div className="text-xl font-bold text-gray-900">Scheduler</div>
-        <div className="flex items-center gap-2 flex-wrap justify-end">
-          <button onClick={() => setCurrentPage(1)} className="px-3 py-2 text-sm font-semibold text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50">Back to First</button>
-          <div className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-gray-600 border border-gray-200 rounded-lg bg-white">
-            <span>Page {currentPage} / {totalPages}</span>
-            <ChevronLeft className="w-4 h-4 text-gray-400 cursor-pointer" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} />
-            <ChevronRight className="w-4 h-4 text-gray-400 cursor-pointer" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} />
-          </div>
-          <button className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50"><SlidersHorizontal className="w-4 h-4 text-gray-500" /></button>
-          <button className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50"><Eye className="w-4 h-4 text-gray-500" /></button>
-          <button onClick={() => setShowUnscheduled(!showUnscheduled)} className="px-3 py-2 text-sm font-semibold text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50">{showUnscheduled ? 'Hide Section' : 'Show Section'}</button>
-          <select className="px-3 py-2 text-sm border border-gray-200 rounded-lg text-gray-700">
-            <option>2 rows</option>
-            <option>3 rows</option>
-          </select>
-          <button className="px-4 py-2 text-sm font-bold text-white bg-blue-600 rounded-lg shadow hover:bg-blue-700">Smart Schedule</button>
+      <div className="flex items-center justify-between rounded-2xl border border-gray-200 bg-white px-6 py-4 shadow-sm">
+        <div className="flex items-center gap-4">
+          <button className="rounded-xl border border-gray-200 p-3 text-gray-400 hover:bg-gray-50">
+            <LayoutDashboard className="h-5 w-5" />
+          </button>
+          <h1 className="text-2xl font-bold text-gray-900">Scheduler</h1>
+        </div>
+        <div className="flex items-center gap-4">
+          <button className="rounded-xl border border-gray-200 p-3 text-gray-400 hover:bg-gray-50">
+            <RotateCcw className="h-5 w-5" />
+          </button>
+          <button
+            type="button"
+            disabled
+            className="rounded-xl border border-gray-200 bg-gray-100 px-6 py-3 text-lg font-semibold text-gray-400"
+          >
+            Save Schedule
+          </button>
+          <button
+            type="button"
+            onClick={openSmartSchedule}
+            className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-3 text-lg font-semibold text-white shadow-sm transition hover:bg-blue-700"
+          >
+            <Zap className="h-5 w-5" />
+            Smart Schedule
+          </button>
         </div>
       </div>
 
@@ -12883,12 +16867,16 @@ const ClientSchedulerTab = ({ workOrders = [], technicians = [], assignableTechn
             <h2 className="text-lg font-bold text-gray-900">Unscheduled Work Orders</h2>
             <span className="px-2 py-0.5 bg-gray-100 text-gray-500 rounded text-xs font-bold">{filteredUnscheduled.length}</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3 flex-wrap">
+            <button onClick={() => setCurrentPage(1)} className="inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-5 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50">
+              <RotateCcw className="h-4 w-4" />
+              Back to First
+            </button>
             <div className="flex items-center bg-gray-50 border border-gray-200 rounded-lg px-2 py-1">
               <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="p-1 hover:bg-white rounded transition-colors disabled:opacity-30">
                 <ChevronLeft className="w-4 h-4 text-gray-400" />
               </button>
-              <span className="px-3 text-xs font-bold text-gray-600">Page {currentPage}/{totalPages}</span>
+              <span className="px-3 text-sm font-medium text-gray-600">Page {currentPage}/{totalPages}</span>
               <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="p-1 hover:bg-white rounded transition-colors disabled:opacity-30">
                 <ChevronRight className="w-4 h-4 text-gray-400" />
               </button>
@@ -12937,12 +16925,16 @@ const ClientSchedulerTab = ({ workOrders = [], technicians = [], assignableTechn
               </FilterPopover>
             </div>
 
-            <button className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+            <button className="rounded-xl border border-gray-300 bg-white p-3 hover:bg-gray-50 transition-colors">
               <Eye className="w-4 h-4 text-gray-400" />
             </button>
-            <button onClick={() => setShowUnscheduled(!showUnscheduled)} className="px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-bold text-gray-600 hover:bg-gray-50 transition-colors shadow-sm">
+            <button onClick={() => setShowUnscheduled(!showUnscheduled)} className="rounded-xl border border-gray-300 bg-white px-5 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors shadow-sm">
               {showUnscheduled ? 'Hide Section' : 'Show Section'}
             </button>
+            <select className="rounded-xl border border-gray-300 bg-white px-5 py-3 text-sm font-medium text-gray-700 focus:outline-none">
+              <option>2 rows</option>
+              <option>3 rows</option>
+            </select>
           </div>
         </div>
 
@@ -12965,31 +16957,25 @@ const ClientSchedulerTab = ({ workOrders = [], technicians = [], assignableTechn
                     techId: '',
                     dueDate: toDateTimeLocalValue(getIssueDueDate(issue))
                   });
-                }} className="min-w-[300px] bg-white border border-gray-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer group space-y-3">
+                }} className="min-h-[192px] min-w-[316px] rounded-3xl border border-gray-200 bg-white p-5 shadow-sm transition hover:shadow-md cursor-pointer group">
                   <div className="flex justify-between items-start gap-2">
-                    <span className="text-xs font-bold text-gray-500">#{String(issue._id || issue.id).slice(-4).toUpperCase()}</span>
+                    <span className="text-[18px] font-semibold text-gray-900">#{String(issue._id || issue.id).slice(-4).toUpperCase()}: {issue.title || 'Work Order'}</span>
                     <button type="button" onClick={(e) => e.stopPropagation()} className="p-1 rounded-lg border border-gray-200 text-gray-400 hover:bg-gray-50">
                       <MoreHorizontal className="w-4 h-4" />
                     </button>
                   </div>
-                  <div className="text-sm font-semibold text-gray-900 leading-tight line-clamp-2">{issue.title || 'Work Order'}</div>
-                  <div className="flex flex-wrap gap-2">
-                    <span className="px-2 py-1 text-[11px] font-semibold rounded-full border bg-gray-50 text-gray-700">{statusChip}</span>
-                    <span className="px-2 py-1 text-[11px] font-semibold rounded-full border bg-amber-50 text-amber-700">{assetChip}</span>
-                    <span className="px-2 py-1 text-[11px] font-semibold rounded-full border bg-emerald-50 text-emerald-700">{typeChip}</span>
+                  <div className="mt-16 flex flex-wrap gap-2">
+                    <span className="rounded-lg bg-slate-100 px-3 py-1 text-sm font-medium text-slate-700">{statusChip}</span>
+                    <span className="rounded-lg bg-emerald-100 px-3 py-1 text-sm font-medium text-emerald-700">{typeChip}</span>
                   </div>
-                  <div className="flex items-center justify-between text-[12px] text-gray-500">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-rose-500">▮</span>
-                      {due ? due.toLocaleDateString() : 'No date'}
+                  <div className="mt-2 flex items-center justify-between text-base text-gray-500">
+                    <div className="flex items-center gap-2 text-red-500">
+                      <Flag className="h-4 w-4 fill-current" />
+                      {due ? formatShortDate(due) : 'No date'}
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <Flag className={`w-3 h-3 ${getPriorityColor(issue.priority)} fill-current`} />
-                      <span className="font-semibold text-gray-700">{issue.priority || 'None'}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 text-gray-400" />
-                      <span className="font-semibold text-gray-700">{issue.expectedHours || '1'} hours</span>
+                    <div className="flex items-center gap-2 text-gray-700">
+                      <Clock className="h-4 w-4 text-gray-500" />
+                      <span>{issue.expectedHours || '1'} hours</span>
                     </div>
                   </div>
                 </div>
@@ -13140,87 +17126,346 @@ const ClientSchedulerTab = ({ workOrders = [], technicians = [], assignableTechn
 
       {/* Team schedule grid */}
       <section className="transition-all duration-300">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="text-lg font-bold text-gray-900">Team Schedule</h2>
-            <p className="text-sm text-gray-500">{formatDate(currentDate)}</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button onClick={handlePrevDate} className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50">
-              <ChevronLeft className="w-4 h-4 text-gray-400" />
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-bold text-gray-900">Team Schedule</h2>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center rounded-xl border border-gray-300 bg-white p-1 shadow-sm">
+              <button
+                onClick={handleToday}
+                className="rounded-lg border border-gray-200 bg-white px-5 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Today
+              </button>
+              <div className="flex items-center gap-4 px-4">
+                <ChevronLeft onClick={handlePrevDate} className="h-4 w-4 cursor-pointer text-gray-400 transition-colors hover:text-gray-600" />
+                <span className="min-w-[260px] text-center text-sm font-semibold text-gray-700">{formatDate(currentDate)}</span>
+                <ChevronRight onClick={handleNextDate} className="h-4 w-4 cursor-pointer text-gray-400 transition-colors hover:text-gray-600" />
+              </div>
+            </div>
+            <div className="relative">
+              <AlertCircle className="h-5 w-5 text-gray-300" />
+              <span className="absolute -right-1.5 -top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-indigo-500 text-xs font-bold text-white shadow-sm">2</span>
+            </div>
+            <button className="rounded-xl border border-gray-300 bg-white p-3 hover:bg-gray-50 transition-colors">
+              <SlidersHorizontal className="h-4 w-4 text-gray-400" />
             </button>
-            <button onClick={handleToday} className="px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-bold text-gray-600 hover:bg-gray-50">Today</button>
-            <button onClick={handleNextDate} className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50">
-              <ChevronRight className="w-4 h-4 text-gray-400" />
+            <button className="rounded-xl border border-gray-300 bg-white p-3 hover:bg-gray-50 transition-colors">
+              <Settings className="h-4 w-4 text-gray-400" />
             </button>
-            <select value={viewType} onChange={(e) => setViewType(e.target.value)} className="px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-700">
-              <option>Day</option>
-              <option>Week</option>
-            </select>
+            <div className="relative">
+              <div
+                onClick={() => setSchedulerPopover(schedulerPopover === 'view-type' ? null : 'view-type')}
+                className="flex cursor-pointer items-center gap-2 rounded-xl border border-gray-300 bg-white px-5 py-3 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 capitalize shadow-sm"
+              >
+                <Calendar className="h-4 w-4" />
+                {viewType}
+                <ChevronDown className={`ml-1 h-4 w-4 transition-transform ${schedulerPopover === 'view-type' ? 'rotate-180' : ''}`} />
+              </div>
+
+              <FilterPopover
+                isOpen={schedulerPopover === 'view-type'}
+                onClose={() => setSchedulerPopover(null)}
+                title="Switch View"
+                className="w-48"
+              >
+                <div className="p-1">
+                  {['Day', 'Week', 'Month'].map(v => (
+                    <button
+                      key={v}
+                      onClick={() => { setViewType(v); setSchedulerPopover(null); }}
+                      className={`w-full rounded-lg px-3 py-2 text-left text-xs font-bold transition-colors ${viewType === v ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50'}`}
+                    >
+                      {v}
+                    </button>
+                  ))}
+                </div>
+              </FilterPopover>
+            </div>
           </div>
         </div>
 
-        <div className="overflow-x-auto bg-white border border-gray-200 rounded-2xl shadow-sm">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="w-60 text-left px-4 py-3 text-xs font-bold text-gray-600 uppercase tracking-wider">Team Members</th>
-                {timeSlots.map(slot => (
-                  <th key={slot} className="text-center px-4 py-3 text-xs font-bold text-gray-600 uppercase tracking-wider">{slot}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {technicians.map((tech, idx) => {
+        <div className="flex min-h-[400px] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+          <div className="flex border-b border-gray-200 bg-gray-50">
+            <div className="flex w-[374px] items-center gap-2 px-6 py-5 text-sm font-semibold text-gray-500">
+              <Users className="h-4 w-4" />
+              Team Members
+            </div>
+            {timeSlots.map((slot) => (
+              <div key={slot} className={`flex-1 border-l border-gray-200 py-5 text-center text-[18px] font-semibold ${slot === '5:00 AM' ? 'bg-blue-50 text-blue-600' : 'text-gray-500'}`}>
+                {slot}
+              </div>
+            ))}
+          </div>
+
+          <div className="relative flex-1 overflow-y-auto">
+            {currentDate.toLocaleDateString() === new Date().toLocaleDateString() && (
+              <div className="absolute bottom-0 top-0 left-[calc(374px+33.33%)] z-10 w-px bg-blue-600">
+                <div className="absolute left-1/2 top-0 h-0 w-0 -translate-x-1/2 border-l-[8px] border-r-[8px] border-t-[14px] border-l-transparent border-r-transparent border-t-blue-600" />
+              </div>
+            )}
+
+            <div className="divide-y divide-gray-200">
+              {technicians.length > 0 ? technicians.map((tech, idx) => {
                 const techIssues = scheduledForTech(tech);
+                const slotBuckets = timeSlots.map(() => []);
+                techIssues.forEach((issue) => {
+                  slotBuckets[slotIndexForIssue(issue)].push(issue);
+                });
+
                 return (
-                  <tr key={tech._id || tech.id || idx} className="border-b border-gray-100">
-                    <td className="px-4 py-3">
+                  <div key={tech._id || tech.id || idx} className="flex min-h-[92px] group">
+                    <div className="flex w-[374px] items-center justify-between border-r border-gray-200 px-6 py-5 group-hover:bg-gray-50/50 transition-colors">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-700 font-bold text-sm">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-indigo-50 text-2xl font-semibold text-indigo-600">
                           {(tech.name || tech.fullName || 'T').charAt(0).toUpperCase()}
                         </div>
                         <div>
-                          <div className="text-sm font-bold text-gray-900">{tech.name || tech.fullName || 'Technician'}</div>
-                          <div className="text-[11px] text-gray-500">{tech.role || tech.specialty?.join?.(', ') || '—'}</div>
+                          <p className="line-clamp-1 text-[18px] font-semibold text-gray-900">{tech.name || tech.fullName || 'Technician'}</p>
+                          <p className="text-sm font-medium text-gray-500">{tech.role || tech.specialty?.join?.(', ') || 'Vendor / Customer'}</p>
                         </div>
-                        <span className="ml-auto text-[11px] text-amber-500 font-bold">0%</span>
-                        <span className="w-3 h-3 border border-gray-300 rounded-full inline-block"></span>
                       </div>
-                    </td>
-                    {timeSlots.map((slot, slotIdx) => {
-                      const issueAtSlot = techIssues.find((iss) => {
-                        const due = getIssueDueDate(iss);
-                        if (!due) return false;
-                        return slotIndexForIssue(iss) === slotIdx;
-                      });
-                      return (
-                        <td key={slot} className="h-16 px-2 py-2 text-center align-middle">
-                          {issueAtSlot ? (
-                            <div className={`mx-auto max-w-[120px] p-2 rounded-lg border ${getPriorityPill(issueAtSlot.priority)} shadow-sm text-left`}>
-                              <div className="text-[11px] font-bold text-gray-900 truncate">{issueAtSlot.title || 'Work Order'}</div>
-                              <div className="text-[10px] text-gray-500 truncate">{issueAtSlot.location || issueAtSlot.assetName || 'Not specified'}</div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-2xl font-medium text-amber-600">{techIssues.length ? `${techIssues.length}` : '0'}%</span>
+                        <div className="h-5 w-5 rounded-full border-2 border-gray-300" />
+                      </div>
+                    </div>
+                    {timeSlots.map((slot, slotIdx) => (
+                      <div key={slot} className="flex-1 border-l border-gray-200 bg-gray-50/30 p-2 transition-colors group-hover:bg-gray-50/50">
+                        <div className="flex flex-col gap-2">
+                          {slotBuckets[slotIdx].map((issue) => (
+                            <div
+                              key={issue._id || issue.id || `${slotIdx}-${issue.title}`}
+                              className={`rounded-xl border px-3 py-2 text-xs font-semibold shadow-sm ${getPriorityPill(issue.priority)}`}
+                              title={issue.title}
+                            >
+                              <div className="line-clamp-1">{issue.title}</div>
+                              <div className="mt-0.5 text-[10px] text-gray-500">{issue.location || issue.assetName || 'Scheduled'}</div>
                             </div>
-                          ) : (
-                            <div className="h-8 w-full bg-gray-50 rounded-md border border-gray-100"></div>
-                          )}
-                        </td>
-                      );
-                    })}
-                  </tr>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 );
-              })}
-              {technicians.length === 0 && (
-                <tr>
-                  <td colSpan={1 + timeSlots.length} className="text-center py-8 text-sm text-gray-500">
-                    No technicians yet
-                  </td>
-                </tr>
+              }) : (
+                <div className="p-8 text-center text-sm text-gray-500">No technicians yet</div>
               )}
-            </tbody>
-          </table>
+            </div>
+          </div>
         </div>
       </section>
+      {smartScheduleOpen && (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+          <div className="flex max-h-[92vh] w-full max-w-7xl flex-col overflow-hidden rounded-[28px] bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-5">
+              <h2 className="text-2xl font-bold text-gray-900">Smart Schedule</h2>
+              <button type="button" onClick={closeSmartSchedule} className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto bg-gray-50 px-6 py-8">
+              {smartScheduleError && (
+                <div className="mb-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                  {smartScheduleError}
+                </div>
+              )}
+
+              <div className="space-y-5">
+                <div className="rounded-3xl border border-gray-200 bg-white">
+                  <button type="button" onClick={() => toggleSmartScheduleSection('when')} className="flex w-full items-center justify-between px-6 py-5 text-left">
+                    <div className="flex items-center gap-3">
+                      <ChevronDown className={`h-5 w-5 text-gray-500 transition-transform ${smartScheduleSections.when ? 'rotate-180' : ''}`} />
+                      <span className="text-[18px] font-semibold text-gray-900">When should the work be scheduled?</span>
+                    </div>
+                    <div className="text-right text-sm text-gray-500">
+                      {formatShortDate(smartScheduleForm.startDate)} - {formatShortDate(smartScheduleForm.endDate)} ({formatTimeLabel(smartScheduleForm.workdayStart)} - {formatTimeLabel(smartScheduleForm.workdayEnd)})
+                    </div>
+                  </button>
+                  {smartScheduleSections.when && (
+                    <div className="grid gap-5 border-t border-gray-200 px-6 py-6 md:grid-cols-3">
+                      <div>
+                        <label className="mb-2 block text-sm font-medium text-gray-700">Date Range</label>
+                        <div className="flex items-center gap-3 rounded-xl border border-gray-300 bg-white px-4 py-3">
+                          <Calendar className="h-4 w-4 text-gray-400" />
+                          <input type="date" value={smartScheduleForm.startDate} onChange={(e) => setSmartScheduleForm((prev) => ({ ...prev, startDate: e.target.value }))} className="w-full text-sm text-gray-700 focus:outline-none" />
+                          <span className="text-gray-400">-</span>
+                          <input type="date" value={smartScheduleForm.endDate} onChange={(e) => setSmartScheduleForm((prev) => ({ ...prev, endDate: e.target.value }))} className="w-full text-sm text-gray-700 focus:outline-none" />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="mb-2 block text-sm font-medium text-gray-700">Workday Start Time</label>
+                        <div className="flex items-center gap-3 rounded-xl border border-gray-300 bg-white px-4 py-3">
+                          <Clock className="h-4 w-4 text-gray-400" />
+                          <input type="time" value={smartScheduleForm.workdayStart} onChange={(e) => setSmartScheduleForm((prev) => ({ ...prev, workdayStart: e.target.value }))} className="w-full text-sm text-gray-700 focus:outline-none" />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="mb-2 block text-sm font-medium text-gray-700">Workday End Time</label>
+                        <div className="flex items-center gap-3 rounded-xl border border-gray-300 bg-white px-4 py-3">
+                          <Clock className="h-4 w-4 text-gray-400" />
+                          <input type="time" value={smartScheduleForm.workdayEnd} onChange={(e) => setSmartScheduleForm((prev) => ({ ...prev, workdayEnd: e.target.value }))} className="w-full text-sm text-gray-700 focus:outline-none" />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-3xl border border-gray-200 bg-white">
+                  <button type="button" onClick={() => toggleSmartScheduleSection('team')} className="flex w-full items-center justify-between px-6 py-5 text-left">
+                    <div className="flex items-center gap-3">
+                      <ChevronDown className={`h-5 w-5 text-gray-500 transition-transform ${smartScheduleSections.team ? 'rotate-180' : ''}`} />
+                      <span className="text-[18px] font-semibold text-gray-900">Who should be considered for the schedule?</span>
+                    </div>
+                    <div className="text-sm text-gray-500">{smartScheduleSelections.techs.length} team member(s) selected</div>
+                  </button>
+                  {smartScheduleSections.team && (
+                    <div className="border-t border-gray-200 px-6 py-6">
+                      <div className="mb-4 flex items-center justify-between">
+                        <div className="text-sm text-gray-500">Team Members <span className="ml-2 rounded-lg bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-600">{smartScheduleTeamMembers.length}</span></div>
+                        <button
+                          type="button"
+                          onClick={() => setSmartScheduleSelections((prev) => ({
+                            ...prev,
+                            techs: prev.techs.length === smartScheduleTeamMembers.length
+                              ? []
+                              : smartScheduleTeamMembers.map((tech, idx) => String(tech._id || tech.id || tech.userId || `tech-${idx}`))
+                          }))}
+                          className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                        >
+                          Select page
+                        </button>
+                      </div>
+                      <div className="min-h-[220px] rounded-2xl border border-gray-200 bg-gray-50 p-5">
+                        <div className="flex flex-wrap gap-4">
+                          {smartScheduleTeamMembers.map((tech, idx) => {
+                            const techId = String(tech._id || tech.id || tech.userId || `tech-${idx}`);
+                            const isSelected = smartScheduleSelections.techs.includes(techId);
+                            return (
+                              <button
+                                key={techId}
+                                type="button"
+                                onClick={() => toggleSmartScheduleSelection('techs', techId)}
+                                className={`flex w-[136px] flex-col items-start gap-3 rounded-2xl border bg-white p-4 text-left transition ${isSelected ? 'border-blue-500 ring-2 ring-blue-100' : 'border-gray-200 hover:border-gray-300'}`}
+                              >
+                                <div className="flex w-full items-start justify-between">
+                                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-indigo-50 text-xl font-semibold text-indigo-600">
+                                    {(tech.name || tech.fullName || 'T').charAt(0).toUpperCase()}
+                                  </div>
+                                  <input type="checkbox" readOnly checked={isSelected} className="mt-1 h-5 w-5 rounded border-gray-300 text-blue-600" />
+                                </div>
+                                <div className="text-lg font-medium text-gray-800">{tech.name || tech.fullName || `Technician ${idx + 1}`}</div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-3xl border border-gray-200 bg-white">
+                  <button type="button" onClick={() => toggleSmartScheduleSection('orders')} className="flex w-full items-center justify-between px-6 py-5 text-left">
+                    <div className="flex items-center gap-3">
+                      <ChevronDown className={`h-5 w-5 text-gray-500 transition-transform ${smartScheduleSections.orders ? 'rotate-180' : ''}`} />
+                      <span className="text-[18px] font-semibold text-gray-900">Which work orders should be scheduled?</span>
+                    </div>
+                    <div className="text-sm text-gray-500">{smartScheduleSelections.workOrders.length} work order(s) selected</div>
+                  </button>
+                  {smartScheduleSections.orders && (
+                    <div className="border-t border-gray-200 px-6 py-6">
+                      <div className="mb-4 flex items-center justify-between">
+                        <div className="text-sm text-gray-500">Work Orders <span className="ml-2 rounded-lg bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-600">{filteredUnscheduled.length}</span></div>
+                        <div className="flex items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setSmartScheduleSelections((prev) => ({
+                              ...prev,
+                              workOrders: prev.workOrders.length === smartScheduleIssues.length
+                                ? []
+                                : smartScheduleIssues.map((issue) => String(issue._id || issue.id))
+                            }))}
+                            className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                          >
+                            Select page
+                          </button>
+                          <button type="button" onClick={() => setSmartSchedulePage(1)} className="inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                            <RotateCcw className="h-4 w-4" />
+                            Back to First
+                          </button>
+                          <div className="flex items-center gap-3 text-sm text-gray-600">
+                            <button type="button" onClick={() => setSmartSchedulePage((page) => Math.max(1, page - 1))} className="text-gray-400 hover:text-gray-600">
+                              <ChevronLeft className="h-4 w-4" />
+                            </button>
+                            Page {smartSchedulePage} / {smartScheduleTotalPages}
+                            <button type="button" onClick={() => setSmartSchedulePage((page) => Math.min(smartScheduleTotalPages, page + 1))} className="text-gray-400 hover:text-gray-600">
+                              <ChevronRight className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="min-h-[360px] rounded-2xl border border-gray-200 bg-gray-50 p-5">
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                          {smartScheduleIssues.map((issue) => {
+                            const issueId = String(issue._id || issue.id);
+                            const isSelected = smartScheduleSelections.workOrders.includes(issueId);
+                            const due = getIssueDueDate(issue);
+                            const priorityTone = String(issue.priority || '').toUpperCase() === 'HIGH'
+                              ? 'text-red-500'
+                              : String(issue.priority || '').toUpperCase() === 'MEDIUM'
+                                ? 'text-amber-500'
+                                : 'text-green-600';
+                            return (
+                              <button
+                                key={issueId}
+                                type="button"
+                                onClick={() => toggleSmartScheduleSelection('workOrders', issueId)}
+                                className={`rounded-2xl border bg-white p-5 text-left transition ${isSelected ? 'border-blue-500 ring-2 ring-blue-100' : 'border-gray-200 hover:border-gray-300'}`}
+                              >
+                                <div className="mb-4 flex items-start justify-between gap-3">
+                                  <div className="text-[18px] font-semibold text-gray-900">#{String(issue._id || issue.id).slice(-3).toUpperCase()}: {issue.title || 'Work Order'}</div>
+                                  <input type="checkbox" readOnly checked={isSelected} className="mt-1 h-5 w-5 rounded border-gray-300 text-blue-600" />
+                                </div>
+                                <div className={`mb-3 flex items-center gap-2 text-sm font-medium ${priorityTone}`}>
+                                  <Flag className="h-4 w-4 fill-current" />
+                                  {issue.priority || 'None'}
+                                </div>
+                                <div className="mb-3 flex items-center gap-2 text-sm text-gray-700">
+                                  <Calendar className="h-4 w-4 text-gray-400" />
+                                  {due ? formatShortDate(due) : 'No date'}
+                                </div>
+                                <div className="flex items-center gap-2 text-sm text-gray-700">
+                                  <Clock className="h-4 w-4 text-gray-400" />
+                                  {issue.expectedHours || '1'} hours
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between border-t border-gray-200 bg-white px-6 py-5">
+              <button type="button" onClick={closeSmartSchedule} className="rounded-xl border border-gray-300 bg-white px-5 py-3 text-lg font-medium text-gray-700 hover:bg-gray-50">
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSmartScheduleGenerate}
+                disabled={smartScheduleSaving || !smartScheduleSelections.workOrders.length || !smartScheduleSelections.techs.length}
+                className="rounded-xl bg-blue-600 px-8 py-3 text-lg font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
+              >
+                {smartScheduleSaving ? 'Generating...' : 'Generate'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -13260,17 +17505,112 @@ export default ClientDashboard;
 
 // --- Create PM Modal ---
 // Placed after export for readability; component defined above return usage.
-function CreatePmModal({ open, onClose, onAddWorkOrderDetails, onAddCalendar, onAddMeter, onAddCombined, onCreated, pmTasks, checklist = [], workOrderDetails, setWorkOrderDetails, scheduleConfig }) {
+function CreatePmModal({
+  open,
+  onClose,
+  mode = 'create',
+  editingScheduleId = '',
+  existingSchedule = null,
+  initialAssetRows = [],
+  onAddWorkOrderDetails,
+  onAddCalendar,
+  onAddMeter,
+  onAddCombined,
+  onCreated,
+  pmTasks,
+  checklist = [],
+  workOrderDetails,
+  setWorkOrderDetails,
+  scheduleConfig,
+  setScheduleConfig,
+  companyAssets = [],
+  companyProperties = [],
+  companyPeople = [],
+  existingSchedules = [],
+}) {
   const [showScheduleMenu, setShowScheduleMenu] = React.useState(false);
+  const [showExistingSchedulePicker, setShowExistingSchedulePicker] = React.useState(false);
   const [assetRows, setAssetRows] = React.useState([{ id: 1, assetId: '', locationId: '', startDate: '', endDate: '', timezone: '(UTC+02:00) Africa/Kigali', assignee: '' }]);
   const [creating, setCreating] = React.useState(false);
   const [error, setError] = React.useState('');
   const imageFiles = Array.isArray(workOrderDetails?.imageFiles) ? workOrderDetails.imageFiles : [];
   const attachmentFiles = Array.isArray(workOrderDetails?.attachmentFiles) ? workOrderDetails.attachmentFiles : [];
+  const locationOptions = React.useMemo(
+    () => (companyProperties || [])
+      .map((property) => ({
+        id: String(property?._id || property?.id || ''),
+        label: property?.name || property?.title || property?.address || 'Unnamed location',
+      }))
+      .filter((entry) => entry.id && entry.label),
+    [companyProperties]
+  );
+  const assigneeOptions = React.useMemo(
+    () => Array.from(
+      new Map(
+        (companyPeople || [])
+          .map((person) => {
+            const id = String(person?._id || person?.id || '');
+            const name = String(person?.name || '').trim();
+            return id && name ? [id, { id, name }] : null;
+          })
+          .filter(Boolean)
+      ).values()
+    ),
+    [companyPeople]
+  );
+  const scheduleTemplateOptions = React.useMemo(
+    () => (Array.isArray(existingSchedules) ? existingSchedules : []).filter((schedule) => (
+      schedule?.calendarRule || schedule?.meterRule || schedule?.combinedRule || schedule?.frequency || schedule?.interval
+    )),
+    [existingSchedules]
+  );
+  const getScheduleOptionSummary = React.useCallback((schedule) => {
+    if (schedule?.calendarRule) {
+      return `Every ${schedule.calendarRule.every || 1} ${schedule.calendarRule.unit || 'day'}(s) at ${schedule.calendarRule.time || '09:00'}`;
+    }
+    if (schedule?.meterRule) {
+      return 'Meter-based schedule';
+    }
+    if (schedule?.combinedRule) {
+      return 'Calendar or meter schedule';
+    }
+    if (schedule?.frequency) {
+      return getScheduleFrequencyLabel(schedule);
+    }
+    return 'Saved schedule';
+  }, []);
+  const isAssetMode = mode === 'assets';
+  React.useEffect(() => {
+    if (!open) return;
+    if (Array.isArray(initialAssetRows) && initialAssetRows.length) {
+      setAssetRows(initialAssetRows.map((row, idx) => ({
+        id: row?.id || idx + 1,
+        assetId: String(row?.assetId || ''),
+        locationId: String(row?.locationId || ''),
+        startDate: row?.startDate || '',
+        endDate: row?.endDate || '',
+        timezone: row?.timezone || '(UTC+02:00) Africa/Kigali',
+        assignee: row?.assignee || '',
+      })));
+      return;
+    }
+    setAssetRows([{ id: 1, assetId: '', locationId: '', startDate: '', endDate: '', timezone: '(UTC+02:00) Africa/Kigali', assignee: '' }]);
+  }, [editingScheduleId, initialAssetRows, open]);
 
   const addAssetRow = () => {
     setAssetRows((rows) => [...rows, { id: rows.length + 1, assetId: '', locationId: '', startDate: '', endDate: '', timezone: '(UTC+02:00) Africa/Kigali', assignee: '' }]);
   };
+
+  const getDefaultLocationIdForAsset = React.useCallback((assetId) => {
+    const selectedAsset = (companyAssets || []).find((asset) => String(asset?._id || asset?.id) === String(assetId || ''));
+    return String(
+      selectedAsset?.propertyId ||
+      selectedAsset?.property?._id ||
+      selectedAsset?.property?.id ||
+      selectedAsset?.location?.branchId ||
+      ''
+    );
+  }, [companyAssets]);
 
   const updateAssetRow = (idx, key, value) => {
     setAssetRows((rows) => rows.map((row, i) => (i === idx ? { ...row, [key]: value } : row)));
@@ -13282,22 +17622,24 @@ function CreatePmModal({ open, onClose, onAddWorkOrderDetails, onAddCalendar, on
 
   const handleCreate = async () => {
     setError('');
-    if (!workOrderDetails?.title?.trim()) {
+    if (!isAssetMode && !workOrderDetails?.title?.trim()) {
       setError('Work order title is required.');
       return;
     }
     setCreating(true);
     try {
       const nextDate = assetRows[0]?.startDate || new Date().toISOString();
+      const resolvedPmTitle = workOrderDetails?.pmTitle || existingSchedule?.name || existingSchedule?.title || workOrderDetails?.title || 'Preventive Maintenance';
+      const resolvedWorkOrderTitle = workOrderDetails?.title || existingSchedule?.workOrderTitle || existingSchedule?.title || resolvedPmTitle;
       const payload = {
-        name: workOrderDetails.title || 'Preventive Maintenance',
-        workOrderTitle: workOrderDetails.title,
-        workOrderDescription: workOrderDetails.description,
-        priority: workOrderDetails.priority,
-        category: workOrderDetails.category,
-        durationHours: workOrderDetails.durationHours ? Number(workOrderDetails.durationHours) : undefined,
-        requiresSignature: !!workOrderDetails.requiresSignature,
-        createFirstWorkOrder: !!workOrderDetails.createNow,
+        name: resolvedPmTitle,
+        workOrderTitle: resolvedWorkOrderTitle,
+        workOrderDescription: workOrderDetails?.description || existingSchedule?.workOrderDescription || existingSchedule?.description || '',
+        priority: workOrderDetails?.priority || existingSchedule?.priority || 'Medium',
+        category: workOrderDetails?.category || existingSchedule?.category || 'General',
+        durationHours: workOrderDetails?.durationHours ? Number(workOrderDetails.durationHours) : (existingSchedule?.durationHours || existingSchedule?.estimatedTime || undefined),
+        requiresSignature: !!(workOrderDetails?.requiresSignature || existingSchedule?.requiresSignature || existingSchedule?.signature),
+        createFirstWorkOrder: !!(workOrderDetails?.createNow || existingSchedule?.createFirstWorkOrder),
         tasks: pmTasks || [],
         checklist: checklist || [],
         assetsRows: assetRows,
@@ -13310,7 +17652,17 @@ function CreatePmModal({ open, onClose, onAddWorkOrderDetails, onAddCalendar, on
         status: 'Pending',
       };
       const hasUploads = imageFiles.length > 0 || attachmentFiles.length > 0;
-      if (hasUploads) {
+      if (mode === 'edit' && editingScheduleId) {
+        await api.put(`/api/maintenance-schedules/${editingScheduleId}`, {
+          ...payload,
+          meterRule: existingSchedule?.meterRule || null,
+          combinedRule: existingSchedule?.combinedRule || null,
+          date: existingSchedule?.date || '',
+          time: existingSchedule?.time || '',
+          status: existingSchedule?.status || 'Pending',
+          routine: existingSchedule?.routine ?? true,
+        });
+      } else if (hasUploads) {
         const formData = new FormData();
         Object.entries(payload).forEach(([key, value]) => {
           if (value === undefined || value === null) return;
@@ -13331,7 +17683,7 @@ function CreatePmModal({ open, onClose, onAddWorkOrderDetails, onAddCalendar, on
       if (typeof onCreated === 'function') await onCreated();
       onClose?.();
     } catch (err) {
-      setError(err?.response?.data?.error || err.message || 'Failed to create PM.');
+      setError(err?.response?.data?.error || err.message || (mode === 'edit' ? 'Failed to update PM.' : 'Failed to create PM.'));
     } finally {
       setCreating(false);
     }
@@ -13346,8 +17698,7 @@ function CreatePmModal({ open, onClose, onAddWorkOrderDetails, onAddCalendar, on
             <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100">
               <X className="w-5 h-5 text-gray-500" />
             </button>
-            <div className="text-xl font-bold text-gray-900">Untitled PM</div>
-            <button className="text-sm text-blue-700 hover:underline">Edit</button>
+            <div className="text-xl font-bold text-gray-900">{isAssetMode ? 'Add Assets' : (workOrderDetails?.pmTitle || workOrderDetails?.title || 'Untitled PM')}</div>
           </div>
           <div className="flex items-center gap-3">
             <button onClick={onClose} className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50">Cancel</button>
@@ -13356,89 +17707,109 @@ function CreatePmModal({ open, onClose, onAddWorkOrderDetails, onAddCalendar, on
               onClick={handleCreate}
               disabled={creating}
             >
-              {creating ? 'Creating…' : 'Create PM'}
+              {creating ? (mode === 'edit' || isAssetMode ? 'Saving…' : 'Creating…') : (mode === 'edit' || isAssetMode ? 'Save Changes' : 'Create PM')}
             </button>
           </div>
         </div>
         {error && <div className="px-6 pt-2 text-sm text-rose-600 font-semibold">{error}</div>}
 
-        <div className="grid grid-cols-2 gap-8 px-6 py-6 border-b border-gray-100">
-          <div>
-            <h3 className="text-lg font-bold text-gray-900">Work Order details <span className="text-rose-500">*</span></h3>
-            <p className="text-sm text-gray-600 mb-3">Specify the details of the work order that will be generated by this preventive maintenance trigger.</p>
-            <button
-              className="w-full h-14 border border-gray-300 rounded-lg text-gray-700 text-sm font-semibold hover:border-gray-400"
-              type="button"
-              onClick={() => onAddWorkOrderDetails?.()}
-            >
-              Add Work Order Details
-            </button>
-            {workOrderDetails?.title ? (
-              <div className="mt-3 border border-gray-200 rounded-xl p-4 bg-gray-50">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="font-bold text-gray-900">{workOrderDetails.title}</div>
-                    <div className="text-xs text-gray-600 flex gap-2 items-center mt-1">
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-100 text-[11px] font-semibold">
-                        {workOrderDetails.priority || 'Medium'}
-                      </span>
-                      {workOrderDetails.category && <span className="text-gray-600 text-xs">{workOrderDetails.category}</span>}
+        <div className={`${isAssetMode ? 'px-6 py-6' : 'grid grid-cols-2 gap-8 px-6 py-6 border-b border-gray-100'}`}>
+          {!isAssetMode && (
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">Work Order details <span className="text-rose-500">*</span></h3>
+              <p className="text-sm text-gray-600 mb-3">Specify the details of the work order that will be generated by this preventive maintenance trigger.</p>
+              <button
+                className="w-full h-14 border border-gray-300 rounded-lg text-gray-700 text-sm font-semibold hover:border-gray-400"
+                type="button"
+                onClick={() => onAddWorkOrderDetails?.()}
+              >
+                Add Work Order Details
+              </button>
+              {workOrderDetails?.title ? (
+                <div className="mt-3 border border-gray-200 rounded-xl p-4 bg-gray-50">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="font-bold text-gray-900">{workOrderDetails.title}</div>
+                      <div className="text-xs text-gray-600 flex gap-2 items-center mt-1">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-100 text-[11px] font-semibold">
+                          {workOrderDetails.priority || 'Medium'}
+                        </span>
+                        {workOrderDetails.category && <span className="text-gray-600 text-xs">{workOrderDetails.category}</span>}
+                      </div>
+                      {workOrderDetails.description ? <div className="text-sm text-gray-700 mt-1 line-clamp-2">{workOrderDetails.description}</div> : null}
                     </div>
-                    {workOrderDetails.description ? <div className="text-sm text-gray-700 mt-1 line-clamp-2">{workOrderDetails.description}</div> : null}
+                    <button className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-100" onClick={() => onAddWorkOrderDetails?.()}>Edit</button>
                   </div>
-                  <button className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-100" onClick={() => onAddWorkOrderDetails?.()}>Edit</button>
                 </div>
-              </div>
-            ) : null}
-            <div className="mt-3 space-y-2">
-              <input
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                placeholder="Work Order Title"
-                value={workOrderDetails?.title || ''}
-                onChange={(e) => setWorkOrderDetails?.((w) => ({ ...w, title: e.target.value }))}
-              />
-              <textarea
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm min-h-[80px]"
-                placeholder="Description"
-                value={workOrderDetails?.description || ''}
-                onChange={(e) => setWorkOrderDetails?.((w) => ({ ...w, description: e.target.value }))}
-              />
-              <div className="grid grid-cols-3 gap-2">
-                <select className="border border-gray-300 rounded-lg px-2 py-2 text-sm" value={workOrderDetails?.priority || 'Medium'} onChange={(e) => setWorkOrderDetails?.((w) => ({ ...w, priority: e.target.value }))}>
-                  <option>Medium</option>
-                  <option>High</option>
-                  <option>Low</option>
-                  <option>Urgent</option>
-                </select>
-                <select className="border border-gray-300 rounded-lg px-2 py-2 text-sm" value={workOrderDetails?.category || 'General'} onChange={(e) => setWorkOrderDetails?.((w) => ({ ...w, category: e.target.value }))}>
-                  <option>General</option>
-                  <option>HVAC</option>
-                  <option>Electrical</option>
-                  <option>Plumbing</option>
-                </select>
+              ) : null}
+              <div className="mt-3 space-y-2">
                 <input
-                  className="border border-gray-300 rounded-lg px-2 py-2 text-sm"
-                  placeholder="Duration (hrs)"
-                  value={workOrderDetails?.durationHours || ''}
-                  onChange={(e) => setWorkOrderDetails?.((w) => ({ ...w, durationHours: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  placeholder="Work Order Title"
+                  value={workOrderDetails?.title || ''}
+                  onChange={(e) => setWorkOrderDetails?.((w) => ({ ...w, title: e.target.value }))}
                 />
+                <textarea
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm min-h-[80px]"
+                  placeholder="Description"
+                  value={workOrderDetails?.description || ''}
+                  onChange={(e) => setWorkOrderDetails?.((w) => ({ ...w, description: e.target.value }))}
+                />
+                <div className="grid grid-cols-3 gap-2">
+                  <select className="border border-gray-300 rounded-lg px-2 py-2 text-sm" value={workOrderDetails?.priority || 'Medium'} onChange={(e) => setWorkOrderDetails?.((w) => ({ ...w, priority: e.target.value }))}>
+                    <option>Medium</option>
+                    <option>High</option>
+                    <option>Low</option>
+                    <option>Urgent</option>
+                  </select>
+                  <select className="border border-gray-300 rounded-lg px-2 py-2 text-sm" value={workOrderDetails?.category || 'General'} onChange={(e) => setWorkOrderDetails?.((w) => ({ ...w, category: e.target.value }))}>
+                    <option>General</option>
+                    <option>HVAC</option>
+                    <option>Electrical</option>
+                    <option>Plumbing</option>
+                  </select>
+                  <input
+                    className="border border-gray-300 rounded-lg px-2 py-2 text-sm"
+                    placeholder="Duration (hrs)"
+                    value={workOrderDetails?.durationHours || ''}
+                    onChange={(e) => setWorkOrderDetails?.((w) => ({ ...w, durationHours: e.target.value }))}
+                  />
+                </div>
+                <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                  <input type="checkbox" className="h-4 w-4 rounded border-gray-300" checked={!!workOrderDetails?.requiresSignature} onChange={(e) => setWorkOrderDetails?.((w) => ({ ...w, requiresSignature: e.target.checked }))} />
+                  Requires Signature
+                </label>
               </div>
-              <label className="inline-flex items-center gap-2 text-sm text-gray-700">
-                <input type="checkbox" className="h-4 w-4 rounded border-gray-300" checked={!!workOrderDetails?.requiresSignature} onChange={(e) => setWorkOrderDetails?.((w) => ({ ...w, requiresSignature: e.target.checked }))} />
-                Requires Signature
-              </label>
             </div>
-          </div>
-          <div>
+          )}
+          <div className={isAssetMode ? '' : ''}>
             <h3 className="text-lg font-bold text-gray-900">Schedules</h3>
             <p className="text-sm text-gray-600 mb-3">Specify the date and time for the scheduled maintenance.</p>
-            <div className="relative">
-            <button
-              className="w-full h-14 border border-gray-300 rounded-lg text-gray-700 text-sm font-semibold hover:border-gray-400 text-left px-4"
-              onClick={() => setShowScheduleMenu(prev => !prev)}
-            >
+            <div className={`relative ${isAssetMode ? 'max-w-5xl border border-gray-200 rounded-2xl p-6 bg-white' : ''}`}>
+            <div className={`grid gap-4 ${isAssetMode ? 'md:grid-cols-2' : ''}`}>
+              {isAssetMode && (
+                <button
+                  className="w-full h-14 border border-gray-300 rounded-lg text-gray-700 text-sm font-semibold hover:border-gray-400 text-center px-4"
+                  type="button"
+                  onClick={() => {
+                    setShowExistingSchedulePicker((prev) => !prev);
+                    setShowScheduleMenu(false);
+                  }}
+                >
+                  Select existing schedule
+                </button>
+              )}
+              <button
+                className="w-full h-14 border border-gray-300 rounded-lg text-gray-700 text-sm font-semibold hover:border-gray-400 text-center px-4"
+                type="button"
+                onClick={() => {
+                  setShowScheduleMenu((prev) => !prev);
+                  setShowExistingSchedulePicker(false);
+                }}
+              >
                 Add Schedule
-            </button>
+              </button>
+            </div>
             {scheduleConfig?.calendarRule && (
               <div className="mt-3 border border-gray-200 rounded-xl p-4 bg-gray-50">
                 <div className="flex items-center justify-between">
@@ -13447,12 +17818,43 @@ function CreatePmModal({ open, onClose, onAddWorkOrderDetails, onAddCalendar, on
                     <div className="text-xs text-gray-600 mt-1">Created {scheduleConfig.calendarRule.leadDays} day(s) before due date at {scheduleConfig.calendarRule.time || '09:00'}</div>
                   </div>
                   <div className="flex gap-2">
-                    <button className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-100" onClick={onAddCalendar}>Edit</button>
-                    <button className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-100" onClick={() => setPmSchedule({ scheduleType: null, calendarRule: null })}>Remove</button>
+                    <button className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-100" type="button" onClick={onAddCalendar}>Edit</button>
+                    <button className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-100" type="button" onClick={() => setScheduleConfig?.({ scheduleType: null, calendarRule: null, meterRule: null, combinedRule: null })}>Remove</button>
                   </div>
                 </div>
               </div>
             )}
+            {showExistingSchedulePicker && isAssetMode && (
+        <div className="absolute left-0 top-16 z-50 bg-white border border-gray-200 rounded-2xl shadow-2xl w-[520px] max-w-full">
+          <div className="max-h-72 overflow-y-auto py-2">
+            {scheduleTemplateOptions.length === 0 ? (
+              <div className="px-4 py-6 text-sm text-gray-500">No saved schedules available yet.</div>
+            ) : (
+              scheduleTemplateOptions.map((schedule, idx) => (
+                <button
+                  key={schedule?.id || schedule?._id || idx}
+                  className="w-full text-left px-4 py-3 hover:bg-gray-50"
+                  type="button"
+                  onClick={() => {
+                    setScheduleConfig?.({
+                      scheduleType: schedule?.scheduleType || 'calendar',
+                      calendarRule: schedule?.calendarRule || null,
+                      meterRule: schedule?.meterRule || null,
+                      combinedRule: schedule?.combinedRule || null,
+                    });
+                    setShowExistingSchedulePicker(false);
+                  }}
+                >
+                  <div className="text-sm font-semibold text-gray-900">{getScheduleOptionSummary(schedule)}</div>
+                  <div className="mt-1 text-xs text-gray-500">
+                    {schedule?.name || schedule?.title || 'Preventive maintenance schedule'}
+                  </div>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
       {showScheduleMenu && (
         <div className="absolute left-0 top-16 z-50 bg-white border border-gray-200 rounded-2xl shadow-2xl w-[520px]">
           <div className="py-2">
@@ -13523,9 +17925,22 @@ function CreatePmModal({ open, onClose, onAddWorkOrderDetails, onAddCalendar, on
                       <select
                         className="w-40 border border-gray-300 rounded-lg px-2 py-2 text-sm text-gray-700"
                         value={row.assetId}
-                        onChange={(e) => updateAssetRow(idx, 'assetId', e.target.value)}
+                        onChange={(e) => {
+                          const nextAssetId = e.target.value;
+                          const defaultLocationId = getDefaultLocationIdForAsset(nextAssetId);
+                          setAssetRows((rows) => rows.map((entry, rowIndex) => rowIndex === idx ? {
+                            ...entry,
+                            assetId: nextAssetId,
+                            locationId: entry.locationId || defaultLocationId,
+                          } : entry));
+                        }}
                       >
                         <option value="">Asset</option>
+                        {(companyAssets || []).map((asset) => (
+                          <option key={asset?._id || asset?.id} value={asset?._id || asset?.id}>
+                            {asset?.name || asset?.title || 'Unnamed asset'}
+                          </option>
+                        ))}
                       </select>
                     </td>
                     <td className="px-4 py-3">
@@ -13535,6 +17950,11 @@ function CreatePmModal({ open, onClose, onAddWorkOrderDetails, onAddCalendar, on
                         onChange={(e) => updateAssetRow(idx, 'locationId', e.target.value)}
                       >
                         <option value="">Location</option>
+                        {locationOptions.map((location) => (
+                          <option key={location.id} value={location.id}>
+                            {location.label}
+                          </option>
+                        ))}
                       </select>
                     </td>
                     <td className="px-4 py-3">
@@ -13570,7 +17990,12 @@ function CreatePmModal({ open, onClose, onAddWorkOrderDetails, onAddCalendar, on
                         value={row.assignee}
                         onChange={(e) => updateAssetRow(idx, 'assignee', e.target.value)}
                       >
-                        <option>Assigned To</option>
+                        <option value="">Assigned To</option>
+                        {assigneeOptions.map((person) => (
+                          <option key={person.id} value={person.id}>
+                            {person.name}
+                          </option>
+                        ))}
                       </select>
                     </td>
                     <td className="px-4 py-3 text-right">
@@ -13596,14 +18021,28 @@ function CreatePmModal({ open, onClose, onAddWorkOrderDetails, onAddCalendar, on
 }
 
 // --- Work Order Details Modal (for PM) ---
-function WorkOrderDetailsModal({ open, onClose, tasks = [], setTasks, workOrderDetails, setWorkOrderDetails, checklist = [], setChecklist, checklistLibrary = [], setChecklistLibrary, companyAssets = [], onChecklistSaved, launchChecklistBuilderDirect = false }) {
+function WorkOrderDetailsModal({ open, onClose, onSave, mode = 'create', tasks = [], setTasks, workOrderDetails, setWorkOrderDetails, checklist = [], setChecklist, checklistLibrary = [], setChecklistLibrary, companyAssets = [], companyProperties = [], technicians = [], teams = [], onChecklistSaved, launchChecklistBuilderDirect = false }) {
   const imageInputRef = React.useRef(null);
   const fileInputRef = React.useRef(null);
   const checklistImportInputRef = React.useRef(null);
+  const categoryRef = React.useRef(null);
+  const primaryAssigneeRef = React.useRef(null);
+  const additionalAssigneesRef = React.useRef(null);
   const [showChecklistModal, setShowChecklistModal] = React.useState(false);
   const [showChecklistBuilder, setShowChecklistBuilder] = React.useState(false);
   const [templateName, setTemplateName] = React.useState('');
   const [showChecklistPicker, setShowChecklistPicker] = React.useState(false);
+  const [categoryOpen, setCategoryOpen] = React.useState(false);
+  const [categorySearch, setCategorySearch] = React.useState('');
+  const [editAddPartOpen, setEditAddPartOpen] = React.useState(false);
+  const [editInventoryParts, setEditInventoryParts] = React.useState([]);
+  const [editInventoryLoading, setEditInventoryLoading] = React.useState(false);
+  const [editInventorySearch, setEditInventorySearch] = React.useState('');
+  const [selectedEditInventoryParts, setSelectedEditInventoryParts] = React.useState({});
+  const [primaryAssigneeOpen, setPrimaryAssigneeOpen] = React.useState(false);
+  const [primaryAssigneeSearch, setPrimaryAssigneeSearch] = React.useState('');
+  const [additionalAssigneesOpen, setAdditionalAssigneesOpen] = React.useState(false);
+  const [additionalAssigneesSearch, setAdditionalAssigneesSearch] = React.useState('');
   const [checklistBuilderView, setChecklistBuilderView] = React.useState('chooser');
   const [checklistTemplateSearch, setChecklistTemplateSearch] = React.useState('');
   const [checklistImporting, setChecklistImporting] = React.useState(false);
@@ -13704,6 +18143,89 @@ function WorkOrderDetailsModal({ open, onClose, tasks = [], setTasks, workOrderD
   const selectedChecklistAsset = React.useMemo(
     () => assetOptions.find((asset) => String(asset.id || asset._id) === String(selectedChecklistAssetId)),
     [assetOptions, selectedChecklistAssetId]
+  );
+  const isEditMode = mode === 'edit' || mode === 'edit-pm';
+  const modalHeading = isEditMode ? 'Edit Work Order Details' : 'Add Work Order Details';
+  const modalSaveLabel = isEditMode ? 'Save Changes' : 'Save Work Order Details';
+  const handleSaveWorkOrder = React.useCallback(async () => {
+    if (typeof onSave === 'function') {
+      await onSave(workOrderDetails);
+      return;
+    }
+    onClose?.();
+  }, [onClose, onSave, workOrderDetails]);
+  const locationOptions = React.useMemo(
+    () => {
+      const propertyOptions = (Array.isArray(companyProperties) ? companyProperties : [])
+        .map((property) => property?.name || property?.title || property?.address || property?.location || '')
+        .filter((value) => typeof value === 'string' && value.trim())
+        .map((value) => value.trim());
+
+      const assetLocationOptions = assetOptions
+        .map((asset) => {
+          const value = asset?.location || asset?.property?.name || asset?.address || '';
+          return typeof value === 'string' ? value.trim() : '';
+        })
+        .filter(Boolean);
+
+      return [...propertyOptions, ...assetLocationOptions].filter((value, index, arr) => arr.indexOf(value) === index);
+    },
+    [assetOptions, companyProperties]
+  );
+  const categoryOptions = React.useMemo(
+    () => ['Inspection', 'None', 'Damage', 'Electrical', 'Meter Reading', 'Preventative', 'Project', 'Safety'],
+    []
+  );
+  const filteredCategoryOptions = React.useMemo(() => {
+    const query = String(categorySearch || '').trim().toLowerCase();
+    return categoryOptions.filter((option) => {
+      if (!query) return true;
+      return option.toLowerCase().includes(query);
+    });
+  }, [categoryOptions, categorySearch]);
+  const primaryAssigneeOptions = React.useMemo(
+    () => (Array.isArray(technicians) ? technicians : []).map((tech, idx) => ({
+      id: tech.id || tech._id || tech.email || `tech-${idx}`,
+      name: tech.name || tech.fullName || tech.email || 'User'
+    })),
+    [technicians]
+  );
+  const selectedAdditionalAssignees = React.useMemo(
+    () => String(workOrderDetails?.additionalResponsibleWorkers || '')
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter(Boolean),
+    [workOrderDetails?.additionalResponsibleWorkers]
+  );
+  const filteredAdditionalAssigneeOptions = React.useMemo(() => {
+    const query = String(additionalAssigneesSearch || '').trim().toLowerCase();
+    return primaryAssigneeOptions.filter((person) => {
+      if (!query) return true;
+      return String(person.name || '').toLowerCase().includes(query);
+    });
+  }, [additionalAssigneesSearch, primaryAssigneeOptions]);
+  const filteredPrimaryAssigneeOptions = React.useMemo(() => {
+    const query = String(primaryAssigneeSearch || '').trim().toLowerCase();
+    return primaryAssigneeOptions.filter((person) => {
+      if (!query) return true;
+      return String(person.name || '').toLowerCase().includes(query);
+    });
+  }, [primaryAssigneeOptions, primaryAssigneeSearch]);
+  const editLineItems = React.useMemo(
+    () => (Array.isArray(workOrderDetails?.lineItems) ? workOrderDetails.lineItems : Array.isArray(workOrderDetails?.parts) ? workOrderDetails.parts : []),
+    [workOrderDetails?.lineItems, workOrderDetails?.parts]
+  );
+  const filteredEditInventoryParts = React.useMemo(
+    () => (Array.isArray(editInventoryParts) ? editInventoryParts : [])
+      .filter((part) => {
+        const q = String(editInventorySearch || '').trim().toLowerCase();
+        if (!q) return true;
+        return String(part?.name || '').toLowerCase().includes(q)
+          || String(part?.partNumber || part?.id || part?._id || '').toLowerCase().includes(q)
+          || String(part?.category || '').toLowerCase().includes(q);
+      })
+      .slice(0, 100),
+    [editInventoryParts, editInventorySearch]
   );
   const getAssetLabel = React.useCallback((asset) => (
     asset?.name ||
@@ -13861,6 +18383,85 @@ function WorkOrderDetailsModal({ open, onClose, tasks = [], setTasks, workOrderD
       setSelectedChecklistAssetId(String(workOrderDetails.assetId));
     }
   }, [open, selectedChecklistAssetId, workOrderDetails?.assetId]);
+  React.useEffect(() => {
+    if (!additionalAssigneesOpen && !primaryAssigneeOpen && !categoryOpen) return undefined;
+    const handlePointerDown = (event) => {
+      if (categoryRef.current && !categoryRef.current.contains(event.target)) {
+        setCategoryOpen(false);
+      }
+      if (primaryAssigneeRef.current && !primaryAssigneeRef.current.contains(event.target)) {
+        setPrimaryAssigneeOpen(false);
+      }
+      if (additionalAssigneesRef.current && !additionalAssigneesRef.current.contains(event.target)) {
+        setAdditionalAssigneesOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => document.removeEventListener('mousedown', handlePointerDown);
+  }, [additionalAssigneesOpen, categoryOpen, primaryAssigneeOpen]);
+  const toggleAdditionalAssignee = React.useCallback((name) => {
+    setWorkOrderDetails?.((prev) => {
+      const current = String(prev?.additionalResponsibleWorkers || '')
+        .split(',')
+        .map((entry) => entry.trim())
+        .filter(Boolean);
+      const exists = current.includes(name);
+      const next = exists ? current.filter((entry) => entry !== name) : [...current, name];
+      return {
+        ...prev,
+        additionalResponsibleWorkers: next.join(', ')
+      };
+    });
+  }, [setWorkOrderDetails]);
+  const getEditStockBadge = React.useCallback((status) => {
+    const s = String(status || '').toLowerCase();
+    if (s.includes('low')) return 'bg-orange-100 text-orange-700';
+    if (s.includes('non')) return 'bg-gray-100 text-gray-700';
+    if (s.includes('out')) return 'bg-rose-100 text-rose-700';
+    return 'bg-emerald-100 text-emerald-700';
+  }, []);
+  const getEditAvailableQty = React.useCallback((part) => Number(part?.available ?? part?.quantity ?? part?.onHand ?? 0), []);
+  const getEditAreaLabel = React.useCallback((part) => part?.area || part?.section || part?.zone || part?.room || part?.bin || '', []);
+  const fetchEditInventoryParts = React.useCallback(async () => {
+    try {
+      setEditInventoryLoading(true);
+      const res = await api.get('/api/parts');
+      setEditInventoryParts(Array.isArray(res?.data) ? res.data : []);
+    } catch (err) {
+      console.warn('Failed to load inventory parts for edit modal', err);
+    } finally {
+      setEditInventoryLoading(false);
+    }
+  }, []);
+  const handleOpenEditAddParts = React.useCallback(() => {
+    setSelectedEditInventoryParts({});
+    setEditInventorySearch('');
+    setEditAddPartOpen(true);
+    fetchEditInventoryParts();
+  }, [fetchEditInventoryParts]);
+  const handleConfirmEditParts = React.useCallback(() => {
+    const selections = Object.values(selectedEditInventoryParts || {});
+    if (!selections.length) return;
+    const nextItems = selections.map((selection, idx) => {
+      const part = selection.part || {};
+      const quantity = Number(selection.quantity) || 1;
+      const cost = Number(part.cost ?? part.unitCost ?? part.price ?? 0) || 0;
+      return {
+        id: part._id || part.id || `part-${Date.now()}-${idx}`,
+        name: part.name || part.partNumber || 'Part',
+        quantity,
+        cost,
+        location: part.location || '',
+        status: part.status || 'In stock',
+      };
+    });
+
+    setWorkOrderDetails?.((prev) => ({
+      ...prev,
+      lineItems: [...(Array.isArray(prev?.lineItems) ? prev.lineItems : []), ...nextItems],
+    }));
+    setEditAddPartOpen(false);
+  }, [selectedEditInventoryParts, setWorkOrderDetails]);
   const saveChecklistToBackend = async () => {
     const name = (blankChecklistMeta.title || templateName || 'Checklist Template').trim();
     if (!name) {
@@ -13937,93 +18538,315 @@ function WorkOrderDetailsModal({ open, onClose, tasks = [], setTasks, workOrderD
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-[60] flex items-start justify-center bg-black/40 overflow-auto py-6">
-      <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-5xl mx-4">
+      <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-[1400px] mx-4">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-          <div className="text-xl font-bold text-gray-900">Add Work Order Details</div>
+          <div className="text-[24px] font-bold text-gray-900">{modalHeading}</div>
           <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100">
             <X className="w-5 h-5 text-gray-500" />
           </button>
         </div>
 
-        <div className="px-6 py-6 space-y-6">
-          <div className="space-y-1">
-            <label className="text-sm font-bold text-gray-800">Work Order Title <span className="text-rose-500">*</span></label>
-            <input
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-              placeholder="Work Order Title"
-              value={workOrderDetails?.title || ''}
-              onChange={(e) => setWorkOrderDetails?.((w) => ({ ...w, title: e.target.value }))}
-            />
-          </div>
-          <div className="space-y-1">
-            <label className="text-sm font-bold text-gray-800">Description</label>
-            <textarea
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm min-h-[120px]"
-              placeholder="Describe the work order"
-              value={workOrderDetails?.description || ''}
-              onChange={(e) => setWorkOrderDetails?.((w) => ({ ...w, description: e.target.value }))}
-            />
-          </div>
-          <label className="flex items-center gap-2 text-sm text-gray-700">
-            <input
-              type="checkbox"
-              className="h-4 w-4 rounded border-gray-300"
-              checked={!!workOrderDetails?.createNow}
-              onChange={(e) => setWorkOrderDetails?.((w) => ({ ...w, createNow: e.target.checked }))}
-            />
-            Create first Work Order Now? <AlertCircle className="w-4 h-4 text-gray-400" />
-          </label>
-
-          <div className="grid grid-cols-2 gap-4">
+        <div className="max-h-[82vh] overflow-y-auto px-6 py-6 space-y-8">
+          <section className="space-y-4 border-b border-gray-100 pb-8">
+            <h3 className="text-[22px] font-bold text-gray-900">Work Order Details</h3>
+            {(mode === 'edit-pm' || mode === 'create') && (
+              <div className="space-y-1">
+                <label className="text-sm font-bold text-gray-800">PM Title <span className="text-rose-500">*</span></label>
+                <input
+                  className="w-full border border-gray-300 rounded-lg px-4 py-3 text-[15px]"
+                  placeholder="PM Title"
+                  value={workOrderDetails?.pmTitle || ''}
+                  onChange={(e) => setWorkOrderDetails?.((w) => ({ ...w, pmTitle: e.target.value }))}
+                />
+              </div>
+            )}
             <div className="space-y-1">
-              <label className="text-sm font-bold text-gray-800">Priority</label>
-              <select
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                value={workOrderDetails?.priority || 'Medium'}
-                onChange={(e) => setWorkOrderDetails?.((w) => ({ ...w, priority: e.target.value }))}
-              >
-                <option>Medium</option>
-                <option>High</option>
-                <option>Low</option>
-              </select>
-            </div>
-            <div className="space-y-1">
-              <label className="text-sm font-bold text-gray-800">Category</label>
-              <select
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                value={workOrderDetails?.category || 'General'}
-                onChange={(e) => setWorkOrderDetails?.((w) => ({ ...w, category: e.target.value }))}
-              >
-                <option>General</option>
-                <option>HVAC</option>
-                <option>Electrical</option>
-              </select>
-            </div>
-            <div className="col-span-2 space-y-1">
-              <label className="text-sm font-bold text-gray-800">Duration (as hours)</label>
+              <label className="text-sm font-bold text-gray-800">Work Order Title <span className="text-rose-500">*</span></label>
               <input
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                placeholder="e.g., 2"
-                value={workOrderDetails?.durationHours || ''}
-                onChange={(e) => setWorkOrderDetails?.((w) => ({ ...w, durationHours: e.target.value }))}
+                className="w-full border border-gray-300 rounded-lg px-4 py-3 text-[15px]"
+                placeholder="Work Order Title"
+                value={workOrderDetails?.title || ''}
+                onChange={(e) => setWorkOrderDetails?.((w) => ({ ...w, title: e.target.value }))}
               />
             </div>
-          </div>
-
-          <div className="flex items-center gap-2 text-sm font-semibold text-gray-800">
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                className="h-4 w-4 rounded border-gray-300"
-                checked={!!workOrderDetails?.requiresSignature}
-                onChange={(e) => setWorkOrderDetails?.((w) => ({ ...w, requiresSignature: e.target.checked }))}
+            <div className="space-y-1">
+              <label className="text-sm font-bold text-gray-800">Description</label>
+              <textarea
+                className="w-full border border-gray-300 rounded-lg px-4 py-3 text-[15px] min-h-[120px]"
+                placeholder="Describe the work order"
+                value={workOrderDetails?.description || ''}
+                onChange={(e) => setWorkOrderDetails?.((w) => ({ ...w, description: e.target.value }))}
               />
-              Requires Signature
-            </label>
-          </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-sm font-bold text-gray-800">Category</label>
+                <div ref={categoryRef} className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setCategoryOpen((prev) => !prev)}
+                    className="flex w-full items-center justify-between rounded-lg border border-gray-300 bg-white px-4 py-3 text-left text-[15px] text-gray-800"
+                  >
+                    <span className={workOrderDetails?.category ? 'truncate text-gray-800' : 'truncate text-gray-400'}>
+                      {workOrderDetails?.category || 'Select category'}
+                    </span>
+                    <ChevronDown className={`h-5 w-5 shrink-0 text-gray-600 transition-transform ${categoryOpen ? 'rotate-180' : ''}`} strokeWidth={2} />
+                  </button>
+                  {categoryOpen && (
+                    <div className="absolute left-0 top-full z-20 mt-2 w-full overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl">
+                      <div className="p-4 pb-2">
+                        <div className="relative">
+                          <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+                          <input
+                            value={categorySearch}
+                            onChange={(e) => setCategorySearch(e.target.value)}
+                            placeholder="Search"
+                            className="w-full rounded-lg border border-blue-500 px-11 py-3 text-[15px] text-gray-800 outline-none ring-2 ring-blue-100"
+                            autoFocus
+                          />
+                        </div>
+                      </div>
+                      <div className="max-h-64 overflow-y-auto px-4 pb-3">
+                        {filteredCategoryOptions.length === 0 ? (
+                          <div className="px-2 py-3 text-[15px] text-gray-400">No categories found</div>
+                        ) : (
+                          filteredCategoryOptions.map((option) => {
+                            const isSelected = String(workOrderDetails?.category || '') === option;
+                            return (
+                              <button
+                                key={option}
+                                type="button"
+                                onClick={() => {
+                                  setWorkOrderDetails?.((w) => ({ ...w, category: option }));
+                                  setCategorySearch('');
+                                  setCategoryOpen(false);
+                                }}
+                                className="flex w-full items-center justify-between rounded-lg px-2 py-2.5 text-left hover:bg-gray-50"
+                              >
+                                <span className={`text-[15px] ${option === 'None' ? 'text-rose-500' : 'text-gray-800'}`}>{option}</span>
+                                <span className={`text-blue-600 ${isSelected ? 'opacity-100' : 'opacity-0'}`}>✓</span>
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-bold text-gray-800">Priority</label>
+                <select
+                  className="w-full border border-gray-300 rounded-lg px-4 py-3 text-[15px]"
+                  value={workOrderDetails?.priority || 'Medium'}
+                  onChange={(e) => setWorkOrderDetails?.((w) => ({ ...w, priority: e.target.value }))}
+                >
+                  <option>High</option>
+                  <option>Medium</option>
+                  <option>Low</option>
+                </select>
+              </div>
+            </div>
+          </section>
+
+          <section className="space-y-4 border-b border-gray-100 pb-8">
+            <h3 className="text-[22px] font-bold text-gray-900">Job Specifications</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-sm font-bold text-gray-800">Asset</label>
+                <select
+                  className="w-full border border-gray-300 rounded-lg px-4 py-3 text-[15px]"
+                  value={workOrderDetails?.assetId || ''}
+                  onChange={(e) => {
+                    const selectedAsset = assetOptions.find((asset) => String(asset.id || asset._id) === String(e.target.value));
+                    setWorkOrderDetails?.((w) => ({
+                      ...w,
+                      assetId: e.target.value,
+                      assetName: selectedAsset?.name || selectedAsset?.title || '',
+                      location: getAssetLocationLabel(selectedAsset) || w.location || '',
+                    }));
+                  }}
+                >
+                  <option value="">Select asset</option>
+                  {assetOptions.map((asset) => (
+                    <option key={asset.id || asset._id} value={asset.id || asset._id}>
+                      {getAssetLabel(asset)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-bold text-gray-800">Location</label>
+                <select
+                  className="w-full border border-gray-300 rounded-lg px-4 py-3 text-[15px]"
+                  value={workOrderDetails?.location || ''}
+                  onChange={(e) => setWorkOrderDetails?.((w) => ({ ...w, location: e.target.value }))}
+                >
+                  <option value="">Select location</option>
+                  {locationOptions.map((location) => (
+                    <option key={location} value={location}>{location}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-bold text-gray-800">Start Date</label>
+                <input
+                  type="datetime-local"
+                  className="w-full border border-gray-300 rounded-lg px-4 py-3 text-[15px]"
+                  value={workOrderDetails?.startDate || ''}
+                  onChange={(e) => setWorkOrderDetails?.((w) => ({ ...w, startDate: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-bold text-gray-800">Due Date</label>
+                <input
+                  type="datetime-local"
+                  className="w-full border border-gray-300 rounded-lg px-4 py-3 text-[15px]"
+                  value={workOrderDetails?.dueDate || ''}
+                  onChange={(e) => setWorkOrderDetails?.((w) => ({ ...w, dueDate: e.target.value }))}
+                />
+              </div>
+              <div className="md:col-span-2 space-y-1">
+                <label className="text-sm font-bold text-gray-800">Duration (as hours)</label>
+                <input
+                  className="w-full border border-gray-300 rounded-lg px-4 py-3 text-[15px]"
+                  placeholder="Duration"
+                  value={workOrderDetails?.durationHours || ''}
+                  onChange={(e) => setWorkOrderDetails?.((w) => ({ ...w, durationHours: e.target.value }))}
+                />
+              </div>
+            </div>
+          </section>
+
+          <section className="space-y-4 border-b border-gray-100 pb-8">
+            <h3 className="text-[22px] font-bold text-gray-900">Assignment & Team</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-sm font-bold text-gray-800">Primary Assignee</label>
+                <div ref={primaryAssigneeRef} className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setPrimaryAssigneeOpen((prev) => !prev)}
+                    className="flex w-full items-center justify-between rounded-lg border border-gray-300 bg-white px-4 py-3 text-left text-[15px] text-gray-800"
+                  >
+                    <span className={workOrderDetails?.assignedTo ? 'truncate text-gray-800' : 'truncate text-gray-400'}>
+                      {workOrderDetails?.assignedTo || 'Select assignee'}
+                    </span>
+                    <ChevronDown className={`h-5 w-5 shrink-0 text-gray-600 transition-transform ${primaryAssigneeOpen ? 'rotate-180' : ''}`} strokeWidth={2} />
+                  </button>
+                  {primaryAssigneeOpen && (
+                    <div className="absolute left-0 top-full z-20 mt-2 w-full overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl">
+                      <div className="p-4 pb-2">
+                        <div className="relative">
+                          <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+                          <input
+                            value={primaryAssigneeSearch}
+                            onChange={(e) => setPrimaryAssigneeSearch(e.target.value)}
+                            placeholder="Search"
+                            className="w-full rounded-lg border border-blue-500 px-11 py-3 text-[15px] text-gray-800 outline-none ring-2 ring-blue-100"
+                            autoFocus
+                          />
+                        </div>
+                      </div>
+                      <div className="max-h-64 overflow-y-auto px-4 pb-3">
+                        {filteredPrimaryAssigneeOptions.length === 0 ? (
+                          <div className="px-2 py-3 text-[15px] text-gray-400">No people found</div>
+                        ) : (
+                          filteredPrimaryAssigneeOptions.map((person) => {
+                            const isSelected = String(workOrderDetails?.assignedTo || '') === String(person.name);
+                            return (
+                              <button
+                                key={person.id}
+                                type="button"
+                                onClick={() => {
+                                  setWorkOrderDetails?.((w) => ({ ...w, assignedTo: person.name }));
+                                  setPrimaryAssigneeSearch('');
+                                  setPrimaryAssigneeOpen(false);
+                                }}
+                                className="flex w-full items-center justify-between rounded-lg px-2 py-2.5 text-left hover:bg-gray-50"
+                              >
+                                <span className="truncate text-[15px] text-gray-800">{person.name}</span>
+                                <span className={`text-blue-600 ${isSelected ? 'opacity-100' : 'opacity-0'}`}>✓</span>
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-bold text-gray-800">Team</label>
+                <select
+                  className="w-full border border-gray-300 rounded-lg px-4 py-3 text-[15px]"
+                  value={workOrderDetails?.team || ''}
+                  onChange={(e) => setWorkOrderDetails?.((w) => ({ ...w, team: e.target.value }))}
+                >
+                  <option value="">Select team</option>
+                  {teams.map((team) => (
+                    <option key={team.id || team._id || team.name} value={team.name || team.title || ''}>
+                      {team.name || team.title || 'Team'}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="md:col-span-2 space-y-1">
+                <label className="text-sm font-bold text-gray-800">Additional Assignee(s)</label>
+                <div ref={additionalAssigneesRef} className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setAdditionalAssigneesOpen((prev) => !prev)}
+                    className="flex w-full items-center justify-between rounded-lg border border-gray-300 bg-white px-4 py-3 text-left text-[15px] text-gray-800"
+                  >
+                    <span className={selectedAdditionalAssignees.length ? 'truncate text-gray-800' : 'truncate text-gray-400'}>
+                      {selectedAdditionalAssignees.length ? selectedAdditionalAssignees.join(', ') : 'Select additional assignee(s)'}
+                    </span>
+                    <ChevronDown className={`h-5 w-5 shrink-0 text-gray-600 transition-transform ${additionalAssigneesOpen ? 'rotate-180' : ''}`} strokeWidth={2} />
+                  </button>
+                  {additionalAssigneesOpen && (
+                    <div className="absolute left-0 top-full z-20 mt-2 w-full overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl">
+                      <div className="p-4 pb-2">
+                        <div className="relative">
+                          <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+                          <input
+                            value={additionalAssigneesSearch}
+                            onChange={(e) => setAdditionalAssigneesSearch(e.target.value)}
+                            placeholder="Search"
+                            className="w-full rounded-lg border border-blue-500 px-11 py-3 text-[15px] text-gray-800 outline-none ring-2 ring-blue-100"
+                            autoFocus
+                          />
+                        </div>
+                      </div>
+                      <div className="max-h-64 overflow-y-auto px-4 pb-3">
+                        {filteredAdditionalAssigneeOptions.length === 0 ? (
+                          <div className="px-2 py-3 text-[15px] text-gray-400">No people found</div>
+                        ) : (
+                          filteredAdditionalAssigneeOptions.map((person) => {
+                            const isSelected = selectedAdditionalAssignees.includes(person.name);
+                            return (
+                              <button
+                                key={person.id}
+                                type="button"
+                                onClick={() => toggleAdditionalAssignee(person.name)}
+                                className="flex w-full items-center justify-between rounded-lg px-2 py-2.5 text-left hover:bg-gray-50"
+                              >
+                                <span className="truncate text-[15px] text-gray-800">{person.name}</span>
+                                <span className={`text-blue-600 ${isSelected ? 'opacity-100' : 'opacity-0'}`}>✓</span>
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </section>
 
           <div className="space-y-4">
-          <h3 className="text-lg font-bold text-gray-900">Attachments</h3>
+          <h3 className="text-[22px] font-bold text-gray-900">Documents & Reference</h3>
           <div className="space-y-2">
             <div className="text-sm font-bold text-gray-700">Photos</div>
             <input
@@ -14110,13 +18933,75 @@ function WorkOrderDetailsModal({ open, onClose, tasks = [], setTasks, workOrderD
             <button className="text-sm font-semibold text-blue-700 hover:underline">Add from Saved Files</button>
           </div>
 
-          <div className="space-y-3">
-            <h3 className="text-lg font-bold text-gray-900">Other Tasks</h3>
+          <div className="space-y-4 border-t border-gray-100 pt-8">
+            <div className="flex items-center justify-between">
+              <div className="text-[22px] font-bold text-gray-900">Parts</div>
+              <button
+                type="button"
+                onClick={handleOpenEditAddParts}
+                className="rounded-lg border border-gray-300 bg-white px-5 py-3 text-[15px] font-medium text-gray-800 hover:bg-gray-50"
+              >
+                Add Parts
+              </button>
+            </div>
+            {editLineItems.length === 0 ? (
+              <div className="rounded-lg border border-gray-200 px-6 py-10 text-center text-[15px] text-gray-500">
+                No line items have been added yet
+              </div>
+            ) : (
+              <div className="overflow-hidden rounded-lg border border-gray-200">
+                <table className="w-full text-sm">
+                  <thead className="border-b border-gray-200 bg-gray-50">
+                    <tr className="text-left text-gray-600">
+                      <th className="px-4 py-3 font-semibold">Part</th>
+                      <th className="px-4 py-3 font-semibold">Qty</th>
+                      <th className="px-4 py-3 font-semibold">Cost</th>
+                      <th className="px-4 py-3 font-semibold">Location</th>
+                      <th className="px-4 py-3 font-semibold">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 bg-white">
+                    {editLineItems.map((item, idx) => (
+                      <tr key={item.id || idx}>
+                        <td className="px-4 py-3 text-gray-900">{item.name || 'Part'}</td>
+                        <td className="px-4 py-3 text-gray-700">{item.quantity || 1}</td>
+                        <td className="px-4 py-3 text-gray-700">{typeof item.cost === 'number' ? item.cost.toFixed(2) : item.cost || '0.00'}</td>
+                        <td className="px-4 py-3 text-gray-700">{item.location || '—'}</td>
+                        <td className="px-4 py-3 text-gray-700">{item.status || 'In stock'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-3 border-t border-gray-100 pt-8">
+            <div className="flex items-center justify-between">
+              <h3 className="text-[22px] font-bold text-gray-900">Tasks & Checklists</h3>
+              <div className="flex items-center gap-3">
+                <button
+                  className="border border-gray-300 text-gray-800 rounded-lg px-4 py-2.5 text-[15px] font-medium hover:bg-gray-50"
+                  type="button"
+                  onClick={addTask}
+                >
+                  Add Task
+                </button>
+                <button
+                  className="border border-gray-300 text-gray-800 rounded-lg px-4 py-2.5 text-[15px] font-medium hover:bg-gray-50"
+                  onClick={() => {
+                    setShowChecklistPicker(true);
+                  }}
+                >
+                  Add Checklist
+                </button>
+              </div>
+            </div>
             <div className="border-t border-gray-100 pt-3">
               <div className="border border-gray-200 rounded-2xl p-3 shadow-sm">
                 <div className="flex items-center gap-2 mb-3">
-                  <div className="text-sm font-semibold text-gray-800 flex-1">Tasks</div>
-                  <button className="text-sm font-semibold text-blue-600 hover:underline" type="button" onClick={addTask}>+ Add Task</button>
+                  <div className="text-sm font-semibold text-gray-800 flex-1">{workOrderDetails?.checklistTemplateName || 'Other Tasks'}</div>
+                  <button className="text-sm font-semibold text-rose-500 hover:text-rose-600" type="button">Remove Checklist</button>
                 </div>
                 {tasks.map((task, idx) => (
                   <div key={task.id} className="flex items-center gap-2 border border-gray-200 rounded-xl p-2 bg-white mb-2">
@@ -14156,24 +19041,6 @@ function WorkOrderDetailsModal({ open, onClose, tasks = [], setTasks, workOrderD
                 </button>
               </div>
             </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              className="border border-blue-500 text-blue-600 font-bold rounded-lg px-4 py-2 flex items-center gap-2 hover:bg-blue-50"
-              type="button"
-              onClick={addTask}
-            >
-              <Plus className="w-4 h-4" /> Add Tasks
-            </button>
-            <button
-              className="border border-blue-500 text-blue-600 font-bold rounded-lg px-4 py-2 flex items-center gap-2 hover:bg-blue-50"
-              onClick={() => {
-                setShowChecklistPicker(true);
-              }}
-            >
-              <Plus className="w-4 h-4" /> Add Checklist
-            </button>
           </div>
         </div>
 
@@ -14253,16 +19120,149 @@ function WorkOrderDetailsModal({ open, onClose, tasks = [], setTasks, workOrderD
           </button>
         </div>
 
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100">
-          <button onClick={onClose} className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50">Cancel</button>
-          <button
-            className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold shadow-sm hover:bg-blue-700"
-            type="button"
-            onClick={() => onClose?.()}
+      <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100">
+        <button onClick={onClose} className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50">Cancel</button>
+        <button
+          className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold shadow-sm hover:bg-blue-700"
+          type="button"
+            onClick={handleSaveWorkOrder}
           >
-            Save Work Order Details
+            {modalSaveLabel}
           </button>
         </div>
+
+        {editAddPartOpen && (
+          <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4">
+            <div className="w-full max-w-[1320px] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl">
+              <div className="flex items-center justify-between px-8 py-5">
+                <h3 className="text-[28px] font-bold tracking-tight text-gray-900">Add Parts</h3>
+                <button onClick={() => setEditAddPartOpen(false)} className="p-1 text-gray-700 hover:text-gray-900">
+                  <X className="h-8 w-8" strokeWidth={1.75} />
+                </button>
+              </div>
+              <div className="border-t border-gray-100 px-8 py-5">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+                  <input
+                    value={editInventorySearch}
+                    onChange={(e) => setEditInventorySearch(e.target.value)}
+                    placeholder="Search"
+                    className="w-full rounded-lg border border-gray-200 bg-gray-50 px-11 py-3 text-[15px] text-gray-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                  />
+                </div>
+              </div>
+              <div className="max-h-[54vh] overflow-auto border-t border-gray-100">
+                <table className="w-full min-w-[1180px] text-sm">
+                  <thead className="border-b border-gray-200 bg-white">
+                    <tr className="text-left text-[14px] font-semibold text-gray-900">
+                      <th className="w-12 px-8 py-4"></th>
+                      <th className="px-6 py-4">Name</th>
+                      <th className="px-6 py-4">ID</th>
+                      <th className="px-6 py-4">Location</th>
+                      <th className="px-6 py-4">Area</th>
+                      <th className="px-6 py-4">Cost</th>
+                      <th className="px-6 py-4">Available Qty</th>
+                      <th className="px-6 py-4">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {editInventoryLoading ? (
+                      <tr>
+                        <td colSpan="8" className="px-8 py-8 text-center text-[15px] text-gray-500">Loading inventory...</td>
+                      </tr>
+                    ) : filteredEditInventoryParts.length === 0 ? (
+                      <tr>
+                        <td colSpan="8" className="px-8 py-8 text-center text-[15px] text-gray-500">No inventory parts found.</td>
+                      </tr>
+                    ) : (
+                      filteredEditInventoryParts.map((part, idx) => {
+                        const key = part._id || part.id || idx;
+                        const selected = Boolean(selectedEditInventoryParts[key]);
+                        const stock = getEditAvailableQty(part);
+                        const price = Number(part.cost ?? part.unitCost ?? part.price ?? 0) || 0;
+                        return (
+                          <tr key={key} className={`${selected ? 'bg-blue-50/60' : 'bg-white'} hover:bg-gray-50`}>
+                            <td className="px-8 py-6 align-middle">
+                              <input
+                                type="checkbox"
+                                checked={selected}
+                                onChange={(e) => {
+                                  const checked = e.target.checked;
+                                  setSelectedEditInventoryParts((prev) => {
+                                    if (checked) {
+                                      return {
+                                        ...prev,
+                                        [key]: { part, quantity: prev[key]?.quantity || 1 }
+                                      };
+                                    }
+                                    const clone = { ...prev };
+                                    delete clone[key];
+                                    return clone;
+                                  });
+                                }}
+                              />
+                            </td>
+                            <td className="px-6 py-6 text-[15px] text-gray-900">{part.name || 'Part'}</td>
+                            <td className="px-6 py-6 text-[15px] text-gray-800">{part.partNumber || part.id || part._id || '—'}</td>
+                            <td className="px-6 py-6 text-[15px] text-gray-800">{part.location || '—'}</td>
+                            <td className="px-6 py-6 text-[15px] text-gray-800">{getEditAreaLabel(part) || '—'}</td>
+                            <td className="px-6 py-6 text-[15px] text-gray-900">{price.toFixed(2)}</td>
+                            <td className="px-6 py-6 text-[15px] text-gray-900">
+                              <div className="flex items-center gap-3">
+                                <span>{Number(stock).toFixed(2)}</span>
+                                {selected && (
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    max={stock || undefined}
+                                    value={selectedEditInventoryParts[key]?.quantity || 1}
+                                    onChange={(e) => {
+                                      const val = Number(e.target.value) || 1;
+                                      setSelectedEditInventoryParts((prev) => ({
+                                        ...prev,
+                                        [key]: { part, quantity: val }
+                                      }));
+                                    }}
+                                    className="w-16 rounded border border-gray-300 px-2 py-1 text-xs"
+                                  />
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-6 py-6">
+                              <span className={`inline-flex rounded-lg px-3 py-1 text-[14px] font-medium ${getEditStockBadge(part.status)}`}>
+                                {part.status || 'In stock'}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-4 border-t border-gray-200 px-8 py-4">
+                <div className="text-[15px] text-gray-500">
+                  {Object.keys(selectedEditInventoryParts).length} {Object.keys(selectedEditInventoryParts).length === 1 ? 'Part' : 'Parts'} selected
+                </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setEditAddPartOpen(false)}
+                    className="rounded-md border border-gray-300 bg-white px-5 py-3 text-[16px] font-medium text-gray-800 hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleConfirmEditParts}
+                    disabled={Object.keys(selectedEditInventoryParts).length === 0}
+                    className="rounded-md bg-blue-600 px-5 py-3 text-[16px] font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    Add
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {showChecklistModal && (
@@ -14862,11 +19862,12 @@ function WorkOrderDetailsModal({ open, onClose, tasks = [], setTasks, workOrderD
 }
 
 // --- Calendar Schedule Modal ---
-function CalendarScheduleModal({ open, onClose, scheduleConfig, setScheduleConfig, resetKey }) {
+function CalendarScheduleModal({ open, onClose, scheduleConfig, setScheduleConfig, resetKey, mode = 'add' }) {
   const [every, setEvery] = React.useState(scheduleConfig?.calendarRule?.every || 1);
   const [unit, setUnit] = React.useState(scheduleConfig?.calendarRule?.unit || 'day');
   const [time, setTime] = React.useState(scheduleConfig?.calendarRule?.time || '22:00');
   const [leadDays, setLeadDays] = React.useState(scheduleConfig?.calendarRule?.leadDays || 0);
+  const [inactivePeriods, setInactivePeriods] = React.useState(Array.isArray(scheduleConfig?.calendarRule?.inactivePeriods) ? scheduleConfig.calendarRule.inactivePeriods : []);
 
   React.useEffect(() => {
     if (!open) return;
@@ -14874,29 +19875,37 @@ function CalendarScheduleModal({ open, onClose, scheduleConfig, setScheduleConfi
     setUnit(scheduleConfig?.calendarRule?.unit || 'day');
     setTime(scheduleConfig?.calendarRule?.time || '22:00');
     setLeadDays(scheduleConfig?.calendarRule?.leadDays || 0);
+    setInactivePeriods(Array.isArray(scheduleConfig?.calendarRule?.inactivePeriods) ? scheduleConfig.calendarRule.inactivePeriods : []);
   }, [open, scheduleConfig, resetKey]);
 
   const saveAndClose = () => {
     setScheduleConfig?.({
       scheduleType: 'calendar',
-      calendarRule: { every: Number(every) || 1, unit, time, leadDays: Number(leadDays) || 0 },
+      calendarRule: { every: Number(every) || 1, unit, time, leadDays: Number(leadDays) || 0, inactivePeriods },
     });
     onClose?.();
   };
 
   if (!open) return null;
+  const isEditMode = mode === 'edit';
 
   return (
     <div className="fixed inset-0 z-[999] flex items-start justify-center bg-black/50 overflow-auto py-10">
       <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-4xl mx-4">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-          <div className="text-xl font-bold text-gray-900">Add Calendar Schedule</div>
+          <div className="text-xl font-bold text-gray-900">{isEditMode ? 'Edit Record' : 'Add Calendar Schedule'}</div>
           <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100">
             <X className="w-5 h-5 text-gray-500" />
           </button>
         </div>
 
         <div className="px-6 py-6 space-y-6">
+          {isEditMode && (
+            <div className="flex items-center gap-8 border-b border-gray-200 pb-4 text-sm font-semibold text-gray-500">
+              <button type="button" className="border-b-2 border-blue-600 pb-3 text-gray-900">Schedule</button>
+              <button type="button" className="border-b-2 border-transparent pb-3 text-gray-500">Record Data</button>
+            </div>
+          )}
           <div className="space-y-1">
             <label className="text-sm font-bold text-gray-800">Schedule Type</label>
             <select className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
@@ -14963,8 +19972,79 @@ function CalendarScheduleModal({ open, onClose, scheduleConfig, setScheduleConfi
             <div className="flex items-center gap-2 text-sm font-bold text-gray-800">
               Inactive Periods
               <AlertCircle className="w-4 h-4 text-gray-400" />
-              <button className="text-sm font-semibold text-blue-700 hover:underline">+ Add Period</button>
+              <button
+                type="button"
+                className="text-sm font-semibold text-blue-700 hover:underline"
+                onClick={() => setInactivePeriods((prev) => [
+                  ...prev,
+                  {
+                    id: `inactive-${Date.now()}-${prev.length}`,
+                    fromMonth: '',
+                    fromDay: '',
+                    toMonth: '',
+                    toDay: '',
+                  },
+                ])}
+              >
+                + Add Period
+              </button>
             </div>
+            {inactivePeriods.length > 0 && (
+              <div className="mt-4 space-y-3">
+                {inactivePeriods.map((period, index) => (
+                  <div key={period.id || index} className="grid grid-cols-[1fr_96px_24px_1fr_96px_auto] items-center gap-3">
+                    <select
+                      className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                      value={period.fromMonth || ''}
+                      onChange={(e) => setInactivePeriods((prev) => prev.map((entry, entryIndex) => entryIndex === index ? { ...entry, fromMonth: e.target.value } : entry))}
+                    >
+                      <option value="">From month</option>
+                      {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((month) => (
+                        <option key={month} value={month}>{month}</option>
+                      ))}
+                    </select>
+                    <select
+                      className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                      value={period.fromDay || ''}
+                      onChange={(e) => setInactivePeriods((prev) => prev.map((entry, entryIndex) => entryIndex === index ? { ...entry, fromDay: e.target.value } : entry))}
+                    >
+                      <option value="">Day</option>
+                      {Array.from({ length: 31 }, (_, dayIndex) => String(dayIndex + 1)).map((day) => (
+                        <option key={day} value={day}>{day}</option>
+                      ))}
+                    </select>
+                    <span className="text-center text-sm text-gray-500">→</span>
+                    <select
+                      className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                      value={period.toMonth || ''}
+                      onChange={(e) => setInactivePeriods((prev) => prev.map((entry, entryIndex) => entryIndex === index ? { ...entry, toMonth: e.target.value } : entry))}
+                    >
+                      <option value="">To month</option>
+                      {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((month) => (
+                        <option key={month} value={month}>{month}</option>
+                      ))}
+                    </select>
+                    <select
+                      className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                      value={period.toDay || ''}
+                      onChange={(e) => setInactivePeriods((prev) => prev.map((entry, entryIndex) => entryIndex === index ? { ...entry, toDay: e.target.value } : entry))}
+                    >
+                      <option value="">Day</option>
+                      {Array.from({ length: 31 }, (_, dayIndex) => String(dayIndex + 1)).map((day) => (
+                        <option key={day} value={day}>{day}</option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      className="rounded-lg p-2 text-rose-500 hover:bg-rose-50"
+                      onClick={() => setInactivePeriods((prev) => prev.filter((_, entryIndex) => entryIndex !== index))}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -14978,14 +20058,14 @@ function CalendarScheduleModal({ open, onClose, scheduleConfig, setScheduleConfi
 }
 
 // --- Meter Schedule Modal ---
-function MeterScheduleModal({ open, onClose }) {
+function MeterScheduleModal({ open, onClose, mode = 'add' }) {
   if (!open) return null;
   const triggerOptions = ['Reaches every', 'Is exactly', 'Is less than', 'Is greater than'];
   return (
     <div className="fixed inset-0 z-[999] flex items-start justify-center bg-black/50 overflow-auto py-10">
       <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-4xl mx-4">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-          <div className="text-xl font-bold text-gray-900">Add Meter Schedule</div>
+          <div className="text-xl font-bold text-gray-900">{mode === 'edit' ? 'Edit Record' : 'Add Meter Schedule'}</div>
           <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100">
             <X className="w-5 h-5 text-gray-500" />
           </button>
@@ -15032,14 +20112,14 @@ function MeterScheduleModal({ open, onClose }) {
 }
 
 // --- Combined Calendar OR Meter Modal ---
-function CombinedScheduleModal({ open, onClose }) {
+function CombinedScheduleModal({ open, onClose, mode = 'add' }) {
   if (!open) return null;
   const triggerOptions = ['Reaches every', 'Is exactly', 'Is less than', 'Is greater than'];
   return (
     <div className="fixed inset-0 z-[999] flex items-start justify-center bg-black/50 overflow-auto py-10">
       <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-5xl mx-4">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-          <div className="text-xl font-bold text-gray-900">Add Calendar OR Meter Schedule</div>
+          <div className="text-xl font-bold text-gray-900">{mode === 'edit' ? 'Edit Record' : 'Add Calendar OR Meter Schedule'}</div>
           <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100">
             <X className="w-5 h-5 text-gray-500" />
           </button>
