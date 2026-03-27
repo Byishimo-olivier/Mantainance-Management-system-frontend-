@@ -11,6 +11,360 @@ import { useLanguage, useTranslation } from "../i18n/LanguageContext";
 import { Clock, Calendar, CheckCircle, X, Bell, Download, Package, ShoppingCart, Gauge, Plus, Search, Eye, MapPin, AlertCircle, Repeat, Edit, ChevronLeft, ChevronRight, ChevronDown, SlidersHorizontal, Flag, MoreHorizontal, Trash2, Image as ImageIcon, Tag, Paperclip, MessageSquare, Send, Navigation, DollarSign, Bookmark, Link2, FileText, Copy, Archive, ArrowUpDown, ArrowRight, LayoutDashboard, Settings, Users, RotateCcw, Zap } from 'lucide-react';
 
 const ASSISTANT_ACTION_STORAGE_KEY = 'mms_assistant_action';
+const REQUEST_FORM_SETTINGS_STORAGE_KEY = 'mms_request_form_settings';
+const DEFAULT_REQUEST_FORM_SETTINGS = {
+  title: { create: 'Required', approval: 'Required' },
+  description: { create: 'Optional', approval: 'Optional' },
+  priority: { create: 'Optional', approval: 'Optional' },
+  images: { create: 'Optional', approval: 'Optional' },
+  primaryWorker: { create: 'Hidden', approval: 'Optional' },
+  assignedTeam: { create: 'Hidden', approval: 'Optional' },
+  files: { create: 'Optional', approval: 'Optional' },
+  additionalWorkers: { create: 'Hidden', approval: 'Optional' },
+  startDate: { create: 'Hidden', approval: 'Optional' },
+  estimatedDuration: { create: 'Hidden', approval: 'Optional' },
+  checklists: { create: 'Hidden', approval: 'Optional' },
+  signature: { create: 'Hidden', approval: 'Optional' },
+};
+const DEFAULT_REQUEST_BRANDING = {
+  logoUrl: '',
+  primaryColor: '#d3ac2a',
+  heroBackground: '#2c8214',
+  header: '#2c8214',
+  footer: '#2c8214',
+  pageBackground: '#c4cc9c',
+};
+const DEFAULT_GENERAL_SETTINGS = {
+  language: 'English',
+  dateFormat: 'MM/DD/YY',
+  currency: 'RWF - Rwandan Franc',
+  timeZone: 'Africa/Kigali +02:00 CAT',
+};
+const DEFAULT_ASSET_SETTINGS = {
+  fields: [
+    { name: 'Additional Information', type: 'Multi-Line Text', source: 'Default', options: [] },
+    { name: 'Additional Worker', type: 'Dropdown', source: 'Default', options: [] },
+    { name: 'Area', type: 'Single Line Text', source: 'Default', options: [] },
+    { name: 'Category', type: 'Single Line Text', source: 'Default', options: [] },
+    { name: 'Customers', type: 'Dropdown', source: 'Default', options: [] },
+    { name: 'Description', type: 'Multi-Line Text', source: 'Default', options: [] },
+    { name: 'Model', type: 'Single Line Text', source: 'Default', options: [] },
+    { name: 'Manufacturer', type: 'Single Line Text', source: 'Default', options: [] },
+    { name: 'Serial Number', type: 'Single Line Text', source: 'Default', options: [] },
+    { name: 'Barcode', type: 'Single Line Text', source: 'Default', options: [] },
+    { name: 'Location Code', type: 'Single Line Text', source: 'Default', options: [] },
+    { name: 'Purchase Date', type: 'Date', source: 'Default', options: [] },
+    { name: 'Warranty Expiration', type: 'Date', source: 'Default', options: [] },
+    { name: 'Purchase Price', type: 'Currency', source: 'Default', options: [] },
+    { name: 'Replacement Cost', type: 'Currency', source: 'Default', options: [] },
+    { name: 'Useful Life', type: 'Number', source: 'Default', options: [] },
+    { name: 'Condition Score', type: 'Number', source: 'Default', options: [] },
+    { name: 'Notes', type: 'Multi-Line Text', source: 'Default', options: [] },
+  ],
+  operatingHours: [],
+  statuses: [],
+  checkInOut: {
+    cascadingHierarchyEnabled: false,
+  },
+};
+const DEFAULT_PARTS_INVENTORY_SETTINGS = {
+  general: {
+    enableMultipleInventoryLines: true,
+    allocatedPartQuantitiesSyncedAt: null,
+  },
+  groupParts: [],
+  customFields: [
+    { name: 'Part Number', type: 'Single Line Text', source: 'Default', options: [] },
+    { name: 'Description', type: 'Multi-Line Text', source: 'Default', options: [] },
+    { name: 'Quantity On Hand', type: 'Number', source: 'Default', options: [] },
+    { name: 'Unit Cost', type: 'Currency', source: 'Default', options: [] },
+    { name: 'Category', type: 'Dropdown', source: 'Default', options: [] },
+    { name: 'Supplier', type: 'Single Line Text', source: 'Default', options: [] },
+  ],
+};
+const DEFAULT_WORK_ORDER_SETTINGS = {
+  general: {
+    includeLaborCostsInTotalCost: true,
+    notifyRequestersOfUpdates: true,
+    automaticallyUpdateTimerByStatusChanges: false,
+    startingWorkOrderNumber: 3,
+    autoAssignWorkOrders: false,
+    autoAssignRequests: false,
+    askForFeedback: true,
+    continueToNotifyAfterCompletion: false,
+  },
+  configuration: {
+    createFields: {
+      description: 'Optional',
+      priority: 'Optional',
+      images: 'Optional',
+      primaryWorker: 'Optional',
+      additionalWorkers: 'Optional',
+      assignedTeam: 'Optional',
+      assignedAsset: 'Optional',
+      assignedLocation: 'Optional',
+      dueDate: 'Optional',
+      category: 'Optional',
+      purchaseOrders: 'Optional',
+      files: 'Optional',
+      signature: 'Optional',
+    },
+    completeFields: {
+      files: 'Optional',
+      time: 'Optional',
+      parts: 'Optional',
+      cost: 'Optional',
+    },
+  },
+  statuses: [
+    { id: 'default-open', name: 'Open', type: 'Open', createdBy: '-', lastUpdated: null, isDefault: true },
+    { id: 'default-in-progress', name: 'In Progress', type: 'In Progress', createdBy: '-', lastUpdated: null, isDefault: true },
+    { id: 'default-on-hold', name: 'On Hold', type: 'On Hold', createdBy: '-', lastUpdated: null, isDefault: true },
+    { id: 'default-complete', name: 'Complete', type: 'Complete', createdBy: '-', lastUpdated: null, isDefault: true },
+  ],
+  categories: [
+    { id: 'default-none', name: 'None', isDefault: true },
+    { id: 'default-damage', name: 'Damage', isDefault: true },
+    { id: 'default-electrical', name: 'Electrical', isDefault: true },
+    { id: 'default-meter-reading', name: 'Meter Reading', isDefault: true },
+    { id: 'default-inspection', name: 'Inspection', isDefault: true },
+    { id: 'default-preventative', name: 'Preventative', isDefault: true },
+    { id: 'default-project', name: 'Project', isDefault: true },
+    { id: 'default-safety', name: 'Safety', isDefault: true },
+  ],
+  timers: [
+    { id: 'default-other-time', name: 'Other Time', createdAt: '2018-12-20T00:00:00.000Z', isDefault: true },
+    { id: 'default-drive-time', name: 'Drive Time', createdAt: '2018-12-20T00:00:00.000Z', isDefault: true },
+    { id: 'default-vendor-time', name: 'Vendor Time', createdAt: '2018-12-20T00:00:00.000Z', isDefault: true },
+    { id: 'default-wrench-time', name: 'Wrench Time', createdAt: '2018-12-20T00:00:00.000Z', isDefault: true },
+    { id: 'default-inspection-time', name: 'Inspection Time', createdAt: '2018-12-20T00:00:00.000Z', isDefault: true },
+  ],
+  customFields: [],
+};
+const DEFAULT_PURCHASE_ORDER_SETTINGS = {
+  general: {
+    startCount: 1,
+    prefix: '',
+  },
+  categories: [],
+  publicRequestPortal: {
+    enabled: false,
+  },
+};
+const DEFAULT_METER_SETTINGS = {
+  categories: [],
+};
+const DEFAULT_TAG_SETTINGS = {
+  items: [],
+};
+const ASSET_FIELD_TYPE_OPTIONS = ['Single Line Text', 'Multi-Line Text', 'Dropdown', 'Date', 'Number', 'Currency'];
+const ASSET_OPERATING_DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const TAG_MODEL_OPTIONS = ['Assets', 'Parts & Inventory', 'Requests', 'Work Orders', 'Purchase Orders', 'Meters', 'Tags'];
+const WORK_ORDER_CONFIGURATION_CREATE_FIELDS = [
+  ['description', 'Description'],
+  ['priority', 'Priority'],
+  ['images', 'Images'],
+  ['primaryWorker', 'Primary Worker'],
+  ['additionalWorkers', 'Additional Workers'],
+  ['assignedTeam', 'Assigned Team'],
+  ['assignedAsset', 'Assigned Asset'],
+  ['assignedLocation', 'Assigned Location'],
+  ['dueDate', 'Due Date'],
+  ['category', 'Category'],
+  ['purchaseOrders', 'Purchase Orders'],
+  ['files', 'Files'],
+  ['signature', 'Signature'],
+];
+const WORK_ORDER_CONFIGURATION_COMPLETE_FIELDS = [
+  ['files', 'Files'],
+  ['time', 'Time'],
+  ['parts', 'Parts'],
+  ['cost', 'Cost'],
+];
+const WORK_ORDER_CONFIGURATION_OPTIONS = ['Required', 'Optional', 'Hidden'];
+const WORK_ORDER_STATUS_TYPE_OPTIONS = ['Open', 'In Progress', 'On Hold', 'Complete'];
+const REQUEST_FORM_FIELD_ROWS = [
+  ['title', 'Title'],
+  ['description', 'Description'],
+  ['priority', 'Priority'],
+  ['images', 'Images'],
+  ['primaryWorker', 'Primary Worker'],
+  ['assignedTeam', 'Assigned Team'],
+  ['files', 'Files'],
+  ['additionalWorkers', 'Additional Workers'],
+  ['startDate', 'Start Date'],
+  ['estimatedDuration', 'Estimated Duration'],
+  ['checklists', 'Checklists'],
+  ['signature', 'Signature'],
+];
+const GENERAL_LANGUAGE_OPTIONS = ['English', 'French', 'Kinyarwanda'];
+const GENERAL_DATE_FORMAT_OPTIONS = ['MM/DD/YY', 'DD/MM/YY', 'YYYY-MM-DD'];
+const GENERAL_CURRENCY_OPTIONS = ['RWF - Rwandan Franc', 'USD - US Dollar', 'EUR - Euro'];
+const GENERAL_TIME_ZONE_OPTIONS = ['Africa/Kigali +02:00 CAT', 'UTC +00:00', 'America/New_York -04:00 EDT'];
+const AUTOMATION_IF_OPTIONS = [
+  'Work Order is created',
+  'Work Order is closed',
+  'Request is created',
+  'Request is approved',
+  'Request is denied',
+  'Purchase Order is created',
+  'Purchase Order is updated',
+  'Task is updated',
+];
+const PURCHASE_ORDER_AND_OPTIONS = [
+  'Purchase Order is assigned to Vendor...',
+  'Purchase Order Category is...',
+  'Purchase Order Due Date is between...',
+  'Purchase Order Due Date is after...',
+  'Purchase Order Date is between...',
+  'Purchase Order Date is after...',
+  'Purchase Order Status is...',
+];
+const PURCHASE_ORDER_THEN_OPTIONS = [
+  'Assign Vendor to Purchase Order',
+  'Assign Category to Purchase Order',
+  'Approve Purchase Order',
+  'Decline Purchase Order',
+  'Fulfill Purchase Order',
+  'Send Purchase Order Reminder Email',
+];
+const WORKFLOW_CATEGORY_OPTIONS = ['General', 'Electrical', 'Inspection', 'HVAC', 'Plumbing'];
+const WORKFLOW_STATUS_OPTIONS = ['Open', 'Pending', 'Approved', 'Declined', 'Closed', 'Fulfilled'];
+
+const getWorkflowAndOptions = (ifCondition) => {
+  if (String(ifCondition || '').startsWith('Purchase Order')) return PURCHASE_ORDER_AND_OPTIONS;
+  if (String(ifCondition || '').startsWith('Request')) return ['Request Priority is...', 'Request Status is...', 'Request Category is...'];
+  if (String(ifCondition || '').startsWith('Work Order')) return ['Work Order Priority is...', 'Work Order Status is...', 'Work Order Category is...'];
+  if (String(ifCondition || '').startsWith('Task')) return ['Task Status is...', 'Task Priority is...'];
+  return [];
+};
+
+const getWorkflowThenOptions = (ifCondition) => {
+  if (String(ifCondition || '').startsWith('Purchase Order')) return PURCHASE_ORDER_THEN_OPTIONS;
+  if (String(ifCondition || '').startsWith('Request')) return ['Assign Team to Request', 'Assign Primary Worker to Request', 'Approve Request', 'Deny Request'];
+  if (String(ifCondition || '').startsWith('Work Order')) return ['Assign Technician to Work Order', 'Close Work Order', 'Set Work Order Priority'];
+  if (String(ifCondition || '').startsWith('Task')) return ['Assign Task', 'Update Task Status'];
+  return [];
+};
+
+const createEmptyWorkflowCondition = () => ({
+  id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  type: '',
+  value: {},
+});
+
+const getEmptyWorkflowValueForType = (type) => {
+  const label = String(type || '');
+  if (label.includes('is between')) {
+    return { startDate: '', startTime: '', endDate: '', endTime: '' };
+  }
+  if (label.includes('is after')) {
+    return { date: '', time: '' };
+  }
+  if (label.includes('assigned to Vendor')) {
+    return { vendorId: '' };
+  }
+  if (label.includes('Category')) {
+    return { category: '' };
+  }
+  if (label.includes('Status')) {
+    return { status: '' };
+  }
+  if (label.includes('Priority')) {
+    return { priority: '' };
+  }
+  return {};
+};
+
+const formatWorkflowValueSummary = (value, lookups = {}) => {
+  if (value === null || value === undefined || value === '') return '';
+  if (typeof value === 'string') return value;
+  if (typeof value !== 'object') return String(value);
+
+  if (value.vendorId) {
+    return lookups.vendorMap?.[String(value.vendorId)] || '';
+  }
+  if (value.email) return value.email;
+  if (value.category) return value.category;
+  if (value.status) return value.status;
+  if (value.priority) return value.priority;
+  if (value.startDate && value.endDate) {
+    return `${value.startDate}${value.startTime ? ` ${value.startTime}` : ''} -> ${value.endDate}${value.endTime ? ` ${value.endTime}` : ''}`;
+  }
+  if (value.date) {
+    return `${value.date}${value.time ? ` ${value.time}` : ''}`;
+  }
+  return '';
+};
+
+const ROLE_PERMISSION_SECTIONS = [
+  { section: 'Categories', permissions: ['Create', 'View', 'Edit', 'Delete'] },
+  { section: 'Locations', permissions: ['Create', 'Edit Partial', 'Delete', 'Export', 'Edit', 'View', 'Import'] },
+  { section: 'Assets', permissions: ['Create', 'Edit Partial', 'Delete', 'Export', 'Edit', 'View', 'Import'] },
+  { section: 'Meters', permissions: ['Create', 'Edit Partial', 'Delete', 'Export', 'Edit', 'View', 'Import'] },
+  { section: 'People & Teams', permissions: ['Create', 'View', 'Disable', 'Edit', 'Delete', 'Import'] },
+  { section: 'Work Orders', permissions: ['Create', 'Edit Partial', 'Delete', 'Work Partial', 'Import', 'Edit', 'View', 'Work', 'Assign Users', 'Export'] },
+  { section: 'Work Request', permissions: ['View', 'Approve/Decline', 'View Partial'] },
+  { section: 'Parts & Sets of Parts', permissions: ['View', 'Import', 'Delete', 'Export'] },
+  { section: 'Files', permissions: ['View', 'Delete'] },
+  { section: 'Preventive Maintenance Triggers', permissions: ['View', 'Create', 'Delete', 'Edit'] },
+  { section: 'Purchase Orders', permissions: ['View', 'Delete'] },
+  { section: 'Vendors & Customers', permissions: ['View', 'Import Vendors', 'Import Customers', 'Delete', 'Export Vendors', 'Export Customers'] },
+  { section: 'Settings', permissions: ['Access'] },
+  { section: 'Analytics Dashboard', permissions: ['View'] },
+];
+
+const createEmptyRoleForm = () => ({
+  name: '',
+  description: '',
+  externalId: '',
+  type: 'Paid',
+  permissions: ROLE_PERMISSION_SECTIONS.map((section) => ({
+    section: section.section,
+    permissions: [...section.permissions],
+    expanded: true,
+  })),
+});
+
+const createEmptyAssetFieldForm = (type = 'Single Line Text') => ({
+  name: '',
+  type,
+  optionsText: '',
+});
+
+const createEmptyOperatingScheduleForm = () => ({
+  name: '',
+  days: ASSET_OPERATING_DAYS.reduce((acc, day) => {
+    acc[day] = {
+      enabled: false,
+      blocks: [{ from: '', to: '' }],
+    };
+    return acc;
+  }, {}),
+});
+
+const createEmptyPartGroupForm = () => ({
+  name: '',
+  description: '',
+});
+
+const createEmptyWorkOrderStatusForm = () => ({
+  type: 'Open',
+  name: '',
+});
+
+const createEmptyWorkOrderFieldForm = (type = 'Single Line Text') => ({
+  name: '',
+  type,
+  optionsText: '',
+});
+
+const hasWorkflowValue = (value) => {
+  if (value === null || value === undefined || value === '') return false;
+  if (typeof value === 'string') return value.trim().length > 0;
+  if (typeof value !== 'object') return true;
+  return Object.values(value).some((entry) => String(entry || '').trim().length > 0);
+};
 
 const createEmptyPropertyForm = () => ({
   name: '',
@@ -788,7 +1142,7 @@ function SectionHeader({ title, count, action }) {
 
 // â”€â”€ Table â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Centralized Popover (manager parity)
-const FilterPopover = ({ isOpen, onClose, title, children, className = "", anchorRef = null }) => {
+const FilterPopover = ({ isOpen, onClose, title, children, className = "", anchorRef = null, bodyClassName = "" }) => {
   const [position, setPosition] = useState({ top: 0, left: 0, width: null });
 
   useEffect(() => {
@@ -797,9 +1151,11 @@ const FilterPopover = ({ isOpen, onClose, title, children, className = "", ancho
     const updatePosition = () => {
       const rect = anchorRef.current?.getBoundingClientRect();
       if (!rect) return;
+      const estimatedWidth = rect.width >= 700 ? rect.width : 760;
+      const maxLeft = Math.max(16, window.innerWidth - estimatedWidth - 16);
       setPosition({
         top: rect.bottom + 8,
-        left: rect.left,
+        left: Math.min(rect.left, maxLeft),
         width: rect.width,
       });
     };
@@ -823,13 +1179,15 @@ const FilterPopover = ({ isOpen, onClose, title, children, className = "", ancho
           className={`fixed z-[1200] glass-surface-strong rounded-xl min-w-[240px] animate-in fade-in zoom-in duration-200 ${className}`}
           style={{ top: position.top, left: position.left, minWidth: position.width || undefined }}
         >
-          <div className="flex items-center justify-between p-4 border-b border-gray-50">
-            <span className="text-sm font-bold text-gray-900">{title}</span>
-            <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg transition-colors">
-              <X className="w-4 h-4 text-gray-400" />
-            </button>
-          </div>
-          <div className="max-h-[320px] overflow-y-auto p-2">
+          {title ? (
+            <div className="flex items-center justify-between p-4 border-b border-gray-50">
+              <span className="text-sm font-bold text-gray-900">{title}</span>
+              <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg transition-colors">
+                <X className="w-4 h-4 text-gray-400" />
+              </button>
+            </div>
+          ) : null}
+          <div className={bodyClassName || "max-h-[320px] overflow-y-auto p-2"}>
             {children}
           </div>
         </div>
@@ -842,13 +1200,15 @@ const FilterPopover = ({ isOpen, onClose, title, children, className = "", ancho
     <>
       <div className="fixed inset-0 z-40" onClick={onClose} />
       <div className={`absolute top-full mt-2 left-0 z-50 glass-surface-strong rounded-xl min-w-[240px] animate-in fade-in zoom-in duration-200 ${className}`}>
-        <div className="flex items-center justify-between p-4 border-b border-gray-50">
-          <span className="text-sm font-bold text-gray-900">{title}</span>
-          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg transition-colors">
-            <X className="w-4 h-4 text-gray-400" />
-          </button>
-        </div>
-        <div className="max-h-[320px] overflow-y-auto p-2">
+        {title ? (
+          <div className="flex items-center justify-between p-4 border-b border-gray-50">
+            <span className="text-sm font-bold text-gray-900">{title}</span>
+            <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg transition-colors">
+              <X className="w-4 h-4 text-gray-400" />
+            </button>
+          </div>
+        ) : null}
+        <div className={bodyClassName || "max-h-[320px] overflow-y-auto p-2"}>
           {children}
         </div>
       </div>
@@ -872,6 +1232,3990 @@ const FilterButton = ({ icon: Icon, label, active, count, onClick }) => (
     <ChevronDown className="h-4 w-4" />
   </button>
 );
+
+const RequestFormSettingsModal = ({
+  open,
+  settings,
+  onChange,
+  onClose,
+  onSave,
+  companyName = '',
+  properties = [],
+  assets = [],
+  vendors = [],
+  legacyPublicRequestsEnabled = false,
+  onToggleLegacyPortal,
+  branding = DEFAULT_REQUEST_BRANDING,
+  onApplyBranding,
+  portals = [],
+  onCreatePortal,
+  generalSettings = DEFAULT_GENERAL_SETTINGS,
+  onSaveGeneralSettings,
+  automationWorkflows = [],
+  onSaveAutomationWorkflows,
+  roleRows = [],
+  onCreateUserRole,
+  assetSettings = DEFAULT_ASSET_SETTINGS,
+  onCreateAssetField,
+  onCreateAssetOperatingSchedule,
+  onCreateAssetStatus,
+  onSaveAssetCheckInOut,
+  partsInventorySettings = DEFAULT_PARTS_INVENTORY_SETTINGS,
+  onCreatePartGroup,
+  onCreatePartCustomField,
+  onSavePartsInventoryGeneral,
+  onAutoGroupParts,
+  onSyncAllocatedPartQuantities,
+  workOrderSettings = DEFAULT_WORK_ORDER_SETTINGS,
+  onSaveWorkOrderGeneral,
+  onSaveWorkOrderConfiguration,
+  onCreateWorkOrderStatus,
+  onCreateWorkOrderCategory,
+  onUpdateWorkOrderCategory,
+  onDeleteWorkOrderCategory,
+  onCreateWorkOrderTimer,
+  onUpdateWorkOrderTimer,
+  onDeleteWorkOrderTimer,
+  onCreateWorkOrderCustomField,
+  purchaseOrderSettings = DEFAULT_PURCHASE_ORDER_SETTINGS,
+  onSavePurchaseOrderGeneral,
+  onCreatePurchaseOrderCategory,
+  onUpdatePurchaseOrderCategory,
+  onDeletePurchaseOrderCategory,
+  onSavePurchaseOrderPublicRequestPortal,
+  meterSettings = DEFAULT_METER_SETTINGS,
+  onCreateMeterCategory,
+  onUpdateMeterCategory,
+  onDeleteMeterCategory,
+  tagSettings = DEFAULT_TAG_SETTINGS,
+  onCreateTag,
+  onUpdateTag,
+  onDeleteTag,
+}) => {
+  const [activeSettingsSection, setActiveSettingsSection] = useState('requests');
+  const [activeRequestSettingsTab, setActiveRequestSettingsTab] = useState('internal');
+  const [activeAssetSettingsTab, setActiveAssetSettingsTab] = useState('fields');
+  const [activePartsInventoryTab, setActivePartsInventoryTab] = useState('general');
+  const [activeWorkOrderSettingsTab, setActiveWorkOrderSettingsTab] = useState('general');
+  const [activePurchaseOrderSettingsTab, setActivePurchaseOrderSettingsTab] = useState('general');
+  const [portalSearch, setPortalSearch] = useState('');
+  const [brandingOpen, setBrandingOpen] = useState(false);
+  const [brandingStep, setBrandingStep] = useState(1);
+  const [brandingLogo, setBrandingLogo] = useState(null);
+  const [createPortalOpen, setCreatePortalOpen] = useState(false);
+  const [portalSaving, setPortalSaving] = useState(false);
+  const [editingPortalId, setEditingPortalId] = useState('');
+  const [generalForm, setGeneralForm] = useState(DEFAULT_GENERAL_SETTINGS);
+  const [workflowSaving, setWorkflowSaving] = useState(false);
+  const [showWorkflowModal, setShowWorkflowModal] = useState(false);
+  const [workflows, setWorkflows] = useState([]);
+  const [showRoleModal, setShowRoleModal] = useState(false);
+  const [roleSaving, setRoleSaving] = useState(false);
+  const [rolesTable, setRolesTable] = useState([]);
+  const [roleForm, setRoleForm] = useState(createEmptyRoleForm());
+  const [assetFieldSearch, setAssetFieldSearch] = useState('');
+  const [showAssetFieldMenu, setShowAssetFieldMenu] = useState(false);
+  const [showAssetFieldModal, setShowAssetFieldModal] = useState(false);
+  const [assetFieldSaving, setAssetFieldSaving] = useState(false);
+  const [assetFieldForm, setAssetFieldForm] = useState(createEmptyAssetFieldForm());
+  const [showScheduleBuilder, setShowScheduleBuilder] = useState(false);
+  const [scheduleSaving, setScheduleSaving] = useState(false);
+  const [operatingScheduleForm, setOperatingScheduleForm] = useState(createEmptyOperatingScheduleForm());
+  const [showAssetStatusModal, setShowAssetStatusModal] = useState(false);
+  const [assetStatusSaving, setAssetStatusSaving] = useState(false);
+  const [assetStatusName, setAssetStatusName] = useState('');
+  const [assetSettingsState, setAssetSettingsState] = useState(DEFAULT_ASSET_SETTINGS);
+  const [partsInventoryState, setPartsInventoryState] = useState(DEFAULT_PARTS_INVENTORY_SETTINGS);
+  const [workOrderSettingsState, setWorkOrderSettingsState] = useState(DEFAULT_WORK_ORDER_SETTINGS);
+  const [purchaseOrderSettingsState, setPurchaseOrderSettingsState] = useState(DEFAULT_PURCHASE_ORDER_SETTINGS);
+  const [meterSettingsState, setMeterSettingsState] = useState(DEFAULT_METER_SETTINGS);
+  const [tagSettingsState, setTagSettingsState] = useState(DEFAULT_TAG_SETTINGS);
+  const [showPartGroupModal, setShowPartGroupModal] = useState(false);
+  const [partGroupSaving, setPartGroupSaving] = useState(false);
+  const [partGroupForm, setPartGroupForm] = useState(createEmptyPartGroupForm());
+  const [autoGroupConfirmChecked, setAutoGroupConfirmChecked] = useState(false);
+  const [autoGroupSaving, setAutoGroupSaving] = useState(false);
+  const [syncingAllocatedParts, setSyncingAllocatedParts] = useState(false);
+  const [partFieldSearch, setPartFieldSearch] = useState('');
+  const [showPartFieldMenu, setShowPartFieldMenu] = useState(false);
+  const [showPartFieldModal, setShowPartFieldModal] = useState(false);
+  const [partFieldSaving, setPartFieldSaving] = useState(false);
+  const [partFieldForm, setPartFieldForm] = useState(createEmptyAssetFieldForm());
+  const [showWorkOrderFieldMenu, setShowWorkOrderFieldMenu] = useState(false);
+  const [showWorkOrderFieldModal, setShowWorkOrderFieldModal] = useState(false);
+  const [workOrderFieldSaving, setWorkOrderFieldSaving] = useState(false);
+  const [workOrderFieldForm, setWorkOrderFieldForm] = useState(createEmptyWorkOrderFieldForm());
+  const [showWorkOrderStatusModal, setShowWorkOrderStatusModal] = useState(false);
+  const [workOrderStatusSaving, setWorkOrderStatusSaving] = useState(false);
+  const [workOrderStatusForm, setWorkOrderStatusForm] = useState(createEmptyWorkOrderStatusForm());
+  const [showWorkOrderCategoryModal, setShowWorkOrderCategoryModal] = useState(false);
+  const [workOrderCategorySaving, setWorkOrderCategorySaving] = useState(false);
+  const [workOrderCategoryName, setWorkOrderCategoryName] = useState('');
+  const [editingWorkOrderCategoryId, setEditingWorkOrderCategoryId] = useState('');
+  const [openWorkOrderCategoryMenuId, setOpenWorkOrderCategoryMenuId] = useState('');
+  const [showWorkOrderTimerModal, setShowWorkOrderTimerModal] = useState(false);
+  const [workOrderTimerSaving, setWorkOrderTimerSaving] = useState(false);
+  const [workOrderTimerName, setWorkOrderTimerName] = useState('');
+  const [editingWorkOrderTimerId, setEditingWorkOrderTimerId] = useState('');
+  const [showPurchaseOrderCategoryModal, setShowPurchaseOrderCategoryModal] = useState(false);
+  const [purchaseOrderCategorySaving, setPurchaseOrderCategorySaving] = useState(false);
+  const [purchaseOrderCategoryName, setPurchaseOrderCategoryName] = useState('');
+  const [editingPurchaseOrderCategoryId, setEditingPurchaseOrderCategoryId] = useState('');
+  const [openPurchaseOrderCategoryMenuId, setOpenPurchaseOrderCategoryMenuId] = useState('');
+  const [showMeterCategoryModal, setShowMeterCategoryModal] = useState(false);
+  const [meterCategorySaving, setMeterCategorySaving] = useState(false);
+  const [meterCategoryName, setMeterCategoryName] = useState('');
+  const [editingMeterCategoryId, setEditingMeterCategoryId] = useState('');
+  const [openMeterCategoryMenuId, setOpenMeterCategoryMenuId] = useState('');
+  const [showTagModal, setShowTagModal] = useState(false);
+  const [tagSaving, setTagSaving] = useState(false);
+  const [tagForm, setTagForm] = useState({ name: '', model: '' });
+  const [editingTagId, setEditingTagId] = useState('');
+  const [openTagMenuId, setOpenTagMenuId] = useState('');
+  const [workflowForm, setWorkflowForm] = useState({
+    title: '',
+    ifCondition: '',
+    andConditions: [createEmptyWorkflowCondition()],
+    thenAction: '',
+    thenValue: '',
+  });
+  const filteredPortals = (Array.isArray(portals) ? portals : []).filter((portal) =>
+    String(portal?.name || '').toLowerCase().includes(String(portalSearch || '').toLowerCase())
+  );
+  const [portalForm, setPortalForm] = useState({
+    name: '',
+    customUrl: '',
+    type: 'general',
+    selectedLocationId: '',
+    selectedAssetId: '',
+    options: {
+      attachments: { enabled: true, required: false },
+      location: { enabled: true, required: false },
+      asset: { enabled: true, required: false },
+    },
+    customFields: [],
+  });
+  const locationOptions = (Array.isArray(properties) ? properties : []).map((property) => ({
+    id: String(property?._id || property?.id || ''),
+    label: String(property?.name || property?.propertyName || '').trim(),
+  })).filter((option) => option.id && option.label);
+  const assetOptions = (Array.isArray(assets) ? assets : []).map((asset) => ({
+    id: String(asset?._id || asset?.id || ''),
+    label: String(asset?.name || asset?.assetName || '').trim(),
+  })).filter((option) => option.id && option.label);
+  const vendorOptions = (Array.isArray(vendors) ? vendors : []).map((vendor) => ({
+    value: String(vendor?._id || vendor?.id || ''),
+    label: String(vendor?.name || vendor?.company || vendor?.email || '').trim(),
+    email: String(vendor?.email || '').trim(),
+  })).filter((option) => option.value && option.label);
+  const vendorNameMap = vendorOptions.reduce((acc, option) => {
+    acc[String(option.value)] = option.label;
+    return acc;
+  }, {});
+  const workflowEmailOptions = vendorOptions
+    .filter((option) => option.email)
+    .map((option) => ({ value: option.email, label: option.email }));
+  const filteredAssetFields = (Array.isArray(assetSettingsState.fields) ? assetSettingsState.fields : []).filter((field) =>
+    String(field?.name || '').toLowerCase().includes(String(assetFieldSearch || '').toLowerCase())
+  );
+  const filteredPartFields = (Array.isArray(partsInventoryState.customFields) ? partsInventoryState.customFields : []).filter((field) =>
+    String(field?.name || '').toLowerCase().includes(String(partFieldSearch || '').toLowerCase())
+  );
+
+  useEffect(() => {
+    setGeneralForm({ ...DEFAULT_GENERAL_SETTINGS, ...(generalSettings || {}) });
+  }, [generalSettings]);
+
+  useEffect(() => {
+    setWorkflows(Array.isArray(automationWorkflows) ? automationWorkflows : []);
+  }, [automationWorkflows]);
+
+  useEffect(() => {
+    setRolesTable(Array.isArray(roleRows) ? roleRows : []);
+  }, [roleRows]);
+
+  useEffect(() => {
+    setAssetSettingsState({
+      ...DEFAULT_ASSET_SETTINGS,
+      ...(assetSettings || {}),
+      fields: Array.isArray(assetSettings?.fields) && assetSettings.fields.length > 0 ? assetSettings.fields : DEFAULT_ASSET_SETTINGS.fields,
+      operatingHours: Array.isArray(assetSettings?.operatingHours) ? assetSettings.operatingHours : [],
+      statuses: Array.isArray(assetSettings?.statuses) ? assetSettings.statuses : [],
+      checkInOut: {
+        ...DEFAULT_ASSET_SETTINGS.checkInOut,
+        ...(assetSettings?.checkInOut || {}),
+      },
+    });
+  }, [assetSettings]);
+
+  useEffect(() => {
+    setPartsInventoryState({
+      ...DEFAULT_PARTS_INVENTORY_SETTINGS,
+      ...(partsInventorySettings || {}),
+      general: {
+        ...DEFAULT_PARTS_INVENTORY_SETTINGS.general,
+        ...(partsInventorySettings?.general || {}),
+      },
+      groupParts: Array.isArray(partsInventorySettings?.groupParts) ? partsInventorySettings.groupParts : [],
+      customFields: Array.isArray(partsInventorySettings?.customFields) && partsInventorySettings.customFields.length > 0
+        ? partsInventorySettings.customFields
+        : DEFAULT_PARTS_INVENTORY_SETTINGS.customFields,
+    });
+  }, [partsInventorySettings]);
+
+  useEffect(() => {
+    setWorkOrderSettingsState({
+      ...DEFAULT_WORK_ORDER_SETTINGS,
+      ...(workOrderSettings || {}),
+      general: {
+        ...DEFAULT_WORK_ORDER_SETTINGS.general,
+        ...(workOrderSettings?.general || {}),
+      },
+      configuration: {
+        createFields: {
+          ...DEFAULT_WORK_ORDER_SETTINGS.configuration.createFields,
+          ...(workOrderSettings?.configuration?.createFields || {}),
+        },
+        completeFields: {
+          ...DEFAULT_WORK_ORDER_SETTINGS.configuration.completeFields,
+          ...(workOrderSettings?.configuration?.completeFields || {}),
+        },
+      },
+      statuses: Array.isArray(workOrderSettings?.statuses) && workOrderSettings.statuses.length > 0
+        ? workOrderSettings.statuses
+        : DEFAULT_WORK_ORDER_SETTINGS.statuses,
+      categories: Array.isArray(workOrderSettings?.categories) && workOrderSettings.categories.length > 0
+        ? workOrderSettings.categories
+        : DEFAULT_WORK_ORDER_SETTINGS.categories,
+      timers: Array.isArray(workOrderSettings?.timers) && workOrderSettings.timers.length > 0
+        ? workOrderSettings.timers
+        : DEFAULT_WORK_ORDER_SETTINGS.timers,
+      customFields: Array.isArray(workOrderSettings?.customFields)
+        ? workOrderSettings.customFields
+        : [],
+    });
+  }, [workOrderSettings]);
+
+  useEffect(() => {
+    setPurchaseOrderSettingsState({
+      ...DEFAULT_PURCHASE_ORDER_SETTINGS,
+      ...(purchaseOrderSettings || {}),
+      general: {
+        ...DEFAULT_PURCHASE_ORDER_SETTINGS.general,
+        ...(purchaseOrderSettings?.general || {}),
+      },
+      categories: Array.isArray(purchaseOrderSettings?.categories) ? purchaseOrderSettings.categories : [],
+      publicRequestPortal: {
+        ...DEFAULT_PURCHASE_ORDER_SETTINGS.publicRequestPortal,
+        ...(purchaseOrderSettings?.publicRequestPortal || {}),
+      },
+    });
+  }, [purchaseOrderSettings]);
+
+  useEffect(() => {
+    setMeterSettingsState({
+      ...DEFAULT_METER_SETTINGS,
+      ...(meterSettings || {}),
+      categories: Array.isArray(meterSettings?.categories) ? meterSettings.categories : [],
+    });
+  }, [meterSettings]);
+
+  useEffect(() => {
+    setTagSettingsState({
+      ...DEFAULT_TAG_SETTINGS,
+      ...(tagSettings || {}),
+      items: Array.isArray(tagSettings?.items) ? tagSettings.items : [],
+    });
+  }, [tagSettings]);
+
+  const updatePortalOption = (key, part, value) => {
+    setPortalForm((prev) => ({
+      ...prev,
+      options: {
+        ...prev.options,
+        [key]: {
+          ...prev.options[key],
+          [part]: value,
+        },
+      },
+    }));
+  };
+
+  const addCustomPortalField = () => {
+    setPortalForm((prev) => ({
+      ...prev,
+      customFields: [
+        ...prev.customFields,
+        {
+          id: `${Date.now()}-${prev.customFields.length}`,
+          type: 'Text',
+          label: '',
+          required: false,
+        },
+      ],
+    }));
+  };
+
+  const updateCustomPortalField = (id, patch) => {
+    setPortalForm((prev) => ({
+      ...prev,
+      customFields: prev.customFields.map((field) => (field.id === id ? { ...field, ...patch } : field)),
+    }));
+  };
+
+  const removeCustomPortalField = (id) => {
+    setPortalForm((prev) => ({
+      ...prev,
+      customFields: prev.customFields.filter((field) => field.id !== id),
+    }));
+  };
+
+  const updateWorkflowCondition = (id, patch) => {
+    setWorkflowForm((prev) => ({
+      ...prev,
+      andConditions: prev.andConditions.map((condition) => (
+        condition.id === id ? { ...condition, ...patch } : condition
+      )),
+    }));
+  };
+
+  const addWorkflowCondition = () => {
+    setWorkflowForm((prev) => ({
+      ...prev,
+      andConditions: [...prev.andConditions, createEmptyWorkflowCondition()],
+    }));
+  };
+
+  const removeWorkflowCondition = (id) => {
+    setWorkflowForm((prev) => ({
+      ...prev,
+      andConditions: prev.andConditions.filter((condition) => condition.id !== id),
+    }));
+  };
+
+  const resetWorkflowForm = () => {
+    setWorkflowForm({
+      title: '',
+      ifCondition: '',
+      andConditions: [createEmptyWorkflowCondition()],
+      thenAction: '',
+      thenValue: {},
+    });
+  };
+
+  const handleSaveWorkflow = async () => {
+    const normalizedConditions = workflowForm.andConditions
+      .filter((condition) => condition.type)
+      .map(({ id, ...condition }) => condition);
+    const needsThenValue = [
+      'Send Purchase Order Reminder Email',
+      'Assign Vendor to Purchase Order',
+      'Assign Category to Purchase Order',
+      'Set Work Order Priority',
+    ].includes(workflowForm.thenAction);
+    const hasInvalidConditionValue = normalizedConditions.some((condition) => !hasWorkflowValue(condition.value));
+    if (hasInvalidConditionValue || (needsThenValue && !hasWorkflowValue(workflowForm.thenValue))) {
+      alert('Please complete the selected workflow condition and action values before saving.');
+      return;
+    }
+    const nextWorkflows = [
+      ...workflows,
+      {
+        id: `${Date.now()}`,
+        title: workflowForm.title.trim(),
+        ifCondition: workflowForm.ifCondition,
+        andConditions: normalizedConditions,
+        thenAction: workflowForm.thenAction,
+        thenValue: workflowForm.thenValue,
+      },
+    ];
+    setWorkflowSaving(true);
+    const saved = await onSaveAutomationWorkflows?.(nextWorkflows);
+    setWorkflowSaving(false);
+    if (saved) {
+      setWorkflows(saved);
+      setShowWorkflowModal(false);
+      resetWorkflowForm();
+    }
+  };
+
+  const updateRoleSectionPermissions = (sectionName, permissions) => {
+    setRoleForm((prev) => ({
+      ...prev,
+      permissions: prev.permissions.map((section) => (
+        section.section === sectionName ? { ...section, permissions } : section
+      )),
+    }));
+  };
+
+  const toggleRoleSectionPermission = (sectionName, permission) => {
+    setRoleForm((prev) => ({
+      ...prev,
+      permissions: prev.permissions.map((section) => {
+        if (section.section !== sectionName) return section;
+        const exists = section.permissions.includes(permission);
+        return {
+          ...section,
+          permissions: exists
+            ? section.permissions.filter((item) => item !== permission)
+            : [...section.permissions, permission],
+        };
+      }),
+    }));
+  };
+
+  const toggleRoleSectionExpanded = (sectionName) => {
+    setRoleForm((prev) => ({
+      ...prev,
+      permissions: prev.permissions.map((section) => (
+        section.section === sectionName ? { ...section, expanded: !section.expanded } : section
+      )),
+    }));
+  };
+
+  const handleSaveRole = async () => {
+    setRoleSaving(true);
+    const payload = {
+      name: roleForm.name.trim(),
+      description: roleForm.description.trim(),
+      externalId: roleForm.externalId.trim(),
+      type: roleForm.type,
+      permissions: roleForm.permissions.map((section) => ({
+        section: section.section,
+        permissions: section.permissions,
+      })),
+    };
+    const result = await onCreateUserRole?.(payload);
+    setRoleSaving(false);
+    if (result?.roleRows) {
+      setRolesTable(result.roleRows);
+      setShowRoleModal(false);
+      setRoleForm(createEmptyRoleForm());
+    }
+  };
+
+  const handleCreateAssetField = async () => {
+    setAssetFieldSaving(true);
+    const payload = {
+      name: assetFieldForm.name.trim(),
+      type: assetFieldForm.type,
+      options: assetFieldForm.type === 'Dropdown'
+        ? assetFieldForm.optionsText.split('\n').map((option) => option.trim()).filter(Boolean)
+        : [],
+    };
+    const result = await onCreateAssetField?.(payload);
+    setAssetFieldSaving(false);
+    if (result?.assets) {
+      setAssetSettingsState(result.assets);
+      setShowAssetFieldModal(false);
+      setShowAssetFieldMenu(false);
+      setAssetFieldForm(createEmptyAssetFieldForm());
+    }
+  };
+
+  const handleAddScheduleBlock = (day) => {
+    setOperatingScheduleForm((prev) => ({
+      ...prev,
+      days: {
+        ...prev.days,
+        [day]: {
+          ...prev.days[day],
+          blocks: [...prev.days[day].blocks, { from: '', to: '' }],
+        },
+      },
+    }));
+  };
+
+  const handleScheduleDayChange = (day, patch) => {
+    setOperatingScheduleForm((prev) => ({
+      ...prev,
+      days: {
+        ...prev.days,
+        [day]: {
+          ...prev.days[day],
+          ...patch,
+        },
+      },
+    }));
+  };
+
+  const handleScheduleBlockChange = (day, index, key, value) => {
+    setOperatingScheduleForm((prev) => ({
+      ...prev,
+      days: {
+        ...prev.days,
+        [day]: {
+          ...prev.days[day],
+          blocks: prev.days[day].blocks.map((block, blockIndex) => (
+            blockIndex === index ? { ...block, [key]: value } : block
+          )),
+        },
+      },
+    }));
+  };
+
+  const handleCreateOperatingSchedule = async () => {
+    const blocks = ASSET_OPERATING_DAYS.flatMap((day) => {
+      const dayState = operatingScheduleForm.days[day];
+      if (!dayState?.enabled) return [];
+      return (Array.isArray(dayState.blocks) ? dayState.blocks : [])
+        .filter((block) => block.from && block.to)
+        .map((block) => ({ day, from: block.from, to: block.to }));
+    });
+    setScheduleSaving(true);
+    const result = await onCreateAssetOperatingSchedule?.({
+      name: operatingScheduleForm.name.trim(),
+      blocks,
+    });
+    setScheduleSaving(false);
+    if (result?.assets) {
+      setAssetSettingsState(result.assets);
+      setShowScheduleBuilder(false);
+      setOperatingScheduleForm(createEmptyOperatingScheduleForm());
+    }
+  };
+
+  const handleCreateAssetStatus = async () => {
+    setAssetStatusSaving(true);
+    const result = await onCreateAssetStatus?.({ name: assetStatusName.trim() });
+    setAssetStatusSaving(false);
+    if (result?.assets) {
+      setAssetSettingsState(result.assets);
+      setShowAssetStatusModal(false);
+      setAssetStatusName('');
+    }
+  };
+
+  const handleToggleCheckInOut = async (enabled) => {
+    setAssetSettingsState((prev) => ({
+      ...prev,
+      checkInOut: {
+        ...prev.checkInOut,
+        cascadingHierarchyEnabled: enabled,
+      },
+    }));
+    const result = await onSaveAssetCheckInOut?.(enabled);
+    if (result?.assets) {
+      setAssetSettingsState(result.assets);
+    }
+  };
+
+  const handleCreatePartGroup = async () => {
+    setPartGroupSaving(true);
+    const result = await onCreatePartGroup?.({
+      name: partGroupForm.name.trim(),
+      description: partGroupForm.description.trim(),
+    });
+    setPartGroupSaving(false);
+    if (result?.partsInventory) {
+      setPartsInventoryState(result.partsInventory);
+      setShowPartGroupModal(false);
+      setPartGroupForm(createEmptyPartGroupForm());
+    }
+  };
+
+  const handleCreatePartField = async () => {
+    setPartFieldSaving(true);
+    const result = await onCreatePartCustomField?.({
+      name: partFieldForm.name.trim(),
+      type: partFieldForm.type,
+      options: partFieldForm.type === 'Dropdown'
+        ? partFieldForm.optionsText.split('\n').map((option) => option.trim()).filter(Boolean)
+        : [],
+    });
+    setPartFieldSaving(false);
+    if (result?.partsInventory) {
+      setPartsInventoryState(result.partsInventory);
+      setShowPartFieldModal(false);
+      setShowPartFieldMenu(false);
+      setPartFieldForm(createEmptyAssetFieldForm());
+    }
+  };
+
+  const handleToggleMultipleInventoryLines = async (enabled) => {
+    setPartsInventoryState((prev) => ({
+      ...prev,
+      general: {
+        ...prev.general,
+        enableMultipleInventoryLines: enabled,
+      },
+    }));
+    const result = await onSavePartsInventoryGeneral?.({
+      enableMultipleInventoryLines: enabled,
+      allocatedPartQuantitiesSyncedAt: partsInventoryState.general?.allocatedPartQuantitiesSyncedAt || null,
+    });
+    if (result?.partsInventory) {
+      setPartsInventoryState(result.partsInventory);
+    }
+  };
+
+  const handleAutoGroupParts = async () => {
+    setAutoGroupSaving(true);
+    const result = await onAutoGroupParts?.(autoGroupConfirmChecked);
+    setAutoGroupSaving(false);
+    if (result?.partsInventory) {
+      setPartsInventoryState(result.partsInventory);
+      setShowPartGroupModal(false);
+      setAutoGroupConfirmChecked(false);
+    }
+  };
+
+  const handleSyncAllocatedParts = async () => {
+    setSyncingAllocatedParts(true);
+    const result = await onSyncAllocatedPartQuantities?.();
+    setSyncingAllocatedParts(false);
+    if (result?.partsInventory) {
+      setPartsInventoryState(result.partsInventory);
+    }
+  };
+
+  const updateWorkOrderGeneralState = (key, value) => {
+    setWorkOrderSettingsState((prev) => ({
+      ...prev,
+      general: {
+        ...prev.general,
+        [key]: value,
+      },
+    }));
+  };
+
+  const updateWorkOrderConfigurationState = (section, key, value) => {
+    setWorkOrderSettingsState((prev) => ({
+      ...prev,
+      configuration: {
+        ...prev.configuration,
+        [section]: {
+          ...prev.configuration[section],
+          [key]: value,
+        },
+      },
+    }));
+  };
+
+  const handleSaveWorkOrderGeneral = async () => {
+    const result = await onSaveWorkOrderGeneral?.(workOrderSettingsState.general);
+    if (result?.workOrders) {
+      setWorkOrderSettingsState((prev) => ({ ...prev, ...result.workOrders }));
+    }
+  };
+
+  const handleSaveWorkOrderConfiguration = async (section) => {
+    const payload = { [section]: workOrderSettingsState.configuration?.[section] || {} };
+    const result = await onSaveWorkOrderConfiguration?.(payload);
+    if (result?.workOrders) {
+      setWorkOrderSettingsState((prev) => ({ ...prev, ...result.workOrders }));
+    }
+  };
+
+  const handleCreateWorkOrderStatus = async () => {
+    setWorkOrderStatusSaving(true);
+    const result = await onCreateWorkOrderStatus?.({
+      type: workOrderStatusForm.type,
+      name: workOrderStatusForm.name.trim(),
+    });
+    setWorkOrderStatusSaving(false);
+    if (result?.workOrders) {
+      setWorkOrderSettingsState((prev) => ({ ...prev, ...result.workOrders }));
+      setShowWorkOrderStatusModal(false);
+      setWorkOrderStatusForm(createEmptyWorkOrderStatusForm());
+    }
+  };
+
+  const handleSaveWorkOrderCategory = async () => {
+    setWorkOrderCategorySaving(true);
+    const payload = { name: workOrderCategoryName.trim() };
+    const result = editingWorkOrderCategoryId
+      ? await onUpdateWorkOrderCategory?.(editingWorkOrderCategoryId, payload)
+      : await onCreateWorkOrderCategory?.(payload);
+    setWorkOrderCategorySaving(false);
+    if (result?.workOrders) {
+      setWorkOrderSettingsState((prev) => ({ ...prev, ...result.workOrders }));
+      setShowWorkOrderCategoryModal(false);
+      setWorkOrderCategoryName('');
+      setEditingWorkOrderCategoryId('');
+      setOpenWorkOrderCategoryMenuId('');
+    }
+  };
+
+  const handleDeleteWorkOrderCategory = async (id) => {
+    const result = await onDeleteWorkOrderCategory?.(id);
+    if (result?.workOrders) {
+      setWorkOrderSettingsState((prev) => ({ ...prev, ...result.workOrders }));
+      setOpenWorkOrderCategoryMenuId('');
+    }
+  };
+
+  const handleSaveWorkOrderTimer = async () => {
+    setWorkOrderTimerSaving(true);
+    const payload = { name: workOrderTimerName.trim() };
+    const result = editingWorkOrderTimerId
+      ? await onUpdateWorkOrderTimer?.(editingWorkOrderTimerId, payload)
+      : await onCreateWorkOrderTimer?.(payload);
+    setWorkOrderTimerSaving(false);
+    if (result?.workOrders) {
+      setWorkOrderSettingsState((prev) => ({ ...prev, ...result.workOrders }));
+      setShowWorkOrderTimerModal(false);
+      setWorkOrderTimerName('');
+      setEditingWorkOrderTimerId('');
+    }
+  };
+
+  const handleCreateWorkOrderField = async () => {
+    setWorkOrderFieldSaving(true);
+    const payload = {
+      name: workOrderFieldForm.name.trim(),
+      type: workOrderFieldForm.type,
+      options: workOrderFieldForm.type === 'Dropdown'
+        ? workOrderFieldForm.optionsText.split('\n').map((option) => option.trim()).filter(Boolean)
+        : [],
+    };
+    const result = await onCreateWorkOrderCustomField?.(payload);
+    setWorkOrderFieldSaving(false);
+    if (result?.workOrders) {
+      setWorkOrderSettingsState((prev) => ({ ...prev, ...result.workOrders }));
+      setShowWorkOrderFieldModal(false);
+      setShowWorkOrderFieldMenu(false);
+      setWorkOrderFieldForm(createEmptyWorkOrderFieldForm());
+    }
+  };
+
+  const handleSavePurchaseOrderGeneral = async () => {
+    const result = await onSavePurchaseOrderGeneral?.(purchaseOrderSettingsState.general);
+    if (result?.purchaseOrders) {
+      setPurchaseOrderSettingsState({
+        ...DEFAULT_PURCHASE_ORDER_SETTINGS,
+        ...(result.purchaseOrders || {}),
+        general: {
+          ...DEFAULT_PURCHASE_ORDER_SETTINGS.general,
+          ...(result.purchaseOrders?.general || {}),
+        },
+        categories: Array.isArray(result.purchaseOrders?.categories) ? result.purchaseOrders.categories : [],
+        publicRequestPortal: {
+          ...DEFAULT_PURCHASE_ORDER_SETTINGS.publicRequestPortal,
+          ...(result.purchaseOrders?.publicRequestPortal || {}),
+        },
+      });
+    }
+  };
+
+  const handleSavePurchaseOrderCategory = async () => {
+    setPurchaseOrderCategorySaving(true);
+    const payload = { name: purchaseOrderCategoryName.trim() };
+    const result = editingPurchaseOrderCategoryId
+      ? await onUpdatePurchaseOrderCategory?.(editingPurchaseOrderCategoryId, payload)
+      : await onCreatePurchaseOrderCategory?.(payload);
+    setPurchaseOrderCategorySaving(false);
+    if (result?.purchaseOrders) {
+      setPurchaseOrderSettingsState({
+        ...DEFAULT_PURCHASE_ORDER_SETTINGS,
+        ...(result.purchaseOrders || {}),
+        general: {
+          ...DEFAULT_PURCHASE_ORDER_SETTINGS.general,
+          ...(result.purchaseOrders?.general || {}),
+        },
+        categories: Array.isArray(result.purchaseOrders?.categories) ? result.purchaseOrders.categories : [],
+        publicRequestPortal: {
+          ...DEFAULT_PURCHASE_ORDER_SETTINGS.publicRequestPortal,
+          ...(result.purchaseOrders?.publicRequestPortal || {}),
+        },
+      });
+      setShowPurchaseOrderCategoryModal(false);
+      setPurchaseOrderCategoryName('');
+      setEditingPurchaseOrderCategoryId('');
+      setOpenPurchaseOrderCategoryMenuId('');
+    }
+  };
+
+  const handleDeletePurchaseOrderCategory = async (id) => {
+    const result = await onDeletePurchaseOrderCategory?.(id);
+    if (result?.purchaseOrders) {
+      setPurchaseOrderSettingsState({
+        ...DEFAULT_PURCHASE_ORDER_SETTINGS,
+        ...(result.purchaseOrders || {}),
+        general: {
+          ...DEFAULT_PURCHASE_ORDER_SETTINGS.general,
+          ...(result.purchaseOrders?.general || {}),
+        },
+        categories: Array.isArray(result.purchaseOrders?.categories) ? result.purchaseOrders.categories : [],
+        publicRequestPortal: {
+          ...DEFAULT_PURCHASE_ORDER_SETTINGS.publicRequestPortal,
+          ...(result.purchaseOrders?.publicRequestPortal || {}),
+        },
+      });
+      setOpenPurchaseOrderCategoryMenuId('');
+    }
+  };
+
+  const handleTogglePurchaseOrderPublicPortal = async (enabled) => {
+    setPurchaseOrderSettingsState((prev) => ({
+      ...prev,
+      publicRequestPortal: {
+        ...(prev.publicRequestPortal || {}),
+        enabled,
+      },
+    }));
+    const result = await onSavePurchaseOrderPublicRequestPortal?.(enabled);
+    if (result?.purchaseOrders) {
+      setPurchaseOrderSettingsState({
+        ...DEFAULT_PURCHASE_ORDER_SETTINGS,
+        ...(result.purchaseOrders || {}),
+        general: {
+          ...DEFAULT_PURCHASE_ORDER_SETTINGS.general,
+          ...(result.purchaseOrders?.general || {}),
+        },
+        categories: Array.isArray(result.purchaseOrders?.categories) ? result.purchaseOrders.categories : [],
+        publicRequestPortal: {
+          ...DEFAULT_PURCHASE_ORDER_SETTINGS.publicRequestPortal,
+          ...(result.purchaseOrders?.publicRequestPortal || {}),
+        },
+      });
+    }
+  };
+
+  const handleSaveMeterCategory = async () => {
+    setMeterCategorySaving(true);
+    const payload = { name: meterCategoryName.trim() };
+    const result = editingMeterCategoryId
+      ? await onUpdateMeterCategory?.(editingMeterCategoryId, payload)
+      : await onCreateMeterCategory?.(payload);
+    setMeterCategorySaving(false);
+    if (result?.meters) {
+      setMeterSettingsState({
+        ...DEFAULT_METER_SETTINGS,
+        ...(result.meters || {}),
+        categories: Array.isArray(result.meters?.categories) ? result.meters.categories : [],
+      });
+      setShowMeterCategoryModal(false);
+      setMeterCategoryName('');
+      setEditingMeterCategoryId('');
+      setOpenMeterCategoryMenuId('');
+    }
+  };
+
+  const handleDeleteMeterCategory = async (id) => {
+    const result = await onDeleteMeterCategory?.(id);
+    if (result?.meters) {
+      setMeterSettingsState({
+        ...DEFAULT_METER_SETTINGS,
+        ...(result.meters || {}),
+        categories: Array.isArray(result.meters?.categories) ? result.meters.categories : [],
+      });
+      setOpenMeterCategoryMenuId('');
+    }
+  };
+
+  const handleSaveTag = async () => {
+    setTagSaving(true);
+    const payload = {
+      name: String(tagForm.name || '').trim(),
+      model: String(tagForm.model || '').trim(),
+    };
+    const result = editingTagId
+      ? await onUpdateTag?.(editingTagId, payload)
+      : await onCreateTag?.(payload);
+    setTagSaving(false);
+    if (result?.tags) {
+      setTagSettingsState({
+        ...DEFAULT_TAG_SETTINGS,
+        ...(result.tags || {}),
+        items: Array.isArray(result.tags?.items) ? result.tags.items : [],
+      });
+      setShowTagModal(false);
+      setTagForm({ name: '', model: '' });
+      setEditingTagId('');
+      setOpenTagMenuId('');
+    }
+  };
+
+  const handleDeleteTag = async (id) => {
+    const result = await onDeleteTag?.(id);
+    if (result?.tags) {
+      setTagSettingsState({
+        ...DEFAULT_TAG_SETTINGS,
+        ...(result.tags || {}),
+        items: Array.isArray(result.tags?.items) ? result.tags.items : [],
+      });
+      setOpenTagMenuId('');
+    }
+  };
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-[1400] flex bg-white">
+      <div className="flex w-full min-w-0">
+        <aside className="flex w-[270px] shrink-0 flex-col border-r border-gray-200 bg-white">
+          <div className="flex items-center gap-5 border-b border-gray-200 px-8 py-6">
+            <button type="button" onClick={onClose} className="text-gray-500 transition hover:text-gray-800">
+              <X className="h-8 w-8" />
+            </button>
+          <h2 className="text-[20px] font-bold text-gray-900">FixNest Settings</h2>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-6">
+            <div className="mb-8">
+              <div className="px-4 text-[13px] font-bold text-gray-900">Organization</div>
+              <div className="mt-3 space-y-1">
+                <button
+                  type="button"
+                  onClick={() => setActiveSettingsSection('general')}
+                  className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-[15px] ${
+                    activeSettingsSection === 'general' ? 'bg-blue-50 font-semibold text-blue-700' : 'text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  <SlidersHorizontal className="h-5 w-5" />
+                  General
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveSettingsSection('automation')}
+                  className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-[15px] ${
+                    activeSettingsSection === 'automation' ? 'bg-blue-50 font-semibold text-blue-700' : 'text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  <Zap className="h-5 w-5" />
+                  Automation
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveSettingsSection('roles')}
+                  className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-[15px] ${
+                    activeSettingsSection === 'roles' ? 'bg-blue-50 font-semibold text-blue-700' : 'text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  <Users className="h-5 w-5" />
+                  User Roles
+                </button>
+              </div>
+            </div>
+            <div className="mb-8">
+              <div className="px-4 text-[13px] font-bold text-gray-900">Modules</div>
+              <div className="mt-3 space-y-1">
+                {['Assets', 'Parts & Inventory', 'Requests', 'Work Orders', 'Purchase Orders', 'Meters', 'Tags'].map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() => {
+                      if (item === 'Requests') setActiveSettingsSection('requests');
+                      if (item === 'Assets') setActiveSettingsSection('assets');
+                      if (item === 'Parts & Inventory') setActiveSettingsSection('partsInventory');
+                      if (item === 'Work Orders') setActiveSettingsSection('workOrders');
+                      if (item === 'Purchase Orders') setActiveSettingsSection('purchaseOrders');
+                      if (item === 'Meters') setActiveSettingsSection('meters');
+                      if (item === 'Tags') setActiveSettingsSection('tags');
+                    }}
+                    className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-[15px] ${
+                      (item === 'Requests' && activeSettingsSection === 'requests') ||
+                      (item === 'Assets' && activeSettingsSection === 'assets') ||
+                      (item === 'Parts & Inventory' && activeSettingsSection === 'partsInventory') ||
+                      (item === 'Work Orders' && activeSettingsSection === 'workOrders') ||
+                      (item === 'Purchase Orders' && activeSettingsSection === 'purchaseOrders') ||
+                      (item === 'Meters' && activeSettingsSection === 'meters') ||
+                      (item === 'Tags' && activeSettingsSection === 'tags')
+                        ? 'bg-blue-50 font-semibold text-blue-700'
+                        : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    <LayoutDashboard className="h-5 w-5" />
+                    {item}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <div className="px-4 text-[13px] font-bold text-gray-900">Advanced</div>
+              <div className="mt-3 space-y-1">
+                {['API', 'Authentication', 'Webhooks'].map((item) => (
+                  <button key={item} type="button" className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-[15px] text-gray-700 hover:bg-gray-50">
+                    <Settings className="h-5 w-5" />
+                    {item}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </aside>
+
+        <div className="min-w-0 flex-1 overflow-y-auto">
+          <div className="mx-auto max-w-[1180px] px-8 py-8">
+            {activeSettingsSection === 'requests' ? (
+              <div className="border-b border-gray-200 pb-5">
+                <div className="flex items-center gap-8 text-[15px] font-semibold text-gray-500">
+                  <button
+                    type="button"
+                    onClick={() => setActiveRequestSettingsTab('internal')}
+                    className={`pb-4 ${activeRequestSettingsTab === 'internal' ? 'border-b-2 border-blue-600 text-gray-900' : ''}`}
+                  >
+                    Internal Requests
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveRequestSettingsTab('legacy')}
+                    className={`pb-4 ${activeRequestSettingsTab === 'legacy' ? 'border-b-2 border-blue-600 text-gray-900' : ''}`}
+                  >
+                    Legacy Public Requests
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveRequestSettingsTab('portals')}
+                    className={`pb-4 ${activeRequestSettingsTab === 'portals' ? 'border-b-2 border-blue-600 text-gray-900' : ''}`}
+                  >
+                    Public Request Portals <span className="ml-2 rounded-md bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-700">New</span>
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
+            {activeSettingsSection === 'assets' ? (
+              <div className="border-b border-gray-200 pb-5">
+                <div className="flex items-center gap-8 text-[15px] font-semibold text-gray-500">
+                  {[
+                    ['fields', 'Fields'],
+                    ['operatingHours', 'Operating Hours'],
+                    ['assetStatus', 'Asset Status'],
+                    ['checkInOut', 'Check In/Out'],
+                  ].map(([key, label]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setActiveAssetSettingsTab(key)}
+                      className={`pb-4 ${activeAssetSettingsTab === key ? 'border-b-2 border-blue-600 text-gray-900' : ''}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {activeSettingsSection === 'partsInventory' ? (
+              <div className="border-b border-gray-200 pb-5">
+                <div className="flex items-center gap-8 text-[15px] font-semibold text-gray-500">
+                  {[
+                    ['general', 'General'],
+                    ['customFields', 'Custom Fields'],
+                  ].map(([key, label]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setActivePartsInventoryTab(key)}
+                      className={`pb-4 ${activePartsInventoryTab === key ? 'border-b-2 border-blue-600 text-gray-900' : ''}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {activeSettingsSection === 'workOrders' ? (
+              <div className="border-b border-gray-200 pb-5">
+                <div className="flex items-center gap-8 text-[15px] font-semibold text-gray-500">
+                  {[
+                    ['general', 'General'],
+                    ['configuration', 'Configuration'],
+                    ['statuses', 'Statuses'],
+                    ['categories', 'Categories'],
+                    ['timers', 'Timers'],
+                    ['customFields', 'Custom Fields'],
+                  ].map(([key, label]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setActiveWorkOrderSettingsTab(key)}
+                      className={`pb-4 ${activeWorkOrderSettingsTab === key ? 'border-b-2 border-blue-600 text-gray-900' : ''}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {activeSettingsSection === 'purchaseOrders' ? (
+              <div className="border-b border-gray-200 pb-5">
+                <div className="flex items-center gap-8 text-[15px] font-semibold text-gray-500">
+                  {[
+                    ['general', 'General'],
+                    ['categories', 'Categories'],
+                    ['publicRequestPortal', 'Public Request Portal'],
+                  ].map(([key, label]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setActivePurchaseOrderSettingsTab(key)}
+                      className={`pb-4 ${activePurchaseOrderSettingsTab === key ? 'border-b-2 border-blue-600 text-gray-900' : ''}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {activeSettingsSection === 'general' && (
+              <div className="px-6 py-10">
+                <div className="grid gap-8 lg:grid-cols-[280px_minmax(0,780px)]">
+                  <div className="pt-1 text-[18px] font-bold text-gray-900">Language &amp; Region</div>
+                  <div className="rounded-2xl border border-gray-200 bg-white px-8 py-8 shadow-sm">
+                    <div className="grid gap-6 md:grid-cols-2">
+                      <div>
+                        <label className="mb-3 block text-[15px] text-gray-800">Language</label>
+                        <select
+                          value={generalForm.language}
+                          onChange={(e) => setGeneralForm((prev) => ({ ...prev, language: e.target.value }))}
+                          className="h-12 w-full rounded-md border border-gray-300 px-4 text-[16px] text-gray-800 outline-none focus:border-blue-500"
+                        >
+                          {GENERAL_LANGUAGE_OPTIONS.map((option) => <option key={option}>{option}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="mb-3 block text-[15px] text-gray-800">Date Format</label>
+                        <select
+                          value={generalForm.dateFormat}
+                          onChange={(e) => setGeneralForm((prev) => ({ ...prev, dateFormat: e.target.value }))}
+                          className="h-12 w-full rounded-md border border-gray-300 px-4 text-[16px] text-gray-800 outline-none focus:border-blue-500"
+                        >
+                          {GENERAL_DATE_FORMAT_OPTIONS.map((option) => <option key={option}>{option}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="mt-8">
+                      <label className="mb-3 block text-[15px] text-gray-800">Currency</label>
+                      <select
+                        value={generalForm.currency}
+                        onChange={(e) => setGeneralForm((prev) => ({ ...prev, currency: e.target.value }))}
+                        className="h-12 w-full rounded-md border border-gray-300 px-4 text-[16px] text-gray-800 outline-none focus:border-blue-500"
+                      >
+                        {GENERAL_CURRENCY_OPTIONS.map((option) => <option key={option}>{option}</option>)}
+                      </select>
+                    </div>
+                    <div className="mt-8">
+                      <label className="mb-3 block text-[15px] text-gray-800">Time Zone</label>
+                      <select
+                        value={generalForm.timeZone}
+                        onChange={(e) => setGeneralForm((prev) => ({ ...prev, timeZone: e.target.value }))}
+                        className="h-12 w-full rounded-md border border-gray-300 px-4 text-[16px] text-gray-800 outline-none focus:border-blue-500"
+                      >
+                        {GENERAL_TIME_ZONE_OPTIONS.map((option) => <option key={option}>{option}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeSettingsSection === 'automation' && (
+              <div className="px-6 py-10">
+                <div className="flex items-start justify-between gap-6">
+                  <div>
+                    <h3 className="text-[20px] font-bold text-gray-900">Automated Workflows</h3>
+                    <p className="mt-4 max-w-[900px] text-[15px] leading-8 text-gray-500">
+                      Create custom workflows as easy as If, And, Then. Save time and easily assign your work orders automatically through workflows to customize FixNest for the way your team operates. Check out our <span className="text-blue-600">Workflows Library</span> to see how others in your industry are using automated workflows to improve their internal process and increase efficiency today!
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowWorkflowModal(true)}
+                    className="rounded-lg bg-blue-600 px-6 py-3 text-[16px] font-semibold text-white hover:bg-blue-700"
+                  >
+                    Create
+                  </button>
+                </div>
+
+                <div className="mt-10 space-y-4">
+                  {workflows.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-gray-300 px-8 py-16 text-center text-[16px] text-gray-500">
+                      No workflows created yet.
+                    </div>
+                  ) : workflows.map((workflow) => (
+                    <div key={workflow.id || workflow.title} className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+                      <div className="text-[18px] font-bold text-gray-900">{workflow.title}</div>
+                      <div className="mt-3 text-[15px] text-gray-600">If {workflow.ifCondition}</div>
+                      {Array.isArray(workflow.andConditions) && workflow.andConditions.filter((condition) => condition?.type).map((condition, index) => (
+                        <div key={`${workflow.id || workflow.title}-and-${index}`} className="mt-2 text-[15px] text-gray-600">
+                          And {condition.type}{formatWorkflowValueSummary(condition.value, { vendorMap: vendorNameMap }) ? ` ${formatWorkflowValueSummary(condition.value, { vendorMap: vendorNameMap })}` : ''}
+                        </div>
+                      ))}
+                      <div className="mt-2 text-[15px] font-semibold text-blue-700">
+                        Then {workflow.thenAction}{formatWorkflowValueSummary(workflow.thenValue, { vendorMap: vendorNameMap }) ? ` ${formatWorkflowValueSummary(workflow.thenValue, { vendorMap: vendorNameMap })}` : ''}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {activeSettingsSection === 'roles' && (
+              <div className="px-6 py-10">
+                <div className="flex items-center justify-between gap-6">
+                  <h3 className="text-[22px] font-bold text-gray-900">Roles</h3>
+                  <button
+                    type="button"
+                    onClick={() => setShowRoleModal(true)}
+                    className="rounded-lg bg-blue-600 px-6 py-3 text-[16px] font-semibold text-white hover:bg-blue-700"
+                  >
+                    Create Role
+                  </button>
+                </div>
+
+                <div className="mt-8 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+                  <table className="min-w-full">
+                    <thead className="border-b border-gray-200 bg-white">
+                      <tr>
+                        <th className="px-8 py-5 text-left text-[14px] font-bold text-gray-900">Name</th>
+                        <th className="px-8 py-5 text-left text-[14px] font-bold text-gray-900">Users</th>
+                        <th className="px-8 py-5 text-left text-[14px] font-bold text-gray-900">External ID</th>
+                        <th className="px-8 py-5 text-left text-[14px] font-bold text-gray-900">Type</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rolesTable.map((role, index) => (
+                        <tr key={`${role.externalId || role.name}-${index}`} className="border-b border-gray-200 last:border-b-0">
+                          <td className="px-8 py-8 text-[17px] text-gray-900">{role.name}</td>
+                          <td className="px-8 py-8 text-[17px] text-gray-900">{role.users ?? 0}</td>
+                          <td className="px-8 py-8 text-[17px] text-gray-900">{role.externalId}</td>
+                          <td className="px-8 py-8">
+                            <span className={`inline-flex rounded-lg px-4 py-2 text-[15px] ${role.type === 'Paid' ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-700'}`}>
+                              {role.type}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {activeSettingsSection === 'assets' && activeAssetSettingsTab === 'fields' && (
+              <div className="px-6 py-8">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="text-[16px] text-gray-600">{filteredAssetFields.length} results</div>
+                  <div className="flex items-center gap-4">
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setShowAssetFieldMenu((prev) => !prev)}
+                        className="flex items-center gap-3 rounded-lg bg-blue-600 px-5 py-3 text-[16px] font-semibold text-white hover:bg-blue-700"
+                      >
+                        Create Field
+                        <ChevronDown className="h-5 w-5" />
+                      </button>
+                      {showAssetFieldMenu && (
+                        <div className="absolute right-0 top-full z-20 mt-2 w-[255px] rounded-2xl border border-gray-200 bg-white p-3 shadow-xl">
+                          {ASSET_FIELD_TYPE_OPTIONS.map((type) => (
+                            <button
+                              key={type}
+                              type="button"
+                              onClick={() => {
+                                setAssetFieldForm(createEmptyAssetFieldForm(type));
+                                setShowAssetFieldModal(true);
+                                setShowAssetFieldMenu(false);
+                              }}
+                              className="flex w-full items-center rounded-xl px-4 py-3 text-left text-[16px] text-gray-800 hover:bg-gray-50"
+                            >
+                              {type}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div className="relative">
+                      <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+                      <input
+                        value={assetFieldSearch}
+                        onChange={(e) => setAssetFieldSearch(e.target.value)}
+                        placeholder="Search by Name"
+                        className="h-11 w-[280px] rounded-lg border border-gray-300 pl-11 pr-4 text-[15px] text-gray-700 outline-none focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-8 overflow-hidden rounded-2xl border border-gray-200 bg-white">
+                  <table className="min-w-full">
+                    <thead className="border-b border-gray-200 bg-white">
+                      <tr className="text-left text-[16px] font-bold text-gray-900">
+                        <th className="px-8 py-6">Name</th>
+                        <th className="px-8 py-6">Type</th>
+                        <th className="px-8 py-6">Source</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {filteredAssetFields.map((field, index) => (
+                        <tr key={`${field.name}-${field.type}-${index}`} className="text-[17px] text-gray-800">
+                          <td className="px-8 py-7">{field.name}</td>
+                          <td className="px-8 py-7">{field.type}</td>
+                          <td className="px-8 py-7">
+                            <span className="rounded-lg bg-gray-100 px-3 py-1 text-[14px] font-medium text-gray-700">{field.source || 'Custom'}</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {activeSettingsSection === 'assets' && activeAssetSettingsTab === 'operatingHours' && (
+              <div className="px-6 py-8">
+                {!showScheduleBuilder ? (
+                  <>
+                    <div className="mb-6 flex items-center justify-between gap-4">
+                      <div className="text-[16px] text-gray-600">{(assetSettingsState.operatingHours || []).length} Schedules</div>
+                      <button
+                        type="button"
+                        onClick={() => setShowScheduleBuilder(true)}
+                        className="rounded-lg bg-blue-600 px-6 py-3 text-[16px] font-semibold text-white hover:bg-blue-700"
+                      >
+                        Create Schedule
+                      </button>
+                    </div>
+                    {(assetSettingsState.operatingHours || []).length === 0 ? (
+                      <div className="flex min-h-[320px] items-center justify-center rounded-2xl border border-dashed border-gray-300 bg-white text-[18px] text-gray-500">
+                        No schedules have been created yet
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {assetSettingsState.operatingHours.map((schedule) => (
+                          <div key={schedule.id || schedule.name} className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+                            <div className="text-[20px] font-bold text-gray-900">{schedule.name}</div>
+                            <div className="mt-4 space-y-2 text-[15px] text-gray-700">
+                              {(schedule.blocks || []).map((block, index) => (
+                                <div key={`${schedule.id || schedule.name}-${index}`}>
+                                  {block.day}: {block.from} - {block.to}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div>
+                    <div className="flex items-center justify-between gap-4">
+                      <h3 className="text-[20px] font-bold text-gray-900">Create New Schedule</h3>
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowScheduleBuilder(false);
+                            setOperatingScheduleForm(createEmptyOperatingScheduleForm());
+                          }}
+                          className="rounded-md border border-gray-300 bg-white px-5 py-2.5 text-[15px] font-medium text-gray-700 hover:bg-gray-50"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleCreateOperatingSchedule}
+                          disabled={scheduleSaving || !operatingScheduleForm.name.trim()}
+                          className="rounded-md bg-blue-600 px-5 py-2.5 text-[15px] font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500"
+                        >
+                          {scheduleSaving ? 'Creating...' : 'Create Schedule'}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="mt-10 grid gap-10 lg:grid-cols-[320px_minmax(0,1fr)]">
+                      <div className="pt-2">
+                        <div className="text-[18px] font-bold text-gray-900">Configure Time-based Schedule</div>
+                        <p className="mt-6 text-[15px] leading-8 text-gray-500">
+                          Select the days and times when assets are expected to be operational. You can create multiple time blocks on each day.
+                        </p>
+                      </div>
+                      <div className="space-y-8">
+                        <div className="rounded-2xl border border-gray-200 bg-white p-8">
+                          <label className="mb-3 block text-[16px] text-gray-900">Schedule Name</label>
+                          <input
+                            value={operatingScheduleForm.name}
+                            onChange={(e) => setOperatingScheduleForm((prev) => ({ ...prev, name: e.target.value }))}
+                            className="h-14 w-full rounded-md border border-gray-300 px-4 text-[16px] text-gray-800 outline-none focus:border-blue-500"
+                          />
+                        </div>
+                        <div className="rounded-2xl border border-gray-200 bg-white p-8">
+                          <div className="space-y-8">
+                            {ASSET_OPERATING_DAYS.map((day) => {
+                              const dayState = operatingScheduleForm.days[day];
+                              return (
+                                <div key={day} className="grid gap-4 lg:grid-cols-[140px_minmax(0,1fr)]">
+                                  <label className="flex items-center gap-3 pt-10 text-[16px] text-gray-800">
+                                    <input
+                                      type="checkbox"
+                                      checked={!!dayState?.enabled}
+                                      onChange={(e) => handleScheduleDayChange(day, { enabled: e.target.checked })}
+                                      className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                    />
+                                    {day}
+                                  </label>
+                                  <div className="space-y-4">
+                                    {dayState.blocks.map((block, index) => (
+                                      <div key={`${day}-${index}`} className="grid items-end gap-4 md:grid-cols-[1fr_1fr_44px]">
+                                        <div>
+                                          <label className="mb-2 block text-[15px] text-gray-700">From</label>
+                                          <input
+                                            type="time"
+                                            value={block.from}
+                                            onChange={(e) => handleScheduleBlockChange(day, index, 'from', e.target.value)}
+                                            disabled={!dayState.enabled}
+                                            className="h-12 w-full rounded-md border border-gray-300 px-4 text-[15px] text-gray-800 outline-none focus:border-blue-500 disabled:bg-gray-100"
+                                          />
+                                        </div>
+                                        <div>
+                                          <label className="mb-2 block text-[15px] text-gray-700">To</label>
+                                          <input
+                                            type="time"
+                                            value={block.to}
+                                            onChange={(e) => handleScheduleBlockChange(day, index, 'to', e.target.value)}
+                                            disabled={!dayState.enabled}
+                                            className="h-12 w-full rounded-md border border-gray-300 px-4 text-[15px] text-gray-800 outline-none focus:border-blue-500 disabled:bg-gray-100"
+                                          />
+                                        </div>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleAddScheduleBlock(day)}
+                                          disabled={!dayState.enabled}
+                                          className="mb-[2px] flex h-11 w-11 items-center justify-center rounded-full border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400"
+                                        >
+                                          <Plus className="h-5 w-5" />
+                                        </button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeSettingsSection === 'assets' && activeAssetSettingsTab === 'assetStatus' && (
+              <div className="px-6 py-8">
+                <div className="flex items-center justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setShowAssetStatusModal(true)}
+                    className="rounded-lg bg-blue-600 px-6 py-3 text-[16px] font-semibold text-white hover:bg-blue-700"
+                  >
+                    Add
+                  </button>
+                </div>
+
+                {(assetSettingsState.statuses || []).length === 0 ? (
+                  <div className="mt-8 flex min-h-[420px] flex-col items-center justify-center rounded-2xl border border-dashed border-gray-300 bg-white text-center">
+                    <div className="text-[30px] font-bold text-gray-900">You don't have any categories yet</div>
+                    <div className="mt-4 text-[18px] text-gray-500">Create a new category to get started</div>
+                    <button
+                      type="button"
+                      onClick={() => setShowAssetStatusModal(true)}
+                      className="mt-10 rounded-md border border-gray-300 bg-white px-8 py-3 text-[16px] font-medium text-gray-700 hover:bg-gray-50"
+                    >
+                      Add
+                    </button>
+                  </div>
+                ) : (
+                  <div className="mt-8 space-y-4">
+                    {assetSettingsState.statuses.map((status) => (
+                      <div key={status.id || status.name} className="rounded-2xl border border-gray-200 bg-white px-6 py-5 text-[17px] text-gray-900 shadow-sm">
+                        {status.name}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeSettingsSection === 'assets' && activeAssetSettingsTab === 'checkInOut' && (
+              <div className="px-6 py-8">
+                <div className="max-w-[760px] rounded-2xl border border-gray-200 bg-white px-6 py-7 shadow-sm">
+                  <div className="flex items-start gap-4">
+                    <button
+                      type="button"
+                      onClick={() => handleToggleCheckInOut(!assetSettingsState.checkInOut?.cascadingHierarchyEnabled)}
+                      className={`mt-1 h-7 w-14 rounded-full px-1 transition ${assetSettingsState.checkInOut?.cascadingHierarchyEnabled ? 'bg-blue-600' : 'bg-gray-300'}`}
+                    >
+                      <span className={`block h-5 w-5 rounded-full bg-white shadow-sm transition ${assetSettingsState.checkInOut?.cascadingHierarchyEnabled ? 'translate-x-7' : ''}`} />
+                    </button>
+                    <div>
+                      <div className="text-[17px] font-medium text-gray-900">Enable cascading hierarchy check in and check out.</div>
+                      <p className="mt-4 max-w-[620px] text-[16px] leading-8 text-gray-500">
+                        When enabled, checking in or out a parent asset will also check in/out all of its descendants. Only descendants with check in/out enabled will be affected.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeSettingsSection === 'workOrders' && activeWorkOrderSettingsTab === 'general' && (
+              <div className="space-y-12 px-6 py-8">
+                <div className="grid gap-10 lg:grid-cols-[320px_minmax(0,780px)]">
+                  <div className="pt-1 text-[18px] font-bold text-gray-900">Overall</div>
+                  <div className="rounded-2xl border border-gray-200 bg-white px-8 py-8 shadow-sm">
+                    <div className="space-y-8">
+                      {[
+                        ['includeLaborCostsInTotalCost', 'Include labor costs in the total WO cost', 'Labor costs are calculated when a user logs time and has an hourly rate stored in FixNest'],
+                        ['notifyRequestersOfUpdates', 'Notify requesters of updates', 'Users get updates for the Work Orders they requested.'],
+                        ['automaticallyUpdateTimerByStatusChanges', 'Automatically update timer based on WO status changes', "Timer will automatically start once a WO is moved into the 'in progress' status, and will end once the status reaches 'complete'. For 'open' and 'on hold', the user can decide whether to start or pause the timer."],
+                      ].map(([key, title, description]) => (
+                        <div key={key} className="flex items-start gap-4">
+                          <button
+                            type="button"
+                            onClick={() => updateWorkOrderGeneralState(key, !workOrderSettingsState.general?.[key])}
+                            className={`mt-1 h-7 w-14 rounded-full px-1 transition ${workOrderSettingsState.general?.[key] ? 'bg-blue-600' : 'bg-gray-300'}`}
+                          >
+                            <span className={`block h-5 w-5 rounded-full bg-white shadow-sm transition ${workOrderSettingsState.general?.[key] ? 'translate-x-7' : ''}`} />
+                          </button>
+                          <div className="flex-1">
+                            <div className="text-[17px] font-medium text-gray-900">{title}</div>
+                            <p className="mt-3 max-w-[640px] text-[16px] leading-8 text-gray-500">{description}</p>
+                          </div>
+                        </div>
+                      ))}
+                      <div className="border-t border-gray-200 pt-8">
+                        <label className="mb-3 block text-[16px] text-gray-900">Starting Work Order Number</label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={workOrderSettingsState.general?.startingWorkOrderNumber ?? 1}
+                          onChange={(e) => updateWorkOrderGeneralState('startingWorkOrderNumber', Math.max(1, Number(e.target.value || 1)))}
+                          className="h-14 w-full max-w-[360px] rounded-md border border-gray-300 px-4 text-[16px] text-gray-800 outline-none focus:border-blue-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid gap-10 lg:grid-cols-[320px_minmax(0,780px)]">
+                  <div className="pt-1">
+                    <div className="text-[18px] font-bold text-gray-900">When a Work Order is Created</div>
+                    <p className="mt-5 text-[16px] leading-8 text-gray-500">These rules are ignored if the creator manually assigns the work order.</p>
+                  </div>
+                  <div className="rounded-2xl border border-gray-200 bg-white px-8 py-8 shadow-sm">
+                    <div className="space-y-8">
+                      {[
+                        ['autoAssignWorkOrders', 'Auto-assign Work Orders', 'Automatically assign new work orders to the person that creates them.'],
+                        ['autoAssignRequests', 'Auto-assign Requests', 'Automatically assign work orders to the person who approves the request.'],
+                      ].map(([key, title, description]) => (
+                        <div key={key} className="flex items-start gap-4">
+                          <button
+                            type="button"
+                            onClick={() => updateWorkOrderGeneralState(key, !workOrderSettingsState.general?.[key])}
+                            className={`mt-1 h-7 w-14 rounded-full px-1 transition ${workOrderSettingsState.general?.[key] ? 'bg-blue-600' : 'bg-gray-300'}`}
+                          >
+                            <span className={`block h-5 w-5 rounded-full bg-white shadow-sm transition ${workOrderSettingsState.general?.[key] ? 'translate-x-7' : ''}`} />
+                          </button>
+                          <div>
+                            <div className="text-[17px] font-medium text-gray-900">{title}</div>
+                            <p className="mt-3 text-[16px] leading-8 text-gray-500">{description}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid gap-10 lg:grid-cols-[320px_minmax(0,780px)]">
+                  <div className="pt-1 text-[18px] font-bold text-gray-900">When a Work Order is Completed</div>
+                  <div className="rounded-2xl border border-gray-200 bg-white px-8 py-8 shadow-sm">
+                    <div className="space-y-8">
+                      {[
+                        ['askForFeedback', 'Ask for feedback', 'Users are asked to give feedback on the job done'],
+                        ['continueToNotifyAfterCompletion', 'Continue to notify people of updates', 'Enable notifications when closed work orders are updated.'],
+                      ].map(([key, title, description]) => (
+                        <div key={key} className="flex items-start gap-4">
+                          <button
+                            type="button"
+                            onClick={() => updateWorkOrderGeneralState(key, !workOrderSettingsState.general?.[key])}
+                            className={`mt-1 h-7 w-14 rounded-full px-1 transition ${workOrderSettingsState.general?.[key] ? 'bg-blue-600' : 'bg-gray-300'}`}
+                          >
+                            <span className={`block h-5 w-5 rounded-full bg-white shadow-sm transition ${workOrderSettingsState.general?.[key] ? 'translate-x-7' : ''}`} />
+                          </button>
+                          <div>
+                            <div className="text-[17px] font-medium text-gray-900">{title}</div>
+                            <p className="mt-3 text-[16px] leading-8 text-gray-500">{description}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={handleSaveWorkOrderGeneral}
+                    className="rounded-md bg-blue-600 px-5 py-2.5 text-[15px] font-semibold text-white hover:bg-blue-700"
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {activeSettingsSection === 'workOrders' && activeWorkOrderSettingsTab === 'configuration' && (
+              <div className="space-y-12 px-6 py-8">
+                <div className="grid gap-10 lg:grid-cols-[320px_minmax(0,780px)]">
+                  <div className="pt-1">
+                    <div className="text-[18px] font-bold text-gray-900">Creating a Work Order</div>
+                    <p className="mt-5 text-[16px] leading-8 text-gray-500">Configure create work order form from this page. You can mark fields as Optional, Hidden or Required.</p>
+                  </div>
+                  <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
+                    <div className="grid gap-6 md:grid-cols-2">
+                      {WORK_ORDER_CONFIGURATION_CREATE_FIELDS.map(([key, label]) => (
+                        <div key={key}>
+                          <label className="mb-3 block text-[16px] text-gray-900">{label}</label>
+                          <select
+                            value={workOrderSettingsState.configuration?.createFields?.[key] || 'Optional'}
+                            onChange={(e) => updateWorkOrderConfigurationState('createFields', key, e.target.value)}
+                            className="h-14 w-full rounded-md border border-gray-300 px-4 text-[16px] text-gray-800 outline-none focus:border-blue-500"
+                          >
+                            {WORK_ORDER_CONFIGURATION_OPTIONS.map((option) => <option key={option}>{option}</option>)}
+                          </select>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid gap-10 lg:grid-cols-[320px_minmax(0,780px)]">
+                  <div className="pt-1">
+                    <div className="text-[18px] font-bold text-gray-900">Completing a Work Order</div>
+                    <p className="mt-5 text-[16px] leading-8 text-gray-500">Configure complete work order form from this page. You can mark fields as Optional, Hidden or Required.</p>
+                  </div>
+                  <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
+                    <div className="grid gap-6 md:grid-cols-2">
+                      {WORK_ORDER_CONFIGURATION_COMPLETE_FIELDS.map(([key, label]) => (
+                        <div key={key}>
+                          <label className="mb-3 block text-[16px] text-gray-900">{label}</label>
+                          <select
+                            value={workOrderSettingsState.configuration?.completeFields?.[key] || 'Optional'}
+                            onChange={(e) => updateWorkOrderConfigurationState('completeFields', key, e.target.value)}
+                            className="h-14 w-full rounded-md border border-gray-300 px-4 text-[16px] text-gray-800 outline-none focus:border-blue-500"
+                          >
+                            {WORK_ORDER_CONFIGURATION_OPTIONS.map((option) => <option key={option}>{option}</option>)}
+                          </select>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => handleSaveWorkOrderConfiguration('createFields')}
+                    className="rounded-md border border-gray-300 bg-white px-5 py-2.5 text-[15px] font-medium text-gray-700 hover:bg-gray-50"
+                  >
+                    Save Create Settings
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSaveWorkOrderConfiguration('completeFields')}
+                    className="rounded-md bg-blue-600 px-5 py-2.5 text-[15px] font-semibold text-white hover:bg-blue-700"
+                  >
+                    Save Complete Settings
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {activeSettingsSection === 'workOrders' && activeWorkOrderSettingsTab === 'statuses' && (
+              <div className="px-6 py-8">
+                <div className="mb-6 flex items-center justify-between gap-4">
+                  <div className="text-[16px] font-semibold text-gray-700">{(workOrderSettingsState.statuses || []).length} statuses</div>
+                  <button
+                    type="button"
+                    onClick={() => setShowWorkOrderStatusModal(true)}
+                    className="rounded-lg bg-blue-600 px-6 py-3 text-[16px] font-semibold text-white hover:bg-blue-700"
+                  >
+                    Create Custom Status
+                  </button>
+                </div>
+                <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+                  <table className="min-w-full">
+                    <thead className="border-b border-gray-200 text-left text-[16px] font-bold text-gray-900">
+                      <tr>
+                        <th className="px-8 py-6">Name</th>
+                        <th className="px-8 py-6">Type</th>
+                        <th className="px-8 py-6">Last Updated</th>
+                        <th className="px-8 py-6">Created By</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {(workOrderSettingsState.statuses || []).map((status) => (
+                        <tr key={status.id || status.name} className="text-[17px] text-gray-800">
+                          <td className="px-8 py-7">{status.name}</td>
+                          <td className="px-8 py-7">
+                            <span className="rounded-lg bg-gray-100 px-3 py-1 text-[14px] font-medium text-gray-700">{status.type}</span>
+                          </td>
+                          <td className="px-8 py-7">{status.lastUpdated ? new Date(status.lastUpdated).toLocaleDateString() : '-'}</td>
+                          <td className="px-8 py-7">{status.createdBy || '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {activeSettingsSection === 'workOrders' && activeWorkOrderSettingsTab === 'categories' && (
+              <div className="px-6 py-8">
+                <div className="mb-6 flex items-center justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingWorkOrderCategoryId('');
+                      setWorkOrderCategoryName('');
+                      setShowWorkOrderCategoryModal(true);
+                    }}
+                    className="rounded-lg bg-blue-600 px-6 py-3 text-[16px] font-semibold text-white hover:bg-blue-700"
+                  >
+                    Add
+                  </button>
+                </div>
+                <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+                  <table className="min-w-full">
+                    <thead className="border-b border-gray-200 text-left text-[16px] font-bold text-gray-900">
+                      <tr>
+                        <th className="px-8 py-6">Name</th>
+                        <th className="w-16 px-8 py-6" />
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {(workOrderSettingsState.categories || []).map((category) => (
+                        <tr key={category.id || category.name} className="relative text-[17px] text-gray-800">
+                          <td className="px-8 py-7">{category.name}</td>
+                          <td className="px-8 py-7 text-right">
+                            <button
+                              type="button"
+                              onClick={() => setOpenWorkOrderCategoryMenuId((prev) => prev === category.id ? '' : category.id)}
+                              className="text-gray-500 hover:text-gray-800"
+                            >
+                              <MoreHorizontal className="h-5 w-5" />
+                            </button>
+                        {openWorkOrderCategoryMenuId === category.id ? (
+                              <div className="absolute right-6 top-16 z-20 w-[190px] rounded-2xl border border-gray-200 bg-white p-3 shadow-2xl">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingWorkOrderCategoryId(category.id);
+                                    setWorkOrderCategoryName(category.name);
+                                    setShowWorkOrderCategoryModal(true);
+                                    setOpenWorkOrderCategoryMenuId('');
+                                  }}
+                                  className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-[16px] text-gray-800 hover:bg-gray-50"
+                                >
+                                  <Edit className="h-4 w-4" /> Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteWorkOrderCategory(category.id)}
+                                  className="mt-1 flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-[16px] text-rose-600 hover:bg-rose-50"
+                                >
+                                  <Trash2 className="h-4 w-4" /> Delete
+                                </button>
+                              </div>
+                            ) : null}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {activeSettingsSection === 'workOrders' && activeWorkOrderSettingsTab === 'timers' && (
+              <div className="px-6 py-8">
+                <div className="mb-6 flex items-center justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingWorkOrderTimerId('');
+                      setWorkOrderTimerName('');
+                      setShowWorkOrderTimerModal(true);
+                    }}
+                    className="rounded-lg bg-blue-600 px-6 py-3 text-[16px] font-semibold text-white hover:bg-blue-700"
+                  >
+                    Add
+                  </button>
+                </div>
+                <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+                  <table className="min-w-full">
+                    <thead className="border-b border-gray-200 text-left text-[16px] font-bold text-gray-900">
+                      <tr>
+                        <th className="px-8 py-6">Name</th>
+                        <th className="px-8 py-6">Date Created</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {(workOrderSettingsState.timers || []).map((timer) => (
+                        <tr
+                          key={timer.id || timer.name}
+                          className="cursor-pointer text-[17px] text-gray-800"
+                          onClick={() => {
+                            if (timer.isDefault) return;
+                            setEditingWorkOrderTimerId(timer.id);
+                            setWorkOrderTimerName(timer.name);
+                            setShowWorkOrderTimerModal(true);
+                          }}
+                        >
+                          <td className="px-8 py-7">{timer.name}</td>
+                          <td className="px-8 py-7">{timer.createdAt ? new Date(timer.createdAt).toLocaleDateString() : '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {activeSettingsSection === 'workOrders' && activeWorkOrderSettingsTab === 'customFields' && (
+              <div className="px-6 py-8">
+                <div className="mb-6 flex items-center justify-between gap-4">
+                  <div className="text-[16px] text-gray-600">{(workOrderSettingsState.customFields || []).length === 0 ? '0 result' : `${workOrderSettingsState.customFields.length} results`}</div>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setShowWorkOrderFieldMenu((prev) => !prev)}
+                      className="inline-flex items-center gap-3 rounded-lg bg-blue-600 px-6 py-3 text-[16px] font-semibold text-white hover:bg-blue-700"
+                    >
+                      Create Field
+                      <ChevronDown className="h-5 w-5" />
+                    </button>
+                    {showWorkOrderFieldMenu ? (
+                      <div className="absolute right-0 top-[calc(100%+10px)] z-20 w-[230px] rounded-2xl border border-gray-200 bg-white p-3 shadow-2xl">
+                        {ASSET_FIELD_TYPE_OPTIONS.map((type) => (
+                          <button
+                            key={type}
+                            type="button"
+                            onClick={() => {
+                              setShowWorkOrderFieldModal(true);
+                              setShowWorkOrderFieldMenu(false);
+                              setWorkOrderFieldForm(createEmptyWorkOrderFieldForm(type));
+                            }}
+                            className="flex w-full items-center gap-4 rounded-xl px-4 py-3 text-left text-[16px] text-gray-800 hover:bg-gray-50"
+                          >
+                            {type}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+                {(workOrderSettingsState.customFields || []).length === 0 ? (
+                  <div className="flex min-h-[420px] flex-col items-center justify-center rounded-2xl border border-dashed border-gray-300 bg-white text-center">
+                    <div className="text-[18px] font-bold text-gray-900">You don't have any custom fields yet</div>
+                    <div className="mt-5 text-[18px] text-gray-500">Create a new custom field to get started</div>
+                  </div>
+                ) : (
+                  <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+                    <table className="min-w-full">
+                      <thead className="border-b border-gray-200 text-left text-[16px] font-bold text-gray-900">
+                        <tr>
+                          <th className="px-8 py-6">Name</th>
+                          <th className="px-8 py-6">Type</th>
+                          <th className="px-8 py-6">Source</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {(workOrderSettingsState.customFields || []).map((field, index) => (
+                          <tr key={`${field.name}-${field.type}-${index}`} className="text-[17px] text-gray-800">
+                            <td className="px-8 py-7">{field.name}</td>
+                            <td className="px-8 py-7">{field.type}</td>
+                            <td className="px-8 py-7"><span className="rounded-lg bg-gray-100 px-3 py-1 text-[14px] font-medium text-gray-700">{field.source || 'Custom'}</span></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeSettingsSection === 'purchaseOrders' && activePurchaseOrderSettingsTab === 'general' && (
+              <div className="space-y-12 px-6 py-8">
+                <div className="grid gap-10 lg:grid-cols-[320px_minmax(0,780px)]">
+                  <div className="pt-1">
+                    <div className="text-[18px] font-bold text-gray-900">Purchase Order Start Count</div>
+                    <p className="mt-5 text-[16px] leading-8 text-gray-500">
+                      Set the number you want your first purchase order to increment from.
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
+                    <label className="mb-3 block text-[16px] text-gray-900">Start count number</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={purchaseOrderSettingsState.general?.startCount ?? 1}
+                      onChange={(e) =>
+                        setPurchaseOrderSettingsState((prev) => ({
+                          ...prev,
+                          general: {
+                            ...(prev.general || {}),
+                            startCount: Number(e.target.value || 1),
+                          },
+                        }))
+                      }
+                      className="h-14 w-full rounded-md border border-gray-300 px-4 text-[16px] text-gray-800 outline-none focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-10 lg:grid-cols-[320px_minmax(0,780px)]">
+                  <div className="pt-1">
+                    <div className="text-[18px] font-bold text-gray-900">Purchase Order Prefix</div>
+                    <p className="mt-5 text-[16px] leading-8 text-gray-500">
+                      Set the prefix you want for your auto generated purchase order number.
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
+                    <label className="mb-3 block text-[16px] text-gray-900">Purchase order prefix</label>
+                    <input
+                      value={purchaseOrderSettingsState.general?.prefix || ''}
+                      onChange={(e) =>
+                        setPurchaseOrderSettingsState((prev) => ({
+                          ...prev,
+                          general: {
+                            ...(prev.general || {}),
+                            prefix: e.target.value,
+                          },
+                        }))
+                      }
+                      className="h-14 w-full rounded-md border border-gray-300 px-4 text-[16px] text-gray-800 outline-none focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={handleSavePurchaseOrderGeneral}
+                    className="rounded-md bg-blue-600 px-5 py-2.5 text-[15px] font-semibold text-white hover:bg-blue-700"
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {activeSettingsSection === 'purchaseOrders' && activePurchaseOrderSettingsTab === 'categories' && (
+              <div className="px-6 py-8">
+                <div className="mb-6 flex items-center justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingPurchaseOrderCategoryId('');
+                      setPurchaseOrderCategoryName('');
+                      setShowPurchaseOrderCategoryModal(true);
+                    }}
+                    className="rounded-lg bg-blue-600 px-6 py-3 text-[16px] font-semibold text-white hover:bg-blue-700"
+                  >
+                    Add
+                  </button>
+                </div>
+
+                {(purchaseOrderSettingsState.categories || []).length === 0 ? (
+                  <div className="flex min-h-[420px] flex-col items-center justify-center rounded-2xl border border-dashed border-gray-300 bg-white text-center">
+                    <div className="text-[18px] font-bold text-gray-900">You don't have any categories yet</div>
+                    <div className="mt-5 text-[18px] text-gray-500">Create a new category to get started</div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingPurchaseOrderCategoryId('');
+                        setPurchaseOrderCategoryName('');
+                        setShowPurchaseOrderCategoryModal(true);
+                      }}
+                      className="mt-10 rounded-md border border-gray-300 bg-white px-6 py-3 text-[16px] font-medium text-gray-700 hover:bg-gray-50"
+                    >
+                      Add
+                    </button>
+                  </div>
+                ) : (
+                  <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+                    <table className="min-w-full">
+                      <thead className="border-b border-gray-200 text-left text-[16px] font-bold text-gray-900">
+                        <tr>
+                          <th className="px-8 py-6">Name</th>
+                          <th className="px-8 py-6">Date Created</th>
+                          <th className="w-16 px-8 py-6" />
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {(purchaseOrderSettingsState.categories || []).map((category) => (
+                          <tr key={category.id || category.name} className="relative text-[17px] text-gray-800">
+                            <td className="px-8 py-7">{category.name}</td>
+                            <td className="px-8 py-7">{category.createdAt ? new Date(category.createdAt).toLocaleDateString() : '-'}</td>
+                            <td className="px-8 py-7 text-right">
+                              <button
+                                type="button"
+                                onClick={() => setOpenPurchaseOrderCategoryMenuId((prev) => (prev === category.id ? '' : category.id))}
+                                className="text-gray-500 hover:text-gray-800"
+                              >
+                                <MoreHorizontal className="h-5 w-5" />
+                              </button>
+                              {openPurchaseOrderCategoryMenuId === category.id ? (
+                                <div className="absolute right-6 top-16 z-20 w-[190px] rounded-2xl border border-gray-200 bg-white p-3 shadow-2xl">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setEditingPurchaseOrderCategoryId(category.id);
+                                      setPurchaseOrderCategoryName(category.name);
+                                      setShowPurchaseOrderCategoryModal(true);
+                                      setOpenPurchaseOrderCategoryMenuId('');
+                                    }}
+                                    className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-[16px] text-gray-800 hover:bg-gray-50"
+                                  >
+                                    <Edit className="h-4 w-4" /> Edit
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeletePurchaseOrderCategory(category.id)}
+                                    className="mt-1 flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-[16px] text-rose-600 hover:bg-rose-50"
+                                  >
+                                    <Trash2 className="h-4 w-4" /> Delete
+                                  </button>
+                                </div>
+                              ) : null}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeSettingsSection === 'purchaseOrders' && activePurchaseOrderSettingsTab === 'publicRequestPortal' && (
+              <div className="px-6 py-8">
+                <div className="mx-auto max-w-[900px] rounded-2xl border border-gray-200 bg-white shadow-sm">
+                  <div className="border-b border-gray-200 px-8 py-7">
+                    <h3 className="text-[20px] font-bold text-gray-900">Purchase Order Requests</h3>
+                  </div>
+                  <div className="flex items-start gap-6 px-8 py-8">
+                    <button
+                      type="button"
+                      onClick={() => handleTogglePurchaseOrderPublicPortal(!purchaseOrderSettingsState.publicRequestPortal?.enabled)}
+                      className={`mt-1 h-7 w-14 rounded-full px-1 transition ${purchaseOrderSettingsState.publicRequestPortal?.enabled ? 'bg-blue-600' : 'bg-gray-300'}`}
+                    >
+                      <span className={`block h-5 w-5 rounded-full bg-white shadow-sm transition ${purchaseOrderSettingsState.publicRequestPortal?.enabled ? 'translate-x-7' : ''}`} />
+                    </button>
+                    <div>
+                      <div className="text-[17px] font-medium text-gray-900">Enable Purchase Order Public Request Portal</div>
+                      <p className="mt-3 text-[16px] leading-8 text-gray-500">
+                        Enable access for non-users to request purchase orders using the public request portal
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeSettingsSection === 'meters' && (
+              <div className="px-6 py-8">
+                <div className="mb-6 flex items-center justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingMeterCategoryId('');
+                      setMeterCategoryName('');
+                      setShowMeterCategoryModal(true);
+                    }}
+                    className="rounded-lg bg-blue-600 px-6 py-3 text-[16px] font-semibold text-white hover:bg-blue-700"
+                  >
+                    Add
+                  </button>
+                </div>
+
+                {(meterSettingsState.categories || []).length === 0 ? (
+                  <div className="flex min-h-[420px] flex-col items-center justify-center rounded-2xl border border-dashed border-gray-300 bg-white text-center">
+                    <div className="text-[18px] font-bold text-gray-900">You don't have any categories yet</div>
+                    <div className="mt-5 text-[18px] text-gray-500">Create a new category to get started</div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingMeterCategoryId('');
+                        setMeterCategoryName('');
+                        setShowMeterCategoryModal(true);
+                      }}
+                      className="mt-10 rounded-md border border-gray-300 bg-white px-6 py-3 text-[16px] font-medium text-gray-700 hover:bg-gray-50"
+                    >
+                      Add
+                    </button>
+                  </div>
+                ) : (
+                  <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+                    <table className="min-w-full">
+                      <thead className="border-b border-gray-200 text-left text-[16px] font-bold text-gray-900">
+                        <tr>
+                          <th className="px-8 py-6">Name</th>
+                          <th className="px-8 py-6">Date Created</th>
+                          <th className="w-16 px-8 py-6" />
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {(meterSettingsState.categories || []).map((category) => (
+                          <tr key={category.id || category.name} className="relative text-[17px] text-gray-800">
+                            <td className="px-8 py-7">{category.name}</td>
+                            <td className="px-8 py-7">{category.createdAt ? new Date(category.createdAt).toLocaleDateString() : '-'}</td>
+                            <td className="px-8 py-7 text-right">
+                              <button
+                                type="button"
+                                onClick={() => setOpenMeterCategoryMenuId((prev) => (prev === category.id ? '' : category.id))}
+                                className="text-gray-500 hover:text-gray-800"
+                              >
+                                <MoreHorizontal className="h-5 w-5" />
+                              </button>
+                              {openMeterCategoryMenuId === category.id ? (
+                                <div className="absolute right-6 top-16 z-20 w-[190px] rounded-2xl border border-gray-200 bg-white p-3 shadow-2xl">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setEditingMeterCategoryId(category.id);
+                                      setMeterCategoryName(category.name);
+                                      setShowMeterCategoryModal(true);
+                                      setOpenMeterCategoryMenuId('');
+                                    }}
+                                    className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-[16px] text-gray-800 hover:bg-gray-50"
+                                  >
+                                    <Edit className="h-4 w-4" /> Edit
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteMeterCategory(category.id)}
+                                    className="mt-1 flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-[16px] text-rose-600 hover:bg-rose-50"
+                                  >
+                                    <Trash2 className="h-4 w-4" /> Delete
+                                  </button>
+                                </div>
+                              ) : null}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeSettingsSection === 'tags' && (
+              <div className="px-6 py-8">
+                <div className="mb-6 flex items-center justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingTagId('');
+                      setTagForm({ name: '', model: '' });
+                      setShowTagModal(true);
+                    }}
+                    className="rounded-lg bg-blue-600 px-6 py-3 text-[16px] font-semibold text-white hover:bg-blue-700"
+                  >
+                    Add
+                  </button>
+                </div>
+
+                {(tagSettingsState.items || []).length === 0 ? (
+                  <div className="flex min-h-[420px] flex-col items-center justify-center rounded-2xl border border-dashed border-gray-300 bg-white text-center">
+                    <div className="text-[18px] font-bold text-gray-900">You don't have any tags yet</div>
+                    <div className="mt-5 text-[18px] text-gray-500">Create a new tag to get started</div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingTagId('');
+                        setTagForm({ name: '', model: '' });
+                        setShowTagModal(true);
+                      }}
+                      className="mt-10 rounded-md border border-gray-300 bg-white px-6 py-3 text-[16px] font-medium text-gray-700 hover:bg-gray-50"
+                    >
+                      Add
+                    </button>
+                  </div>
+                ) : (
+                  <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+                    <table className="min-w-full">
+                      <thead className="border-b border-gray-200 text-left text-[16px] font-bold text-gray-900">
+                        <tr>
+                          <th className="px-8 py-6">Name</th>
+                          <th className="px-8 py-6">Models</th>
+                          <th className="px-8 py-6">Date Created</th>
+                          <th className="w-16 px-8 py-6" />
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {(tagSettingsState.items || []).map((tag) => (
+                          <tr key={tag.id || tag.name} className="relative text-[17px] text-gray-800">
+                            <td className="px-8 py-7">{tag.name}</td>
+                            <td className="px-8 py-7">{tag.model || '-'}</td>
+                            <td className="px-8 py-7">{tag.createdAt ? new Date(tag.createdAt).toLocaleDateString() : '-'}</td>
+                            <td className="px-8 py-7 text-right">
+                              <button
+                                type="button"
+                                onClick={() => setOpenTagMenuId((prev) => (prev === tag.id ? '' : tag.id))}
+                                className="text-gray-500 hover:text-gray-800"
+                              >
+                                <MoreHorizontal className="h-5 w-5" />
+                              </button>
+                              {openTagMenuId === tag.id ? (
+                                <div className="absolute right-6 top-16 z-20 w-[190px] rounded-2xl border border-gray-200 bg-white p-3 shadow-2xl">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setEditingTagId(tag.id);
+                                      setTagForm({ name: tag.name || '', model: tag.model || '' });
+                                      setShowTagModal(true);
+                                      setOpenTagMenuId('');
+                                    }}
+                                    className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-[16px] text-gray-800 hover:bg-gray-50"
+                                  >
+                                    <Edit className="h-4 w-4" /> Edit
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteTag(tag.id)}
+                                    className="mt-1 flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-[16px] text-rose-600 hover:bg-rose-50"
+                                  >
+                                    <Trash2 className="h-4 w-4" /> Delete
+                                  </button>
+                                </div>
+                              ) : null}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeSettingsSection === 'partsInventory' && activePartsInventoryTab === 'general' && (
+              <div className="px-6 py-8">
+                <div className="grid gap-8 lg:grid-cols-[280px_minmax(0,780px)]">
+                  <div className="pt-1 text-[18px] font-bold text-gray-900">Parts &amp; Inventory</div>
+                  <div className="space-y-8">
+                    <div className="rounded-2xl border border-gray-200 bg-white px-8 py-8 shadow-sm">
+                      <div className="flex items-start gap-4">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleMultipleInventoryLines(!partsInventoryState.general?.enableMultipleInventoryLines)}
+                          className={`mt-1 h-7 w-14 rounded-full px-1 transition ${partsInventoryState.general?.enableMultipleInventoryLines ? 'bg-blue-600' : 'bg-gray-300'}`}
+                        >
+                          <span className={`block h-5 w-5 rounded-full bg-white shadow-sm transition ${partsInventoryState.general?.enableMultipleInventoryLines ? 'translate-x-7' : ''}`} />
+                        </button>
+                        <div>
+                          <div className="text-[17px] font-medium text-gray-900">Enable Parts with multiple inventory lines</div>
+                          <p className="mt-3 text-[16px] leading-8 text-gray-500">
+                            Please follow <span className="text-blue-600">this import process</span> to update your data
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => setShowPartGroupModal(true)}
+                            className="mt-8 rounded-lg bg-blue-600 px-6 py-3 text-[16px] font-semibold text-white hover:bg-blue-700"
+                          >
+                            Group Parts
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-gray-200 bg-white px-8 py-8 shadow-sm">
+                      <div className="text-[17px] font-bold text-gray-900">Sync allocated part quantities</div>
+                      <p className="mt-6 max-w-[720px] text-[16px] leading-8 text-gray-500">
+                        The allocated quantity field on your parts to be synced to match the total quantity of parts on incomplete work orders. Parts on deleted, archived, or complete work orders do not get counted as allocated.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleSyncAllocatedParts}
+                        disabled={syncingAllocatedParts}
+                        className="mt-8 rounded-lg bg-blue-600 px-6 py-3 text-[16px] font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500"
+                      >
+                        {syncingAllocatedParts ? 'Syncing...' : 'Sync'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeSettingsSection === 'partsInventory' && activePartsInventoryTab === 'customFields' && (
+              <div className="px-6 py-8">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="text-[16px] text-gray-600">{(partsInventoryState.groupParts || []).length === 0 ? '0 result' : `${filteredPartFields.length} results`}</div>
+                  <div className="flex items-center gap-4">
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setShowPartFieldMenu((prev) => !prev)}
+                        className="flex items-center gap-3 rounded-lg bg-blue-600 px-5 py-3 text-[16px] font-semibold text-white hover:bg-blue-700"
+                      >
+                        Create Field
+                        <ChevronDown className="h-5 w-5" />
+                      </button>
+                      {showPartFieldMenu && (
+                        <div className="absolute right-0 top-full z-20 mt-2 w-[255px] rounded-2xl border border-gray-200 bg-white p-3 shadow-xl">
+                          {ASSET_FIELD_TYPE_OPTIONS.map((type) => (
+                            <button
+                              key={type}
+                              type="button"
+                              onClick={() => {
+                                setPartFieldForm(createEmptyAssetFieldForm(type));
+                                setShowPartFieldModal(true);
+                                setShowPartFieldMenu(false);
+                              }}
+                              className="flex w-full items-center rounded-xl px-4 py-3 text-left text-[16px] text-gray-800 hover:bg-gray-50"
+                            >
+                              {type}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {filteredPartFields.filter((field) => String(field.source || '') === 'Custom').length === 0 ? (
+                  <div className="mt-8 flex min-h-[420px] flex-col items-center justify-center border-t border-gray-200 text-center">
+                    <div className="text-[18px] font-bold text-gray-900">You don't have any custom fields yet</div>
+                    <div className="mt-4 text-[18px] text-gray-500">Create a new custom field to get started</div>
+                  </div>
+                ) : (
+                  <div className="mt-8 overflow-hidden rounded-2xl border border-gray-200 bg-white">
+                    <table className="min-w-full">
+                      <thead className="border-b border-gray-200 bg-white">
+                        <tr className="text-left text-[16px] font-bold text-gray-900">
+                          <th className="px-8 py-6">Name</th>
+                          <th className="px-8 py-6">Type</th>
+                          <th className="px-8 py-6">Source</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {filteredPartFields.filter((field) => String(field.source || '') === 'Custom').map((field, index) => (
+                          <tr key={`${field.name}-${field.type}-${index}`} className="text-[17px] text-gray-800">
+                            <td className="px-8 py-7">{field.name}</td>
+                            <td className="px-8 py-7">{field.type}</td>
+                            <td className="px-8 py-7">
+                              <span className="rounded-lg bg-gray-100 px-3 py-1 text-[14px] font-medium text-gray-700">{field.source || 'Custom'}</span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeSettingsSection === 'requests' && activeRequestSettingsTab === 'internal' && (
+              <div className="px-6 py-10">
+                <h3 className="text-[20px] font-bold text-gray-900">Form Items</h3>
+                <p className="mt-6 max-w-[760px] text-[15px] leading-7 text-gray-500">
+                  These are only displayed during Request creation. After the Request is created, the responses will be included in the Request description.
+                </p>
+                <button type="button" className="mt-6 text-[15px] font-semibold text-blue-600 hover:text-blue-700">
+                  + Add Task
+                </button>
+
+                <div className="mt-10 max-w-[780px] rounded-2xl border border-gray-200 bg-white shadow-sm">
+                  <div className="border-b border-gray-200 px-8 py-7">
+                    <h4 className="text-[18px] font-bold text-gray-900">Request fields</h4>
+                    <p className="mt-4 text-[15px] leading-7 text-gray-500">
+                      Configure the request form from this page. You can mark fields as Optional, Hidden or Required.
+                    </p>
+                  </div>
+                  <div className="max-h-[62vh] overflow-auto px-8 py-5">
+                    <div className="grid grid-cols-[1.1fr_1fr_1fr] gap-6 border-b border-gray-200 pb-4 text-[15px] font-bold text-gray-900">
+                      <div />
+                      <div>During Create</div>
+                      <div>During Approval</div>
+                    </div>
+                    <div className="divide-y divide-gray-200">
+                      {REQUEST_FORM_FIELD_ROWS.map(([key, label]) => (
+                        <div key={key} className="grid grid-cols-[1.1fr_1fr_1fr] gap-6 py-6">
+                          <div className="self-center text-[15px] font-semibold text-gray-800">{label}</div>
+                          <select
+                            value={settings[key]?.create || 'Optional'}
+                            onChange={(e) => onChange(key, 'create', e.target.value)}
+                            className="h-12 rounded-md border border-gray-300 px-4 text-[15px] text-gray-800 outline-none focus:border-blue-500"
+                          >
+                            <option>Required</option>
+                            <option>Optional</option>
+                            <option>Hidden</option>
+                          </select>
+                          <select
+                            value={settings[key]?.approval || 'Optional'}
+                            onChange={(e) => onChange(key, 'approval', e.target.value)}
+                            className="h-12 rounded-md border border-gray-300 px-4 text-[15px] text-gray-800 outline-none focus:border-blue-500"
+                          >
+                            <option>Required</option>
+                            <option>Optional</option>
+                            <option>Hidden</option>
+                          </select>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeSettingsSection === 'requests' && activeRequestSettingsTab === 'legacy' && (
+              <div className="px-6 py-10">
+                <div className="mx-auto max-w-[860px] rounded-sm border border-gray-200 bg-white px-6 py-6">
+                  <div className="mb-6 flex items-start justify-between gap-6">
+                    <div>
+                      <h3 className="text-[20px] font-normal text-gray-900">Company Request Portal</h3>
+                      <p className="mt-6 max-w-[760px] text-[18px] leading-8 text-gray-800">
+                        The Request Portal allows users that are not on your team to add and view their request just by signing in with their email account.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => onToggleLegacyPortal?.(!legacyPublicRequestsEnabled)}
+                      className={`mt-1 h-7 w-14 rounded-full px-1 transition ${legacyPublicRequestsEnabled ? 'bg-blue-600' : 'bg-gray-300'}`}
+                    >
+                      <span className={`block h-5 w-5 rounded-full bg-white shadow-sm transition ${legacyPublicRequestsEnabled ? 'translate-x-7' : ''}`} />
+                    </button>
+                  </div>
+                  <p className="max-w-[760px] text-[17px] leading-9 text-rose-500">
+                    *By enabling the public request portal, you are allowing anyone with the portal link to submit requests. Once a request is submitted, anyone with an identifying email will be able to view the request. If you are worried about sensitive information or security, we recommend adding users as Requesters and keeping the public request portal disabled.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {activeSettingsSection === 'requests' && activeRequestSettingsTab === 'portals' && (
+              <div className="py-8">
+                <div className="flex items-center justify-between border-b border-gray-200 px-8 pb-5">
+                  <h3 className="text-[22px] font-bold text-gray-900">Request Portals</h3>
+                  <div className="flex items-center gap-4">
+                    <div className="relative">
+                      <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+                      <input
+                        value={portalSearch}
+                        onChange={(e) => setPortalSearch(e.target.value)}
+                        placeholder="Search portals..."
+                        className="h-11 w-[300px] rounded-lg border border-gray-300 pl-11 pr-4 text-[15px] text-gray-700 outline-none focus:border-blue-500"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBrandingLogo(null);
+                        setBrandingStep(branding.logoUrl ? 2 : 1);
+                        setBrandingOpen(true);
+                      }}
+                      className="rounded-xl border border-blue-300 bg-white px-5 py-3 text-[16px] font-semibold text-blue-700 hover:bg-blue-50"
+                    >
+                      Branding
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingPortalId('');
+                        setPortalForm({
+                          name: '',
+                          customUrl: '',
+                          type: 'general',
+                          selectedLocationId: '',
+                          selectedAssetId: '',
+                          options: {
+                            attachments: { enabled: true, required: false },
+                            location: { enabled: true, required: false },
+                            asset: { enabled: true, required: false },
+                          },
+                          customFields: [],
+                        });
+                        setCreatePortalOpen(true);
+                      }}
+                      className="rounded-xl bg-blue-600 px-6 py-3 text-[16px] font-semibold text-white hover:bg-blue-700"
+                    >
+                      + Create Request Portal
+                    </button>
+                  </div>
+                </div>
+
+                {filteredPortals.length === 0 ? (
+                  <div className="flex min-h-[520px] items-center justify-center px-8 py-10">
+                    <div className="text-center">
+                      <div className="mx-auto flex h-[270px] w-[270px] items-center justify-center rounded-[24px] bg-gray-50">
+                        <Navigation className="h-20 w-20 text-gray-400" />
+                      </div>
+                      <h4 className="mt-6 text-[26px] font-bold text-gray-900">No Request Portals Yet</h4>
+                      <p className="mx-auto mt-4 max-w-[620px] text-[18px] leading-9 text-gray-700">
+                        Create your first request portal to allow users to submit maintenance requests through a customizable, public-facing interface.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid gap-4 px-8 py-8 md:grid-cols-2">
+                    {filteredPortals.map((portal) => (
+                      <div key={portal.id} className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <div className="text-[18px] font-bold text-gray-900">{portal.name}</div>
+                            <div className="mt-2 text-[14px] uppercase tracking-wide text-blue-600">{portal.type} portal</div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <div className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+                              {portal.customFields?.length || 0} field(s)
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingPortalId(portal.id);
+                                setPortalForm({
+                                  name: portal.name || '',
+                                  customUrl: portal.customUrl || '',
+                                  type: portal.type || 'general',
+                                  selectedLocationId: portal.selectedLocationId || '',
+                                  selectedAssetId: portal.selectedAssetId || '',
+                                  options: {
+                                    attachments: { enabled: portal.options?.attachments?.enabled !== false, required: !!portal.options?.attachments?.required },
+                                    location: { enabled: portal.options?.location?.enabled !== false, required: !!portal.options?.location?.required },
+                                    asset: { enabled: portal.options?.asset?.enabled !== false, required: !!portal.options?.asset?.required },
+                                  },
+                                  customFields: Array.isArray(portal.customFields)
+                                    ? portal.customFields.map((field, index) => ({
+                                        id: field.id || `${portal.id}-${index}`,
+                                        type: field.type || 'Text',
+                                        label: field.label || '',
+                                        required: !!field.required,
+                                      }))
+                                    : [],
+                                });
+                                setCreatePortalOpen(true);
+                              }}
+                              className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                            >
+                              Edit
+                            </button>
+                          </div>
+                        </div>
+                        <div className="mt-5 text-[15px] text-gray-600">
+                          {portal.customUrl ? `/${portal.customUrl}` : 'No custom url'}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeSettingsSection === 'requests' && activeRequestSettingsTab === 'internal' ? (
+              <div className="flex items-center justify-end gap-3 border-t border-gray-200 px-6 py-5">
+                <button type="button" onClick={onClose} className="rounded-md border border-gray-300 bg-white px-5 py-2.5 text-[15px] font-medium text-gray-700 hover:bg-gray-50">
+                  Cancel
+                </button>
+                <button type="button" onClick={onSave} className="rounded-md bg-blue-600 px-5 py-2.5 text-[15px] font-semibold text-white hover:bg-blue-700">
+                  Save
+                </button>
+              </div>
+            ) : activeSettingsSection === 'general' ? (
+              <div className="flex items-center justify-end gap-3 border-t border-gray-200 px-6 py-5">
+                <button type="button" onClick={onClose} className="rounded-md border border-gray-300 bg-white px-5 py-2.5 text-[15px] font-medium text-gray-700 hover:bg-gray-50">
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onSaveGeneralSettings?.(generalForm)}
+                  className="rounded-md bg-blue-600 px-5 py-2.5 text-[15px] font-semibold text-white hover:bg-blue-700"
+                >
+                  Save
+                </button>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </div>
+
+      {showAssetFieldModal && (
+        <div className="fixed inset-0 z-[1500] flex items-center justify-center bg-black/45 p-6">
+          <div className="w-full max-w-[720px] rounded-[20px] bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-gray-200 px-8 py-7">
+              <h3 className="text-[22px] font-bold text-gray-900">Create Field</h3>
+              <button type="button" onClick={() => { setShowAssetFieldModal(false); setAssetFieldForm(createEmptyAssetFieldForm()); }} className="text-gray-500 hover:text-gray-800">
+                <X className="h-8 w-8" />
+              </button>
+            </div>
+            <div className="px-8 py-8">
+              <div>
+                <label className="mb-3 block text-[15px] text-gray-900">Field Name</label>
+                <input
+                  value={assetFieldForm.name}
+                  onChange={(e) => setAssetFieldForm((prev) => ({ ...prev, name: e.target.value }))}
+                  className="h-14 w-full rounded-md border border-gray-300 px-4 text-[16px] text-gray-800 outline-none focus:border-blue-500"
+                />
+              </div>
+              <div className="mt-6">
+                <label className="mb-3 block text-[15px] text-gray-900">Type</label>
+                <input
+                  value={assetFieldForm.type}
+                  readOnly
+                  className="h-14 w-full rounded-md border border-gray-200 bg-gray-50 px-4 text-[16px] text-gray-700 outline-none"
+                />
+              </div>
+              {assetFieldForm.type === 'Dropdown' && (
+                <div className="mt-6">
+                  <label className="mb-3 block text-[15px] text-gray-900">Dropdown Options</label>
+                  <textarea
+                    rows={5}
+                    value={assetFieldForm.optionsText}
+                    onChange={(e) => setAssetFieldForm((prev) => ({ ...prev, optionsText: e.target.value }))}
+                    placeholder="Enter one option per line"
+                    className="w-full rounded-md border border-gray-300 px-4 py-4 text-[15px] text-gray-800 outline-none focus:border-blue-500"
+                  />
+                </div>
+              )}
+            </div>
+            <div className="flex items-center justify-end gap-3 border-t border-gray-200 px-8 py-5">
+              <button type="button" onClick={() => { setShowAssetFieldModal(false); setAssetFieldForm(createEmptyAssetFieldForm()); }} className="rounded-md border border-gray-300 bg-white px-5 py-2.5 text-[15px] font-medium text-gray-700 hover:bg-gray-50">
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleCreateAssetField}
+                disabled={assetFieldSaving || !assetFieldForm.name.trim() || (assetFieldForm.type === 'Dropdown' && !assetFieldForm.optionsText.trim())}
+                className="rounded-md bg-blue-600 px-5 py-2.5 text-[15px] font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500"
+              >
+                {assetFieldSaving ? 'Creating...' : 'Create Field'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAssetStatusModal && (
+        <div className="fixed inset-0 z-[1500] flex items-center justify-center bg-black/45 p-6">
+          <div className="w-full max-w-[630px] rounded-[20px] bg-white shadow-2xl">
+            <div className="flex items-center justify-between px-8 py-8">
+              <h3 className="text-[22px] font-bold text-gray-900">Add Category</h3>
+              <button type="button" onClick={() => { setShowAssetStatusModal(false); setAssetStatusName(''); }} className="text-gray-500 hover:text-gray-800">
+                <X className="h-8 w-8" />
+              </button>
+            </div>
+            <div className="px-8 pb-10">
+              <input
+                value={assetStatusName}
+                onChange={(e) => setAssetStatusName(e.target.value)}
+                className="h-14 w-full rounded-md border border-gray-300 px-4 text-[16px] text-gray-800 outline-none focus:border-blue-500"
+              />
+            </div>
+            <div className="flex items-center justify-end gap-3 border-t border-gray-200 px-8 py-5">
+              <button type="button" onClick={() => { setShowAssetStatusModal(false); setAssetStatusName(''); }} className="rounded-md border border-gray-300 bg-white px-5 py-2.5 text-[15px] font-medium text-gray-700 hover:bg-gray-50">
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleCreateAssetStatus}
+                disabled={assetStatusSaving || !assetStatusName.trim()}
+                className="rounded-md bg-blue-600 px-5 py-2.5 text-[15px] font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500"
+              >
+                {assetStatusSaving ? 'Saving...' : 'Confirm'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showPartGroupModal && (
+        <div className="fixed inset-0 z-[1500] flex items-center justify-center bg-black/45 p-6">
+          <div className="w-full max-w-[760px] rounded-[20px] bg-white shadow-2xl">
+            <div className="flex items-center justify-between px-8 py-8">
+              <h3 className="text-[22px] font-bold text-gray-900">Auto Group Parts</h3>
+              <button type="button" onClick={() => { setShowPartGroupModal(false); setPartGroupForm(createEmptyPartGroupForm()); setAutoGroupConfirmChecked(false); }} className="text-gray-500 hover:text-gray-800">
+                <X className="h-8 w-8" />
+              </button>
+            </div>
+            <div className="space-y-8 px-8 pb-10">
+              <p className="max-w-[560px] text-[18px] leading-9 text-gray-800">
+                This process will automatically group your current parts by the "Part Number" field.
+              </p>
+              <p className="text-[17px] leading-8 text-gray-600">
+                Please follow <span className="text-blue-600">this import process</span> to update your data
+              </p>
+              <label className="flex items-center gap-4 text-[17px] text-gray-900">
+                <input
+                  type="checkbox"
+                  checked={autoGroupConfirmChecked}
+                  onChange={(e) => setAutoGroupConfirmChecked(e.target.checked)}
+                  className="h-6 w-6 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                All of my parts have a part number
+              </label>
+            </div>
+            <div className="flex items-center justify-end gap-3 border-t border-gray-200 px-8 py-5">
+              <button type="button" onClick={() => { setShowPartGroupModal(false); setPartGroupForm(createEmptyPartGroupForm()); setAutoGroupConfirmChecked(false); }} className="rounded-md border border-gray-300 bg-white px-5 py-2.5 text-[15px] font-medium text-gray-700 hover:bg-gray-50">
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleAutoGroupParts}
+                disabled={autoGroupSaving || !autoGroupConfirmChecked}
+                className="rounded-md bg-blue-600 px-5 py-2.5 text-[15px] font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500"
+              >
+                {autoGroupSaving ? 'Continuing...' : 'Continue'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showPartFieldModal && (
+        <div className="fixed inset-0 z-[1500] flex items-center justify-center bg-black/45 p-6">
+          <div className="w-full max-w-[720px] rounded-[20px] bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-gray-200 px-8 py-7">
+              <h3 className="text-[22px] font-bold text-gray-900">Create Part Field</h3>
+              <button type="button" onClick={() => { setShowPartFieldModal(false); setPartFieldForm(createEmptyAssetFieldForm()); }} className="text-gray-500 hover:text-gray-800">
+                <X className="h-8 w-8" />
+              </button>
+            </div>
+            <div className="px-8 py-8">
+              <div>
+                <label className="mb-3 block text-[15px] text-gray-900">Field Name</label>
+                <input
+                  value={partFieldForm.name}
+                  onChange={(e) => setPartFieldForm((prev) => ({ ...prev, name: e.target.value }))}
+                  className="h-14 w-full rounded-md border border-gray-300 px-4 text-[16px] text-gray-800 outline-none focus:border-blue-500"
+                />
+              </div>
+              <div className="mt-6">
+                <label className="mb-3 block text-[15px] text-gray-900">Type</label>
+                <input
+                  value={partFieldForm.type}
+                  readOnly
+                  className="h-14 w-full rounded-md border border-gray-200 bg-gray-50 px-4 text-[16px] text-gray-700 outline-none"
+                />
+              </div>
+              {partFieldForm.type === 'Dropdown' && (
+                <div className="mt-6">
+                  <label className="mb-3 block text-[15px] text-gray-900">Dropdown Options</label>
+                  <textarea
+                    rows={5}
+                    value={partFieldForm.optionsText}
+                    onChange={(e) => setPartFieldForm((prev) => ({ ...prev, optionsText: e.target.value }))}
+                    placeholder="Enter one option per line"
+                    className="w-full rounded-md border border-gray-300 px-4 py-4 text-[15px] text-gray-800 outline-none focus:border-blue-500"
+                  />
+                </div>
+              )}
+            </div>
+            <div className="flex items-center justify-end gap-3 border-t border-gray-200 px-8 py-5">
+              <button type="button" onClick={() => { setShowPartFieldModal(false); setPartFieldForm(createEmptyAssetFieldForm()); }} className="rounded-md border border-gray-300 bg-white px-5 py-2.5 text-[15px] font-medium text-gray-700 hover:bg-gray-50">
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleCreatePartField}
+                disabled={partFieldSaving || !partFieldForm.name.trim() || (partFieldForm.type === 'Dropdown' && !partFieldForm.optionsText.trim())}
+                className="rounded-md bg-blue-600 px-5 py-2.5 text-[15px] font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500"
+              >
+                {partFieldSaving ? 'Creating...' : 'Create Field'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showWorkflowModal && (
+        <div className="fixed inset-0 z-[1500] flex items-center justify-center bg-black/45 p-6">
+          <div className="w-full max-w-[860px] rounded-[20px] bg-white shadow-2xl">
+            <div className="flex items-center justify-between px-8 py-8">
+              <h3 className="text-[22px] font-bold text-gray-900">Create Workflow</h3>
+              <button type="button" onClick={() => { setShowWorkflowModal(false); resetWorkflowForm(); }} className="text-gray-500 hover:text-gray-800">
+                <X className="h-8 w-8" />
+              </button>
+            </div>
+            <div className="max-h-[78vh] overflow-y-auto px-8 pb-8">
+              <div>
+                <label className="mb-3 block text-[15px] text-gray-900">Title <span className="text-rose-500">*</span></label>
+                <input
+                  value={workflowForm.title}
+                  onChange={(e) => setWorkflowForm((prev) => ({ ...prev, title: e.target.value }))}
+                  className="h-14 w-full rounded-md border border-rose-400 px-4 text-[16px] outline-none"
+                />
+              </div>
+              <div className="mt-8">
+                <label className="mb-3 block text-[15px] text-gray-900">If <span className="text-rose-500">*</span></label>
+                <select
+                  value={workflowForm.ifCondition}
+                  onChange={(e) => setWorkflowForm((prev) => ({ ...prev, ifCondition: e.target.value, andConditions: [createEmptyWorkflowCondition()], thenAction: '', thenValue: {} }))}
+                  className="h-14 w-full rounded-md border border-gray-300 px-4 text-[16px] text-gray-800 outline-none focus:border-blue-500"
+                >
+                  <option value="">Select trigger</option>
+                  {AUTOMATION_IF_OPTIONS.map((option) => <option key={option}>{option}</option>)}
+                </select>
+              </div>
+
+              {workflowForm.ifCondition ? workflowForm.andConditions.map((condition, index) => {
+                const andOptions = getWorkflowAndOptions(workflowForm.ifCondition);
+                const showVendorValue = condition.type === 'Purchase Order is assigned to Vendor...';
+                const showCategoryValue = condition.type.includes('Category');
+                const showStatusValue = condition.type.includes('Status');
+                return (
+                  <div key={condition.id} className="mt-10">
+                    <label className="mb-3 block text-[15px] text-gray-900">{index === 0 ? 'And (optional)' : `And ${index + 1} (optional)`}</label>
+                    <select
+                      value={condition.type}
+                      onChange={(e) => updateWorkflowCondition(condition.id, { type: e.target.value, value: getEmptyWorkflowValueForType(e.target.value) })}
+                      className="h-14 w-full rounded-md border border-gray-300 px-4 text-[16px] text-gray-800 outline-none focus:border-blue-500"
+                    >
+                      <option value="">Select condition</option>
+                      {andOptions.map((option) => <option key={option}>{option}</option>)}
+                    </select>
+                    {showVendorValue ? (
+                      <div className="mt-6">
+                        <SettingsSearchableSelect
+                          label="Vendor"
+                          value={condition.value?.vendorId || ''}
+                          options={vendorOptions}
+                          placeholder="Search"
+                          onChange={(nextValue) => updateWorkflowCondition(condition.id, { value: { vendorId: nextValue } })}
+                        />
+                      </div>
+                    ) : null}
+                    {showCategoryValue ? (
+                      <div className="mt-6">
+                        <label className="mb-3 block text-[15px] text-gray-900">Category</label>
+                        <select
+                          value={condition.value?.category || ''}
+                          onChange={(e) => updateWorkflowCondition(condition.id, { value: { category: e.target.value } })}
+                          className="h-14 w-full rounded-md border border-gray-300 px-4 text-[16px] text-gray-800 outline-none focus:border-blue-500"
+                        >
+                          <option value="">Select category</option>
+                          {WORKFLOW_CATEGORY_OPTIONS.map((option) => <option key={option}>{option}</option>)}
+                        </select>
+                      </div>
+                    ) : null}
+                    {showStatusValue ? (
+                      <div className="mt-6">
+                        <label className="mb-3 block text-[15px] text-gray-900">Status</label>
+                        <select
+                          value={condition.value?.status || ''}
+                          onChange={(e) => updateWorkflowCondition(condition.id, { value: { status: e.target.value } })}
+                          className="h-14 w-full rounded-md border border-gray-300 px-4 text-[16px] text-gray-800 outline-none focus:border-blue-500"
+                        >
+                          <option value="">Select status</option>
+                          {WORKFLOW_STATUS_OPTIONS.map((option) => <option key={option}>{option}</option>)}
+                        </select>
+                      </div>
+                    ) : null}
+                    {condition.type.includes('Priority') ? (
+                      <div className="mt-6">
+                        <label className="mb-3 block text-[15px] text-gray-900">Priority</label>
+                        <select
+                          value={condition.value?.priority || ''}
+                          onChange={(e) => updateWorkflowCondition(condition.id, { value: { priority: e.target.value } })}
+                          className="h-14 w-full rounded-md border border-gray-300 px-4 text-[16px] text-gray-800 outline-none focus:border-blue-500"
+                        >
+                          <option value="">Select priority</option>
+                          {['Low', 'Medium', 'High'].map((option) => <option key={option}>{option}</option>)}
+                        </select>
+                      </div>
+                    ) : null}
+                    {condition.type.includes('is between') ? (
+                      <div className="mt-6 grid gap-4 md:grid-cols-2">
+                        <div>
+                          <label className="mb-3 block text-[15px] text-gray-900">Start Date</label>
+                          <input
+                            type="date"
+                            value={condition.value?.startDate || ''}
+                            onChange={(e) => updateWorkflowCondition(condition.id, { value: { ...(condition.value || {}), startDate: e.target.value } })}
+                            className="h-14 w-full rounded-md border border-gray-300 px-4 text-[16px] text-gray-800 outline-none focus:border-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-3 block text-[15px] text-gray-900">Start Time</label>
+                          <input
+                            type="time"
+                            value={condition.value?.startTime || ''}
+                            onChange={(e) => updateWorkflowCondition(condition.id, { value: { ...(condition.value || {}), startTime: e.target.value } })}
+                            className="h-14 w-full rounded-md border border-gray-300 px-4 text-[16px] text-gray-800 outline-none focus:border-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-3 block text-[15px] text-gray-900">End Date</label>
+                          <input
+                            type="date"
+                            value={condition.value?.endDate || ''}
+                            onChange={(e) => updateWorkflowCondition(condition.id, { value: { ...(condition.value || {}), endDate: e.target.value } })}
+                            className="h-14 w-full rounded-md border border-gray-300 px-4 text-[16px] text-gray-800 outline-none focus:border-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-3 block text-[15px] text-gray-900">End Time</label>
+                          <input
+                            type="time"
+                            value={condition.value?.endTime || ''}
+                            onChange={(e) => updateWorkflowCondition(condition.id, { value: { ...(condition.value || {}), endTime: e.target.value } })}
+                            className="h-14 w-full rounded-md border border-gray-300 px-4 text-[16px] text-gray-800 outline-none focus:border-blue-500"
+                          />
+                        </div>
+                      </div>
+                    ) : null}
+                    {condition.type.includes('is after') ? (
+                      <div className="mt-6 grid gap-4 md:grid-cols-2">
+                        <div>
+                          <label className="mb-3 block text-[15px] text-gray-900">Date</label>
+                          <input
+                            type="date"
+                            value={condition.value?.date || ''}
+                            onChange={(e) => updateWorkflowCondition(condition.id, { value: { ...(condition.value || {}), date: e.target.value } })}
+                            className="h-14 w-full rounded-md border border-gray-300 px-4 text-[16px] text-gray-800 outline-none focus:border-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-3 block text-[15px] text-gray-900">Time</label>
+                          <input
+                            type="time"
+                            value={condition.value?.time || ''}
+                            onChange={(e) => updateWorkflowCondition(condition.id, { value: { ...(condition.value || {}), time: e.target.value } })}
+                            className="h-14 w-full rounded-md border border-gray-300 px-4 text-[16px] text-gray-800 outline-none focus:border-blue-500"
+                          />
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              }) : null}
+
+              {workflowForm.ifCondition ? (
+                <div className="mt-8 flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => removeWorkflowCondition(workflowForm.andConditions[workflowForm.andConditions.length - 1]?.id)}
+                    disabled={workflowForm.andConditions.length <= 1}
+                    className="rounded-md bg-rose-600 px-6 py-3 text-[16px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Delete
+                  </button>
+                  <button
+                    type="button"
+                    onClick={addWorkflowCondition}
+                    className="rounded-md bg-blue-600 px-6 py-3 text-[16px] font-semibold text-white hover:bg-blue-700"
+                  >
+                    Add New
+                  </button>
+                </div>
+              ) : null}
+
+              {workflowForm.ifCondition ? (
+                <div className="mt-10">
+                  <label className="mb-3 block text-[15px] text-gray-900">Then <span className="text-rose-500">*</span></label>
+                  <select
+                    value={workflowForm.thenAction}
+                    onChange={(e) => setWorkflowForm((prev) => ({ ...prev, thenAction: e.target.value, thenValue: {} }))}
+                    className="h-14 w-full rounded-md border border-gray-300 px-4 text-[16px] text-gray-800 outline-none focus:border-blue-500"
+                  >
+                    <option value="">Select action</option>
+                    {getWorkflowThenOptions(workflowForm.ifCondition).map((option) => <option key={option}>{option}</option>)}
+                  </select>
+                </div>
+              ) : null}
+
+              {workflowForm.thenAction === 'Send Purchase Order Reminder Email' ? (
+                <div className="mt-6">
+                  <SettingsSearchableSelect
+                    label="Email"
+                    value={workflowForm.thenValue?.email || ''}
+                    options={workflowEmailOptions}
+                    placeholder="Search"
+                    onChange={(nextValue) => setWorkflowForm((prev) => ({ ...prev, thenValue: { email: nextValue } }))}
+                  />
+                </div>
+              ) : null}
+
+              {workflowForm.thenAction === 'Assign Vendor to Purchase Order' ? (
+                <div className="mt-6">
+                  <SettingsSearchableSelect
+                    label="Vendor"
+                    value={workflowForm.thenValue?.vendorId || ''}
+                    options={vendorOptions}
+                    placeholder="Search"
+                    onChange={(nextValue) => setWorkflowForm((prev) => ({ ...prev, thenValue: { vendorId: nextValue } }))}
+                  />
+                </div>
+              ) : null}
+
+              {workflowForm.thenAction === 'Assign Category to Purchase Order' || workflowForm.thenAction === 'Set Work Order Priority' ? (
+                <div className="mt-6">
+                  <label className="mb-3 block text-[15px] text-gray-900">{workflowForm.thenAction.includes('Priority') ? 'Priority' : 'Category'}</label>
+                  <select
+                    value={workflowForm.thenAction.includes('Priority') ? (workflowForm.thenValue?.priority || '') : (workflowForm.thenValue?.category || '')}
+                    onChange={(e) => setWorkflowForm((prev) => ({ ...prev, thenValue: workflowForm.thenAction.includes('Priority') ? { priority: e.target.value } : { category: e.target.value } }))}
+                    className="h-14 w-full rounded-md border border-gray-300 px-4 text-[16px] text-gray-800 outline-none focus:border-blue-500"
+                  >
+                    <option value="">Select option</option>
+                    {(workflowForm.thenAction.includes('Priority') ? ['Low', 'Medium', 'High'] : WORKFLOW_CATEGORY_OPTIONS).map((option) => <option key={option}>{option}</option>)}
+                  </select>
+                </div>
+              ) : null}
+
+              <div className="mt-10 flex items-center gap-6">
+                <button type="button" onClick={() => { setShowWorkflowModal(false); resetWorkflowForm(); }} className="rounded-md border border-gray-300 bg-white px-6 py-3 text-[16px] font-medium text-gray-700 hover:bg-gray-50">
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={workflowSaving || !workflowForm.title.trim() || !workflowForm.ifCondition || !workflowForm.thenAction}
+                  onClick={handleSaveWorkflow}
+                  className="rounded-md bg-gray-100 px-6 py-3 text-[16px] font-semibold text-gray-600 disabled:opacity-70"
+                >
+                  {workflowSaving ? 'Saving...' : 'Save'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showWorkOrderStatusModal && (
+        <div className="fixed inset-0 z-[1500] flex items-center justify-center bg-black/45 p-6">
+          <div className="w-full max-w-[720px] rounded-[20px] bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-gray-200 px-8 py-7">
+              <h3 className="text-[22px] font-bold text-gray-900">Create Custom Status</h3>
+              <button type="button" onClick={() => { setShowWorkOrderStatusModal(false); setWorkOrderStatusForm(createEmptyWorkOrderStatusForm()); }} className="text-gray-500 hover:text-gray-800">
+                <X className="h-8 w-8" />
+              </button>
+            </div>
+            <div className="space-y-6 px-8 py-8">
+              <div>
+                <label className="mb-3 block text-[16px] text-gray-900">Type</label>
+                <select
+                  value={workOrderStatusForm.type}
+                  onChange={(e) => setWorkOrderStatusForm((prev) => ({ ...prev, type: e.target.value }))}
+                  className="h-14 w-full rounded-md border border-gray-300 px-4 text-[16px] text-gray-800 outline-none focus:border-blue-500"
+                >
+                  {WORK_ORDER_STATUS_TYPE_OPTIONS.map((option) => <option key={option}>{option}</option>)}
+                </select>
+                <p className="mt-3 text-[15px] leading-7 text-gray-500">
+                  {workOrderStatusForm.type === 'Open' ? "Work orders in an Open status represent work that hasn't been started yet" : `Create a custom status under ${workOrderStatusForm.type}.`}
+                </p>
+              </div>
+              <div className="border-t border-gray-200 pt-6">
+                <label className="mb-3 block text-[16px] text-gray-900">Status</label>
+                <input
+                  value={workOrderStatusForm.name}
+                  onChange={(e) => setWorkOrderStatusForm((prev) => ({ ...prev, name: e.target.value }))}
+                  className="h-14 w-full rounded-md border border-gray-300 px-4 text-[16px] text-gray-800 outline-none focus:border-blue-500"
+                />
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-3 border-t border-gray-200 px-8 py-5">
+              <button type="button" onClick={() => { setShowWorkOrderStatusModal(false); setWorkOrderStatusForm(createEmptyWorkOrderStatusForm()); }} className="rounded-md border border-gray-300 bg-white px-5 py-2.5 text-[15px] font-medium text-gray-700 hover:bg-gray-50">
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleCreateWorkOrderStatus}
+                disabled={workOrderStatusSaving || !workOrderStatusForm.name.trim()}
+                className="rounded-md bg-blue-600 px-5 py-2.5 text-[15px] font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500"
+              >
+                {workOrderStatusSaving ? 'Creating...' : 'Create Custom Status'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showWorkOrderCategoryModal && (
+        <div className="fixed inset-0 z-[1500] flex items-center justify-center bg-black/45 p-6">
+          <div className="w-full max-w-[630px] rounded-[20px] bg-white shadow-2xl">
+            <div className="flex items-center justify-between px-8 py-8">
+              <h3 className="text-[22px] font-bold text-gray-900">Add Category</h3>
+              <button type="button" onClick={() => { setShowWorkOrderCategoryModal(false); setWorkOrderCategoryName(''); setEditingWorkOrderCategoryId(''); }} className="text-gray-500 hover:text-gray-800">
+                <X className="h-8 w-8" />
+              </button>
+            </div>
+            <div className="px-8 pb-10">
+              <input
+                value={workOrderCategoryName}
+                onChange={(e) => setWorkOrderCategoryName(e.target.value)}
+                className="h-14 w-full rounded-md border border-gray-300 px-4 text-[16px] text-gray-800 outline-none focus:border-blue-500"
+              />
+            </div>
+            <div className="flex items-center justify-end gap-3 border-t border-gray-200 px-8 py-5">
+              <button type="button" onClick={() => { setShowWorkOrderCategoryModal(false); setWorkOrderCategoryName(''); setEditingWorkOrderCategoryId(''); }} className="rounded-md border border-gray-300 bg-white px-5 py-2.5 text-[15px] font-medium text-gray-700 hover:bg-gray-50">
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveWorkOrderCategory}
+                disabled={workOrderCategorySaving || !workOrderCategoryName.trim()}
+                className="rounded-md bg-blue-600 px-5 py-2.5 text-[15px] font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500"
+              >
+                {workOrderCategorySaving ? 'Saving...' : 'Confirm'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showWorkOrderTimerModal && (
+        <div className="fixed inset-0 z-[1500] flex items-center justify-center bg-black/45 p-6">
+          <div className="w-full max-w-[630px] rounded-[20px] bg-white shadow-2xl">
+            <div className="flex items-center justify-between px-8 py-8">
+              <h3 className="text-[22px] font-bold text-gray-900">Add Category</h3>
+              <button type="button" onClick={() => { setShowWorkOrderTimerModal(false); setWorkOrderTimerName(''); setEditingWorkOrderTimerId(''); }} className="text-gray-500 hover:text-gray-800">
+                <X className="h-8 w-8" />
+              </button>
+            </div>
+            <div className="px-8 pb-10">
+              <input
+                value={workOrderTimerName}
+                onChange={(e) => setWorkOrderTimerName(e.target.value)}
+                className="h-14 w-full rounded-md border border-gray-300 px-4 text-[16px] text-gray-800 outline-none focus:border-blue-500"
+              />
+            </div>
+            <div className="flex items-center justify-end gap-3 border-t border-gray-200 px-8 py-5">
+              <button type="button" onClick={() => { setShowWorkOrderTimerModal(false); setWorkOrderTimerName(''); setEditingWorkOrderTimerId(''); }} className="rounded-md border border-gray-300 bg-white px-5 py-2.5 text-[15px] font-medium text-gray-700 hover:bg-gray-50">
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveWorkOrderTimer}
+                disabled={workOrderTimerSaving || !workOrderTimerName.trim()}
+                className="rounded-md bg-blue-600 px-5 py-2.5 text-[15px] font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500"
+              >
+                {workOrderTimerSaving ? 'Saving...' : 'Confirm'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showWorkOrderFieldModal && (
+        <div className="fixed inset-0 z-[1500] flex items-center justify-center bg-black/45 p-6">
+          <div className="w-full max-w-[720px] rounded-[20px] bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-gray-200 px-8 py-7">
+              <h3 className="text-[22px] font-bold text-gray-900">Create Field</h3>
+              <button type="button" onClick={() => { setShowWorkOrderFieldModal(false); setWorkOrderFieldForm(createEmptyWorkOrderFieldForm()); }} className="text-gray-500 hover:text-gray-800">
+                <X className="h-8 w-8" />
+              </button>
+            </div>
+            <div className="px-8 py-8">
+              <div>
+                <label className="mb-3 block text-[15px] text-gray-900">Field Name</label>
+                <input
+                  value={workOrderFieldForm.name}
+                  onChange={(e) => setWorkOrderFieldForm((prev) => ({ ...prev, name: e.target.value }))}
+                  className="h-14 w-full rounded-md border border-gray-300 px-4 text-[16px] text-gray-800 outline-none focus:border-blue-500"
+                />
+              </div>
+              <div className="mt-6">
+                <label className="mb-3 block text-[15px] text-gray-900">Type</label>
+                <input
+                  value={workOrderFieldForm.type}
+                  readOnly
+                  className="h-14 w-full rounded-md border border-gray-200 bg-gray-50 px-4 text-[16px] text-gray-700 outline-none"
+                />
+              </div>
+              {workOrderFieldForm.type === 'Dropdown' && (
+                <div className="mt-6">
+                  <label className="mb-3 block text-[15px] text-gray-900">Dropdown Options</label>
+                  <textarea
+                    rows={5}
+                    value={workOrderFieldForm.optionsText}
+                    onChange={(e) => setWorkOrderFieldForm((prev) => ({ ...prev, optionsText: e.target.value }))}
+                    placeholder="Enter one option per line"
+                    className="w-full rounded-md border border-gray-300 px-4 py-4 text-[15px] text-gray-800 outline-none focus:border-blue-500"
+                  />
+                </div>
+              )}
+            </div>
+            <div className="flex items-center justify-end gap-3 border-t border-gray-200 px-8 py-5">
+              <button type="button" onClick={() => { setShowWorkOrderFieldModal(false); setWorkOrderFieldForm(createEmptyWorkOrderFieldForm()); }} className="rounded-md border border-gray-300 bg-white px-5 py-2.5 text-[15px] font-medium text-gray-700 hover:bg-gray-50">
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleCreateWorkOrderField}
+                disabled={workOrderFieldSaving || !workOrderFieldForm.name.trim() || (workOrderFieldForm.type === 'Dropdown' && !workOrderFieldForm.optionsText.trim())}
+                className="rounded-md bg-blue-600 px-5 py-2.5 text-[15px] font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500"
+              >
+                {workOrderFieldSaving ? 'Creating...' : 'Create Field'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showRoleModal && (
+        <div className="fixed inset-0 z-[1500] flex items-center justify-center bg-black/45 p-6">
+          <div className="flex max-h-[92vh] w-full max-w-[1130px] flex-col overflow-hidden rounded-[24px] bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-gray-200 px-8 py-7">
+              <h3 className="text-[24px] font-bold text-gray-900">Create Role</h3>
+              <button type="button" onClick={() => { setShowRoleModal(false); setRoleForm(createEmptyRoleForm()); }} className="text-gray-500 hover:text-gray-800">
+                <X className="h-7 w-7" />
+              </button>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto px-8 py-8">
+              <div>
+                <label className="mb-3 block text-[15px] font-semibold text-gray-900">Name</label>
+                <input
+                  value={roleForm.name}
+                  onChange={(e) => setRoleForm((prev) => ({ ...prev, name: e.target.value.slice(0, 50) }))}
+                  placeholder="Name"
+                  className="h-12 w-full rounded-md border border-gray-300 px-4 text-[16px] outline-none focus:border-blue-500"
+                />
+                <div className="mt-2 text-[14px] text-rose-500">Name is required and must be 50 characters or less.</div>
+              </div>
+
+              <div className="mt-8">
+                <label className="mb-3 block text-[15px] font-semibold text-gray-900">Description</label>
+                <textarea
+                  value={roleForm.description}
+                  onChange={(e) => setRoleForm((prev) => ({ ...prev, description: e.target.value.slice(0, 150) }))}
+                  placeholder="Description"
+                  rows={4}
+                  className="w-full rounded-md border border-gray-300 px-4 py-3 text-[16px] outline-none focus:border-blue-500"
+                />
+                <div className="mt-2 text-[14px] text-rose-500">Description is required and must be 150 characters or less.</div>
+              </div>
+
+              <div className="mt-8">
+                <label className="mb-3 block text-[15px] font-semibold text-gray-900">External ID</label>
+                <input
+                  value={roleForm.externalId}
+                  onChange={(e) => setRoleForm((prev) => ({ ...prev, externalId: e.target.value.toLowerCase().replace(/[^a-z_]/g, '').slice(0, 50) }))}
+                  placeholder="External ID"
+                  className="h-12 w-full rounded-md border border-gray-300 px-4 text-[16px] outline-none focus:border-blue-500"
+                />
+                <div className="mt-2 text-[15px] text-gray-500">This is unique to each role and will show up on import/export (can only contain lower case letters and underscores).</div>
+                <div className="mt-2 text-[14px] text-rose-500">External ID is required and must be 50 characters or less, can only have letters and underscores and cannot start or end with an underscore.</div>
+              </div>
+
+              <div className="mt-12">
+                <h4 className="text-[24px] font-bold text-gray-900">Permissions</h4>
+                <p className="mt-4 text-[16px] text-gray-500">This role can do everything an Administrator can do in FixNest, but you can customize some important permissions below.</p>
+              </div>
+
+              <div className="mt-8 space-y-8">
+                {roleForm.permissions.map((section) => {
+                  const sectionTemplate = ROLE_PERMISSION_SECTIONS.find((item) => item.section === section.section);
+                  const allSelected = section.permissions.length === (sectionTemplate?.permissions.length || 0);
+                  return (
+                    <div key={section.section}>
+                      <div className="mb-4 flex items-center justify-between gap-4">
+                        <h5 className="text-[18px] font-bold text-gray-900">{section.section}</h5>
+                        <div className="flex items-center gap-4">
+                          <button
+                            type="button"
+                            onClick={() => updateRoleSectionPermissions(section.section, allSelected ? [] : [...(sectionTemplate?.permissions || [])])}
+                            className="flex items-center gap-3 text-[15px] text-gray-600"
+                          >
+                            <span>Select All</span>
+                            <span className={`flex h-6 w-6 items-center justify-center rounded-md ${allSelected ? 'bg-gray-500 text-white' : 'border border-gray-300 bg-white text-gray-400'}`}>
+                              {allSelected ? <CheckCircle className="h-4 w-4" /> : null}
+                            </span>
+                          </button>
+                          <button type="button" onClick={() => toggleRoleSectionExpanded(section.section)} className="text-gray-600 hover:text-gray-800">
+                            {section.expanded ? <ChevronDown className="h-6 w-6" /> : <ChevronRight className="h-6 w-6" />}
+                          </button>
+                        </div>
+                      </div>
+
+                      {section.expanded ? (
+                        <div className="rounded-2xl border border-gray-200 bg-white px-5 py-5">
+                          <div className="grid gap-y-4 md:grid-cols-2">
+                            {(sectionTemplate?.permissions || []).map((permission) => {
+                              const checked = section.permissions.includes(permission);
+                              return (
+                                <label key={`${section.section}-${permission}`} className="flex items-center gap-3 text-[16px] text-gray-600">
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={() => toggleRoleSectionPermission(section.section, permission)}
+                                    className="h-6 w-6 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                  />
+                                  <span>{permission}</span>
+                                  {(permission === 'Create' || permission === 'Edit') ? <AlertCircle className="h-4 w-4 text-gray-400" /> : null}
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-4 border-t border-gray-200 px-8 py-6">
+              <button
+                type="button"
+                onClick={() => { setShowRoleModal(false); setRoleForm(createEmptyRoleForm()); }}
+                className="rounded-md border border-gray-300 bg-white px-6 py-3 text-[16px] font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={
+                  roleSaving ||
+                  !roleForm.name.trim() ||
+                  !roleForm.description.trim() ||
+                  !/^[a-z]+(?:_[a-z]+)*$/.test(roleForm.externalId.trim())
+                }
+                onClick={handleSaveRole}
+                className="rounded-md bg-gray-100 px-6 py-3 text-[16px] font-semibold text-gray-600 disabled:opacity-70"
+              >
+                {roleSaving ? 'Submitting...' : 'Submit'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showPurchaseOrderCategoryModal && (
+        <div className="fixed inset-0 z-[1500] flex items-center justify-center bg-black/45 p-6">
+          <div className="w-full max-w-[630px] rounded-[20px] bg-white shadow-2xl">
+            <div className="flex items-center justify-between px-8 py-8">
+              <h3 className="text-[22px] font-bold text-gray-900">
+                {editingPurchaseOrderCategoryId ? 'Edit Category' : 'Add Category'}
+              </h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPurchaseOrderCategoryModal(false);
+                  setEditingPurchaseOrderCategoryId('');
+                  setPurchaseOrderCategoryName('');
+                }}
+                className="text-gray-500 hover:text-gray-800"
+              >
+                <X className="h-8 w-8" />
+              </button>
+            </div>
+            <div className="px-8 pb-10">
+              <input
+                value={purchaseOrderCategoryName}
+                onChange={(e) => setPurchaseOrderCategoryName(e.target.value)}
+                className="h-14 w-full rounded-md border border-gray-300 px-4 text-[16px] text-gray-800 outline-none focus:border-blue-500"
+                autoFocus
+              />
+            </div>
+            <div className="flex items-center justify-end gap-3 border-t border-gray-200 px-8 py-5">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPurchaseOrderCategoryModal(false);
+                  setEditingPurchaseOrderCategoryId('');
+                  setPurchaseOrderCategoryName('');
+                }}
+                className="rounded-md border border-gray-300 bg-white px-5 py-2.5 text-[15px] font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSavePurchaseOrderCategory}
+                disabled={!purchaseOrderCategoryName.trim()}
+                className="rounded-md bg-blue-600 px-5 py-2.5 text-[15px] font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500"
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showMeterCategoryModal && (
+        <div className="fixed inset-0 z-[1500] flex items-center justify-center bg-black/45 p-6">
+          <div className="w-full max-w-[630px] rounded-[20px] bg-white shadow-2xl">
+            <div className="flex items-center justify-between px-8 py-8">
+              <h3 className="text-[22px] font-bold text-gray-900">
+                {editingMeterCategoryId ? 'Edit Category' : 'Add Category'}
+              </h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMeterCategoryModal(false);
+                  setEditingMeterCategoryId('');
+                  setMeterCategoryName('');
+                }}
+                className="text-gray-500 hover:text-gray-800"
+              >
+                <X className="h-8 w-8" />
+              </button>
+            </div>
+            <div className="px-8 pb-10">
+              <input
+                value={meterCategoryName}
+                onChange={(e) => setMeterCategoryName(e.target.value)}
+                className="h-14 w-full rounded-md border border-gray-300 px-4 text-[16px] text-gray-800 outline-none focus:border-blue-500"
+                autoFocus
+              />
+            </div>
+            <div className="flex items-center justify-end gap-3 border-t border-gray-200 px-8 py-5">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMeterCategoryModal(false);
+                  setEditingMeterCategoryId('');
+                  setMeterCategoryName('');
+                }}
+                className="rounded-md border border-gray-300 bg-white px-5 py-2.5 text-[15px] font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveMeterCategory}
+                disabled={!meterCategoryName.trim()}
+                className="rounded-md bg-blue-600 px-5 py-2.5 text-[15px] font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500"
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showTagModal && (
+        <div className="fixed inset-0 z-[1500] flex items-center justify-center bg-black/45 p-6">
+          <div className="w-full max-w-[680px] rounded-[20px] bg-white shadow-2xl">
+            <div className="flex items-center justify-between px-8 py-8">
+              <h3 className="text-[22px] font-bold text-gray-900">{editingTagId ? 'Edit Tag' : 'Add Tag'}</h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowTagModal(false);
+                  setEditingTagId('');
+                  setTagForm({ name: '', model: '' });
+                }}
+                className="text-gray-500 hover:text-gray-800"
+              >
+                <X className="h-8 w-8" />
+              </button>
+            </div>
+            <div className="space-y-6 px-8 pb-10">
+              <div>
+                <input
+                  value={tagForm.name}
+                  onChange={(e) => setTagForm((prev) => ({ ...prev, name: e.target.value }))}
+                  placeholder="Enter tag name"
+                  className="h-14 w-full rounded-md border border-gray-300 px-4 text-[16px] text-gray-800 outline-none focus:border-blue-500"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="mb-3 block text-[15px] font-medium text-gray-900">Models</label>
+                <select
+                  value={tagForm.model}
+                  onChange={(e) => setTagForm((prev) => ({ ...prev, model: e.target.value }))}
+                  className="h-14 w-full rounded-md border border-gray-300 px-4 text-[16px] text-gray-800 outline-none focus:border-blue-500"
+                >
+                  <option value="">Select model</option>
+                  {TAG_MODEL_OPTIONS.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-3 border-t border-gray-200 px-8 py-5">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowTagModal(false);
+                  setEditingTagId('');
+                  setTagForm({ name: '', model: '' });
+                }}
+                className="rounded-md border border-gray-300 bg-white px-5 py-2.5 text-[15px] font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveTag}
+                disabled={!tagForm.name.trim()}
+                className="rounded-md bg-blue-600 px-5 py-2.5 text-[15px] font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500"
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {brandingOpen && (
+        <div className="fixed inset-0 z-[1500] flex items-center justify-center bg-black/45 p-6">
+          <div className="flex max-h-[94vh] w-full max-w-[1250px] flex-col overflow-hidden rounded-[28px] bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-gray-200 px-8 py-7">
+              <div className="flex items-center gap-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (brandingStep === 2) {
+                      setBrandingStep(1);
+                      return;
+                    }
+                    setBrandingOpen(false);
+                  }}
+                  className="rounded-lg p-2 text-gray-500 hover:bg-gray-100"
+                >
+                  <ChevronLeft className="h-6 w-6" />
+                </button>
+                <h3 className="text-[24px] font-bold text-gray-900">{brandingStep === 1 ? 'Upload Logo' : 'Preview & Adjust'}</h3>
+                <span className="text-[15px] text-gray-500">Step {brandingStep} of 2</span>
+              </div>
+              <button type="button" onClick={() => setBrandingOpen(false)} className="rounded-lg p-2 text-gray-500 hover:bg-gray-100">
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+            {brandingStep === 1 ? (
+              <>
+                <div className="min-h-0 flex-1 overflow-y-auto px-8 py-12">
+                  <div className="mx-auto max-w-[640px] text-center">
+                    <h4 className="text-[28px] font-bold text-gray-900">Upload your company logo</h4>
+                    <p className="mt-5 text-[18px] text-gray-500">We'll automatically extract your brand colors from the logo</p>
+                  </div>
+
+                  <label className="mx-auto mt-10 flex max-w-[600px] cursor-pointer flex-col items-center justify-center rounded-[24px] border-2 border-dashed border-gray-300 px-8 py-20 text-center hover:border-blue-300">
+                    <div className="text-[56px] text-gray-400">☁</div>
+                    <div className="mt-4 text-[20px] font-medium text-gray-600">Drop your logo here, or click to browse</div>
+                    <div className="mt-4 text-[16px] text-gray-500">PNG, JPG, or SVG · Max 2MB</div>
+                    <input
+                      type="file"
+                      accept=".png,.jpg,.jpeg,.svg"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] || null;
+                        setBrandingLogo(file);
+                        if (file) setBrandingStep(2);
+                      }}
+                    />
+                  </label>
+                </div>
+                <div className="flex items-center justify-end border-t border-gray-200 px-8 py-5">
+                  <button type="button" onClick={() => setBrandingOpen(false)} className="rounded-md border border-blue-300 bg-white px-6 py-2.5 text-[16px] font-medium text-blue-700 hover:bg-blue-50">
+                    Cancel
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
+                  <div className="overflow-hidden rounded-[22px] border border-gray-200">
+                    <div className="bg-[#2c8214] px-6 py-4">
+                      <div className="flex items-start justify-between">
+                        <div className="h-10 w-10 overflow-hidden rounded-md bg-white/20">
+                          {brandingLogo ? (
+                            <img src={URL.createObjectURL(brandingLogo)} alt="Logo preview" className="h-full w-full object-cover" />
+                          ) : branding.logoUrl ? (
+                            <img src={getImageUrl(branding.logoUrl)} alt="Logo preview" className="h-full w-full object-cover" />
+                          ) : null}
+                        </div>
+                        <button type="button" className="rounded-md border border-yellow-300 px-3 py-1 text-[14px] font-medium text-yellow-200">
+                          Sign In
+                        </button>
+                      </div>
+                      <div className="py-12 text-center text-white">
+                        <h4 className="text-[26px] font-medium">How can we help?</h4>
+                        <p className="mt-3 text-[18px]">Describe your issue and we'll take care of it</p>
+                        <div className="mx-auto mt-8 max-w-[520px] rounded-xl bg-white/95 p-4 text-left text-gray-400">
+                          Describe what needs to be fixed or maintained...
+                        </div>
+                        <div className="mx-auto mt-4 grid max-w-[520px] grid-cols-2 gap-3">
+                          <div className="rounded-lg bg-white px-4 py-3 text-left text-gray-400">Your name</div>
+                          <div className="rounded-lg bg-white px-4 py-3 text-left text-gray-400">Email address</div>
+                        </div>
+                        <button type="button" className="mt-4 rounded-lg bg-[#d3ac2a] px-6 py-3 text-[16px] font-semibold text-white">
+                          Continue
+                        </button>
+                      </div>
+                    </div>
+                    <div className="bg-[#c4cc9c] px-6 py-6">
+                    <div className="text-center text-[12px] text-white">Powered by FixNest</div>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 flex items-center gap-4">
+                    <div className="h-12 w-12 overflow-hidden rounded-md bg-gray-100">
+                      {brandingLogo ? <img src={URL.createObjectURL(brandingLogo)} alt="Logo preview" className="h-full w-full object-cover" /> : null}
+                    </div>
+                    <button type="button" onClick={() => setBrandingStep(1)} className="text-[16px] text-gray-600 hover:text-gray-900">
+                      Change logo
+                    </button>
+                    <div className="ml-auto text-[16px] text-gray-500">Drag to reorder, click to change</div>
+                  </div>
+
+                  <div className="mt-6 flex flex-wrap items-start justify-center gap-12">
+                    {[
+                      ['Primary Color', branding.primaryColor],
+                      ['Hero Background', branding.heroBackground],
+                      ['Header', branding.header],
+                      ['Footer', branding.footer],
+                      ['Page Background', branding.pageBackground],
+                    ].map(([label, value]) => (
+                      <div key={label} className="text-center">
+                        <div className="mx-auto h-10 w-20 rounded-xl border border-gray-200" style={{ backgroundColor: value }} />
+                        <div className="mt-3 text-[14px] font-medium text-gray-800">{label}</div>
+                        <div className="mt-2 rounded-md border border-gray-200 px-3 py-1 text-[14px] text-gray-600">{value}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex items-center justify-between border-t border-gray-200 px-8 py-5">
+                  <button type="button" className="rounded-md border border-rose-300 bg-white px-6 py-2.5 text-[16px] font-medium text-rose-600 hover:bg-rose-50">
+                    Reset to defaults
+                  </button>
+                  <div className="flex items-center gap-3">
+                    <button type="button" onClick={() => setBrandingOpen(false)} className="rounded-md border border-blue-300 bg-white px-6 py-2.5 text-[16px] font-medium text-blue-700 hover:bg-blue-50">
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await onApplyBranding?.(brandingLogo);
+                        setBrandingOpen(false);
+                      }}
+                      className="rounded-md bg-blue-600 px-6 py-2.5 text-[16px] font-semibold text-white hover:bg-blue-700"
+                    >
+                      Apply to all portals
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {createPortalOpen && (
+        <div className="fixed inset-0 z-[1500] flex items-center justify-center bg-black/45 p-6">
+          <div className="flex max-h-[92vh] w-full max-w-[1060px] flex-col overflow-hidden rounded-[20px] bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-6">
+              <h3 className="text-[24px] font-bold text-gray-900">{editingPortalId ? 'Edit Portal' : 'Create New Portal'}</h3>
+              <button type="button" onClick={() => setCreatePortalOpen(false)} className="rounded-lg p-2 text-gray-500 hover:bg-gray-100">
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-8">
+              <div>
+                <h4 className="text-[18px] font-bold text-gray-900">Request Portal Details</h4>
+                <div className="mt-8 space-y-7">
+                  <div>
+                    <label className="mb-3 block text-[15px] font-semibold text-gray-900">Portal Name</label>
+                    <input
+                      value={portalForm.name}
+                      onChange={(e) => setPortalForm((prev) => ({ ...prev, name: e.target.value }))}
+                      placeholder="Portal Name"
+                      className="h-12 w-full rounded-md border border-gray-300 px-4 text-[16px] outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-3 block text-[15px] font-semibold text-gray-900">Custom Url</label>
+                    <div className="flex h-12 items-center rounded-md border border-gray-300 px-4 text-[16px] text-gray-500">
+                      <span className="mr-3">https://request-portal.onupkeep.com</span>
+                      <input
+                        value={portalForm.customUrl}
+                        onChange={(e) => setPortalForm((prev) => ({ ...prev, customUrl: e.target.value }))}
+                        placeholder="Custom Url"
+                        className="h-full flex-1 border-0 bg-transparent text-gray-700 outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-14">
+                <h4 className="text-[18px] font-bold text-gray-900">Areas & Assets</h4>
+                <p className="mt-2 text-[15px] text-gray-500">Specify the locations or assets for this portal.</p>
+                <div className="mt-6 grid gap-4 md:grid-cols-3">
+                  {[
+                    ['general', 'General Portal', 'Allow requests for all locations & assets', Navigation],
+                    ['location', 'Location Portal', 'Limit requests to specific location(s)', MapPin],
+                    ['asset', 'Asset Portal', 'Limit requests to specific asset(s)', Package],
+                  ].map(([value, label, description, Icon]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setPortalForm((prev) => ({ ...prev, type: value }))}
+                      className={`rounded-xl border px-6 py-12 text-center ${
+                        portalForm.type === value ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white'
+                      }`}
+                    >
+                      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-100">
+                        <Icon className="h-7 w-7 text-gray-700" />
+                      </div>
+                      <div className="mt-6 text-[16px] font-semibold text-gray-900">{label}</div>
+                      <div className="mt-3 text-[15px] leading-7 text-gray-500">{description}</div>
+                    </button>
+                  ))}
+                </div>
+                {portalForm.type === 'location' ? (
+                  <div className="mt-6 max-w-[420px]">
+                    <label className="mb-3 block text-[15px] font-semibold text-gray-900">Choose Location</label>
+                    <select
+                      value={portalForm.selectedLocationId}
+                      onChange={(e) => setPortalForm((prev) => ({ ...prev, selectedLocationId: e.target.value }))}
+                      className="h-12 w-full rounded-md border border-gray-300 px-4 text-[16px] text-gray-800 outline-none focus:border-blue-500"
+                    >
+                      <option value="">Select Location</option>
+                      {locationOptions.map((option) => (
+                        <option key={option.id} value={option.id}>{option.label}</option>
+                      ))}
+                    </select>
+                    {locationOptions.length === 0 ? (
+                      <div className="mt-2 text-sm text-gray-500">No locations available yet.</div>
+                    ) : null}
+                  </div>
+                ) : null}
+                {portalForm.type === 'asset' ? (
+                  <div className="mt-6 max-w-[420px]">
+                    <label className="mb-3 block text-[15px] font-semibold text-gray-900">Choose Asset</label>
+                    <select
+                      value={portalForm.selectedAssetId}
+                      onChange={(e) => setPortalForm((prev) => ({ ...prev, selectedAssetId: e.target.value }))}
+                      className="h-12 w-full rounded-md border border-gray-300 px-4 text-[16px] text-gray-800 outline-none focus:border-blue-500"
+                    >
+                      <option value="">Select Asset</option>
+                      {assetOptions.map((option) => (
+                        <option key={option.id} value={option.id}>{option.label}</option>
+                      ))}
+                    </select>
+                    {assetOptions.length === 0 ? (
+                      <div className="mt-2 text-sm text-gray-500">No assets available yet.</div>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="mt-16">
+                <h4 className="text-[18px] font-bold text-gray-900">Request Options</h4>
+                <p className="mt-2 text-[15px] text-gray-500">Enable or disable optional fields.</p>
+                <div className="mt-6 space-y-3">
+                  {[
+                    ['attachments', 'Attachments', 'Let users upload up to 5 photos or files.'],
+                    ['location', 'Location', 'Let users specify the exact location.'],
+                    ['asset', 'Asset', 'Let users specify an asset.'],
+                  ].map(([key, label, description]) => (
+                    <div key={key} className="flex items-center justify-between rounded-xl border border-blue-300 bg-blue-50 px-5 py-5">
+                      <div className="flex items-start gap-4">
+                        <button
+                          type="button"
+                          onClick={() => updatePortalOption(key, 'enabled', !portalForm.options[key].enabled)}
+                          className={`mt-1 flex h-8 w-8 items-center justify-center rounded-lg ${
+                            portalForm.options[key].enabled ? 'bg-blue-600 text-white' : 'bg-white text-gray-400 border border-gray-300'
+                          }`}
+                        >
+                          {portalForm.options[key].enabled ? <CheckCircle className="h-5 w-5" /> : null}
+                        </button>
+                        <div>
+                          <div className="text-[16px] font-semibold text-gray-900">{label}</div>
+                          <div className="mt-1 text-[15px] text-gray-500">{description}</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => updatePortalOption(key, 'required', !portalForm.options[key].required)}
+                          className={`relative h-8 w-14 rounded-full transition ${portalForm.options[key].required ? 'bg-blue-600' : 'bg-gray-300'}`}
+                        >
+                          <span className={`absolute top-1 h-6 w-6 rounded-full bg-white transition ${portalForm.options[key].required ? 'left-7' : 'left-1'}`} />
+                        </button>
+                        <span className="text-[15px] text-gray-700">Required</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-16">
+                <h4 className="text-[18px] font-bold text-gray-900">Custom Fields</h4>
+                <p className="mt-2 text-[15px] text-gray-500">Add extra fields to collect specific details when someone submits a request.</p>
+
+                <div className="mt-6 space-y-6">
+                  {portalForm.customFields.map((field) => (
+                    <div key={field.id} className="rounded-2xl border border-gray-200 p-5">
+                      <div className="grid gap-5 md:grid-cols-2">
+                        <div>
+                          <label className="mb-3 block text-[15px] font-semibold text-gray-900">Field Type</label>
+                          <select
+                            value={field.type}
+                            onChange={(e) => updateCustomPortalField(field.id, { type: e.target.value })}
+                            className="h-12 w-full rounded-md border border-gray-300 px-4 text-[16px] outline-none focus:border-blue-500"
+                          >
+                            <option>Text</option>
+                            <option>Number</option>
+                            <option>Date</option>
+                            <option>Paragraph</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="mb-3 block text-[15px] font-semibold text-gray-900">Label</label>
+                          <input
+                            value={field.label}
+                            onChange={(e) => updateCustomPortalField(field.id, { label: e.target.value })}
+                            placeholder="Enter field name"
+                            className="h-12 w-full rounded-md border border-gray-300 px-4 text-[16px] outline-none focus:border-blue-500"
+                          />
+                        </div>
+                      </div>
+                      <div className="mt-5 flex items-end justify-between">
+                        <div>
+                          <div className="text-[15px] font-semibold text-gray-900">Required</div>
+                          <button
+                            type="button"
+                            onClick={() => updateCustomPortalField(field.id, { required: !field.required })}
+                            className={`relative mt-3 h-8 w-14 rounded-full transition ${field.required ? 'bg-blue-600' : 'bg-gray-300'}`}
+                          >
+                            <span className={`absolute top-1 h-6 w-6 rounded-full bg-white transition ${field.required ? 'left-7' : 'left-1'}`} />
+                          </button>
+                        </div>
+                        <button type="button" onClick={() => removeCustomPortalField(field.id)} className="text-rose-500 hover:text-rose-600">
+                          <Trash2 className="h-5 w-5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={addCustomPortalField}
+                  className="mt-6 inline-flex items-center gap-2 rounded-xl border border-blue-300 bg-white px-5 py-3 text-[16px] font-semibold text-blue-700 hover:bg-blue-50"
+                >
+                  <Plus className="h-5 w-5" />
+                  Add Custom Field
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 border-t border-gray-200 px-6 py-5">
+              <button type="button" onClick={() => setCreatePortalOpen(false)} className="rounded-md border border-blue-300 bg-white px-6 py-2.5 text-[16px] font-medium text-blue-700 hover:bg-blue-50">
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={portalSaving || !portalForm.name.trim()}
+                onClick={async () => {
+                  setPortalSaving(true);
+                  const created = await onCreatePortal?.(portalForm, editingPortalId);
+                  setPortalSaving(false);
+                  if (created) {
+                    setEditingPortalId('');
+                    setCreatePortalOpen(false);
+                    setPortalForm({
+                      name: '',
+                      customUrl: '',
+                      type: 'general',
+                      selectedLocationId: '',
+                      selectedAssetId: '',
+                      options: {
+                        attachments: { enabled: true, required: false },
+                        location: { enabled: true, required: false },
+                        asset: { enabled: true, required: false },
+                      },
+                      customFields: [],
+                    });
+                  }
+                }}
+                className="rounded-md bg-blue-600 px-6 py-2.5 text-[16px] font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {editingPortalId ? 'Save Portal' : 'Create Request Portal'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const SettingsSearchableSelect = ({
+  label,
+  value,
+  options = [],
+  placeholder = 'Search',
+  onChange,
+}) => {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (containerRef.current && !containerRef.current.contains(event.target)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const normalizedOptions = (Array.isArray(options) ? options : []).map((option) => (
+    typeof option === 'string' ? { value: option, label: option } : option
+  ));
+  const selectedLabel = normalizedOptions.find((option) => String(option.value) === String(value))?.label || '';
+  const filteredOptions = normalizedOptions.filter((option) =>
+    String(option.label || '').toLowerCase().includes(String(search || '').toLowerCase())
+  );
+
+  return (
+    <div ref={containerRef} className="relative">
+      {label ? <label className="mb-3 block text-[15px] font-semibold text-gray-900">{label}</label> : null}
+      <button
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        className="flex h-12 w-full items-center justify-between rounded-md border border-gray-300 px-4 text-left text-[16px] text-gray-800"
+      >
+        <span className={selectedLabel ? '' : 'text-gray-400'}>{selectedLabel || placeholder}</span>
+        <ChevronDown className="h-5 w-5 text-gray-500" />
+      </button>
+      {open ? (
+        <div className="absolute left-0 top-full z-[1800] mt-2 w-full overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl">
+          <div className="border-b border-gray-100 p-3">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <input
+                autoFocus
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={placeholder}
+                className="h-11 w-full rounded-md border border-blue-500 pl-10 pr-3 text-[15px] outline-none"
+              />
+            </div>
+          </div>
+          <div className="max-h-48 overflow-y-auto py-2">
+            {filteredOptions.length === 0 ? (
+              <div className="px-4 py-3 text-sm text-gray-500">No matches found.</div>
+            ) : (
+              filteredOptions.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => {
+                    onChange?.(option.value);
+                    setOpen(false);
+                    setSearch('');
+                  }}
+                  className="flex w-full items-center justify-between px-4 py-3 text-left text-[15px] text-gray-800 hover:bg-gray-50"
+                >
+                  <span>{option.label}</span>
+                  {String(option.value) === String(value) ? <CheckCircle className="h-4 w-4 text-blue-600" /> : null}
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+};
 
 function Table({ heads, rows, empty = 'No data found.' }) {
   return (
@@ -1477,6 +5821,36 @@ function ClientDashboard() {
   const workOrderLocationFilterRef = useRef(null);
   const workOrderAssetFilterRef = useRef(null);
   const workOrderAssignedFilterRef = useRef(null);
+  const [requestOpenPopover, setRequestOpenPopover] = useState(null);
+  const [requestSearchQuery, setRequestSearchQuery] = useState('');
+  const [selectedRequestStatuses, setSelectedRequestStatuses] = useState([]);
+  const [selectedRequestLocations, setSelectedRequestLocations] = useState([]);
+  const [selectedRequestAssets, setSelectedRequestAssets] = useState([]);
+  const [selectedRequestAssignedTo, setSelectedRequestAssignedTo] = useState([]);
+  const [requestSortBy, setRequestSortBy] = useState('submittedDate');
+  const [requestSortDirection, setRequestSortDirection] = useState('desc');
+  const [showRequestSortMenu, setShowRequestSortMenu] = useState(false);
+  const [showRequestActionsMenu, setShowRequestActionsMenu] = useState(false);
+  const [showRequestSettingsModal, setShowRequestSettingsModal] = useState(false);
+  const [requestFormSettings, setRequestFormSettings] = useState(DEFAULT_REQUEST_FORM_SETTINGS);
+  const [generalSettings, setGeneralSettings] = useState(DEFAULT_GENERAL_SETTINGS);
+  const [legacyPublicRequestsEnabled, setLegacyPublicRequestsEnabled] = useState(false);
+  const [requestBranding, setRequestBranding] = useState(DEFAULT_REQUEST_BRANDING);
+  const [requestPortals, setRequestPortals] = useState([]);
+  const [automationWorkflows, setAutomationWorkflows] = useState([]);
+  const [roleRows, setRoleRows] = useState([]);
+  const [assetSettings, setAssetSettings] = useState(DEFAULT_ASSET_SETTINGS);
+  const [partsInventorySettings, setPartsInventorySettings] = useState(DEFAULT_PARTS_INVENTORY_SETTINGS);
+  const [workOrderSettings, setWorkOrderSettings] = useState(DEFAULT_WORK_ORDER_SETTINGS);
+  const [purchaseOrderSettings, setPurchaseOrderSettings] = useState(DEFAULT_PURCHASE_ORDER_SETTINGS);
+  const [meterSettings, setMeterSettings] = useState(DEFAULT_METER_SETTINGS);
+  const [tagSettings, setTagSettings] = useState(DEFAULT_TAG_SETTINGS);
+  const requestStatusFilterRef = useRef(null);
+  const requestLocationFilterRef = useRef(null);
+  const requestAssetFilterRef = useRef(null);
+  const requestAssignedFilterRef = useRef(null);
+  const requestSortButtonRef = useRef(null);
+  const requestActionsButtonRef = useRef(null);
   const [pmOpenPopover, setPmOpenPopover] = useState(null);
   const [pmSearchQuery, setPmSearchQuery] = useState('');
   const [pmLocationSearch, setPmLocationSearch] = useState('');
@@ -2101,7 +6475,7 @@ function ClientDashboard() {
   }, [allWorkers, internalTechnicians]);
 
   // New Detail Modal Implementation (manager parity)
-  const DetailsModal = useCallback(function DetailsModal({ open, type, item, onClose, getAssignedTechName, onRefresh, technicians = [], teams = [], workOrders = [], people = [], contacts = [], onPrivateMessage, onEditWorkOrder }) {
+  const DetailsModal = useCallback(function DetailsModal({ open, type, item, onClose, getAssignedTechName, onRefresh, technicians = [], teams = [], workOrders = [], people = [], contacts = [], assets = [], properties = [], checklistLibrary = [], onPrivateMessage, onEditWorkOrder }) {
     const normalizeTaskArray = (value) => {
       if (!value) return [];
       if (Array.isArray(value)) return value;
@@ -2227,6 +6601,8 @@ function ClientDashboard() {
     const [laborForm, setLaborForm] = useState({ worker: '', rate: 0, startedAt: '', hours: 0, minutes: 0, category: '' });
     const [localLabor, setLocalLabor] = useState([]);
     const fileInputRef = useRef(null);
+    const imageInputRef = useRef(null);
+    const requestFileInputRef = useRef(null);
     const invoiceSignatureInputRef = useRef(null);
     const invoicePartsActionsRef = useRef(null);
     const moreActionsRef = useRef(null);
@@ -2600,6 +6976,18 @@ function ClientDashboard() {
     const isRequestReadOnly = !canEdit;
     const requestLockClass = isRequestReadOnly ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : '';
     const requestFieldClass = `w-full border border-gray-300 rounded-lg p-2.5 text-sm ${requestLockClass}`;
+    const [requestOpenDropdown, setRequestOpenDropdown] = useState(null);
+    const [requestDropdownSearch, setRequestDropdownSearch] = useState({
+      priority: '',
+      category: '',
+      location: '',
+      asset: '',
+      assignedTo: '',
+      additionalWorkers: '',
+      team: '',
+      checklist: '',
+    });
+    const requestDropdownRef = useRef(null);
     const selectableWorkers = React.useMemo(() => {
       const pool = Array.isArray(technicians) ? technicians : [];
       const fallbackPeople = Array.isArray(people) ? people : [];
@@ -2608,6 +6996,97 @@ function ClientDashboard() {
         (worker) => worker?._id || worker?.id || worker?.userId || worker?.email || worker?.phone || worker?.name
       );
     }, [people, technicians]);
+    const requestLocationOptions = React.useMemo(
+      () => Array.from(
+        new Set(
+          (Array.isArray(properties) ? properties : [])
+            .map((property) => property?.name || property?.title || property?.address || property?.location || '')
+            .filter(Boolean)
+        )
+      ).sort((a, b) => String(a).localeCompare(String(b))),
+      [properties]
+    );
+    const requestAssetOptions = React.useMemo(() => {
+      const selectedLocation = String(formData.location || '').trim().toLowerCase();
+      const pool = Array.isArray(assets) ? assets : [];
+      if (!selectedLocation) return pool;
+      const filtered = pool.filter((asset) => {
+        const candidates = [
+          asset?.location,
+          asset?.property?.name,
+          asset?.propertyName,
+          asset?.address,
+          asset?.location?.name,
+          asset?.location?.building,
+          asset?.location?.floor,
+          asset?.location?.room,
+          asset?.building,
+          asset?.floor,
+          asset?.room,
+          asset?.block,
+        ].filter(Boolean).map((value) => String(value).trim().toLowerCase());
+        const haystack = candidates.join(' ');
+        return candidates.includes(selectedLocation)
+          || haystack.includes(selectedLocation)
+          || selectedLocation.includes(haystack);
+      });
+      return filtered.length ? filtered : pool;
+    }, [assets, formData.location]);
+    const checklistTemplateOptions = React.useMemo(
+      () => (Array.isArray(checklistLibrary) ? checklistLibrary : []).filter(Boolean),
+      [checklistLibrary]
+    );
+    const requestPriorityOptions = React.useMemo(
+      () => ['LOW', 'MEDIUM', 'HIGH', 'URGENT'].map((value) => ({ value, label: value.charAt(0) + value.slice(1).toLowerCase() })),
+      []
+    );
+    const requestCategoryOptions = React.useMemo(
+      () => ['Damage', 'Electrical', 'Inspections', 'Meter Reading', 'Plumbing', 'Preventative', 'Project', 'Safety', 'Upgrade']
+        .map((value) => ({ value, label: value })),
+      []
+    );
+    const requestLocationDropdownOptions = React.useMemo(
+      () => requestLocationOptions.map((locationOption) => ({ value: locationOption, label: locationOption })),
+      [requestLocationOptions]
+    );
+    const requestAssetDropdownOptions = React.useMemo(
+      () => requestAssetOptions.map((asset, index) => ({
+        value: String(asset?._id || asset?.id || asset?.name || asset?.title || `asset-${index}`),
+        label: asset?.name || asset?.title || 'Asset',
+        keywords: [asset?.location, asset?.property?.name, asset?.propertyName, asset?.serialNumber, asset?.tag].filter(Boolean).join(' '),
+        rawValue: asset?.name || asset?.title || '',
+      })),
+      [requestAssetOptions]
+    );
+    const requestWorkerDropdownOptions = React.useMemo(
+      () => selectableWorkers.map((worker, index) => ({
+        value: String(worker?._id || worker?.id || worker?.userId || worker?.email || `worker-${index}`),
+        label: worker?.name || worker?.fullName || worker?.email || 'Worker',
+        keywords: [worker?.email, worker?.phone, worker?.role].filter(Boolean).join(' '),
+        worker,
+      })),
+      [selectableWorkers]
+    );
+    const requestAdditionalWorkerOptions = React.useMemo(
+      () => requestWorkerDropdownOptions.filter((workerOption) => String(workerOption.value) !== String(formData.assignedTo || '')),
+      [formData.assignedTo, requestWorkerDropdownOptions]
+    );
+    const requestTeamDropdownOptions = React.useMemo(
+      () => (Array.isArray(teams) ? teams : []).map((team, index) => ({
+        value: String(team?.name || team?.title || team?._id || team?.id || `team-${index}`),
+        label: team?.name || team?.title || 'Team',
+      })),
+      [teams]
+    );
+    const requestChecklistDropdownOptions = React.useMemo(
+      () => checklistTemplateOptions.map((tpl, index) => ({
+        value: String(tpl?.id || tpl?._id || `checklist-${index}`),
+        label: tpl?.name || tpl?.title || 'Checklist',
+        keywords: [tpl?.description, Array.isArray(tpl?.tags) ? tpl.tags.join(' ') : ''].filter(Boolean).join(' '),
+        template: tpl,
+      })),
+      [checklistTemplateOptions]
+    );
     const findWorkerRecord = useCallback((value) => {
       if (!value) return null;
       const normalizedValue = typeof value === 'object'
@@ -2687,6 +7166,119 @@ function ClientDashboard() {
       }
       return [normalizeWorkerSelection(raw)].filter(Boolean);
     }, [formData.additionalResponsibleWorkers, normalizeWorkerSelection]);
+    const updateRequestDropdownValue = useCallback((key, value) => {
+      setRequestDropdownSearch((prev) => ({ ...prev, [key]: value }));
+    }, []);
+    const getRequestOptionLabel = useCallback((options, currentValue, placeholder, fallbackValue = '') => {
+      const normalizedCurrentValue = String(currentValue ?? '').trim();
+      if (!normalizedCurrentValue) return placeholder;
+      const match = options.find((option) => String(option.value) === normalizedCurrentValue || String(option.rawValue || '') === normalizedCurrentValue);
+      if (match?.label) return match.label;
+      return fallbackValue || normalizedCurrentValue || placeholder;
+    }, []);
+    const SearchableRequestDropdown = ({
+      dropdownKey,
+      placeholder,
+      options = [],
+      value,
+      onChange,
+      multiple = false,
+      disabled = false,
+      emptyLabel = 'No matches found.',
+      fallbackLabel = '',
+    }) => {
+      const searchValue = requestDropdownSearch[dropdownKey] || '';
+      const normalizedSearch = String(searchValue).trim().toLowerCase();
+      const normalizedValues = multiple
+        ? (Array.isArray(value) ? value.map((entry) => String(entry)) : [])
+        : [String(value ?? '')];
+      const filteredOptions = options.filter((option) => {
+        if (!normalizedSearch) return true;
+        const haystack = [option?.label, option?.value, option?.keywords].filter(Boolean).join(' ').toLowerCase();
+        return haystack.includes(normalizedSearch);
+      });
+      const buttonLabel = multiple
+        ? (() => {
+          if (!normalizedValues.length) return placeholder;
+          const selectedLabels = normalizedValues.map((entry) => {
+            const match = options.find((option) => String(option.value) === String(entry));
+            return match?.label || String(entry);
+          }).filter(Boolean);
+          return selectedLabels.length ? selectedLabels.join(', ') : placeholder;
+        })()
+        : getRequestOptionLabel(options, value, placeholder, fallbackLabel);
+
+      return (
+        <div className="relative" ref={requestOpenDropdown === dropdownKey ? requestDropdownRef : null}>
+          <button
+            type="button"
+            onClick={() => {
+              if (disabled) return;
+              setRequestOpenDropdown((prev) => prev === dropdownKey ? null : dropdownKey);
+            }}
+            disabled={disabled}
+            className={`${requestFieldClass} flex items-center justify-between gap-3 text-left ${disabled ? '' : 'bg-white'}`}
+          >
+            <span className={`truncate ${normalizedValues.filter(Boolean).length ? 'text-gray-900' : 'text-gray-500'}`}>{buttonLabel}</span>
+            <ChevronDown className={`h-4 w-4 shrink-0 text-gray-500 transition-transform ${requestOpenDropdown === dropdownKey ? 'rotate-180' : ''}`} />
+          </button>
+          {requestOpenDropdown === dropdownKey && !disabled && (
+            <div className="absolute left-0 right-0 z-30 mt-2 rounded-xl border border-gray-200 bg-white shadow-xl">
+              <div className="border-b border-gray-100 p-3">
+                <input
+                  value={searchValue}
+                  onChange={(e) => updateRequestDropdownValue(dropdownKey, e.target.value)}
+                  placeholder={`Search ${placeholder.toLowerCase()}...`}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-500"
+                />
+              </div>
+              <div className="max-h-60 overflow-y-auto py-2">
+                {filteredOptions.length === 0 ? (
+                  <div className="px-3 py-2 text-sm text-gray-500">{emptyLabel}</div>
+                ) : filteredOptions.map((option) => {
+                  const isSelected = normalizedValues.includes(String(option.value));
+                  return (
+                    <button
+                      key={`${dropdownKey}-${option.value}`}
+                      type="button"
+                      onClick={() => {
+                        if (multiple) {
+                          const nextValues = isSelected
+                            ? normalizedValues.filter((entry) => entry !== String(option.value))
+                            : [...normalizedValues.filter(Boolean), String(option.value)];
+                          onChange(nextValues);
+                          return;
+                        }
+                        onChange(option.value, option);
+                        setRequestOpenDropdown(null);
+                      }}
+                      className={`flex w-full items-center gap-3 px-3 py-2 text-left text-sm transition ${isSelected ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'}`}
+                    >
+                      {multiple ? (
+                        <input type="checkbox" readOnly checked={isSelected} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                      ) : (
+                        <span className={`h-2.5 w-2.5 rounded-full ${isSelected ? 'bg-blue-600' : 'bg-gray-300'}`} />
+                      )}
+                      <span className="truncate">{option.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    };
+    useEffect(() => {
+      if (!requestOpenDropdown) return undefined;
+      const handlePointerDown = (event) => {
+        if (requestDropdownRef.current && !requestDropdownRef.current.contains(event.target)) {
+          setRequestOpenDropdown(null);
+        }
+      };
+      document.addEventListener('mousedown', handlePointerDown);
+      return () => document.removeEventListener('mousedown', handlePointerDown);
+    }, [requestOpenDropdown]);
     const approvalSecondaryWorkers = React.useMemo(() => {
       const primaryWorker = normalizeWorkerSelection(formData.assignedTo);
       const primaryKey = String(primaryWorker?.id || primaryWorker?.email || primaryWorker?.name || '').trim().toLowerCase();
@@ -2794,6 +7386,28 @@ function ClientDashboard() {
       item?.photo && { label: 'Photo', url: item.photo },
       item?.image && { label: 'Image', url: item.image }
     ].filter(Boolean);
+    const isImageLikeFile = useCallback((entry) => {
+      const typeLabel = String(entry?.type || '').toLowerCase();
+      const nameLabel = String(entry?.name || entry?.label || entry?.url || '').toLowerCase();
+      return typeLabel.startsWith('image/')
+        || /\.(png|jpe?g|gif|bmp|webp|svg)$/i.test(nameLabel);
+    }, []);
+    const requestUploadedImages = React.useMemo(
+      () => [
+        ...coreImageItems.map((img, index) => ({
+          id: `request-core-image-${index}`,
+          name: img.label || `Image ${index + 1}`,
+          url: getImageUrl(img.url),
+          type: 'image',
+        })),
+        ...combinedFileItems.filter((entry) => isImageLikeFile(entry)),
+      ],
+      [combinedFileItems, coreImageItems, isImageLikeFile]
+    );
+    const requestUploadedFiles = React.useMemo(
+      () => combinedFileItems.filter((entry) => !isImageLikeFile(entry)),
+      [combinedFileItems, isImageLikeFile]
+    );
     const availableWorkOrders = Array.isArray(workOrders)
       ? workOrders.filter(wo => String(wo._id || wo.id) !== String(itemId))
       : [];
@@ -2942,9 +7556,13 @@ function ClientDashboard() {
       });
     }, []);
 
-    const handleFileImport = async (fileList) => {
+    const handleFileImport = async (fileList, mode = 'all') => {
       if (!fileList || fileList.length === 0) return;
-      const filesArray = Array.from(fileList);
+      const filesArray = Array.from(fileList).filter((file) => {
+        if (mode === 'image') return String(file?.type || '').toLowerCase().startsWith('image/');
+        return true;
+      });
+      if (!filesArray.length) return;
       if (!itemId) {
         const entries = filesArray.map((file) => ({
           id: `file-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -2960,6 +7578,8 @@ function ClientDashboard() {
         if (fileInputRef.current) {
           fileInputRef.current.value = '';
         }
+        if (imageInputRef.current) imageInputRef.current.value = '';
+        if (requestFileInputRef.current) requestFileInputRef.current.value = '';
         return;
       }
       try {
@@ -2992,6 +7612,8 @@ function ClientDashboard() {
         if (fileInputRef.current) {
           fileInputRef.current.value = '';
         }
+        if (imageInputRef.current) imageInputRef.current.value = '';
+        if (requestFileInputRef.current) requestFileInputRef.current.value = '';
       }
     };
 
@@ -3014,6 +7636,10 @@ function ClientDashboard() {
     const handleFileDrop = (event) => {
       event.preventDefault();
       handleFileImport(event.dataTransfer?.files);
+    };
+    const handleImageDrop = (event) => {
+      event.preventDefault();
+      handleFileImport(event.dataTransfer?.files, 'image');
     };
 
     const handleAddLink = async () => {
@@ -4432,43 +9058,56 @@ function ClientDashboard() {
 
                         <div>
                           <label className="block text-sm text-gray-800 mb-2">Priority</label>
-                          <select
-                            className={`w-full rounded-lg border border-gray-300 px-4 py-3 text-[15px] ${requestLockClass}`}
+                          <SearchableRequestDropdown
+                            dropdownKey="priority"
+                            placeholder="Select Priority"
+                            options={requestPriorityOptions}
                             value={formData.priority}
-                            onChange={e => setFormData({ ...formData, priority: e.target.value })}
+                            onChange={(nextValue) => setFormData({ ...formData, priority: nextValue })}
                             disabled={isRequestReadOnly}
-                          >
-                            <option value="">Select Priority</option>
-                            <option value="LOW">Low</option>
-                            <option value="MEDIUM">Medium</option>
-                            <option value="HIGH">High</option>
-                            <option value="URGENT">Urgent</option>
-                          </select>
+                          />
                         </div>
 
                         <div>
                           <label className="block text-sm text-gray-800 mb-2">Image</label>
                           <div
                             onDragOver={(e) => e.preventDefault()}
-                            onDrop={handleFileDrop}
+                            onDrop={handleImageDrop}
                             className="rounded-lg border border-dashed border-gray-300 px-5 py-6 text-center text-sm text-gray-500"
                           >
                             <button
                               type="button"
-                              onClick={() => fileInputRef.current?.click()}
+                              onClick={() => imageInputRef.current?.click()}
                               className="rounded-lg border border-gray-300 bg-white px-6 py-2 text-gray-800 font-medium"
                             >
                               Upload
                             </button>
                             <span className="ml-4">or Drop Images</span>
                             <input
-                              ref={fileInputRef}
+                              ref={imageInputRef}
                               type="file"
                               multiple
+                              accept="image/*"
                               className="hidden"
-                              onChange={(e) => handleFileImport(e.target.files)}
+                              onChange={(e) => handleFileImport(e.target.files, 'image')}
                             />
                           </div>
+                          {requestUploadedImages.length > 0 && (
+                            <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3">
+                              {requestUploadedImages.map((imageEntry, index) => (
+                                <div key={imageEntry.id || `request-image-${index}`} className="overflow-hidden rounded-xl border border-gray-200 bg-gray-50">
+                                  <img
+                                    src={imageEntry.url ? getImageUrl(imageEntry.url) : ''}
+                                    alt={imageEntry.name || `Image ${index + 1}`}
+                                    className="h-28 w-full object-cover"
+                                  />
+                                  <div className="truncate border-t border-gray-200 px-3 py-2 text-xs font-medium text-gray-700">
+                                    {imageEntry.name || `Image ${index + 1}`}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
 
                         <div>
@@ -4495,124 +9134,116 @@ function ClientDashboard() {
 
                         <div>
                           <label className="block text-sm text-gray-800 mb-2">Category</label>
-                          <select
-                            className={`w-full rounded-lg border border-gray-300 px-4 py-3 text-[15px] ${requestLockClass}`}
+                          <SearchableRequestDropdown
+                            dropdownKey="category"
+                            placeholder="Select Category"
+                            options={requestCategoryOptions}
                             value={formData.category}
-                            onChange={e => setFormData({ ...formData, category: e.target.value })}
-                            disabled={isRequestReadOnly}
-                          >
-                            <option value="">Select Category</option>
-                            <option value="Damage">Damage</option>
-                            <option value="Electrical">Electrical</option>
-                            <option value="Inspections">Inspections</option>
-                            <option value="Meter Reading">Meter Reading</option>
-                            <option value="Plumbing">Plumbing</option>
-                            <option value="Preventative">Preventative</option>
-                            <option value="Project">Project</option>
-                            <option value="Safety">Safety</option>
-                            <option value="Upgrade">Upgrade</option>
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="block text-sm text-gray-800 mb-2">Location</label>
-                          <select
-                            className={`w-full rounded-lg border border-gray-300 px-4 py-3 text-[15px] ${requestLockClass}`}
-                            value={formData.location}
-                            onChange={e => setFormData({ ...formData, location: e.target.value })}
-                            disabled={isRequestReadOnly}
-                          >
-                            <option value="">Select Location</option>
-                            {(properties || []).map((property) => (
-                              <option key={property._id || property.id} value={property.name || property.title || property.address || ''}>
-                                {property.name || property.title || property.address || 'Property'}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="block text-sm text-gray-800 mb-2">Asset</label>
-                          <select
-                            className={`w-full rounded-lg border border-gray-300 px-4 py-3 text-[15px] ${requestLockClass}`}
-                            value={formData.assetName}
-                            onChange={e => setFormData({ ...formData, assetName: e.target.value })}
-                            disabled={isRequestReadOnly}
-                          >
-                            <option value="">Select Asset</option>
-                            {(assets || []).map((asset) => (
-                              <option key={asset._id || asset.id} value={asset.name || asset.title || ''}>
-                                {asset.name || asset.title || 'Asset'}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="block text-sm text-gray-800 mb-2">Primary Worker</label>
-                          <select
-                            className={`w-full rounded-lg border border-gray-300 px-4 py-3 text-[15px] ${requestLockClass}`}
-                            value={formData.assignedTo}
-                            onChange={e => setFormData({ ...formData, assignedTo: e.target.value })}
-                            disabled={isRequestReadOnly}
-                          >
-                            <option value="">Select worker</option>
-                            {technicians.map((t, idx) => (
-                              <option key={`${t._id || t.id || 'tech'}-${idx}`} value={t._id || t.id}>
-                                {t.name || t.fullName || t.email || 'Worker'}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="block text-sm text-gray-800 mb-2">Additional Workers</label>
-                          <input
-                            type="text"
-                            className={`w-full rounded-lg border border-gray-300 px-4 py-3 text-[15px] ${requestLockClass}`}
-                            value={formData.additionalResponsibleWorkers || ''}
-                            onChange={e => setFormData({ ...formData, additionalResponsibleWorkers: e.target.value })}
+                            onChange={(nextValue) => setFormData({ ...formData, category: nextValue })}
                             disabled={isRequestReadOnly}
                           />
                         </div>
 
                         <div>
-                          <label className="block text-sm text-gray-800 mb-2">Team</label>
-                          <select
-                            className={`w-full rounded-lg border border-gray-300 px-4 py-3 text-[15px] ${requestLockClass}`}
-                            value={formData.team}
-                            onChange={e => setFormData({ ...formData, team: e.target.value })}
+                          <label className="block text-sm text-gray-800 mb-2">Location</label>
+                          <SearchableRequestDropdown
+                            dropdownKey="location"
+                            placeholder="Select Location"
+                            options={requestLocationDropdownOptions}
+                            value={formData.location}
+                            onChange={(nextValue) => setFormData({ ...formData, location: nextValue, assetName: '' })}
                             disabled={isRequestReadOnly}
-                          >
-                            <option value="">Select Team</option>
-                            {teams.map(team => (
-                              <option key={team._id || team.id} value={team.name}>{team.name}</option>
-                            ))}
-                          </select>
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm text-gray-800 mb-2">Asset</label>
+                          <SearchableRequestDropdown
+                            dropdownKey="asset"
+                            placeholder="Select Asset"
+                            options={requestAssetDropdownOptions}
+                            value={formData.assetName}
+                            fallbackLabel={formData.assetName || ''}
+                            onChange={(_, option) => setFormData({ ...formData, assetName: option?.rawValue || option?.label || '' })}
+                            disabled={isRequestReadOnly}
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm text-gray-800 mb-2">Primary Worker</label>
+                          <SearchableRequestDropdown
+                            dropdownKey="assignedTo"
+                            placeholder="Select Worker"
+                            options={requestWorkerDropdownOptions}
+                            value={formData.assignedTo}
+                            onChange={(nextValue) => {
+                              const nextPrimary = String(nextValue || '');
+                              const nextAdditionalWorkers = normalizedAdditionalWorkers.filter((worker) => String(worker.id || worker.email || worker.name || '') !== nextPrimary);
+                              setFormData({
+                                ...formData,
+                                assignedTo: nextPrimary,
+                                additionalResponsibleWorkers: nextAdditionalWorkers,
+                              });
+                            }}
+                            disabled={isRequestReadOnly}
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm text-gray-800 mb-2">Additional Workers</label>
+                          <SearchableRequestDropdown
+                            dropdownKey="additionalWorkers"
+                            placeholder="Select Additional Workers"
+                            options={requestAdditionalWorkerOptions}
+                            value={normalizedAdditionalWorkers.map((worker) => String(worker.id || worker.email || worker.name || ''))}
+                            onChange={(nextValues) => {
+                              const selectedWorkers = nextValues
+                                .map((selectedValue) => requestAdditionalWorkerOptions.find((workerOption) => String(workerOption.value) === String(selectedValue))?.worker)
+                                .filter(Boolean)
+                                .map((worker) => ({
+                                  id: String(worker._id || worker.id || worker.userId || ''),
+                                  name: worker.name || worker.fullName || worker.email || 'Worker',
+                                  email: worker.email || '',
+                                  phone: worker.phone || '',
+                                  role: worker.role || ''
+                                }));
+                              setFormData({ ...formData, additionalResponsibleWorkers: selectedWorkers });
+                            }}
+                            multiple
+                            disabled={isRequestReadOnly}
+                          />
+                          <div className="mt-2 text-xs text-gray-500">Search and pick one or more additional workers.</div>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm text-gray-800 mb-2">Team</label>
+                          <SearchableRequestDropdown
+                            dropdownKey="team"
+                            placeholder="Select Team"
+                            options={requestTeamDropdownOptions}
+                            value={formData.team}
+                            onChange={(nextValue) => setFormData({ ...formData, team: nextValue })}
+                            disabled={isRequestReadOnly}
+                          />
                         </div>
 
                         <div>
                           <label className="block text-sm text-gray-800 mb-2">Checklists</label>
-                          <select
-                            className={`w-full rounded-lg border border-gray-300 px-4 py-3 text-[15px] ${requestLockClass}`}
+                          <SearchableRequestDropdown
+                            dropdownKey="checklist"
+                            placeholder="Select Checklist"
+                            options={requestChecklistDropdownOptions}
                             value={formData.checklistTemplateId || ''}
-                            onChange={e => {
-                              const selected = (pmChecklistLibrary || []).find((tpl) => String(tpl.id || tpl._id) === String(e.target.value));
+                            onChange={(nextValue, option) => {
+                              const selected = option?.template || checklistTemplateOptions.find((tpl) => String(tpl.id || tpl._id) === String(nextValue));
                               setFormData({
                                 ...formData,
-                                checklistTemplateId: e.target.value,
+                                checklistTemplateId: nextValue,
                                 checklist: selected?.items || formData.checklist,
                               });
                             }}
                             disabled={isRequestReadOnly}
-                          >
-                            <option value="">Select Checklist</option>
-                            {(pmChecklistLibrary || []).map((tpl) => (
-                              <option key={tpl.id || tpl._id} value={tpl.id || tpl._id}>
-                                {tpl.name || tpl.title || 'Checklist'}
-                              </option>
-                            ))}
-                          </select>
+                          />
                         </div>
 
                         <div>
@@ -4646,16 +9277,47 @@ function ClientDashboard() {
                           >
                             <button
                               type="button"
-                              onClick={() => fileInputRef.current?.click()}
+                              onClick={() => requestFileInputRef.current?.click()}
                               className="rounded-lg border border-gray-300 bg-white px-6 py-2 text-gray-800 font-medium"
                             >
                               Upload
                             </button>
                             <span className="ml-4">or Drop Files</span>
+                            <input
+                              ref={requestFileInputRef}
+                              type="file"
+                              multiple
+                              className="hidden"
+                              onChange={(e) => handleFileImport(e.target.files)}
+                            />
                           </div>
                           <button type="button" className="mt-5 text-[15px] font-medium text-blue-600 hover:text-blue-700">
                             Add from Saved Files
                           </button>
+                          {requestUploadedFiles.length > 0 && (
+                            <div className="mt-4 space-y-2">
+                              {requestUploadedFiles.map((fileEntry, index) => (
+                                <div key={fileEntry.id || `request-file-${index}`} className="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-4 py-3">
+                                  <div className="min-w-0">
+                                    <div className="truncate text-sm font-semibold text-gray-800">
+                                      {fileEntry.name || `File ${index + 1}`}
+                                    </div>
+                                    <div className="text-xs text-gray-500">
+                                      {fileEntry.type || 'File'}
+                                      {fileEntry.size ? ` • ${Math.max(1, Math.round(fileEntry.size / 1024))} KB` : ''}
+                                    </div>
+                                  </div>
+                                  {fileEntry.url ? (
+                                    <a href={getImageUrl(fileEntry.url)} target="_blank" rel="noreferrer" className="text-sm font-semibold text-blue-600 hover:text-blue-700">
+                                      Open
+                                    </a>
+                                  ) : (
+                                    <span className="text-xs text-gray-400">Pending</span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
 
                         {(item.beforePhoto || item.photo || item.image || item.beforeImage || item.afterImage || item.afterPhoto) && (
@@ -5403,7 +10065,7 @@ function ClientDashboard() {
             <div className="w-full md:w-[34rem] lg:w-[35rem] flex flex-col bg-white border-l border-gray-200 flex-shrink-0">
             <div className="px-0 py-0 bg-white flex items-center justify-between">
               <div className="px-4 py-4 border-b border-gray-200 w-full">
-                <h4 className="text-[18px] font-bold text-gray-900">Comments</h4>
+                <h4 className="text-[18px] font-bold text-gray-900">Internal</h4>
                 <p className="mt-1 text-xs text-gray-500">Shared discussion for everyone who can access this request.</p>
               </div>
               <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors hidden md:block">
@@ -7042,6 +11704,721 @@ function ClientDashboard() {
     setShowWorkOrderModal(true);
   };
 
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(REQUEST_FORM_SETTINGS_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      setRequestFormSettings((prev) => ({
+        ...prev,
+        ...Object.fromEntries(
+          Object.entries(parsed || {}).map(([key, value]) => [
+            key,
+            {
+              create: value?.create || prev[key]?.create || 'Optional',
+              approval: value?.approval || prev[key]?.approval || 'Optional',
+            },
+          ])
+        ),
+      }));
+    } catch (error) {
+      console.warn('Failed to load request form settings', error);
+    }
+  }, []);
+
+  const updateRequestFormSetting = useCallback((field, stage, value) => {
+    setRequestFormSettings((prev) => ({
+      ...prev,
+      [field]: {
+        ...(prev[field] || { create: 'Optional', approval: 'Optional' }),
+        [stage]: value,
+      },
+    }));
+  }, []);
+
+  const loadRequestSettings = useCallback(async () => {
+    try {
+      const response = await api.get('/api/request-settings');
+      const payload = response.data || {};
+      setGeneralSettings({ ...DEFAULT_GENERAL_SETTINGS, ...(payload.general || {}) });
+      if (payload.internalRequests) {
+        setRequestFormSettings((prev) => ({ ...prev, ...payload.internalRequests }));
+      }
+      setLegacyPublicRequestsEnabled(!!payload.legacyPublicRequests?.companyRequestPortalEnabled);
+      setRequestBranding({ ...DEFAULT_REQUEST_BRANDING, ...(payload.branding || {}) });
+      setRequestPortals(Array.isArray(payload.portals) ? payload.portals : []);
+      setAutomationWorkflows(Array.isArray(payload.automation?.workflows) ? payload.automation.workflows : []);
+      setRoleRows(Array.isArray(payload.roleRows) ? payload.roleRows : []);
+      setAssetSettings({
+        ...DEFAULT_ASSET_SETTINGS,
+        ...(payload.assets || {}),
+        fields: Array.isArray(payload.assets?.fields) && payload.assets.fields.length > 0 ? payload.assets.fields : DEFAULT_ASSET_SETTINGS.fields,
+        operatingHours: Array.isArray(payload.assets?.operatingHours) ? payload.assets.operatingHours : [],
+        statuses: Array.isArray(payload.assets?.statuses) ? payload.assets.statuses : [],
+        checkInOut: {
+          ...DEFAULT_ASSET_SETTINGS.checkInOut,
+          ...(payload.assets?.checkInOut || {}),
+        },
+      });
+      setPartsInventorySettings({
+        ...DEFAULT_PARTS_INVENTORY_SETTINGS,
+        ...(payload.partsInventory || {}),
+        groupParts: Array.isArray(payload.partsInventory?.groupParts) ? payload.partsInventory.groupParts : [],
+        customFields: Array.isArray(payload.partsInventory?.customFields) && payload.partsInventory.customFields.length > 0
+          ? payload.partsInventory.customFields
+          : DEFAULT_PARTS_INVENTORY_SETTINGS.customFields,
+      });
+      setWorkOrderSettings({
+        ...DEFAULT_WORK_ORDER_SETTINGS,
+        ...(payload.workOrders || {}),
+        general: {
+          ...DEFAULT_WORK_ORDER_SETTINGS.general,
+          ...(payload.workOrders?.general || {}),
+        },
+        configuration: {
+          createFields: {
+            ...DEFAULT_WORK_ORDER_SETTINGS.configuration.createFields,
+            ...(payload.workOrders?.configuration?.createFields || {}),
+          },
+          completeFields: {
+            ...DEFAULT_WORK_ORDER_SETTINGS.configuration.completeFields,
+            ...(payload.workOrders?.configuration?.completeFields || {}),
+          },
+        },
+        statuses: Array.isArray(payload.workOrders?.statuses) && payload.workOrders.statuses.length > 0
+          ? payload.workOrders.statuses
+          : DEFAULT_WORK_ORDER_SETTINGS.statuses,
+        categories: Array.isArray(payload.workOrders?.categories) && payload.workOrders.categories.length > 0
+          ? payload.workOrders.categories
+          : DEFAULT_WORK_ORDER_SETTINGS.categories,
+        timers: Array.isArray(payload.workOrders?.timers) && payload.workOrders.timers.length > 0
+          ? payload.workOrders.timers
+          : DEFAULT_WORK_ORDER_SETTINGS.timers,
+        customFields: Array.isArray(payload.workOrders?.customFields)
+          ? payload.workOrders.customFields
+          : [],
+      });
+      setPurchaseOrderSettings({
+        ...DEFAULT_PURCHASE_ORDER_SETTINGS,
+        ...(payload.purchaseOrders || {}),
+        general: {
+          ...DEFAULT_PURCHASE_ORDER_SETTINGS.general,
+          ...(payload.purchaseOrders?.general || {}),
+        },
+        categories: Array.isArray(payload.purchaseOrders?.categories) ? payload.purchaseOrders.categories : [],
+        publicRequestPortal: {
+          ...DEFAULT_PURCHASE_ORDER_SETTINGS.publicRequestPortal,
+          ...(payload.purchaseOrders?.publicRequestPortal || {}),
+        },
+      });
+      setMeterSettings({
+        ...DEFAULT_METER_SETTINGS,
+        ...(payload.meters || {}),
+        categories: Array.isArray(payload.meters?.categories) ? payload.meters.categories : [],
+      });
+      setTagSettings({
+        ...DEFAULT_TAG_SETTINGS,
+        ...(payload.tags || {}),
+        items: Array.isArray(payload.tags?.items) ? payload.tags.items : [],
+      });
+    } catch (error) {
+      console.warn('Failed to load request settings', error);
+    }
+  }, []);
+
+  const saveGeneralSettings = useCallback(async (nextGeneralSettings) => {
+    try {
+      const response = await api.put('/api/request-settings/general', { general: nextGeneralSettings });
+      setGeneralSettings({ ...DEFAULT_GENERAL_SETTINGS, ...(response.data?.general || nextGeneralSettings) });
+    } catch (error) {
+      console.warn('Failed to save general settings', error);
+      alert(error.response?.data?.error || 'Failed to save general settings.');
+    }
+  }, []);
+
+  const saveRequestFormSettings = useCallback(() => {
+    (async () => {
+      try {
+        await api.put('/api/request-settings/internal', { internalRequests: requestFormSettings });
+        try {
+          localStorage.setItem(REQUEST_FORM_SETTINGS_STORAGE_KEY, JSON.stringify(requestFormSettings));
+        } catch (error) {
+          console.warn('Failed to save request form settings', error);
+        }
+        setShowRequestSettingsModal(false);
+      } catch (error) {
+        console.warn('Failed to persist request form settings', error);
+        alert(error.response?.data?.error || 'Failed to save request form settings.');
+      }
+    })();
+  }, [requestFormSettings]);
+
+  const toggleLegacyPublicRequests = useCallback(async (enabled) => {
+    try {
+      await api.put('/api/request-settings/legacy', { companyRequestPortalEnabled: !!enabled });
+      setLegacyPublicRequestsEnabled(!!enabled);
+    } catch (error) {
+      console.warn('Failed to update legacy public requests setting', error);
+      alert(error.response?.data?.error || 'Failed to update company request portal.');
+    }
+  }, []);
+
+  const applyRequestBranding = useCallback(async (logoFile) => {
+    try {
+      const formData = new FormData();
+      if (logoFile) formData.append('logo', logoFile);
+      formData.append('primaryColor', requestBranding.primaryColor);
+      formData.append('heroBackground', requestBranding.heroBackground);
+      formData.append('header', requestBranding.header);
+      formData.append('footer', requestBranding.footer);
+      formData.append('pageBackground', requestBranding.pageBackground);
+      const response = await api.put('/api/request-settings/branding', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setRequestBranding({ ...DEFAULT_REQUEST_BRANDING, ...(response.data?.branding || {}) });
+    } catch (error) {
+      console.warn('Failed to apply request branding', error);
+      alert(error.response?.data?.error || 'Failed to save branding.');
+    }
+  }, [requestBranding]);
+
+  const createRequestPortal = useCallback(async (portalForm, portalId = '') => {
+    try {
+      const response = portalId
+        ? await api.put(`/api/request-settings/portals/${portalId}`, portalForm)
+        : await api.post('/api/request-settings/portals', portalForm);
+      const created = response.data;
+      setRequestPortals((prev) => {
+        if (portalId) {
+          return prev.map((portal) => (portal.id === portalId ? created : portal));
+        }
+        return [created, ...prev];
+      });
+      return created;
+    } catch (error) {
+      console.warn('Failed to save request portal', error);
+      alert(error.response?.data?.error || 'Failed to save request portal.');
+      return null;
+    }
+  }, []);
+
+  const saveAutomationSettings = useCallback(async (nextWorkflows) => {
+    try {
+      const response = await api.put('/api/request-settings/automation', { workflows: nextWorkflows });
+      const saved = Array.isArray(response.data?.workflows) ? response.data.workflows : [];
+      setAutomationWorkflows(saved);
+      return saved;
+    } catch (error) {
+      console.warn('Failed to save automation workflows', error);
+      alert(error.response?.data?.error || 'Failed to save automation workflows.');
+      return null;
+    }
+  }, []);
+
+  const createUserRole = useCallback(async (payload) => {
+    try {
+      const response = await api.post('/api/request-settings/roles', payload);
+      if (Array.isArray(response.data?.roleRows)) {
+        setRoleRows(response.data.roleRows);
+      }
+      return response.data;
+    } catch (error) {
+      console.warn('Failed to create user role', error);
+      alert(error.response?.data?.error || 'Failed to create role.');
+      return null;
+    }
+  }, []);
+
+  const createAssetField = useCallback(async (payload) => {
+    try {
+      const response = await api.post('/api/request-settings/assets/fields', payload);
+      const nextAssets = {
+        ...DEFAULT_ASSET_SETTINGS,
+        ...(response.data?.assets || {}),
+      };
+      setAssetSettings(nextAssets);
+      return response.data;
+    } catch (error) {
+      console.warn('Failed to create asset field', error);
+      alert(error.response?.data?.error || 'Failed to create asset field.');
+      return null;
+    }
+  }, []);
+
+  const createAssetOperatingSchedule = useCallback(async (payload) => {
+    try {
+      const response = await api.post('/api/request-settings/assets/operating-hours', payload);
+      const nextAssets = {
+        ...DEFAULT_ASSET_SETTINGS,
+        ...(response.data?.assets || {}),
+      };
+      setAssetSettings(nextAssets);
+      return response.data;
+    } catch (error) {
+      console.warn('Failed to create asset operating schedule', error);
+      alert(error.response?.data?.error || 'Failed to create schedule.');
+      return null;
+    }
+  }, []);
+
+  const createAssetStatus = useCallback(async (payload) => {
+    try {
+      const response = await api.post('/api/request-settings/assets/statuses', payload);
+      const nextAssets = {
+        ...DEFAULT_ASSET_SETTINGS,
+        ...(response.data?.assets || {}),
+      };
+      setAssetSettings(nextAssets);
+      return response.data;
+    } catch (error) {
+      console.warn('Failed to create asset status', error);
+      alert(error.response?.data?.error || 'Failed to create asset status.');
+      return null;
+    }
+  }, []);
+
+  const saveAssetCheckInOut = useCallback(async (enabled) => {
+    try {
+      const response = await api.put('/api/request-settings/assets/check-in-out', { cascadingHierarchyEnabled: !!enabled });
+      const nextAssets = {
+        ...DEFAULT_ASSET_SETTINGS,
+        ...(response.data?.assets || {}),
+      };
+      setAssetSettings(nextAssets);
+      return response.data;
+    } catch (error) {
+      console.warn('Failed to update asset check in/out settings', error);
+      alert(error.response?.data?.error || 'Failed to update check in/out settings.');
+      return null;
+    }
+  }, []);
+
+  const createPartGroup = useCallback(async (payload) => {
+    try {
+      const response = await api.post('/api/request-settings/parts-inventory/groups', payload);
+      const nextPartsInventory = {
+        ...DEFAULT_PARTS_INVENTORY_SETTINGS,
+        ...(response.data?.partsInventory || {}),
+      };
+      setPartsInventorySettings(nextPartsInventory);
+      return response.data;
+    } catch (error) {
+      console.warn('Failed to create part group', error);
+      alert(error.response?.data?.error || 'Failed to create part group.');
+      return null;
+    }
+  }, []);
+
+  const createPartCustomField = useCallback(async (payload) => {
+    try {
+      const response = await api.post('/api/request-settings/parts-inventory/fields', payload);
+      const nextPartsInventory = {
+        ...DEFAULT_PARTS_INVENTORY_SETTINGS,
+        ...(response.data?.partsInventory || {}),
+      };
+      setPartsInventorySettings(nextPartsInventory);
+      return response.data;
+    } catch (error) {
+      console.warn('Failed to create part custom field', error);
+      alert(error.response?.data?.error || 'Failed to create custom field.');
+      return null;
+    }
+  }, []);
+
+  const savePartsInventoryGeneral = useCallback(async (general) => {
+    try {
+      const response = await api.put('/api/request-settings/parts-inventory/general', { general });
+      const nextPartsInventory = {
+        ...DEFAULT_PARTS_INVENTORY_SETTINGS,
+        ...(response.data?.partsInventory || {}),
+      };
+      setPartsInventorySettings(nextPartsInventory);
+      return response.data;
+    } catch (error) {
+      console.warn('Failed to save parts & inventory general settings', error);
+      alert(error.response?.data?.error || 'Failed to save parts & inventory settings.');
+      return null;
+    }
+  }, []);
+
+  const autoGroupParts = useCallback(async (allPartsHavePartNumber) => {
+    try {
+      const response = await api.post('/api/request-settings/parts-inventory/auto-group', { allPartsHavePartNumber });
+      const nextPartsInventory = {
+        ...DEFAULT_PARTS_INVENTORY_SETTINGS,
+        ...(response.data?.partsInventory || {}),
+      };
+      setPartsInventorySettings(nextPartsInventory);
+      return response.data;
+    } catch (error) {
+      console.warn('Failed to auto group parts', error);
+      alert(error.response?.data?.error || 'Failed to auto group parts.');
+      return null;
+    }
+  }, []);
+
+  const syncAllocatedPartQuantities = useCallback(async () => {
+    try {
+      const response = await api.post('/api/request-settings/parts-inventory/sync');
+      const nextPartsInventory = {
+        ...DEFAULT_PARTS_INVENTORY_SETTINGS,
+        ...(response.data?.partsInventory || {}),
+      };
+      setPartsInventorySettings(nextPartsInventory);
+      return response.data;
+    } catch (error) {
+      console.warn('Failed to sync allocated part quantities', error);
+      alert(error.response?.data?.error || 'Failed to sync allocated part quantities.');
+      return null;
+    }
+  }, []);
+
+  const saveWorkOrderGeneral = useCallback(async (general) => {
+    try {
+      const response = await api.put('/api/request-settings/work-orders/general', { general });
+      const nextWorkOrders = {
+        ...DEFAULT_WORK_ORDER_SETTINGS,
+        ...(response.data?.workOrders || {}),
+      };
+      setWorkOrderSettings(nextWorkOrders);
+      return response.data;
+    } catch (error) {
+      console.warn('Failed to save work order general settings', error);
+      alert(error.response?.data?.error || 'Failed to save work order general settings.');
+      return null;
+    }
+  }, []);
+
+  const saveWorkOrderConfiguration = useCallback(async (configuration) => {
+    try {
+      const response = await api.put('/api/request-settings/work-orders/configuration', { configuration });
+      const nextWorkOrders = {
+        ...DEFAULT_WORK_ORDER_SETTINGS,
+        ...(response.data?.workOrders || {}),
+      };
+      setWorkOrderSettings(nextWorkOrders);
+      return response.data;
+    } catch (error) {
+      console.warn('Failed to save work order configuration settings', error);
+      alert(error.response?.data?.error || 'Failed to save work order configuration settings.');
+      return null;
+    }
+  }, []);
+
+  const createWorkOrderStatus = useCallback(async (payload) => {
+    try {
+      const response = await api.post('/api/request-settings/work-orders/statuses', payload);
+      const nextWorkOrders = {
+        ...DEFAULT_WORK_ORDER_SETTINGS,
+        ...(response.data?.workOrders || {}),
+      };
+      setWorkOrderSettings(nextWorkOrders);
+      return response.data;
+    } catch (error) {
+      console.warn('Failed to create work order status', error);
+      alert(error.response?.data?.error || 'Failed to create work order status.');
+      return null;
+    }
+  }, []);
+
+  const createWorkOrderCategory = useCallback(async (payload) => {
+    try {
+      const response = await api.post('/api/request-settings/work-orders/categories', payload);
+      const nextWorkOrders = {
+        ...DEFAULT_WORK_ORDER_SETTINGS,
+        ...(response.data?.workOrders || {}),
+      };
+      setWorkOrderSettings(nextWorkOrders);
+      return response.data;
+    } catch (error) {
+      console.warn('Failed to create work order category', error);
+      alert(error.response?.data?.error || 'Failed to create work order category.');
+      return null;
+    }
+  }, []);
+
+  const updateWorkOrderCategory = useCallback(async (categoryId, payload) => {
+    try {
+      const response = await api.put(`/api/request-settings/work-orders/categories/${categoryId}`, payload);
+      const nextWorkOrders = {
+        ...DEFAULT_WORK_ORDER_SETTINGS,
+        ...(response.data?.workOrders || {}),
+      };
+      setWorkOrderSettings(nextWorkOrders);
+      return response.data;
+    } catch (error) {
+      console.warn('Failed to update work order category', error);
+      alert(error.response?.data?.error || 'Failed to update work order category.');
+      return null;
+    }
+  }, []);
+
+  const deleteWorkOrderCategory = useCallback(async (categoryId) => {
+    try {
+      const response = await api.delete(`/api/request-settings/work-orders/categories/${categoryId}`);
+      const nextWorkOrders = {
+        ...DEFAULT_WORK_ORDER_SETTINGS,
+        ...(response.data?.workOrders || {}),
+      };
+      setWorkOrderSettings(nextWorkOrders);
+      return response.data;
+    } catch (error) {
+      console.warn('Failed to delete work order category', error);
+      alert(error.response?.data?.error || 'Failed to delete work order category.');
+      return null;
+    }
+  }, []);
+
+  const createWorkOrderTimer = useCallback(async (payload) => {
+    try {
+      const response = await api.post('/api/request-settings/work-orders/timers', payload);
+      const nextWorkOrders = {
+        ...DEFAULT_WORK_ORDER_SETTINGS,
+        ...(response.data?.workOrders || {}),
+      };
+      setWorkOrderSettings(nextWorkOrders);
+      return response.data;
+    } catch (error) {
+      console.warn('Failed to create work order timer', error);
+      alert(error.response?.data?.error || 'Failed to create work order timer.');
+      return null;
+    }
+  }, []);
+
+  const updateWorkOrderTimer = useCallback(async (timerId, payload) => {
+    try {
+      const response = await api.put(`/api/request-settings/work-orders/timers/${timerId}`, payload);
+      const nextWorkOrders = {
+        ...DEFAULT_WORK_ORDER_SETTINGS,
+        ...(response.data?.workOrders || {}),
+      };
+      setWorkOrderSettings(nextWorkOrders);
+      return response.data;
+    } catch (error) {
+      console.warn('Failed to update work order timer', error);
+      alert(error.response?.data?.error || 'Failed to update work order timer.');
+      return null;
+    }
+  }, []);
+
+  const deleteWorkOrderTimer = useCallback(async (timerId) => {
+    try {
+      const response = await api.delete(`/api/request-settings/work-orders/timers/${timerId}`);
+      const nextWorkOrders = {
+        ...DEFAULT_WORK_ORDER_SETTINGS,
+        ...(response.data?.workOrders || {}),
+      };
+      setWorkOrderSettings(nextWorkOrders);
+      return response.data;
+    } catch (error) {
+      console.warn('Failed to delete work order timer', error);
+      alert(error.response?.data?.error || 'Failed to delete work order timer.');
+      return null;
+    }
+  }, []);
+
+  const createWorkOrderCustomField = useCallback(async (payload) => {
+    try {
+      const response = await api.post('/api/request-settings/work-orders/fields', payload);
+      const nextWorkOrders = {
+        ...DEFAULT_WORK_ORDER_SETTINGS,
+        ...(response.data?.workOrders || {}),
+      };
+      setWorkOrderSettings(nextWorkOrders);
+      return response.data;
+    } catch (error) {
+      console.warn('Failed to create work order custom field', error);
+      alert(error.response?.data?.error || 'Failed to create work order custom field.');
+      return null;
+    }
+  }, []);
+
+  const savePurchaseOrderGeneral = useCallback(async (payload) => {
+    try {
+      const response = await api.put('/api/request-settings/purchase-orders/general', payload);
+      const nextSettings = {
+        ...DEFAULT_PURCHASE_ORDER_SETTINGS,
+        ...(response.data?.purchaseOrders || {}),
+      };
+      setPurchaseOrderSettings(nextSettings);
+      return response.data;
+    } catch (error) {
+      console.warn('Failed to save purchase order general settings', error);
+      alert(error.response?.data?.error || 'Failed to save purchase order settings.');
+      return null;
+    }
+  }, []);
+
+  const createPurchaseOrderCategory = useCallback(async (payload) => {
+    try {
+      const response = await api.post('/api/request-settings/purchase-orders/categories', payload);
+      const nextSettings = {
+        ...DEFAULT_PURCHASE_ORDER_SETTINGS,
+        ...(response.data?.purchaseOrders || {}),
+      };
+      setPurchaseOrderSettings(nextSettings);
+      return response.data;
+    } catch (error) {
+      console.warn('Failed to create purchase order category', error);
+      alert(error.response?.data?.error || 'Failed to create purchase order category.');
+      return null;
+    }
+  }, []);
+
+  const updatePurchaseOrderCategory = useCallback(async (id, payload) => {
+    try {
+      const response = await api.put(`/api/request-settings/purchase-orders/categories/${id}`, payload);
+      const nextSettings = {
+        ...DEFAULT_PURCHASE_ORDER_SETTINGS,
+        ...(response.data?.purchaseOrders || {}),
+      };
+      setPurchaseOrderSettings(nextSettings);
+      return response.data;
+    } catch (error) {
+      console.warn('Failed to update purchase order category', error);
+      alert(error.response?.data?.error || 'Failed to update purchase order category.');
+      return null;
+    }
+  }, []);
+
+  const deletePurchaseOrderCategory = useCallback(async (id) => {
+    try {
+      const response = await api.delete(`/api/request-settings/purchase-orders/categories/${id}`);
+      const nextSettings = {
+        ...DEFAULT_PURCHASE_ORDER_SETTINGS,
+        ...(response.data?.purchaseOrders || {}),
+      };
+      setPurchaseOrderSettings(nextSettings);
+      return response.data;
+    } catch (error) {
+      console.warn('Failed to delete purchase order category', error);
+      alert(error.response?.data?.error || 'Failed to delete purchase order category.');
+      return null;
+    }
+  }, []);
+
+  const savePurchaseOrderPublicRequestPortal = useCallback(async (enabled) => {
+    try {
+      const response = await api.put('/api/request-settings/purchase-orders/public-request-portal', { enabled: !!enabled });
+      const nextSettings = {
+        ...DEFAULT_PURCHASE_ORDER_SETTINGS,
+        ...(response.data?.purchaseOrders || {}),
+      };
+      setPurchaseOrderSettings(nextSettings);
+      return response.data;
+    } catch (error) {
+      console.warn('Failed to save purchase order public request portal', error);
+      alert(error.response?.data?.error || 'Failed to update purchase order public request portal.');
+      return null;
+    }
+  }, []);
+
+  const createMeterCategory = useCallback(async (payload) => {
+    try {
+      const response = await api.post('/api/request-settings/meters/categories', payload);
+      const nextSettings = {
+        ...DEFAULT_METER_SETTINGS,
+        ...(response.data?.meters || {}),
+      };
+      setMeterSettings(nextSettings);
+      return response.data;
+    } catch (error) {
+      console.warn('Failed to create meter category', error);
+      alert(error.response?.data?.error || 'Failed to create meter category.');
+      return null;
+    }
+  }, []);
+
+  const updateMeterCategory = useCallback(async (id, payload) => {
+    try {
+      const response = await api.put(`/api/request-settings/meters/categories/${id}`, payload);
+      const nextSettings = {
+        ...DEFAULT_METER_SETTINGS,
+        ...(response.data?.meters || {}),
+      };
+      setMeterSettings(nextSettings);
+      return response.data;
+    } catch (error) {
+      console.warn('Failed to update meter category', error);
+      alert(error.response?.data?.error || 'Failed to update meter category.');
+      return null;
+    }
+  }, []);
+
+  const deleteMeterCategory = useCallback(async (id) => {
+    try {
+      const response = await api.delete(`/api/request-settings/meters/categories/${id}`);
+      const nextSettings = {
+        ...DEFAULT_METER_SETTINGS,
+        ...(response.data?.meters || {}),
+      };
+      setMeterSettings(nextSettings);
+      return response.data;
+    } catch (error) {
+      console.warn('Failed to delete meter category', error);
+      alert(error.response?.data?.error || 'Failed to delete meter category.');
+      return null;
+    }
+  }, []);
+
+  const createTag = useCallback(async (payload) => {
+    try {
+      const response = await api.post('/api/request-settings/tags', payload);
+      const nextSettings = {
+        ...DEFAULT_TAG_SETTINGS,
+        ...(response.data?.tags || {}),
+      };
+      setTagSettings(nextSettings);
+      return response.data;
+    } catch (error) {
+      console.warn('Failed to create tag', error);
+      alert(error.response?.data?.error || 'Failed to create tag.');
+      return null;
+    }
+  }, []);
+
+  const updateTag = useCallback(async (id, payload) => {
+    try {
+      const response = await api.put(`/api/request-settings/tags/${id}`, payload);
+      const nextSettings = {
+        ...DEFAULT_TAG_SETTINGS,
+        ...(response.data?.tags || {}),
+      };
+      setTagSettings(nextSettings);
+      return response.data;
+    } catch (error) {
+      console.warn('Failed to update tag', error);
+      alert(error.response?.data?.error || 'Failed to update tag.');
+      return null;
+    }
+  }, []);
+
+  const deleteTag = useCallback(async (id) => {
+    try {
+      const response = await api.delete(`/api/request-settings/tags/${id}`);
+      const nextSettings = {
+        ...DEFAULT_TAG_SETTINGS,
+        ...(response.data?.tags || {}),
+      };
+      setTagSettings(nextSettings);
+      return response.data;
+    } catch (error) {
+      console.warn('Failed to delete tag', error);
+      alert(error.response?.data?.error || 'Failed to delete tag.');
+      return null;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!showRequestSettingsModal) return;
+    loadRequestSettings();
+  }, [loadRequestSettings, showRequestSettingsModal]);
+
+  useEffect(() => {
+    if (!currentUser?.companyName) return;
+    loadRequestSettings();
+  }, [currentUser?.companyName, loadRequestSettings]);
+
   const publicRequestLink = React.useMemo(() => {
     if (!currentUser?.companyName || typeof window === 'undefined') return '';
     return `${window.location.origin}/public-request/${slugifyCompanyName(currentUser.companyName)}`;
@@ -7452,12 +12829,134 @@ function ClientDashboard() {
       || st.includes('COMPLETE');
   };
 
+  const isRequestRecord = (issue) => {
+    if (!issue || isPmLinkedIssue(issue)) return false;
+    const st = String(issue?.status || '').toUpperCase();
+    return Boolean(
+      issue?.requestorId
+      || issue?.requestorName
+      || issue?.submittedAt
+      || issue?.submissionType
+      || issue?.approved !== undefined
+      || issue?.rejected !== undefined
+      || st === 'SUBMITTED'
+      || st === 'APPROVED'
+      || st === 'DECLINED'
+      || st === 'REJECTED'
+      || st === 'PENDING'
+    );
+  };
+
   const isRequestIssue = (issue) => {
     if (!issue || isRejectedRequest(issue)) return false;
-    return !isApprovedWorkOrder(issue);
+    return isRequestRecord(issue) || !isApprovedWorkOrder(issue);
   };
 
   const pendingRequests = allIssues.filter((issue) => isRequestIssue(issue));
+  const requestStatusOptions = ['Pending', 'Approved', 'In Progress', 'Declined'];
+  const requestLocationOptions = React.useMemo(
+    () => Array.from(new Set(
+      pendingRequests
+        .map((request) => String(request.location || request.property?.name || request.propertyName || request.assetLocation || '').trim())
+        .filter(Boolean)
+    )).sort((a, b) => a.localeCompare(b)),
+    [pendingRequests]
+  );
+  const requestAssetOptions = React.useMemo(
+    () => Array.from(new Set(
+      pendingRequests
+        .map((request) => String(request.assetName || request.asset?.name || request.asset || '').trim())
+        .filter(Boolean)
+    )).sort((a, b) => a.localeCompare(b)),
+    [pendingRequests]
+  );
+  const requestAssignedOptions = React.useMemo(
+    () => Array.from(new Set(
+      pendingRequests
+        .map((request) => String(getAssignedName(request) || '').trim())
+        .filter((value) => value && value !== '—')
+    )).sort((a, b) => a.localeCompare(b)),
+    [getAssignedName, pendingRequests]
+  );
+  const totalActiveRequestFilters =
+    selectedRequestStatuses.length +
+    selectedRequestLocations.length +
+    selectedRequestAssets.length +
+    selectedRequestAssignedTo.length;
+  const filteredRequests = React.useMemo(() => {
+    const query = String(requestSearchQuery || '').trim().toLowerCase();
+    const rows = pendingRequests.filter((request) => {
+      const rawStatus = String(request.status || '').toUpperCase();
+      const isDeclined = request.rejected || rawStatus === 'DECLINED' || rawStatus === 'REJECTED';
+      const isInProgress = rawStatus === 'IN PROGRESS' || rawStatus === 'IN_PROGRESS' || rawStatus.includes('IN PROGRESS');
+      const isApproved = request.approved || rawStatus === 'APPROVED' || isInProgress;
+      const statusLabel = isDeclined
+        ? 'Declined'
+        : isInProgress
+          ? 'In Progress'
+          : isApproved
+            ? 'Approved'
+            : 'Pending';
+      const location = String(request.location || request.property?.name || request.propertyName || request.assetLocation || '').trim();
+      const asset = String(request.assetName || request.asset?.name || request.asset || '').trim();
+      const assignedTo = String(getAssignedName(request) || '').trim();
+
+      if (selectedRequestStatuses.length > 0 && !selectedRequestStatuses.includes(statusLabel)) return false;
+      if (selectedRequestLocations.length > 0 && !selectedRequestLocations.includes(location)) return false;
+      if (selectedRequestAssets.length > 0 && !selectedRequestAssets.includes(asset)) return false;
+      if (selectedRequestAssignedTo.length > 0 && !selectedRequestAssignedTo.includes(assignedTo)) return false;
+
+      if (!query) return true;
+      const haystack = [
+        request.title,
+        request.description,
+        statusLabel,
+        location,
+        asset,
+        assignedTo,
+        request.category,
+        request.requestorName,
+        request.userName,
+        request.email,
+      ].join(' ').toLowerCase();
+      return haystack.includes(query);
+    });
+
+    return [...rows].sort((a, b) => {
+      const direction = requestSortDirection === 'asc' ? 1 : -1;
+      const compareText = (first, second) => String(first || '').localeCompare(String(second || ''), undefined, { sensitivity: 'base' });
+
+      if (requestSortBy === 'title') {
+        return compareText(a.title || a.items?.[0]?.title, b.title || b.items?.[0]?.title) * direction;
+      }
+      if (requestSortBy === 'asset') {
+        return compareText(a.assetName || a.asset?.name || a.asset, b.assetName || b.asset?.name || b.asset) * direction;
+      }
+      if (requestSortBy === 'category') {
+        return compareText(a.category || a.issueType || a.type, b.category || b.issueType || b.type) * direction;
+      }
+      if (requestSortBy === 'priority') {
+        const priorityRank = { NONE: 0, LOW: 1, MEDIUM: 2, HIGH: 3, URGENT: 4 };
+        const aRank = priorityRank[String(a.priority || 'NONE').toUpperCase()] ?? 0;
+        const bRank = priorityRank[String(b.priority || 'NONE').toUpperCase()] ?? 0;
+        return (aRank - bRank) * direction;
+      }
+
+      const aTime = new Date(a.createdAt || a.submittedAt || a.date || 0).getTime();
+      const bTime = new Date(b.createdAt || b.submittedAt || b.date || 0).getTime();
+      return (aTime - bTime) * direction;
+    });
+  }, [
+    getAssignedName,
+    pendingRequests,
+    requestSearchQuery,
+    requestSortBy,
+    requestSortDirection,
+    selectedRequestAssets,
+    selectedRequestAssignedTo,
+    selectedRequestLocations,
+    selectedRequestStatuses,
+  ]);
   const workOrders = allIssues.filter(issue => isApprovedWorkOrder(issue));
   const workOrderStatusOptions = ['OPEN', 'IN PROGRESS', 'ON HOLD', 'COMPLETED'];
   const workOrderPriorityOptions = ['HIGH', 'MEDIUM', 'LOW', 'NONE'];
@@ -10685,54 +16184,209 @@ function ClientDashboard() {
 
           {/* â”€â”€ Requests â”€â”€ */}
           {activeTab === 'requests' && (
-            <div>
-              <div className="mb-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Requests</h2>
-                    <p className="text-gray-600">Review submitted requests and follow their work order progress</p>
-                  </div>
-                  <div className="flex items-center gap-3">
+            <div className="overflow-hidden rounded-[24px] border border-gray-200 bg-white shadow-sm">
+              <div className="flex items-center justify-between border-b border-gray-200 px-8 py-4">
+                <h2 className="text-[22px] font-bold text-gray-900">Requests</h2>
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={handleNewRequest}
+                    className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
+                  >
+                    Create Request
+                  </button>
+                  <div ref={requestActionsButtonRef} className="relative">
                     <button
-                      onClick={handleNewRequest}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold shadow-sm hover:bg-blue-700"
+                      type="button"
+                      onClick={() => setShowRequestActionsMenu((prev) => !prev)}
+                      className="rounded-lg p-2 text-gray-500 hover:bg-gray-100"
                     >
-                      Submit Request
+                      <MoreHorizontal className="h-5 w-5" />
                     </button>
-                    <div className="px-4 py-2 bg-gradient-to-r from-orange-50 to-amber-50 rounded-lg border border-orange-200">
-                      <span className="text-orange-700 font-semibold">{pendingRequests.length} total</span>
-                    </div>
+                    <FilterPopover
+                      anchorRef={requestActionsButtonRef}
+                      isOpen={showRequestActionsMenu}
+                      onClose={() => setShowRequestActionsMenu(false)}
+                      title=""
+                      className="w-[220px]"
+                      bodyClassName="p-2"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowRequestActionsMenu(false);
+                          setShowRequestSettingsModal(true);
+                        }}
+                        className="flex w-full items-center rounded-xl px-4 py-3 text-left text-[15px] font-medium text-gray-700 transition hover:bg-gray-50"
+                      >
+                        Edit Request Form
+                      </button>
+                    </FilterPopover>
                   </div>
                 </div>
               </div>
 
-              <div className="mb-6 rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50 via-white to-indigo-50 p-5 shadow-sm">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                  <div>
-                    <div className="text-sm font-bold uppercase tracking-[0.22em] text-blue-700">Public Request Link</div>
-                    <div className="mt-2 text-xl font-bold text-slate-900">Let external requestors submit without logging in.</div>
-                    <p className="mt-1 text-sm text-slate-600">
-                      This link already carries <span className="font-semibold text-slate-900">{currentUser?.companyName || 'your company'}</span>,
-                      so requestors do not need to type the company name.
-                    </p>
-                  </div>
-                  <div className="flex flex-col gap-3 lg:items-end">
-                    <div className="max-w-full rounded-xl border border-blue-100 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
-                      <span className="font-semibold text-slate-900">Share link:</span>{' '}
-                      <span className="break-all">{publicRequestLink || 'No company link available yet.'}</span>
-                    </div>
+              <div className="flex flex-wrap items-center justify-between gap-4 border-b border-gray-200 px-8 py-4">
+                <div className="text-sm font-semibold text-gray-900">{filteredRequests.length} Result Returned</div>
+                <div className="flex flex-wrap items-center gap-5">
+                  <div ref={requestSortButtonRef} className="relative">
                     <button
-                      onClick={copyPublicRequestLink}
-                      className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+                      type="button"
+                      onClick={() => setShowRequestSortMenu((prev) => !prev)}
+                      className="inline-flex items-center gap-2 text-sm font-semibold text-gray-700"
                     >
-                      {publicRequestLinkCopied ? 'Copied' : 'Copy Public Request Link'}
+                      <ArrowUpDown className="h-4 w-4" />
+                      Sort
                     </button>
+                    <FilterPopover
+                      anchorRef={requestSortButtonRef}
+                      isOpen={showRequestSortMenu}
+                      onClose={() => setShowRequestSortMenu(false)}
+                      title=""
+                      className="w-[252px]"
+                      bodyClassName="p-0"
+                    >
+                      <div className="px-5 py-5">
+                        <div className="text-[13px] font-bold uppercase tracking-wide text-gray-900">Sort By</div>
+                        <div className="mt-4 space-y-4">
+                          {[
+                            ['title', 'Title'],
+                            ['asset', 'Asset'],
+                            ['submittedDate', 'Submitted Date'],
+                            ['category', 'Category'],
+                            ['priority', 'Priority'],
+                          ].map(([value, label]) => (
+                            <button
+                              key={value}
+                              type="button"
+                              onClick={() => setRequestSortBy(value)}
+                              className="flex w-full items-center justify-between text-left text-[16px] text-gray-700"
+                            >
+                              <span>{label}</span>
+                              {requestSortBy === value && <CheckCircle className="h-4 w-4 text-blue-600" />}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="border-t border-gray-200 px-5 py-5">
+                        <div className="text-[13px] font-bold uppercase tracking-wide text-gray-900">Order</div>
+                        <div className="mt-4 space-y-4">
+                          {[
+                            ['desc', 'Descending'],
+                            ['asc', 'Ascending'],
+                          ].map(([value, label]) => (
+                            <button
+                              key={value}
+                              type="button"
+                              onClick={() => setRequestSortDirection(value)}
+                              className="flex w-full items-center justify-between text-left text-[16px] text-gray-700"
+                            >
+                              <span>{label}</span>
+                              {requestSortDirection === value && <CheckCircle className="h-4 w-4 text-blue-600" />}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </FilterPopover>
+                  </div>
+                  <button type="button" className="inline-flex items-center gap-2 text-sm font-semibold text-gray-700">
+                    <LayoutDashboard className="h-4 w-4" />
+                    Columns
+                  </button>
+                  <div className="relative">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                    <input
+                      value={requestSearchQuery}
+                      onChange={(e) => setRequestSearchQuery(e.target.value)}
+                      placeholder="Search"
+                      className="h-10 w-72 rounded-lg border border-gray-200 bg-gray-50 pl-10 pr-4 text-sm text-gray-700 outline-none transition focus:border-blue-500"
+                    />
                   </div>
                 </div>
               </div>
 
-              {pendingRequests.length === 0 ? (
-                <div className="glass-surface rounded-xl p-12 text-center border border-gray-200">
+              <div className="relative z-20 flex flex-wrap items-center gap-3 overflow-visible border-b border-gray-200 px-8 py-4">
+                <button type="button" className={`inline-flex h-11 items-center gap-2 rounded-2xl border px-4 text-[15px] font-medium shadow-sm transition ${totalActiveRequestFilters > 0 ? 'border-blue-300 bg-blue-50 text-blue-700' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'}`}>
+                  <SlidersHorizontal className="h-4 w-4" />
+                  Filters
+                </button>
+                <div ref={requestAssetFilterRef} className="relative">
+                  <FilterButton icon={Package} label="Asset" active={selectedRequestAssets.length > 0} count={selectedRequestAssets.length || undefined} onClick={() => setRequestOpenPopover(requestOpenPopover === 'asset' ? null : 'asset')} />
+                  <FilterPopover anchorRef={requestAssetFilterRef} isOpen={requestOpenPopover === 'asset'} onClose={() => setRequestOpenPopover(null)} title="Asset" className="w-80">
+                    <div className="space-y-1">
+                      {requestAssetOptions.length === 0 ? (
+                        <div className="px-2 py-1 text-sm text-gray-500">No assets found.</div>
+                      ) : requestAssetOptions.map((asset) => (
+                        <label key={asset} className="flex items-center gap-3 rounded-lg p-2 hover:bg-gray-50">
+                          <input type="checkbox" checked={selectedRequestAssets.includes(asset)} onChange={(e) => setSelectedRequestAssets(e.target.checked ? [...selectedRequestAssets, asset] : selectedRequestAssets.filter((value) => value !== asset))} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                          <span className="text-sm font-medium text-gray-700">{asset}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </FilterPopover>
+                </div>
+                <div ref={requestStatusFilterRef} className="relative">
+                  <FilterButton icon={AlertCircle} label="Status" active={selectedRequestStatuses.length > 0} count={selectedRequestStatuses.length || undefined} onClick={() => setRequestOpenPopover(requestOpenPopover === 'status' ? null : 'status')} />
+                  <FilterPopover anchorRef={requestStatusFilterRef} isOpen={requestOpenPopover === 'status'} onClose={() => setRequestOpenPopover(null)} title="Status">
+                    <div className="space-y-1">
+                      {requestStatusOptions.map((status) => (
+                        <label key={status} className="flex items-center gap-3 rounded-lg p-2 hover:bg-gray-50">
+                          <input type="checkbox" checked={selectedRequestStatuses.includes(status)} onChange={(e) => setSelectedRequestStatuses(e.target.checked ? [...selectedRequestStatuses, status] : selectedRequestStatuses.filter((value) => value !== status))} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                          <span className="text-sm font-medium text-gray-700">{status}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </FilterPopover>
+                </div>
+                <div ref={requestAssignedFilterRef} className="relative">
+                  <FilterButton icon={Users} label="Assigned To" active={selectedRequestAssignedTo.length > 0} count={selectedRequestAssignedTo.length || undefined} onClick={() => setRequestOpenPopover(requestOpenPopover === 'assigned' ? null : 'assigned')} />
+                  <FilterPopover anchorRef={requestAssignedFilterRef} isOpen={requestOpenPopover === 'assigned'} onClose={() => setRequestOpenPopover(null)} title="Assigned To">
+                    <div className="space-y-1">
+                      {requestAssignedOptions.length === 0 ? (
+                        <div className="px-2 py-1 text-sm text-gray-500">No assignees found.</div>
+                      ) : requestAssignedOptions.map((assignedTo) => (
+                        <label key={assignedTo} className="flex items-center gap-3 rounded-lg p-2 hover:bg-gray-50">
+                          <input type="checkbox" checked={selectedRequestAssignedTo.includes(assignedTo)} onChange={(e) => setSelectedRequestAssignedTo(e.target.checked ? [...selectedRequestAssignedTo, assignedTo] : selectedRequestAssignedTo.filter((value) => value !== assignedTo))} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                          <span className="text-sm font-medium text-gray-700">{assignedTo}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </FilterPopover>
+                </div>
+                <div ref={requestLocationFilterRef} className="relative">
+                  <FilterButton icon={MapPin} label="Location" active={selectedRequestLocations.length > 0} count={selectedRequestLocations.length || undefined} onClick={() => setRequestOpenPopover(requestOpenPopover === 'location' ? null : 'location')} />
+                  <FilterPopover anchorRef={requestLocationFilterRef} isOpen={requestOpenPopover === 'location'} onClose={() => setRequestOpenPopover(null)} title="Location" className="w-80">
+                    <div className="space-y-1">
+                      {requestLocationOptions.length === 0 ? (
+                        <div className="px-2 py-1 text-sm text-gray-500">No locations found.</div>
+                      ) : requestLocationOptions.map((location) => (
+                        <label key={location} className="flex items-center gap-3 rounded-lg p-2 hover:bg-gray-50">
+                          <input type="checkbox" checked={selectedRequestLocations.includes(location)} onChange={(e) => setSelectedRequestLocations(e.target.checked ? [...selectedRequestLocations, location] : selectedRequestLocations.filter((value) => value !== location))} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                          <span className="text-sm font-medium text-gray-700">{location}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </FilterPopover>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedRequestAssets([]);
+                    setSelectedRequestStatuses([]);
+                    setSelectedRequestAssignedTo([]);
+                    setSelectedRequestLocations([]);
+                    setRequestSearchQuery('');
+                    setRequestOpenPopover(null);
+                  }}
+                  className="text-[15px] font-medium text-blue-600 hover:text-blue-700"
+                >
+                  Reset Filters
+                </button>
+                <button type="button" className="ml-auto text-[15px] font-medium text-gray-700 hover:text-gray-900">Save View</button>
+              </div>
+
+              <div className="p-8">
+              {filteredRequests.length === 0 ? (
+                <div className="rounded-xl border border-gray-200 p-12 text-center">
                   <div className="w-24 h-24 bg-gradient-to-br from-emerald-100 to-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
                     <CheckCircle className="w-12 h-12 text-emerald-600" />
                   </div>
@@ -10740,11 +16394,12 @@ function ClientDashboard() {
                   <p className="text-gray-600 mb-6">No requests to review</p>
                 </div>
               ) : (
-                <div className="glass-surface rounded-xl overflow-hidden shadow-2xl border border-gray-200">
+                <div className="overflow-hidden rounded-2xl border border-gray-200">
                   <div className="overflow-x-auto">
                     <table className="min-w-[1200px] w-full text-left border-collapse text-sm">
-                      <thead className="bg-gray-50 border-b border-gray-200 text-[11px] uppercase tracking-wider text-gray-600">
+                      <thead className="border-b border-gray-200 bg-white text-[11px] uppercase tracking-wider text-gray-600">
                         <tr>
+                          <th className="py-4 px-3"><input type="checkbox" className="h-6 w-6 rounded border-gray-300" /></th>
                           <th className="py-3 px-3">Title</th>
                           <th className="py-3 px-3">Image</th>
                           <th className="py-3 px-3">Asset</th>
@@ -10757,7 +16412,7 @@ function ClientDashboard() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100 bg-white">
-                        {pendingRequests.map((request, i) => {
+                        {filteredRequests.map((request, i) => {
                           const reqId = request._id || request.id || `pending-${i}`;
                           const title = request.title || request.items?.[0]?.title || 'Untitled';
                           const imagePath = request.beforePhoto || request.photo || request.image || request.beforeImage || request.afterImage || request.afterPhoto || (Array.isArray(request.files) ? request.files[0] : null);
@@ -10770,25 +16425,25 @@ function ClientDashboard() {
                           const rawWorkOrderStatus = request.workOrderStatus || request.workOrder?.status || request.workOrderState || request.issueStatus || request.workOrderStatusLabel || '';
                           const normalizedWorkOrder = String(rawWorkOrderStatus || '').toUpperCase();
                           const hasWorkOrderRef = !!(request.workOrderId || request.workOrderNumber || request.workOrderNo || request.workOrder);
-                          const workOrderLabel = normalizedWorkOrder.includes('PROGRESS') ? 'IN PROGRESS'
-                            : normalizedWorkOrder.includes('COMPLETE') ? 'COMPLETED'
-                            : normalizedWorkOrder.includes('OPEN') ? 'OPEN'
-                                : (hasWorkOrderRef ? 'OPEN' : 'NONE');
+                          const workOrderLabel = normalizedWorkOrder.includes('PROGRESS') ? 'Open'
+                            : normalizedWorkOrder.includes('COMPLETE') ? 'Completed'
+                            : normalizedWorkOrder.includes('OPEN') ? 'Open'
+                                : (isApproved || hasWorkOrderRef ? 'Open' : 'None');
                           const statusLabel = isDeclined
-                            ? 'DECLINED'
+                            ? 'Declined'
                             : isInProgress
-                              ? 'IN PROGRESS'
-                              : (isApproved || hasWorkOrderRef)
-                                ? 'APPROVED'
-                                : 'SUBMITTED';
+                              ? 'In Progress'
+                              : isApproved
+                                ? 'Approved'
+                                : 'Pending';
                           const submittedAt = request.createdAt || request.submittedAt || request.date || null;
                           const submittedBy = request.name || request.requestorName || request.userName || request.email || 'N/A';
                           const category = request.category || request.issueType || request.type || request.submissionType || 'N/A';
-                          const workOrderClass = workOrderLabel === 'COMPLETED'
+                          const workOrderClass = workOrderLabel === 'Completed'
                             ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                            : workOrderLabel === 'IN PROGRESS'
+                            : workOrderLabel === 'In Progress'
                               ? 'bg-blue-50 text-blue-700 border-blue-200'
-                            : workOrderLabel === 'OPEN'
+                            : workOrderLabel === 'Open'
                                 ? 'bg-slate-100 text-slate-700 border-slate-200'
                                 : 'bg-gray-50 text-gray-500 border-gray-200';
 
@@ -10798,6 +16453,9 @@ function ClientDashboard() {
                               onClick={() => setModalData({ open: true, type: 'request', item: request })}
                               className="hover:bg-gray-50 transition-all cursor-pointer group/row"
                             >
+                              <td className="py-3 px-3" onClick={(e) => e.stopPropagation()}>
+                                <input type="checkbox" className="h-6 w-6 rounded border-gray-300" />
+                              </td>
                               <td className="py-3 px-3">
                                 <div className="font-semibold text-gray-800 line-clamp-1" title={title}>{title}</div>
                               </td>
@@ -10858,6 +16516,7 @@ function ClientDashboard() {
                   </div>
                 </div>
               )}
+              </div>
             </div>
           )}
 
@@ -12677,40 +18336,95 @@ function ClientDashboard() {
       )}
 
       {showWorkOrderModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="glass-surface-strong rounded-3xl w-full max-w-5xl max-h-[92vh] overflow-hidden border border-white/40 shadow-2xl">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-white/40">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/45 p-4">
+          <div className="w-full max-w-[1280px] max-h-[94vh] overflow-hidden rounded-[18px] border border-gray-200 bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-5">
               <div>
-                <h3 className="text-xl font-bold text-slate-900">Submit Request</h3>
-                <p className="text-xs text-slate-500">Provide details to create a new request.</p>
+                <h3 className="text-[22px] font-bold text-gray-900">Create Request</h3>
               </div>
               <button
                 onClick={() => setShowWorkOrderModal(false)}
-                className="p-2 rounded-lg hover:bg-white/60 transition"
+                className="rounded-lg p-2 transition hover:bg-gray-100"
                 aria-label="Close"
               >
-                <X className="w-5 h-5 text-slate-500" />
+                <X className="h-6 w-6 text-gray-500" />
               </button>
             </div>
-            <div className="p-6 overflow-y-auto max-h-[80vh]">
+            <div className="max-h-[84vh] overflow-y-auto px-6 pb-4">
               <WorkOrderForm
                 submitLabel="Submit Request"
+                fieldSettings={requestFormSettings}
                 onCancel={() => setShowWorkOrderModal(false)}
                 onSubmitted={() => {
                   setShowWorkOrderModal(false);
                   fetchIssues().catch(() => { });
                   setActiveTab('requests');
                 }}
-                showSidebar
-                checklistTemplates={pmChecklistLibrary}
-                companyProperties={properties}
-                companyAssets={assets}
-                companyTechnicians={internalTechnicians}
               />
             </div>
           </div>
         </div>
       )}
+
+      <RequestFormSettingsModal
+        open={showRequestSettingsModal}
+        settings={requestFormSettings}
+        onChange={updateRequestFormSetting}
+        onClose={() => setShowRequestSettingsModal(false)}
+        onSave={saveRequestFormSettings}
+        companyName={currentUser?.companyName || currentUser?.name || ''}
+        properties={properties}
+        assets={assets}
+        vendors={contactPeople.filter((person) => person.__source === 'vendor')}
+        legacyPublicRequestsEnabled={legacyPublicRequestsEnabled}
+        onToggleLegacyPortal={toggleLegacyPublicRequests}
+        branding={requestBranding}
+        onApplyBranding={applyRequestBranding}
+        portals={requestPortals}
+        onCreatePortal={createRequestPortal}
+        generalSettings={generalSettings}
+        onSaveGeneralSettings={saveGeneralSettings}
+        automationWorkflows={automationWorkflows}
+        onSaveAutomationWorkflows={saveAutomationSettings}
+        roleRows={roleRows}
+        onCreateUserRole={createUserRole}
+        assetSettings={assetSettings}
+        onCreateAssetField={createAssetField}
+        onCreateAssetOperatingSchedule={createAssetOperatingSchedule}
+        onCreateAssetStatus={createAssetStatus}
+        onSaveAssetCheckInOut={saveAssetCheckInOut}
+        partsInventorySettings={partsInventorySettings}
+        onCreatePartGroup={createPartGroup}
+        onCreatePartCustomField={createPartCustomField}
+        onSavePartsInventoryGeneral={savePartsInventoryGeneral}
+        onAutoGroupParts={autoGroupParts}
+        onSyncAllocatedPartQuantities={syncAllocatedPartQuantities}
+        workOrderSettings={workOrderSettings}
+        onSaveWorkOrderGeneral={saveWorkOrderGeneral}
+        onSaveWorkOrderConfiguration={saveWorkOrderConfiguration}
+        onCreateWorkOrderStatus={createWorkOrderStatus}
+        onCreateWorkOrderCategory={createWorkOrderCategory}
+        onUpdateWorkOrderCategory={updateWorkOrderCategory}
+        onDeleteWorkOrderCategory={deleteWorkOrderCategory}
+        onCreateWorkOrderTimer={createWorkOrderTimer}
+        onUpdateWorkOrderTimer={updateWorkOrderTimer}
+        onDeleteWorkOrderTimer={deleteWorkOrderTimer}
+        onCreateWorkOrderCustomField={createWorkOrderCustomField}
+        purchaseOrderSettings={purchaseOrderSettings}
+        onSavePurchaseOrderGeneral={savePurchaseOrderGeneral}
+        onCreatePurchaseOrderCategory={createPurchaseOrderCategory}
+        onUpdatePurchaseOrderCategory={updatePurchaseOrderCategory}
+        onDeletePurchaseOrderCategory={deletePurchaseOrderCategory}
+        onSavePurchaseOrderPublicRequestPortal={savePurchaseOrderPublicRequestPortal}
+        meterSettings={meterSettings}
+        onCreateMeterCategory={createMeterCategory}
+        onUpdateMeterCategory={updateMeterCategory}
+        onDeleteMeterCategory={deleteMeterCategory}
+        tagSettings={tagSettings}
+        onCreateTag={createTag}
+        onUpdateTag={updateTag}
+        onDeleteTag={deleteTag}
+      />
 
       {/* â”€â”€ Issue Assign Modal (For Client) â”€â”€ */}
       {issueAssignModalOpen && (
@@ -12824,6 +18538,9 @@ function ClientDashboard() {
         workOrders={workOrders}
         people={people}
         contacts={contactPeople}
+        assets={assets}
+        properties={properties}
+        checklistLibrary={pmChecklistLibrary}
         onPrivateMessage={openPrivateMessageComposer}
         onEditWorkOrder={openEditWorkOrderDetails}
       />
@@ -16570,12 +22287,51 @@ const ClientEdgeTab = () => {
 
 // ── Scheduler (client) copied from Manager ───────────────────────────────────
 const ClientSchedulerTab = ({ workOrders = [], technicians = [], assignableTechnicians = [], onSchedule, onOpenWorkOrderDetails }) => {
+  const scheduleSettingsStorageKey = 'mms_client_scheduler_settings';
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewType, setViewType] = useState('Day');
   const [currentPage, setCurrentPage] = useState(1);
   const [showUnscheduled, setShowUnscheduled] = useState(true);
   const [schedulerPopover, setSchedulerPopover] = useState(null);
   const [unscheduledFilters, setUnscheduledFilters] = useState({ status: [], priority: [] });
+  const [unscheduledPanelState, setUnscheduledPanelState] = useState({
+    sortBy: 'Priority',
+    priority: '',
+    category: '',
+    asset: '',
+    location: '',
+    workOrderStatus: '',
+    dueDate: '',
+    team: ''
+  });
+  const [unscheduledPanelDraft, setUnscheduledPanelDraft] = useState({
+    sortBy: 'Priority',
+    priority: '',
+    category: '',
+    asset: '',
+    location: '',
+    workOrderStatus: '',
+    dueDate: '',
+    team: ''
+  });
+  const [unscheduledRowCount, setUnscheduledRowCount] = useState('2');
+  const [showUnscheduledDetails, setShowUnscheduledDetails] = useState(true);
+  const [unscheduledLayout, setUnscheduledLayout] = useState('grid');
+  const [teamFilters, setTeamFilters] = useState({ roles: [], scheduledOnly: false });
+  const [teamPanelState, setTeamPanelState] = useState({
+    sortBy: 'First Name',
+    location: '',
+    team: '',
+    accountType: ''
+  });
+  const [teamPanelDraft, setTeamPanelDraft] = useState({
+    sortBy: 'First Name',
+    location: '',
+    team: '',
+    accountType: ''
+  });
+  const unscheduledFilterButtonRef = useRef(null);
+  const teamFilterButtonRef = useRef(null);
   const [selectedUnscheduledIssue, setSelectedUnscheduledIssue] = useState(null);
   const [scheduleForm, setScheduleForm] = useState({ techId: '', dueDate: '' });
   const [scheduleSaving, setScheduleSaving] = useState(false);
@@ -16589,6 +22345,23 @@ const ClientSchedulerTab = ({ workOrders = [], technicians = [], assignableTechn
     when: true,
     team: true,
     orders: true
+  });
+  const [scheduleSettingsOpen, setScheduleSettingsOpen] = useState(false);
+  const [scheduleSettings, setScheduleSettings] = useState({
+    visibleUnits: '8',
+    timeGranularity: 'Hours (:00)',
+    defaultDailyHours: '8',
+    dayStart: '09:00',
+    dayEnd: '17:00',
+    workDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
+  });
+  const [scheduleSettingsDraft, setScheduleSettingsDraft] = useState({
+    visibleUnits: '8',
+    timeGranularity: 'Hours (:00)',
+    defaultDailyHours: '8',
+    dayStart: '09:00',
+    dayEnd: '17:00',
+    workDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
   });
   const [smartScheduleForm, setSmartScheduleForm] = useState(() => {
     const today = new Date();
@@ -16633,14 +22406,88 @@ const ClientSchedulerTab = ({ workOrders = [], technicians = [], assignableTechn
     const hasDate = !!getIssueDueDate(issue);
     return hasAssignee && hasDate && !isCompletedStatus(issue.status);
   };
+  const formatShortDateValue = (value) => {
+    if (!value) return 'No date';
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return 'No date';
+    return date.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
+  };
+  const getIssueCategory = (issue) => String(issue?.category || issue?.issueType || '').trim();
+  const getIssueAsset = (issue) => String(issue?.assetName || issue?.asset?.name || '').trim();
+  const getIssueLocation = (issue) => String(issue?.location || issue?.property?.name || issue?.propertyName || '').trim();
+  const getIssueAssignedTeam = (issue) => String(issue?.assignedToName || issue?.assignedTo || '').trim();
+  const getIssueStatus = (issue) => String(issue?.status || 'Open').trim();
+  const getIssueDuration = (issue) => Number(issue?.expectedHours) || 0;
 
-  const cardsPerPage = 5;
+  const unscheduledCategoryOptions = React.useMemo(
+    () => Array.from(new Set((workOrders || []).map(getIssueCategory).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    [workOrders]
+  );
+  const unscheduledAssetOptions = React.useMemo(
+    () => Array.from(new Set((workOrders || []).map(getIssueAsset).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    [workOrders]
+  );
+  const unscheduledLocationOptions = React.useMemo(
+    () => Array.from(new Set((workOrders || []).map(getIssueLocation).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    [workOrders]
+  );
+  const unscheduledTeamOptions = React.useMemo(
+    () => Array.from(new Set((workOrders || []).map(getIssueAssignedTeam).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    [workOrders]
+  );
+  const unscheduledStatusOptions = React.useMemo(
+    () => Array.from(new Set((workOrders || []).map(getIssueStatus).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    [workOrders]
+  );
+  const unscheduledDueDateOptions = React.useMemo(
+    () => Array.from(new Set((workOrders || []).map((issue) => formatShortDateValue(getIssueDueDate(issue))).filter((value) => value && value !== 'No date'))).sort((a, b) => new Date(a) - new Date(b)),
+    [workOrders]
+  );
+
+  const getTechLocation = (tech) => String(tech?.location || tech?.property?.name || tech?.branch || '').trim();
+  const getTechTeam = (tech) => String(tech?.team || tech?.teamName || tech?.department || '').trim();
+  const getTechAccountType = (tech) => String(tech?.accountType || tech?.companyType || tech?.role || '').trim();
+  const teamLocationOptions = React.useMemo(
+    () => Array.from(new Set((technicians || []).map(getTechLocation).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    [technicians]
+  );
+  const teamNameOptions = React.useMemo(
+    () => Array.from(new Set((technicians || []).map(getTechTeam).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    [technicians]
+  );
+  const teamAccountTypeOptions = React.useMemo(
+    () => Array.from(new Set((technicians || []).map(getTechAccountType).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    [technicians]
+  );
+
+  const cardsPerPage = Math.max(5, Number(unscheduledRowCount || 2) * 5);
   const filteredUnscheduled = workOrders.filter(issue => {
     if (isScheduledIssue(issue)) return false;
-    if (unscheduledFilters.status.length > 0 && !unscheduledFilters.status.includes(issue.status)) return false;
-    if (unscheduledFilters.priority.length > 0 && !unscheduledFilters.priority.includes(issue.priority)) return false;
+    if (unscheduledFilters.status.length > 0 && !unscheduledFilters.status.includes(getIssueStatus(issue))) return false;
+    if (unscheduledFilters.priority.length > 0 && !unscheduledFilters.priority.includes(String(issue.priority || ''))) return false;
+    if (unscheduledPanelState.priority && String(issue.priority || '') !== unscheduledPanelState.priority) return false;
+    if (unscheduledPanelState.category && getIssueCategory(issue) !== unscheduledPanelState.category) return false;
+    if (unscheduledPanelState.asset && getIssueAsset(issue) !== unscheduledPanelState.asset) return false;
+    if (unscheduledPanelState.location && getIssueLocation(issue) !== unscheduledPanelState.location) return false;
+    if (unscheduledPanelState.workOrderStatus && getIssueStatus(issue) !== unscheduledPanelState.workOrderStatus) return false;
+    if (unscheduledPanelState.dueDate && formatShortDateValue(getIssueDueDate(issue)) !== unscheduledPanelState.dueDate) return false;
+    if (unscheduledPanelState.team && getIssueAssignedTeam(issue) !== unscheduledPanelState.team) return false;
     if (isCompletedStatus(issue.status)) return false;
     return true;
+  }).sort((a, b) => {
+    switch (unscheduledPanelState.sortBy) {
+      case 'Due Date':
+        return (getIssueDueDate(a)?.getTime?.() || 0) - (getIssueDueDate(b)?.getTime?.() || 0);
+      case 'Duration':
+        return getIssueDuration(b) - getIssueDuration(a);
+      case 'Work Order Number':
+        return String(a?._id || a?.id || '').localeCompare(String(b?._id || b?.id || ''));
+      case 'Priority':
+      default: {
+        const weight = { HIGH: 3, MEDIUM: 2, LOW: 1, NONE: 0 };
+        return (weight[String(b?.priority || '').toUpperCase()] ?? -1) - (weight[String(a?.priority || '').toUpperCase()] ?? -1);
+      }
+    }
   });
 
   const totalPages = Math.ceil(filteredUnscheduled.length / cardsPerPage) || 1;
@@ -16649,18 +22496,66 @@ const ClientSchedulerTab = ({ workOrders = [], technicians = [], assignableTechn
   const smartScheduleTotalPages = Math.ceil(filteredUnscheduled.length / smartCardsPerPage) || 1;
   const smartScheduleIssues = filteredUnscheduled.slice((smartSchedulePage - 1) * smartCardsPerPage, smartSchedulePage * smartCardsPerPage);
   const smartScheduleTeamMembers = (assignableTechnicians?.length ? assignableTechnicians : technicians) || [];
+  const teamRoleOptions = React.useMemo(
+    () => Array.from(new Set((technicians || []).map((tech) => String(tech?.role || tech?.specialty?.[0] || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    [technicians]
+  );
 
-  const timeSlots = [
-    "2:00 AM",
-    "3:00 AM",
-    "4:00 AM",
-    "5:00 AM",
-    "6:00 AM",
-    "7:00 AM",
-    "8:00 AM",
-    "9:00 AM",
-    "10:00 AM"
-  ];
+  const buildTimeSlotLabel = (hour24, minute = 0) => {
+    const suffix = hour24 >= 12 ? 'PM' : 'AM';
+    const normalizedHour = hour24 % 12 || 12;
+    return `${normalizedHour}:${String(minute).padStart(2, '0')} ${suffix}`;
+  };
+  const parseTimeValue = (value, fallback = 9) => {
+    const [hourStr = `${fallback}`, minuteStr = '00'] = String(value || '').split(':');
+    return {
+      hour: Number(hourStr) || fallback,
+      minute: Number(minuteStr) || 0,
+    };
+  };
+  const timeSlots = React.useMemo(() => {
+    const start = parseTimeValue(scheduleSettings.dayStart, 9);
+    const visibleUnits = Math.max(1, Number(scheduleSettings.visibleUnits) || 8);
+    const stepMinutes = scheduleSettings.timeGranularity === '30 Minutes' ? 30 : 60;
+    return Array.from({ length: visibleUnits }).map((_, index) => {
+      const totalMinutes = (start.hour * 60) + start.minute + (index * stepMinutes);
+      const hour = Math.floor(totalMinutes / 60) % 24;
+      const minute = totalMinutes % 60;
+      return buildTimeSlotLabel(hour, minute);
+    });
+  }, [scheduleSettings.dayStart, scheduleSettings.timeGranularity, scheduleSettings.visibleUnits]);
+  React.useEffect(() => {
+    try {
+      const raw = localStorage.getItem(scheduleSettingsStorageKey);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') return;
+      const nextSettings = {
+        visibleUnits: String(parsed.visibleUnits || '8'),
+        timeGranularity: parsed.timeGranularity === '30 Minutes' ? '30 Minutes' : 'Hours (:00)',
+        defaultDailyHours: String(parsed.defaultDailyHours || '8'),
+        dayStart: String(parsed.dayStart || '09:00'),
+        dayEnd: String(parsed.dayEnd || '17:00'),
+        workDays: Array.isArray(parsed.workDays) && parsed.workDays.length ? parsed.workDays : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
+      };
+      setScheduleSettings(nextSettings);
+      setScheduleSettingsDraft(nextSettings);
+      setSmartScheduleForm((prev) => ({
+        ...prev,
+        workdayStart: nextSettings.dayStart,
+        workdayEnd: nextSettings.dayEnd
+      }));
+    } catch {
+      // Keep defaults if stored settings cannot be parsed.
+    }
+  }, []);
+  React.useEffect(() => {
+    try {
+      localStorage.setItem(scheduleSettingsStorageKey, JSON.stringify(scheduleSettings));
+    } catch {
+      // Ignore localStorage failures silently.
+    }
+  }, [scheduleSettings]);
   const parseSlotHour = (slotLabel) => {
     const [time, meridiem] = slotLabel.split(' ');
     const [hourStr] = time.split(':');
@@ -16670,6 +22565,17 @@ const ClientSchedulerTab = ({ workOrders = [], technicians = [], assignableTechn
     return hour;
   };
   const slotHourMap = timeSlots.map(parseSlotHour);
+  const currentIndicatorLeft = React.useMemo(() => {
+    const now = new Date();
+    const start = parseTimeValue(scheduleSettings.dayStart, 9);
+    const stepMinutes = scheduleSettings.timeGranularity === '30 Minutes' ? 30 : 60;
+    const startMinutes = (start.hour * 60) + start.minute;
+    const nowMinutes = (now.getHours() * 60) + now.getMinutes();
+    const slotProgress = (nowMinutes - startMinutes) / stepMinutes;
+    const clampedProgress = Math.min(Math.max(slotProgress, 0), Math.max(timeSlots.length - 1, 0));
+    const percentage = (100 / Math.max(timeSlots.length, 1)) * clampedProgress;
+    return `calc(374px + ${percentage}%)`;
+  }, [scheduleSettings.dayStart, scheduleSettings.timeGranularity, timeSlots.length]);
 
   const slotIndexForIssue = (issue) => {
     const dt = getIssueDueDate(issue);
@@ -16714,6 +22620,30 @@ const ClientSchedulerTab = ({ workOrders = [], technicians = [], assignableTechn
       return true;
     });
   };
+  const filteredTeamMembers = React.useMemo(() => {
+    const filtered = (technicians || []).filter((tech) => {
+      const role = String(tech?.role || tech?.specialty?.[0] || '').trim();
+      if (teamFilters.roles.length > 0 && !teamFilters.roles.includes(role)) return false;
+      if (teamFilters.scheduledOnly && scheduledForTech(tech).length === 0) return false;
+      if (teamPanelState.location && getTechLocation(tech) !== teamPanelState.location) return false;
+      if (teamPanelState.team && getTechTeam(tech) !== teamPanelState.team) return false;
+      if (teamPanelState.accountType && getTechAccountType(tech) !== teamPanelState.accountType) return false;
+      return true;
+    });
+    return [...filtered].sort((a, b) => {
+      const aName = String(a?.name || a?.fullName || '').trim();
+      const bName = String(b?.name || b?.fullName || '').trim();
+      const aParts = aName.split(/\s+/);
+      const bParts = bName.split(/\s+/);
+      const aFirst = aParts[0] || '';
+      const bFirst = bParts[0] || '';
+      const aLast = aParts[aParts.length - 1] || '';
+      const bLast = bParts[bParts.length - 1] || '';
+      return teamPanelState.sortBy === 'Last Name'
+        ? aLast.localeCompare(bLast) || aFirst.localeCompare(bFirst)
+        : aFirst.localeCompare(bFirst) || aLast.localeCompare(bLast);
+    });
+  }, [scheduledForTech, teamFilters.roles, teamFilters.scheduledOnly, technicians, teamPanelState]);
 
   const getPriorityColor = (priority) => {
     switch (priority) {
@@ -16734,12 +22664,7 @@ const ClientSchedulerTab = ({ workOrders = [], technicians = [], assignableTechn
   };
 
   const formatDate = (date) => date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
-  const formatShortDate = (value) => {
-    if (!value) return 'No date';
-    const date = value instanceof Date ? value : new Date(value);
-    if (Number.isNaN(date.getTime())) return 'No date';
-    return date.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
-  };
+  const formatShortDate = formatShortDateValue;
   const formatTimeLabel = (value) => {
     if (!value) return '8:00 AM';
     const [hourStr = '0', minuteStr = '00'] = String(value).split(':');
@@ -16757,6 +22682,30 @@ const ClientSchedulerTab = ({ workOrders = [], technicians = [], assignableTechn
   };
   const toggleSmartScheduleSection = (section) => {
     setSmartScheduleSections((prev) => ({ ...prev, [section]: !prev[section] }));
+  };
+  const openScheduleSettings = () => {
+    setScheduleSettingsDraft(scheduleSettings);
+    setScheduleSettingsOpen(true);
+  };
+  const closeScheduleSettings = () => {
+    setScheduleSettingsOpen(false);
+  };
+  const saveScheduleSettings = () => {
+    const normalizedDailyHours = Math.min(24, Math.max(1, Number(scheduleSettingsDraft.defaultDailyHours) || 8));
+    const normalizedWorkDays = Array.from(new Set((scheduleSettingsDraft.workDays || []).filter(Boolean)));
+    const nextSettings = {
+      ...scheduleSettingsDraft,
+      defaultDailyHours: String(normalizedDailyHours),
+      workDays: normalizedWorkDays.length ? normalizedWorkDays : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
+    };
+    setScheduleSettings(nextSettings);
+    setScheduleSettingsDraft(nextSettings);
+    setSmartScheduleForm((prev) => ({
+      ...prev,
+      workdayStart: nextSettings.dayStart,
+      workdayEnd: nextSettings.dayEnd
+    }));
+    setScheduleSettingsOpen(false);
   };
   const openSmartSchedule = () => {
     setSmartScheduleError('');
@@ -16786,6 +22735,10 @@ const ClientSchedulerTab = ({ workOrders = [], technicians = [], assignableTechn
       setSmartScheduleError('Choose a valid date range and workday time window.');
       return;
     }
+    if (!scheduleSettings.workDays.length) {
+      setSmartScheduleError('Choose at least one working day in Schedule Settings.');
+      return;
+    }
 
     const selectedIssues = filteredUnscheduled.filter((issue) =>
       smartScheduleSelections.workOrders.includes(String(issue._id || issue.id))
@@ -16798,9 +22751,41 @@ const ClientSchedulerTab = ({ workOrders = [], technicians = [], assignableTechn
       return;
     }
 
-    const rangeStart = startDate.getTime();
-    const rangeEnd = endDate.getTime();
-    const windowMinutes = Math.max(30, Math.floor((rangeEnd - rangeStart) / 60000));
+    const [startHourStr = '8', startMinuteStr = '00'] = String(smartScheduleForm.workdayStart || '08:00').split(':');
+    const [endHourStr = '17', endMinuteStr = '00'] = String(smartScheduleForm.workdayEnd || '17:00').split(':');
+    const stepMinutes = scheduleSettings.timeGranularity === '30 Minutes' ? 30 : 60;
+    const defaultDailyHours = Math.min(24, Math.max(1, Number(scheduleSettings.defaultDailyHours) || 8));
+    const workDayIndexMap = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+    const allowedDayIndexes = new Set(
+      (scheduleSettings.workDays || [])
+        .map((day) => workDayIndexMap[day])
+        .filter((value) => value !== undefined)
+    );
+    const dailyStartMinutes = ((Number(startHourStr) || 8) * 60) + (Number(startMinuteStr) || 0);
+    const rawDailyEndMinutes = ((Number(endHourStr) || 17) * 60) + (Number(endMinuteStr) || 0);
+    const cappedDailyEndMinutes = Math.min(rawDailyEndMinutes, dailyStartMinutes + (defaultDailyHours * 60));
+    const schedulingSlots = [];
+    const cursor = new Date(startDate);
+    cursor.setHours(0, 0, 0, 0);
+    const lastDay = new Date(endDate);
+    lastDay.setHours(0, 0, 0, 0);
+    while (cursor <= lastDay) {
+      if (allowedDayIndexes.has(cursor.getDay())) {
+        for (let minutes = dailyStartMinutes; minutes < cappedDailyEndMinutes; minutes += stepMinutes) {
+          const slotDate = new Date(cursor);
+          slotDate.setHours(0, 0, 0, 0);
+          slotDate.setMinutes(minutes);
+          if (slotDate >= startDate && slotDate <= endDate) {
+            schedulingSlots.push(new Date(slotDate));
+          }
+        }
+      }
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    if (!schedulingSlots.length) {
+      setSmartScheduleError('No available time slots match your schedule settings and date range.');
+      return;
+    }
 
     try {
       setSmartScheduleSaving(true);
@@ -16808,9 +22793,7 @@ const ClientSchedulerTab = ({ workOrders = [], technicians = [], assignableTechn
       for (let index = 0; index < selectedIssues.length; index += 1) {
         const issue = selectedIssues[index];
         const tech = selectedTechs[index % selectedTechs.length];
-        const durationHours = Math.max(1, Number(issue.expectedHours) || 1);
-        const offsetMinutes = Math.min(windowMinutes - 30, index * durationHours * 60);
-        const slotDate = new Date(rangeStart + Math.max(0, offsetMinutes) * 60000);
+        const slotDate = schedulingSlots[index % schedulingSlots.length];
         await onSchedule(
           issue.id || issue._id,
           tech._id || tech.id || tech.userId,
@@ -16829,6 +22812,9 @@ const ClientSchedulerTab = ({ workOrders = [], technicians = [], assignableTechn
   const handlePrevDate = () => setCurrentDate(d => { const nd = new Date(d); nd.setDate(nd.getDate() - 1); return nd; });
   const handleNextDate = () => setCurrentDate(d => { const nd = new Date(d); nd.setDate(nd.getDate() + 1); return nd; });
   const handleToday = () => setCurrentDate(new Date());
+  React.useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
 
   return (
     <div className="flex flex-col gap-8 bg-transparent min-h-screen glass-theme-blue">
@@ -16837,7 +22823,7 @@ const ClientSchedulerTab = ({ workOrders = [], technicians = [], assignableTechn
           <button className="rounded-xl border border-gray-200 p-3 text-gray-400 hover:bg-gray-50">
             <LayoutDashboard className="h-5 w-5" />
           </button>
-          <h1 className="text-2xl font-bold text-gray-900">Scheduler</h1>
+          <h1 className="text-xl font-bold text-gray-900">Scheduler</h1>
         </div>
         <div className="flex items-center gap-4">
           <button className="rounded-xl border border-gray-200 p-3 text-gray-400 hover:bg-gray-50">
@@ -16846,14 +22832,14 @@ const ClientSchedulerTab = ({ workOrders = [], technicians = [], assignableTechn
           <button
             type="button"
             disabled
-            className="rounded-xl border border-gray-200 bg-gray-100 px-6 py-3 text-lg font-semibold text-gray-400"
+            className="rounded-xl border border-gray-200 bg-gray-100 px-6 py-3 text-base font-semibold text-gray-400"
           >
             Save Schedule
           </button>
           <button
             type="button"
             onClick={openSmartSchedule}
-            className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-3 text-lg font-semibold text-white shadow-sm transition hover:bg-blue-700"
+            className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-3 text-base font-semibold text-white shadow-sm transition hover:bg-blue-700"
           >
             <Zap className="h-5 w-5" />
             Smart Schedule
@@ -16864,7 +22850,7 @@ const ClientSchedulerTab = ({ workOrders = [], technicians = [], assignableTechn
       <section className="transition-all duration-300">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <h2 className="text-lg font-bold text-gray-900">Unscheduled Work Orders</h2>
+            <h2 className="text-base font-bold text-gray-900">Unscheduled Work Orders</h2>
             <span className="px-2 py-0.5 bg-gray-100 text-gray-500 rounded text-xs font-bold">{filteredUnscheduled.length}</span>
           </div>
           <div className="flex items-center gap-3 flex-wrap">
@@ -16884,6 +22870,7 @@ const ClientSchedulerTab = ({ workOrders = [], technicians = [], assignableTechn
 
             <div className="relative">
               <button
+                ref={unscheduledFilterButtonRef}
                 onClick={() => setSchedulerPopover(schedulerPopover === 'unscheduled-filters' ? null : 'unscheduled-filters')}
                 className={`p-2 border rounded-lg hover:bg-gray-50 transition-colors ${unscheduledFilters.status.length > 0 || unscheduledFilters.priority.length > 0 ? 'border-blue-200 bg-blue-50 text-blue-600' : 'border-gray-200 text-gray-400'}`}
               >
@@ -16893,53 +22880,125 @@ const ClientSchedulerTab = ({ workOrders = [], technicians = [], assignableTechn
                 isOpen={schedulerPopover === 'unscheduled-filters'}
                 onClose={() => setSchedulerPopover(null)}
                 title="Filter Work Orders"
-                className="min-w-[200px]"
+                className="w-[760px] max-w-[calc(100vw-2rem)]"
+                anchorRef={unscheduledFilterButtonRef}
+                bodyClassName="overflow-visible p-0"
               >
-                <div className="p-2 space-y-4">
-                  <div>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">Priority</p>
-                    <div className="space-y-1">
-                      {['HIGH', 'MEDIUM', 'LOW'].map(p => (
-                        <label key={p} className="flex items-center gap-2 p-1.5 hover:bg-gray-50 rounded cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={unscheduledFilters.priority.includes(p)}
-                            onChange={(e) => {
-                              const newP = e.target.checked ? [...unscheduledFilters.priority, p] : unscheduledFilters.priority.filter(x => x !== p);
-                              setUnscheduledFilters({ ...unscheduledFilters, priority: newP });
-                              setCurrentPage(1);
-                            }}
-                            className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600"
-                          />
-                          <span className="text-xs font-medium text-gray-700">{p}</span>
-                        </label>
+                <div className="grid gap-0 md:grid-cols-[1fr_1.1fr]">
+                  <div className="border-b border-gray-100 p-6 md:border-b-0 md:border-r">
+                    <h4 className="mb-4 text-base font-semibold text-gray-900">Sort</h4>
+                    <div className="space-y-3">
+                      {['Priority', 'Due Date', 'Duration', 'Work Order Number'].map((option) => (
+                        <button
+                          key={option}
+                          type="button"
+                          onClick={() => setUnscheduledPanelDraft((prev) => ({ ...prev, sortBy: option }))}
+                          className={`flex w-full items-center justify-between rounded-xl px-4 py-4 text-left text-base transition ${unscheduledPanelDraft.sortBy === option ? 'bg-blue-50 text-gray-900' : 'text-gray-800 hover:bg-gray-50'}`}
+                        >
+                          <span>{option}</span>
+                          {unscheduledPanelDraft.sortBy === option && <ChevronDown className="h-5 w-5 text-gray-500" />}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="p-6">
+                    <h4 className="mb-4 text-base font-semibold text-gray-900">Filters</h4>
+                    <div className="grid gap-4">
+                      {[
+                        ['priority', 'Priority', [''].concat(['HIGH', 'MEDIUM', 'LOW'])],
+                        ['category', 'Category', [''].concat(unscheduledCategoryOptions)],
+                        ['asset', 'Asset', [''].concat(unscheduledAssetOptions)],
+                        ['location', 'Location', [''].concat(unscheduledLocationOptions)],
+                        ['workOrderStatus', 'Work Order Status', [''].concat(unscheduledStatusOptions)],
+                        ['dueDate', 'Due Date', [''].concat(unscheduledDueDateOptions)],
+                        ['team', 'Team', [''].concat(unscheduledTeamOptions)],
+                      ].map(([key, label, options]) => (
+                        <div key={key}>
+                          <label className="mb-2 block text-sm font-medium text-gray-900">{label}</label>
+                          <select
+                            value={unscheduledPanelDraft[key]}
+                            onChange={(e) => setUnscheduledPanelDraft((prev) => ({ ...prev, [key]: e.target.value }))}
+                            className="w-full rounded-xl border border-gray-300 px-4 py-3 text-base text-gray-600 focus:outline-none"
+                          >
+                            <option value="">{`Select ${label}`}</option>
+                            {options.filter((option) => option).map((option) => (
+                              <option key={option} value={option}>{option}</option>
+                            ))}
+                          </select>
+                        </div>
                       ))}
                     </div>
                   </div>
                 </div>
-                <div className="flex border-t border-gray-50 p-2 justify-end">
-                  <button onClick={() => { setUnscheduledFilters({ status: [], priority: [] }); setSchedulerPopover(null); }} className="text-[10px] font-bold text-blue-600 hover:bg-blue-50 px-2 py-1 rounded">
-                    Reset
+                <div className="flex items-center justify-between border-t border-gray-100 px-6 py-5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const resetState = {
+                        sortBy: 'Priority',
+                        priority: '',
+                        category: '',
+                        asset: '',
+                        location: '',
+                        workOrderStatus: '',
+                        dueDate: '',
+                        team: ''
+                      };
+                      setUnscheduledPanelDraft(resetState);
+                      setUnscheduledPanelState(resetState);
+                      setUnscheduledFilters({ status: [], priority: [] });
+                      setCurrentPage(1);
+                    }}
+                    className="rounded-xl border border-blue-300 px-5 py-3 text-base font-medium text-blue-600 hover:bg-blue-50"
+                  >
+                    Reset Filters
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUnscheduledPanelState(unscheduledPanelDraft);
+                      setUnscheduledFilters({
+                        status: unscheduledPanelDraft.workOrderStatus ? [unscheduledPanelDraft.workOrderStatus] : [],
+                        priority: unscheduledPanelDraft.priority ? [unscheduledPanelDraft.priority] : []
+                      });
+                      setCurrentPage(1);
+                      setSchedulerPopover(null);
+                    }}
+                    className="rounded-xl bg-blue-600 px-5 py-3 text-base font-semibold text-white hover:bg-blue-700"
+                  >
+                    Apply
                   </button>
                 </div>
               </FilterPopover>
             </div>
 
-            <button className="rounded-xl border border-gray-300 bg-white p-3 hover:bg-gray-50 transition-colors">
+            <button
+              type="button"
+              onClick={() => setShowUnscheduledDetails((prev) => !prev)}
+              className={`rounded-xl border bg-white p-3 transition-colors ${showUnscheduledDetails ? 'border-blue-300 bg-blue-50 text-blue-600' : 'border-gray-300 hover:bg-gray-50'}`}
+            >
               <Eye className="w-4 h-4 text-gray-400" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setUnscheduledLayout((prev) => (prev === 'grid' ? 'list' : 'grid'))}
+              className={`rounded-xl border bg-white p-3 transition-colors ${unscheduledLayout === 'list' ? 'border-blue-300 bg-blue-50 text-blue-600' : 'border-gray-300 hover:bg-gray-50'}`}
+            >
+              <LayoutDashboard className="w-4 h-4 text-gray-400" />
             </button>
             <button onClick={() => setShowUnscheduled(!showUnscheduled)} className="rounded-xl border border-gray-300 bg-white px-5 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors shadow-sm">
               {showUnscheduled ? 'Hide Section' : 'Show Section'}
             </button>
-            <select className="rounded-xl border border-gray-300 bg-white px-5 py-3 text-sm font-medium text-gray-700 focus:outline-none">
-              <option>2 rows</option>
-              <option>3 rows</option>
+            <select value={unscheduledRowCount} onChange={(e) => { setUnscheduledRowCount(e.target.value); setCurrentPage(1); }} className="rounded-xl border border-gray-300 bg-white px-5 py-3 text-sm font-medium text-gray-700 focus:outline-none">
+              <option value="1">1 row</option>
+              <option value="2">2 rows</option>
+              <option value="3">3 rows</option>
             </select>
           </div>
         </div>
 
         {showUnscheduled && (
-          <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className={`${unscheduledLayout === 'grid' ? 'grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-5' : 'flex gap-4 overflow-x-auto'} pb-4 scrollbar-hide animate-in fade-in slide-in-from-top-4 duration-300`}>
             {currentIssues.map((issue, idx) => {
               const statusChip = issue.status || 'Open';
               const assetChip = issue.assetName || issue.location || 'General';
@@ -16957,18 +23016,18 @@ const ClientSchedulerTab = ({ workOrders = [], technicians = [], assignableTechn
                     techId: '',
                     dueDate: toDateTimeLocalValue(getIssueDueDate(issue))
                   });
-                }} className="min-h-[192px] min-w-[316px] rounded-3xl border border-gray-200 bg-white p-5 shadow-sm transition hover:shadow-md cursor-pointer group">
+                }} className={`${unscheduledLayout === 'grid' ? 'min-h-[192px]' : 'min-h-[192px] min-w-[316px]'} rounded-3xl border border-gray-200 bg-white p-5 shadow-sm transition hover:shadow-md cursor-pointer group`}>
                   <div className="flex justify-between items-start gap-2">
-                    <span className="text-[18px] font-semibold text-gray-900">#{String(issue._id || issue.id).slice(-4).toUpperCase()}: {issue.title || 'Work Order'}</span>
+                    <span className="text-base font-semibold text-gray-900">#{String(issue._id || issue.id).slice(-4).toUpperCase()}: {issue.title || 'Work Order'}</span>
                     <button type="button" onClick={(e) => e.stopPropagation()} className="p-1 rounded-lg border border-gray-200 text-gray-400 hover:bg-gray-50">
                       <MoreHorizontal className="w-4 h-4" />
                     </button>
                   </div>
-                  <div className="mt-16 flex flex-wrap gap-2">
-                    <span className="rounded-lg bg-slate-100 px-3 py-1 text-sm font-medium text-slate-700">{statusChip}</span>
-                    <span className="rounded-lg bg-emerald-100 px-3 py-1 text-sm font-medium text-emerald-700">{typeChip}</span>
+                  <div className={`${showUnscheduledDetails ? 'mt-16' : 'mt-8'} flex flex-wrap gap-2`}>
+                    <span className="rounded-lg bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">{statusChip}</span>
+                    <span className="rounded-lg bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-700">{typeChip}</span>
                   </div>
-                  <div className="mt-2 flex items-center justify-between text-base text-gray-500">
+                  <div className={`${showUnscheduledDetails ? 'mt-2 flex' : 'hidden'} items-center justify-between text-sm text-gray-500`}>
                     <div className="flex items-center gap-2 text-red-500">
                       <Flag className="h-4 w-4 fill-current" />
                       {due ? formatShortDate(due) : 'No date'}
@@ -17127,7 +23186,7 @@ const ClientSchedulerTab = ({ workOrders = [], technicians = [], assignableTechn
       {/* Team schedule grid */}
       <section className="transition-all duration-300">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-bold text-gray-900">Team Schedule</h2>
+          <h2 className="text-base font-bold text-gray-900">Team Schedule</h2>
           <div className="flex items-center gap-3">
             <div className="flex items-center rounded-xl border border-gray-300 bg-white p-1 shadow-sm">
               <button
@@ -17138,7 +23197,7 @@ const ClientSchedulerTab = ({ workOrders = [], technicians = [], assignableTechn
               </button>
               <div className="flex items-center gap-4 px-4">
                 <ChevronLeft onClick={handlePrevDate} className="h-4 w-4 cursor-pointer text-gray-400 transition-colors hover:text-gray-600" />
-                <span className="min-w-[260px] text-center text-sm font-semibold text-gray-700">{formatDate(currentDate)}</span>
+                <span className="min-w-[260px] text-center text-xs font-semibold text-gray-700">{formatDate(currentDate)}</span>
                 <ChevronRight onClick={handleNextDate} className="h-4 w-4 cursor-pointer text-gray-400 transition-colors hover:text-gray-600" />
               </div>
             </div>
@@ -17146,16 +23205,100 @@ const ClientSchedulerTab = ({ workOrders = [], technicians = [], assignableTechn
               <AlertCircle className="h-5 w-5 text-gray-300" />
               <span className="absolute -right-1.5 -top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-indigo-500 text-xs font-bold text-white shadow-sm">2</span>
             </div>
-            <button className="rounded-xl border border-gray-300 bg-white p-3 hover:bg-gray-50 transition-colors">
-              <SlidersHorizontal className="h-4 w-4 text-gray-400" />
-            </button>
-            <button className="rounded-xl border border-gray-300 bg-white p-3 hover:bg-gray-50 transition-colors">
+            <div className="relative">
+              <button
+                ref={teamFilterButtonRef}
+                type="button"
+                onClick={() => setSchedulerPopover(schedulerPopover === 'team-filters' ? null : 'team-filters')}
+                className={`rounded-xl border bg-white p-3 transition-colors ${teamFilters.roles.length || teamFilters.scheduledOnly ? 'border-blue-300 bg-blue-50 text-blue-600' : 'border-gray-300 hover:bg-gray-50'}`}
+              >
+                <SlidersHorizontal className="h-4 w-4 text-gray-400" />
+              </button>
+              <FilterPopover
+                isOpen={schedulerPopover === 'team-filters'}
+                onClose={() => setSchedulerPopover(null)}
+                title="Filter Team Schedule"
+                className="w-[760px] max-w-[calc(100vw-2rem)]"
+                anchorRef={teamFilterButtonRef}
+                bodyClassName="overflow-visible p-0"
+              >
+                <div className="grid gap-0 md:grid-cols-[1fr_1.1fr]">
+                  <div className="border-b border-gray-100 p-6 md:border-b-0 md:border-r">
+                    <h4 className="mb-4 text-[18px] font-semibold text-gray-900">Sort</h4>
+                    <div className="space-y-3">
+                      {['First Name', 'Last Name'].map((option) => (
+                        <button
+                          key={option}
+                          type="button"
+                          onClick={() => setTeamPanelDraft((prev) => ({ ...prev, sortBy: option }))}
+                          className={`flex w-full items-center justify-between rounded-xl px-4 py-4 text-left text-base transition ${teamPanelDraft.sortBy === option ? 'bg-blue-50 text-gray-900' : 'text-gray-800 hover:bg-gray-50'}`}
+                        >
+                          <span>{option}</span>
+                          {teamPanelDraft.sortBy === option && <ChevronDown className="h-5 w-5 text-gray-500" />}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="p-6">
+                    <h4 className="mb-4 text-[18px] font-semibold text-gray-900">Filters</h4>
+                    <div className="grid gap-4">
+                      {[
+                        ['location', 'Location', teamLocationOptions],
+                        ['team', 'Team', teamNameOptions.length ? teamNameOptions : teamRoleOptions],
+                        ['accountType', 'Account Type', teamAccountTypeOptions],
+                      ].map(([key, label, options]) => (
+                        <div key={key}>
+                          <label className="mb-2 block text-sm font-medium text-gray-900">{label}</label>
+                          <select
+                            value={teamPanelDraft[key]}
+                            onChange={(e) => setTeamPanelDraft((prev) => ({ ...prev, [key]: e.target.value }))}
+                            className="w-full rounded-xl border border-gray-300 px-4 py-3 text-base text-gray-600 focus:outline-none"
+                          >
+                            <option value="">{`Select ${label}`}</option>
+                            {options.filter((option) => option).map((option) => (
+                              <option key={option} value={option}>{option}</option>
+                            ))}
+                          </select>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between border-t border-gray-100 px-6 py-5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const resetState = { sortBy: 'First Name', location: '', team: '', accountType: '' };
+                      setTeamPanelDraft(resetState);
+                      setTeamPanelState(resetState);
+                      setTeamFilters({ roles: [], scheduledOnly: false });
+                    }}
+                    className="rounded-xl border border-blue-300 px-5 py-3 text-base font-medium text-blue-600 hover:bg-blue-50"
+                  >
+                    Reset Filters
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTeamPanelState(teamPanelDraft);
+                      const nextRoles = teamPanelDraft.team ? [teamPanelDraft.team] : [];
+                      setTeamFilters((prev) => ({ ...prev, roles: nextRoles }));
+                      setSchedulerPopover(null);
+                    }}
+                    className="rounded-xl bg-blue-600 px-5 py-3 text-base font-semibold text-white hover:bg-blue-700"
+                  >
+                    Apply
+                  </button>
+                </div>
+              </FilterPopover>
+            </div>
+            <button type="button" onClick={openScheduleSettings} className="rounded-xl border border-gray-300 bg-white p-3 hover:bg-gray-50 transition-colors">
               <Settings className="h-4 w-4 text-gray-400" />
             </button>
             <div className="relative">
               <div
                 onClick={() => setSchedulerPopover(schedulerPopover === 'view-type' ? null : 'view-type')}
-                className="flex cursor-pointer items-center gap-2 rounded-xl border border-gray-300 bg-white px-5 py-3 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 capitalize shadow-sm"
+                className="flex cursor-pointer items-center gap-2 rounded-xl border border-gray-300 bg-white px-5 py-3 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 capitalize shadow-sm"
               >
                 <Calendar className="h-4 w-4" />
                 {viewType}
@@ -17191,7 +23334,7 @@ const ClientSchedulerTab = ({ workOrders = [], technicians = [], assignableTechn
               Team Members
             </div>
             {timeSlots.map((slot) => (
-              <div key={slot} className={`flex-1 border-l border-gray-200 py-5 text-center text-[18px] font-semibold ${slot === '5:00 AM' ? 'bg-blue-50 text-blue-600' : 'text-gray-500'}`}>
+              <div key={slot} className={`flex-1 border-l border-gray-200 py-5 text-center text-base font-semibold ${slot === '5:00 AM' ? 'bg-blue-50 text-blue-600' : 'text-gray-500'}`}>
                 {slot}
               </div>
             ))}
@@ -17199,13 +23342,13 @@ const ClientSchedulerTab = ({ workOrders = [], technicians = [], assignableTechn
 
           <div className="relative flex-1 overflow-y-auto">
             {currentDate.toLocaleDateString() === new Date().toLocaleDateString() && (
-              <div className="absolute bottom-0 top-0 left-[calc(374px+33.33%)] z-10 w-px bg-blue-600">
+              <div className="absolute bottom-0 top-0 z-10 w-px bg-blue-600" style={{ left: currentIndicatorLeft }}>
                 <div className="absolute left-1/2 top-0 h-0 w-0 -translate-x-1/2 border-l-[8px] border-r-[8px] border-t-[14px] border-l-transparent border-r-transparent border-t-blue-600" />
               </div>
             )}
 
             <div className="divide-y divide-gray-200">
-              {technicians.length > 0 ? technicians.map((tech, idx) => {
+              {filteredTeamMembers.length > 0 ? filteredTeamMembers.map((tech, idx) => {
                 const techIssues = scheduledForTech(tech);
                 const slotBuckets = timeSlots.map(() => []);
                 techIssues.forEach((issue) => {
@@ -17220,12 +23363,12 @@ const ClientSchedulerTab = ({ workOrders = [], technicians = [], assignableTechn
                           {(tech.name || tech.fullName || 'T').charAt(0).toUpperCase()}
                         </div>
                         <div>
-                          <p className="line-clamp-1 text-[18px] font-semibold text-gray-900">{tech.name || tech.fullName || 'Technician'}</p>
-                          <p className="text-sm font-medium text-gray-500">{tech.role || tech.specialty?.join?.(', ') || 'Vendor / Customer'}</p>
+                          <p className="line-clamp-1 text-base font-semibold text-gray-900">{tech.name || tech.fullName || 'Technician'}</p>
+                          <p className="text-xs font-medium text-gray-500">{tech.role || tech.specialty?.join?.(', ') || 'Vendor / Customer'}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-2xl font-medium text-amber-600">{techIssues.length ? `${techIssues.length}` : '0'}%</span>
+                        <span className="text-xl font-medium text-amber-600">{techIssues.length ? `${techIssues.length}` : '0'}%</span>
                         <div className="h-5 w-5 rounded-full border-2 border-gray-300" />
                       </div>
                     </div>
@@ -17248,17 +23391,156 @@ const ClientSchedulerTab = ({ workOrders = [], technicians = [], assignableTechn
                   </div>
                 );
               }) : (
-                <div className="p-8 text-center text-sm text-gray-500">No technicians yet</div>
+                <div className="p-8 text-center text-sm text-gray-500">No team members match the current filters</div>
               )}
             </div>
           </div>
         </div>
       </section>
+      {scheduleSettingsOpen && (
+        <div className="fixed inset-0 z-[129] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-4xl rounded-[28px] bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-gray-200 px-8 py-7">
+              <h2 className="text-xl font-bold text-gray-900">Schedule Settings</h2>
+              <button type="button" onClick={closeScheduleSettings} className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            <div className="space-y-8 px-8 py-6">
+              <div>
+                <div className="mb-5 flex items-center gap-2 text-base font-medium text-gray-500">
+                  <span>Chart View Settings</span>
+                  <AlertCircle className="h-4 w-4" />
+                </div>
+                <div className="grid gap-5 md:grid-cols-2">
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-gray-900">Visible Units</label>
+                    <div className="flex items-center gap-3 rounded-xl border border-gray-300 px-4 py-3">
+                      <Eye className="h-4 w-4 text-gray-400" />
+                      <select
+                        value={scheduleSettingsDraft.visibleUnits}
+                        onChange={(e) => setScheduleSettingsDraft((prev) => ({ ...prev, visibleUnits: e.target.value }))}
+                        className="w-full bg-transparent text-base text-gray-700 focus:outline-none"
+                      >
+                        <option value="4">4 hours</option>
+                        <option value="5">5 hours</option>
+                        <option value="6">6 hours</option>
+                        <option value="7">7 hours </option>
+                        <option value="8">8 hours</option>
+                        <option value="9">9 hours</option>
+                        <option value="10">10 hours</option>
+                        <option value="11">11 hours</option>
+                        <option value="12">12 hours</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-gray-900">Time Granularity</label>
+                    <div className="flex items-center gap-3 rounded-xl border border-gray-300 px-4 py-3">
+                      <Clock className="h-4 w-4 text-gray-400" />
+                      <select
+                        value={scheduleSettingsDraft.timeGranularity}
+                        onChange={(e) => setScheduleSettingsDraft((prev) => ({ ...prev, timeGranularity: e.target.value }))}
+                        className="w-full bg-transparent text-base text-gray-700 focus:outline-none"
+                      >
+                        <option>Hours (:00)</option>
+                        <option>30 Minutes</option>
+                        <option>15 Minutes</option>
+                        <option>10 Minutes</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <div className="mb-5 flex items-center gap-2 text-base font-medium text-gray-500">
+                  <span>Technician Capacity Defaults</span>
+                  <AlertCircle className="h-4 w-4" />
+                </div>
+                <div className="space-y-5">
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-gray-900">Default Daily Hours</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="24"
+                      value={scheduleSettingsDraft.defaultDailyHours}
+                      onChange={(e) => setScheduleSettingsDraft((prev) => ({ ...prev, defaultDailyHours: e.target.value }))}
+                      className="w-full rounded-xl border border-gray-300 px-4 py-3 text-base text-gray-700 focus:outline-none"
+                    />
+                    <p className="mt-2 text-sm text-gray-500">Enter the number of hours a technician is expected to work per day (min 1, max 24).</p>
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-gray-900">Daily Start/End Times</label>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <div className="flex items-center gap-3 rounded-xl border border-gray-300 px-4 py-3">
+                        <Clock className="h-4 w-4 text-gray-400" />
+                        <input
+                          type="time"
+                          value={scheduleSettingsDraft.dayStart}
+                          onChange={(e) => setScheduleSettingsDraft((prev) => ({ ...prev, dayStart: e.target.value }))}
+                          className="bg-transparent text-base text-gray-700 focus:outline-none"
+                        />
+                      </div>
+                      <div className="flex items-center gap-3 rounded-xl border border-gray-300 px-4 py-3">
+                        <Clock className="h-4 w-4 text-gray-400" />
+                        <input
+                          type="time"
+                          value={scheduleSettingsDraft.dayEnd}
+                          onChange={(e) => setScheduleSettingsDraft((prev) => ({ ...prev, dayEnd: e.target.value }))}
+                          className="bg-transparent text-base text-gray-700 focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                    <p className="mt-2 text-sm text-gray-500">Select the start time and end time of each working day</p>
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-gray-900">Work Days</label>
+                    <div className="flex flex-wrap gap-3 rounded-xl bg-gray-50 px-3 py-3">
+                      {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => {
+                        const checked = scheduleSettingsDraft.workDays.includes(day);
+                        return (
+                          <label key={day} className="flex items-center gap-2 text-sm text-gray-700">
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={(e) => setScheduleSettingsDraft((prev) => ({
+                                ...prev,
+                                workDays: e.target.checked
+                                  ? [...prev.workDays, day]
+                                  : prev.workDays.filter((entry) => entry !== day)
+                              }))}
+                              className="h-5 w-5 rounded border-gray-300 text-blue-600"
+                            />
+                            {day}
+                          </label>
+                        );
+                      })}
+                    </div>
+                    <p className="mt-2 text-sm text-gray-500">Choose the default working days used for technician scheduling.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-4 px-8 py-6">
+              <button type="button" onClick={closeScheduleSettings} className="rounded-xl border border-gray-300 bg-white px-6 py-3 text-base font-medium text-gray-700 hover:bg-gray-50">
+                Cancel
+              </button>
+              <button type="button" onClick={saveScheduleSettings} className="rounded-xl bg-blue-600 px-6 py-3 text-base font-semibold text-white hover:bg-blue-700">
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {smartScheduleOpen && (
         <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
           <div className="flex max-h-[92vh] w-full max-w-7xl flex-col overflow-hidden rounded-[28px] bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-gray-200 px-6 py-5">
-              <h2 className="text-2xl font-bold text-gray-900">Smart Schedule</h2>
+              <h2 className="text-xl font-bold text-gray-900">Smart Schedule</h2>
               <button type="button" onClick={closeSmartSchedule} className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
                 <X className="h-6 w-6" />
               </button>
@@ -17276,7 +23558,7 @@ const ClientSchedulerTab = ({ workOrders = [], technicians = [], assignableTechn
                   <button type="button" onClick={() => toggleSmartScheduleSection('when')} className="flex w-full items-center justify-between px-6 py-5 text-left">
                     <div className="flex items-center gap-3">
                       <ChevronDown className={`h-5 w-5 text-gray-500 transition-transform ${smartScheduleSections.when ? 'rotate-180' : ''}`} />
-                      <span className="text-[18px] font-semibold text-gray-900">When should the work be scheduled?</span>
+                      <span className="text-base font-semibold text-gray-900">When should the work be scheduled?</span>
                     </div>
                     <div className="text-right text-sm text-gray-500">
                       {formatShortDate(smartScheduleForm.startDate)} - {formatShortDate(smartScheduleForm.endDate)} ({formatTimeLabel(smartScheduleForm.workdayStart)} - {formatTimeLabel(smartScheduleForm.workdayEnd)})
@@ -17315,7 +23597,7 @@ const ClientSchedulerTab = ({ workOrders = [], technicians = [], assignableTechn
                   <button type="button" onClick={() => toggleSmartScheduleSection('team')} className="flex w-full items-center justify-between px-6 py-5 text-left">
                     <div className="flex items-center gap-3">
                       <ChevronDown className={`h-5 w-5 text-gray-500 transition-transform ${smartScheduleSections.team ? 'rotate-180' : ''}`} />
-                      <span className="text-[18px] font-semibold text-gray-900">Who should be considered for the schedule?</span>
+                      <span className="text-base font-semibold text-gray-900">Who should be considered for the schedule?</span>
                     </div>
                     <div className="text-sm text-gray-500">{smartScheduleSelections.techs.length} team member(s) selected</div>
                   </button>
@@ -17354,7 +23636,7 @@ const ClientSchedulerTab = ({ workOrders = [], technicians = [], assignableTechn
                                   </div>
                                   <input type="checkbox" readOnly checked={isSelected} className="mt-1 h-5 w-5 rounded border-gray-300 text-blue-600" />
                                 </div>
-                                <div className="text-lg font-medium text-gray-800">{tech.name || tech.fullName || `Technician ${idx + 1}`}</div>
+                                <div className="text-sm font-medium text-gray-800">{tech.name || tech.fullName || `Technician ${idx + 1}`}</div>
                               </button>
                             );
                           })}
@@ -17368,7 +23650,7 @@ const ClientSchedulerTab = ({ workOrders = [], technicians = [], assignableTechn
                   <button type="button" onClick={() => toggleSmartScheduleSection('orders')} className="flex w-full items-center justify-between px-6 py-5 text-left">
                     <div className="flex items-center gap-3">
                       <ChevronDown className={`h-5 w-5 text-gray-500 transition-transform ${smartScheduleSections.orders ? 'rotate-180' : ''}`} />
-                      <span className="text-[18px] font-semibold text-gray-900">Which work orders should be scheduled?</span>
+                      <span className="text-base font-semibold text-gray-900">Which work orders should be scheduled?</span>
                     </div>
                     <div className="text-sm text-gray-500">{smartScheduleSelections.workOrders.length} work order(s) selected</div>
                   </button>
@@ -17424,7 +23706,7 @@ const ClientSchedulerTab = ({ workOrders = [], technicians = [], assignableTechn
                                 className={`rounded-2xl border bg-white p-5 text-left transition ${isSelected ? 'border-blue-500 ring-2 ring-blue-100' : 'border-gray-200 hover:border-gray-300'}`}
                               >
                                 <div className="mb-4 flex items-start justify-between gap-3">
-                                  <div className="text-[18px] font-semibold text-gray-900">#{String(issue._id || issue.id).slice(-3).toUpperCase()}: {issue.title || 'Work Order'}</div>
+                                  <div className="text-base font-semibold text-gray-900">#{String(issue._id || issue.id).slice(-3).toUpperCase()}: {issue.title || 'Work Order'}</div>
                                   <input type="checkbox" readOnly checked={isSelected} className="mt-1 h-5 w-5 rounded border-gray-300 text-blue-600" />
                                 </div>
                                 <div className={`mb-3 flex items-center gap-2 text-sm font-medium ${priorityTone}`}>
@@ -17451,14 +23733,14 @@ const ClientSchedulerTab = ({ workOrders = [], technicians = [], assignableTechn
             </div>
 
             <div className="flex items-center justify-between border-t border-gray-200 bg-white px-6 py-5">
-              <button type="button" onClick={closeSmartSchedule} className="rounded-xl border border-gray-300 bg-white px-5 py-3 text-lg font-medium text-gray-700 hover:bg-gray-50">
+              <button type="button" onClick={closeSmartSchedule} className="rounded-xl border border-gray-300 bg-white px-5 py-3 text-base font-medium text-gray-700 hover:bg-gray-50">
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleSmartScheduleGenerate}
                 disabled={smartScheduleSaving || !smartScheduleSelections.workOrders.length || !smartScheduleSelections.techs.length}
-                className="rounded-xl bg-blue-600 px-8 py-3 text-lg font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
+                className="rounded-xl bg-blue-600 px-8 py-3 text-base font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
               >
                 {smartScheduleSaving ? 'Generating...' : 'Generate'}
               </button>
@@ -19482,7 +25764,7 @@ function WorkOrderDetailsModal({ open, onClose, onSave, mode = 'create', tasks =
                   </div>
 
                   <div className="border-t border-slate-200 bg-indigo-50 px-6 py-3 text-center text-[18px] text-slate-700">
-                    Powered by UpKeep Intelligence
+                    Powered by FixNest Intelligence
                   </div>
                 </div>
 
