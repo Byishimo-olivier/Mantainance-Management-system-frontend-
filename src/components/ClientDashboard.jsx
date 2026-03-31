@@ -8,7 +8,7 @@ import SubscriptionWidget from './SubscriptionWidget';
 import SubscriptionManagement from './SubscriptionManagement';
 import { getImageUrl } from '../utils/imageUrl';
 import { useLanguage, useTranslation } from "../i18n/LanguageContext";
-import { Clock, Calendar, CheckCircle, X, Bell, Download, Package, ShoppingCart, Gauge, Plus, Search, Eye, MapPin, AlertCircle, Repeat, Edit, ChevronLeft, ChevronRight, ChevronDown, SlidersHorizontal, Flag, MoreHorizontal, Trash2, Image as ImageIcon, Tag, Paperclip, MessageSquare, Send, Navigation, DollarSign, Bookmark, Link2, FileText, Copy, Archive, ArrowUpDown, ArrowRight, LayoutDashboard, Settings, Users, RotateCcw, Zap } from 'lucide-react';
+import { Clock, Calendar, CheckCircle, ClipboardCheck, X, Bell, Download, Package, ShoppingCart, Gauge, Plus, Search, Eye, MapPin, AlertCircle, Repeat, Edit, ChevronLeft, ChevronRight, ChevronDown, SlidersHorizontal, Flag, MoreHorizontal, MoreVertical, Trash2, Image as ImageIcon, Tag, Paperclip, MessageSquare, Send, Navigation, DollarSign, Bookmark, Link2, FileText, Copy, Archive, ArrowUpDown, ArrowRight, ArrowLeft, LayoutDashboard, Settings, Users, RotateCcw, Zap, Globe, Activity, QrCode, GripVertical } from 'lucide-react';
 
 const ASSISTANT_ACTION_STORAGE_KEY = 'mms_assistant_action';
 const REQUEST_FORM_SETTINGS_STORAGE_KEY = 'mms_request_form_settings';
@@ -157,9 +157,101 @@ const DEFAULT_METER_SETTINGS = {
 const DEFAULT_TAG_SETTINGS = {
   items: [],
 };
+const DEFAULT_API_SETTINGS = {
+  version: '2022-09-14',
+};
+const DEFAULT_AUTHENTICATION_SETTINGS = {
+  saml: {
+    provider: '',
+    configured: false,
+  },
+};
+const DEFAULT_WEBHOOK_SETTINGS = {
+  items: [],
+};
 const ASSET_FIELD_TYPE_OPTIONS = ['Single Line Text', 'Multi-Line Text', 'Dropdown', 'Date', 'Number', 'Currency'];
 const ASSET_OPERATING_DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const TAG_MODEL_OPTIONS = ['Assets', 'Parts & Inventory', 'Requests', 'Work Orders', 'Purchase Orders', 'Meters', 'Tags'];
+const WEBHOOK_EVENT_OPTIONS = [
+  'Work Order Created',
+  'Work Order Updated',
+  'Work Order Status Updated',
+  'Work Order Deleted',
+  'Work Order Comment Added',
+  'Request Created',
+  'Request Approved',
+  'Request Denied',
+  'Purchase Order Created',
+  'Purchase Order Updated',
+];
+const CHECKLIST_TEMPLATE_LIBRARY_SEED = [
+  {
+    id: 'seed-fleet-preuse',
+    name: 'Truck/Bus/Van/Pickup Pre-Use Inspection',
+    description: 'Daily pre-use inspection for commercial vehicles before dispatch.',
+    industry: 'Fleet Management',
+    useCase: 'Inspection',
+    tags: ['Fleet', 'Safety'],
+    items: [
+      { id: 'fleet-1', text: 'Ensure DOT inspection has been completed in the last 12 months.', type: 'Status', options: ['Pass', 'Fail', 'N/A'] },
+      { id: 'fleet-2', text: 'Ensure gauges and lights are in good condition.', type: 'Status', options: ['Pass', 'Fail', 'N/A'] },
+      { id: 'fleet-3', text: 'Ensure seat belts are in good condition.', type: 'Status', options: ['Pass', 'Fail', 'N/A'] },
+      { id: 'fleet-4', text: 'Ensure glass and mirrors are in good condition.', type: 'Status', options: ['Pass', 'Fail', 'N/A'] },
+    ],
+  },
+  {
+    id: 'seed-facility-hvac',
+    name: 'HVAC Rooftop Unit Inspection',
+    description: 'Routine HVAC checklist for preventive maintenance and visual inspection.',
+    industry: 'Facility Maintenance',
+    useCase: 'Maintenance',
+    tags: ['HVAC', 'PM'],
+    items: [
+      { id: 'hvac-1', text: 'Inspect filters and replace if dirty.', type: 'Checkbox' },
+      { id: 'hvac-2', text: 'Record supply air temperature.', type: 'Number', meter: 'F' },
+      { id: 'hvac-3', text: 'Inspect belts and pulleys for wear.', type: 'Status', options: ['Good', 'Needs Attention'] },
+    ],
+  },
+  {
+    id: 'seed-healthcare-room',
+    name: 'Patient Room Cleaning Audit',
+    description: 'Audit workflow for healthcare room sanitization and readiness.',
+    industry: 'Healthcare',
+    useCase: 'Audit',
+    tags: ['Cleaning', 'Audit'],
+    items: [
+      { id: 'health-1', text: 'Verify all touch surfaces were disinfected.', type: 'Status', options: ['Complete', 'Incomplete'] },
+      { id: 'health-2', text: 'Upload room condition photo.', type: 'Inspection' },
+      { id: 'health-3', text: 'Note any missing supplies.', type: 'Text' },
+    ],
+  },
+  {
+    id: 'seed-property-turnover',
+    name: 'Apartment Turnover Readiness',
+    description: 'Checklist for preparing residential units between tenants.',
+    industry: 'Property Management',
+    useCase: 'Inspection',
+    tags: ['Turnover', 'Residential'],
+    items: [
+      { id: 'prop-1', text: 'Check appliances for visible damage.', type: 'Status', options: ['Pass', 'Fail'] },
+      { id: 'prop-2', text: 'Confirm locks and keys are updated.', type: 'Checkbox' },
+      { id: 'prop-3', text: 'Document move-in readiness notes.', type: 'Text' },
+    ],
+  },
+  {
+    id: 'seed-manufacturing-safety',
+    name: 'Production Line Safety Walk',
+    description: 'Shift-start safety walkthrough for manufacturing lines.',
+    industry: 'Manufacturing',
+    useCase: 'Inspection',
+    tags: ['Safety', 'Production'],
+    items: [
+      { id: 'mfg-1', text: 'Emergency stops are accessible and labeled.', type: 'Status', options: ['Pass', 'Fail'] },
+      { id: 'mfg-2', text: 'Record guarding condition concerns.', type: 'Text' },
+      { id: 'mfg-3', text: 'Capture image of any unsafe condition.', type: 'Inspection' },
+    ],
+  },
+];
 const WORK_ORDER_CONFIGURATION_CREATE_FIELDS = [
   ['description', 'Description'],
   ['priority', 'Priority'],
@@ -359,6 +451,13 @@ const createEmptyWorkOrderFieldForm = (type = 'Single Line Text') => ({
   optionsText: '',
 });
 
+const createEmptyWebhookForm = () => ({
+  title: '',
+  endpoint: '',
+  allEvents: false,
+  selectedEvents: [],
+});
+
 const hasWorkflowValue = (value) => {
   if (value === null || value === undefined || value === '') return false;
   if (typeof value === 'string') return value.trim().length > 0;
@@ -388,18 +487,50 @@ const createEmptyPropertyForm = () => ({
   customData: []
 });
 
+const createEmptyPropertyFloorplanForm = () => ({
+  name: '',
+  area: '',
+  files: [],
+});
+
 const createEmptyAssetForm = () => ({
   name: '',
   type: '',
   description: '',
+  model: '',
+  manufacturer: '',
   serialNumber: '',
+  category: '',
+  area: '',
+  barcodeMode: 'custom',
+  barcode: '',
   propertyId: '',
   locationType: 'property',
   branchId: '',
+  parentId: '',
+  operatingScheduleId: '',
   quantity: 1,
   building: '',
   blocks: [],
-  room: ''
+  room: '',
+  purchasePrice: '',
+  purchaseDate: '',
+  residualPrice: '',
+  usefulLife: '',
+  usefulLifeUnit: 'years',
+  workerId: '',
+  additionalWorkerIds: [],
+  teamId: '',
+  vendorId: '',
+  customerId: '',
+  serviceDate: '',
+  warrantyExpiration: '',
+  additionalInformation: '',
+  imageFiles: [],
+  documentFiles: [],
+  warrantyFiles: [],
+  parts: [],
+  trackCheckInOut: false,
 });
 
 const normalizeCoordinate = (value) => {
@@ -1291,6 +1422,14 @@ const RequestFormSettingsModal = ({
   onCreateTag,
   onUpdateTag,
   onDeleteTag,
+  apiSettings = DEFAULT_API_SETTINGS,
+  onSaveApiSettings,
+  authenticationSettings = DEFAULT_AUTHENTICATION_SETTINGS,
+  onSaveAuthenticationSettings,
+  webhookSettings = DEFAULT_WEBHOOK_SETTINGS,
+  onCreateWebhook,
+  onUpdateWebhook,
+  onDeleteWebhook,
 }) => {
   const [activeSettingsSection, setActiveSettingsSection] = useState('requests');
   const [activeRequestSettingsTab, setActiveRequestSettingsTab] = useState('internal');
@@ -1330,6 +1469,17 @@ const RequestFormSettingsModal = ({
   const [purchaseOrderSettingsState, setPurchaseOrderSettingsState] = useState(DEFAULT_PURCHASE_ORDER_SETTINGS);
   const [meterSettingsState, setMeterSettingsState] = useState(DEFAULT_METER_SETTINGS);
   const [tagSettingsState, setTagSettingsState] = useState(DEFAULT_TAG_SETTINGS);
+  const [apiForm, setApiForm] = useState(DEFAULT_API_SETTINGS);
+  const [apiSaving, setApiSaving] = useState(false);
+  const [showApiVersionEditor, setShowApiVersionEditor] = useState(false);
+  const [authenticationForm, setAuthenticationForm] = useState(DEFAULT_AUTHENTICATION_SETTINGS);
+  const [authenticationSaving, setAuthenticationSaving] = useState(false);
+  const [webhookSettingsState, setWebhookSettingsState] = useState(DEFAULT_WEBHOOK_SETTINGS);
+  const [showWebhookModal, setShowWebhookModal] = useState(false);
+  const [webhookSaving, setWebhookSaving] = useState(false);
+  const [webhookForm, setWebhookForm] = useState(createEmptyWebhookForm());
+  const [editingWebhookId, setEditingWebhookId] = useState('');
+  const [openWebhookMenuId, setOpenWebhookMenuId] = useState('');
   const [showPartGroupModal, setShowPartGroupModal] = useState(false);
   const [partGroupSaving, setPartGroupSaving] = useState(false);
   const [partGroupForm, setPartGroupForm] = useState(createEmptyPartGroupForm());
@@ -1527,6 +1677,32 @@ const RequestFormSettingsModal = ({
       items: Array.isArray(tagSettings?.items) ? tagSettings.items : [],
     });
   }, [tagSettings]);
+
+  useEffect(() => {
+    setApiForm({
+      ...DEFAULT_API_SETTINGS,
+      ...(apiSettings || {}),
+    });
+  }, [apiSettings]);
+
+  useEffect(() => {
+    setAuthenticationForm({
+      ...DEFAULT_AUTHENTICATION_SETTINGS,
+      ...(authenticationSettings || {}),
+      saml: {
+        ...DEFAULT_AUTHENTICATION_SETTINGS.saml,
+        ...(authenticationSettings?.saml || {}),
+      },
+    });
+  }, [authenticationSettings]);
+
+  useEffect(() => {
+    setWebhookSettingsState({
+      ...DEFAULT_WEBHOOK_SETTINGS,
+      ...(webhookSettings || {}),
+      items: Array.isArray(webhookSettings?.items) ? webhookSettings.items : [],
+    });
+  }, [webhookSettings]);
 
   const updatePortalOption = (key, part, value) => {
     setPortalForm((prev) => ({
@@ -2139,6 +2315,117 @@ const RequestFormSettingsModal = ({
     }
   };
 
+  const handleSaveApiSettings = async () => {
+    setApiSaving(true);
+    const result = await onSaveApiSettings?.({
+      version: String(apiForm.version || '').trim() || DEFAULT_API_SETTINGS.version,
+    });
+    setApiSaving(false);
+    if (result?.api) {
+      setApiForm({ ...DEFAULT_API_SETTINGS, ...(result.api || {}) });
+      setShowApiVersionEditor(false);
+    }
+  };
+
+  const handleSaveAuthenticationSettings = async () => {
+    setAuthenticationSaving(true);
+    const payload = {
+      saml: {
+        provider: String(authenticationForm?.saml?.provider || '').trim(),
+        configured: !!authenticationForm?.saml?.provider,
+      },
+    };
+    const result = await onSaveAuthenticationSettings?.(payload);
+    setAuthenticationSaving(false);
+    if (result?.authentication) {
+      setAuthenticationForm({
+        ...DEFAULT_AUTHENTICATION_SETTINGS,
+        ...(result.authentication || {}),
+        saml: {
+          ...DEFAULT_AUTHENTICATION_SETTINGS.saml,
+          ...(result.authentication?.saml || {}),
+        },
+      });
+    }
+  };
+
+  const openCreateWebhookModal = () => {
+    setEditingWebhookId('');
+    setWebhookForm(createEmptyWebhookForm());
+    setShowWebhookModal(true);
+  };
+
+  const openEditWebhookModal = (item) => {
+    setEditingWebhookId(String(item?.id || item?._id || ''));
+    setWebhookForm({
+      title: String(item?.title || ''),
+      endpoint: String(item?.endpoint || ''),
+      allEvents: !!item?.allEvents,
+      selectedEvents: Array.isArray(item?.selectedEvents) ? item.selectedEvents : [],
+    });
+    setShowWebhookModal(true);
+    setOpenWebhookMenuId('');
+  };
+
+  const handleSaveWebhook = async () => {
+    const normalizedTitle = String(webhookForm.title || '').trim();
+    const normalizedEndpoint = String(webhookForm.endpoint || '').trim();
+    const selectedEvents = webhookForm.allEvents
+      ? []
+      : Array.from(new Set((Array.isArray(webhookForm.selectedEvents) ? webhookForm.selectedEvents : []).filter(Boolean)));
+
+    if (!normalizedTitle) {
+      alert('Webhook title is required.');
+      return;
+    }
+
+    try {
+      new URL(normalizedEndpoint);
+    } catch {
+      alert('Endpoint must be a valid URL.');
+      return;
+    }
+
+    if (!webhookForm.allEvents && selectedEvents.length === 0) {
+      alert('Select at least one event or choose all events.');
+      return;
+    }
+
+    setWebhookSaving(true);
+    const payload = {
+      title: normalizedTitle,
+      endpoint: normalizedEndpoint,
+      allEvents: !!webhookForm.allEvents,
+      selectedEvents,
+    };
+    const result = editingWebhookId
+      ? await onUpdateWebhook?.(editingWebhookId, payload)
+      : await onCreateWebhook?.(payload);
+    setWebhookSaving(false);
+    if (result?.webhooks) {
+      setWebhookSettingsState({
+        ...DEFAULT_WEBHOOK_SETTINGS,
+        ...(result.webhooks || {}),
+        items: Array.isArray(result.webhooks?.items) ? result.webhooks.items : [],
+      });
+      setShowWebhookModal(false);
+      setEditingWebhookId('');
+      setWebhookForm(createEmptyWebhookForm());
+    }
+  };
+
+  const handleDeleteWebhook = async (id) => {
+    const result = await onDeleteWebhook?.(id);
+    if (result?.webhooks) {
+      setWebhookSettingsState({
+        ...DEFAULT_WEBHOOK_SETTINGS,
+        ...(result.webhooks || {}),
+        items: Array.isArray(result.webhooks?.items) ? result.webhooks.items : [],
+      });
+      setOpenWebhookMenuId('');
+    }
+  };
+
   if (!open) return null;
 
   return (
@@ -2225,7 +2512,22 @@ const RequestFormSettingsModal = ({
               <div className="px-4 text-[13px] font-bold text-gray-900">Advanced</div>
               <div className="mt-3 space-y-1">
                 {['API', 'Authentication', 'Webhooks'].map((item) => (
-                  <button key={item} type="button" className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-[15px] text-gray-700 hover:bg-gray-50">
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() => {
+                      if (item === 'API') setActiveSettingsSection('api');
+                      if (item === 'Authentication') setActiveSettingsSection('authentication');
+                      if (item === 'Webhooks') setActiveSettingsSection('webhooks');
+                    }}
+                    className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-[15px] ${
+                      (item === 'API' && activeSettingsSection === 'api') ||
+                      (item === 'Authentication' && activeSettingsSection === 'authentication') ||
+                      (item === 'Webhooks' && activeSettingsSection === 'webhooks')
+                        ? 'bg-blue-50 font-semibold text-blue-700'
+                        : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
                     <Settings className="h-5 w-5" />
                     {item}
                   </button>
@@ -2351,6 +2653,333 @@ const RequestFormSettingsModal = ({
                 </div>
               </div>
             ) : null}
+
+            {activeSettingsSection === 'api' && (
+              <div className="px-6 py-10">
+                <div className="max-w-[760px]">
+                  <h3 className="text-[22px] font-bold text-gray-900">API</h3>
+
+                  <div className="mt-14">
+                    <div className="text-[16px] font-bold text-gray-900">Version</div>
+                    {showApiVersionEditor ? (
+                      <div className="mt-5 flex max-w-[360px] items-end gap-3">
+                        <div className="flex-1">
+                          <select
+                            value={apiForm.version}
+                            onChange={(e) => setApiForm((prev) => ({ ...prev, version: e.target.value }))}
+                            className="h-12 w-full rounded-md border border-gray-300 px-4 text-[16px] text-gray-800 outline-none focus:border-blue-500"
+                          >
+                            {['2022-09-14', '2023-01-01', '2024-01-01'].map((version) => (
+                              <option key={version} value={version}>{version}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleSaveApiSettings}
+                          disabled={apiSaving}
+                          className="rounded-lg bg-blue-600 px-5 py-3 text-[16px] font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {apiSaving ? 'Saving...' : 'Save'}
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="mt-6 text-[16px] text-gray-900">{apiForm.version || DEFAULT_API_SETTINGS.version}</div>
+                        <button
+                          type="button"
+                          onClick={() => setShowApiVersionEditor(true)}
+                          className="mt-8 rounded-lg bg-blue-600 px-6 py-3 text-[16px] font-semibold text-white hover:bg-blue-700"
+                        >
+                          Change
+                        </button>
+                      </>
+                    )}
+                    <p className="mt-8 text-[15px] text-gray-700">
+                      To learn more about API versioning click <span className="text-blue-600">here</span>.
+                    </p>
+                  </div>
+
+                  <div className="mt-12 border-t border-gray-200 pt-10">
+                    <div className="text-[16px] font-bold text-gray-900">Documentation</div>
+                    <p className="mt-8 text-[15px] text-gray-700">
+                      View documentation <span className="text-blue-600">here</span>.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeSettingsSection === 'authentication' && (
+              <div className="px-6 py-10">
+                <div className="max-w-[980px]">
+                  <h3 className="text-[22px] font-bold text-gray-900">Authentication</h3>
+                  <div className="mt-10 rounded-[24px] border border-gray-200 bg-white px-8 py-10 shadow-sm">
+                    <div className="flex items-start gap-6">
+                      <div className="mt-1 flex h-14 w-14 items-center justify-center rounded-full bg-amber-100 text-[14px] font-bold text-amber-700">
+                        SAML
+                      </div>
+                      <div>
+                        <div className="text-[18px] font-bold text-gray-900">SAML Authentication</div>
+                        <p className="mt-2 text-[15px] text-gray-700">
+                          Set up SSO for your enterprise with Okta, Google or your custom SAML 2.0 solution
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-12 grid gap-10 lg:grid-cols-[1fr_420px]">
+                      <div>
+                        <div className="text-[16px] font-bold text-gray-900">Choose your SAML provider</div>
+                        <p className="mt-6 text-[15px] text-gray-700">Select one of the providers to configure</p>
+                        <p className="mt-8 text-[15px] text-gray-700">
+                          Dont see the one you want? We&apos;ll be adding additional providers soon.
+                        </p>
+                        <button type="button" className="mt-8 text-[15px] font-medium text-blue-600 hover:text-blue-700">
+                          Instructions to setup SSO.
+                        </button>
+                      </div>
+
+                      <div className="space-y-8">
+                        {[
+                          ['okta', 'Okta'],
+                          ['google', 'Google'],
+                          ['custom_saml_2_0', 'Custom SAML 2.0'],
+                        ].map(([value, label]) => (
+                          <label key={value} className="flex items-center gap-4 text-[16px] text-gray-900">
+                            <input
+                              type="radio"
+                              name="saml-provider"
+                              checked={authenticationForm?.saml?.provider === value}
+                              onChange={() => setAuthenticationForm((prev) => ({
+                                ...prev,
+                                saml: { ...(prev?.saml || {}), provider: value, configured: true },
+                              }))}
+                              className="h-5 w-5 accent-blue-600"
+                            />
+                            <span>{label}</span>
+                          </label>
+                        ))}
+
+                        <button
+                          type="button"
+                          onClick={handleSaveAuthenticationSettings}
+                          disabled={!authenticationForm?.saml?.provider || authenticationSaving}
+                          className="mt-6 rounded-lg bg-blue-600 px-8 py-3 text-[16px] font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          {authenticationSaving ? 'Saving...' : 'Configure'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeSettingsSection === 'webhooks' && (
+              <div className="px-6 py-10">
+                <div className="flex items-start justify-between gap-6">
+                  <div>
+                    <h3 className="text-[22px] font-bold text-gray-900">Webhooks</h3>
+                    <p className="mt-4 text-[15px] text-gray-700">
+                      Webhooks let you keep FixNest synced with your platform in both directions. <span className="text-blue-600">Learn more about webhooks</span>
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={openCreateWebhookModal}
+                    className="rounded-lg bg-blue-600 px-6 py-3 text-[16px] font-semibold text-white hover:bg-blue-700"
+                  >
+                    + Add Webhook
+                  </button>
+                </div>
+
+                <div className="mt-10">
+                  {(webhookSettingsState.items || []).length === 0 ? (
+                    <div className="flex min-h-[360px] flex-col items-center justify-center rounded-2xl border border-dashed border-gray-300 bg-white text-center">
+                      <div className="text-[19px] font-bold text-gray-900">You don&apos;t have any webhooks yet</div>
+                      <div className="mt-4 text-[17px] text-gray-500">Create a webhook to get started</div>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {(webhookSettingsState.items || []).map((item) => {
+                        const itemId = String(item?.id || item?._id || '');
+                        const eventsLabel = item?.allEvents
+                          ? 'All events'
+                          : `${Array.isArray(item?.selectedEvents) ? item.selectedEvents.length : 0} event(s)`;
+                        return (
+                          <div key={itemId || item.title} className="flex items-start justify-between rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+                            <div>
+                              <div className="text-[18px] font-bold text-gray-900">{item.title || 'Untitled webhook'}</div>
+                              <div className="mt-2 text-[14px] text-gray-600">{item.endpoint}</div>
+                              <div className="mt-3 inline-flex rounded-lg bg-gray-100 px-3 py-1 text-[13px] font-medium text-gray-700">{eventsLabel}</div>
+                            </div>
+                            <div className="relative">
+                              <button
+                                type="button"
+                                onClick={() => setOpenWebhookMenuId((prev) => (prev === itemId ? '' : itemId))}
+                                className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                              >
+                                <MoreHorizontal className="h-6 w-6" />
+                              </button>
+                              {openWebhookMenuId === itemId && (
+                                <div className="absolute right-0 top-full z-20 mt-2 w-[210px] rounded-2xl border border-gray-200 bg-white p-3 shadow-xl">
+                                  <button
+                                    type="button"
+                                    onClick={() => openEditWebhookModal(item)}
+                                    className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-[16px] text-gray-800 hover:bg-gray-50"
+                                  >
+                                    <Pencil className="h-5 w-5" />
+                                    Edit
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteWebhook(itemId)}
+                                    className="mt-1 flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-[16px] text-rose-600 hover:bg-rose-50"
+                                  >
+                                    <Trash2 className="h-5 w-5" />
+                                    Delete
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {showWebhookModal && (
+              <div className="fixed inset-0 z-[1500] flex items-center justify-center bg-black/45 p-6">
+                <div className="flex max-h-[92vh] w-full max-w-[700px] flex-col overflow-hidden rounded-[28px] bg-white shadow-2xl">
+                  <div className="flex items-center justify-between border-b border-gray-200 px-8 py-7">
+                    <h3 className="text-[22px] font-bold text-gray-900">{editingWebhookId ? 'Edit Webhook' : 'Add Webhook'}</h3>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowWebhookModal(false);
+                        setEditingWebhookId('');
+                        setWebhookForm(createEmptyWebhookForm());
+                      }}
+                      className="text-gray-500 transition hover:text-gray-800"
+                    >
+                      <X className="h-7 w-7" />
+                    </button>
+                  </div>
+
+                  <div className="min-h-0 flex-1 overflow-y-auto px-8 py-8">
+                    <div>
+                      <label className="mb-3 block text-[15px] font-medium text-gray-900">Title *</label>
+                      <input
+                        type="text"
+                        value={webhookForm.title}
+                        onChange={(e) => setWebhookForm((prev) => ({ ...prev, title: e.target.value }))}
+                        className="h-14 w-full rounded-md border border-gray-300 px-4 text-[16px] text-gray-900 outline-none focus:border-blue-500"
+                      />
+                    </div>
+
+                    <div className="mt-8">
+                      <label className="mb-3 block text-[15px] font-medium text-gray-900">Endpoint *</label>
+                      <input
+                        type="url"
+                        value={webhookForm.endpoint}
+                        onChange={(e) => setWebhookForm((prev) => ({ ...prev, endpoint: e.target.value }))}
+                        className="h-14 w-full rounded-md border border-gray-300 px-4 text-[16px] text-gray-900 outline-none focus:border-blue-500"
+                      />
+                    </div>
+
+                    <div className="mt-8">
+                      <div className="text-[15px] font-medium text-gray-900">Which events would you like to trigger this webhook?</div>
+                      <div className="mt-5 space-y-4">
+                        <label className="flex items-center gap-4 text-[16px] text-gray-900">
+                          <input
+                            type="radio"
+                            name="webhook-event-mode"
+                            checked={!!webhookForm.allEvents}
+                            onChange={() => setWebhookForm((prev) => ({ ...prev, allEvents: true }))}
+                            className="h-6 w-6 accent-blue-600"
+                          />
+                          <span>All events</span>
+                        </label>
+                        <label className="flex items-center gap-4 text-[16px] text-gray-900">
+                          <input
+                            type="radio"
+                            name="webhook-event-mode"
+                            checked={!webhookForm.allEvents}
+                            onChange={() => setWebhookForm((prev) => ({ ...prev, allEvents: false }))}
+                            className="h-6 w-6 accent-blue-600"
+                          />
+                          <span>Let me choose individually</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    {!webhookForm.allEvents && (
+                      <div className="mt-6 max-h-[360px] overflow-y-auto rounded-2xl border border-gray-200 bg-gray-50/50 p-3">
+                        <div className="space-y-3">
+                          {WEBHOOK_EVENT_OPTIONS.map((eventName) => {
+                            const checked = webhookForm.selectedEvents.includes(eventName);
+                            return (
+                              <label
+                                key={eventName}
+                                className="flex items-center gap-4 rounded-xl border border-gray-200 bg-white px-4 py-4 text-[16px] text-gray-900 hover:bg-gray-50"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() =>
+                                    setWebhookForm((prev) => {
+                                      const current = Array.isArray(prev.selectedEvents) ? prev.selectedEvents : [];
+                                      return {
+                                        ...prev,
+                                        selectedEvents: checked
+                                          ? current.filter((item) => item !== eventName)
+                                          : [...current, eventName],
+                                      };
+                                    })
+                                  }
+                                  className="h-5 w-5 rounded border-gray-300 accent-blue-600"
+                                />
+                                <span>{eventName}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-end gap-3 border-t border-gray-200 px-8 py-5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowWebhookModal(false);
+                        setEditingWebhookId('');
+                        setWebhookForm(createEmptyWebhookForm());
+                      }}
+                      className="rounded-md border border-gray-300 bg-white px-5 py-2.5 text-[15px] font-medium text-gray-700 hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSaveWebhook}
+                      disabled={
+                        webhookSaving ||
+                        !String(webhookForm.title || '').trim() ||
+                        !String(webhookForm.endpoint || '').trim() ||
+                        (!webhookForm.allEvents && (!Array.isArray(webhookForm.selectedEvents) || webhookForm.selectedEvents.length === 0))
+                      }
+                      className="rounded-md bg-blue-600 px-5 py-2.5 text-[15px] font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500"
+                    >
+                      {webhookSaving ? 'Saving...' : editingWebhookId ? 'Save Webhook' : 'Add Webhook'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {activeSettingsSection === 'general' && (
               <div className="px-6 py-10">
@@ -5709,6 +6338,573 @@ function NavItem({ label, icon, active, onClick, danger }) {
   );
 }
 
+function AssetEditorModal({
+  editingAsset,
+  assetForm,
+  setAssetForm,
+  onClose,
+  onSubmit,
+  imageSrc,
+  handleAssetFilesSelected,
+  removeAssetFileAt,
+  assetWorkerOptions,
+  assetTeamOptions,
+  assetVendorOptions,
+  assetCustomerOptions,
+  assetParentOptions,
+  properties,
+  branches,
+  getPropertyBlockOptions,
+  maintenanceSchedules,
+}) {
+  if (editingAsset === null) return null;
+
+  const isEditing = Boolean(editingAsset?._id || editingAsset?.id);
+  const [additionalWorkersOpen, setAdditionalWorkersOpen] = useState(false);
+  const [additionalWorkersQuery, setAdditionalWorkersQuery] = useState('');
+  const [addPartOpen, setAddPartOpen] = useState(false);
+  const [partMode, setPartMode] = useState('select');
+  const [partSearch, setPartSearch] = useState('');
+  const [availableParts, setAvailableParts] = useState([]);
+  const [partsLoading, setPartsLoading] = useState(false);
+  const [partDraft, setPartDraft] = useState({ id: '', name: '', quantity: '1', cost: '', description: '', category: '', partNumber: '' });
+  const filteredAdditionalWorkerOptions = assetWorkerOptions.filter((worker) =>
+    worker.label.toLowerCase().includes(String(additionalWorkersQuery || '').trim().toLowerCase())
+  );
+  const selectedAdditionalWorkers = assetWorkerOptions.filter((worker) =>
+    (assetForm.additionalWorkerIds || []).includes(worker.id)
+  );
+  const filteredAvailableParts = availableParts.filter((part) => {
+    const haystack = `${part.name || ''} ${part.partNumber || ''} ${part.category || ''} ${part.description || ''}`.toLowerCase();
+    return haystack.includes(String(partSearch || '').trim().toLowerCase());
+  });
+
+  useEffect(() => {
+    if (!addPartOpen || availableParts.length) return;
+    let mounted = true;
+    setPartsLoading(true);
+    api.get('/api/parts')
+      .then((res) => {
+        if (!mounted) return;
+        setAvailableParts(Array.isArray(res.data) ? res.data : []);
+      })
+      .catch((error) => {
+        console.error('Failed to load parts', error);
+      })
+      .finally(() => {
+        if (mounted) setPartsLoading(false);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [addPartOpen, availableParts.length]);
+
+  return createPortal(
+    <div className="fixed inset-0 z-[130] bg-white">
+      <form onSubmit={onSubmit} className="flex h-full flex-col">
+        <div className="flex items-center justify-between border-b border-gray-200 px-8 py-6">
+          <div className="flex items-center gap-5">
+            <button type="button" onClick={onClose} className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700">
+              <X className="h-8 w-8" />
+            </button>
+            <h3 className="text-[2rem] font-bold text-gray-900">{isEditing ? 'Edit Asset' : 'Create Asset'}</h3>
+          </div>
+          <button type="submit" className="rounded-lg bg-blue-600 px-7 py-3 text-lg font-semibold text-white hover:bg-blue-700">
+            {isEditing ? 'Save Asset' : 'Create Asset'}
+          </button>
+        </div>
+
+        <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_460px]">
+          <div className="min-h-0 overflow-y-auto px-16 py-10">
+            <div className="mx-auto max-w-[560px] space-y-12">
+              <section>
+                <h4 className="text-[2rem] font-bold text-gray-900">Asset Information</h4>
+                <div className="mt-10 space-y-6">
+                  <div>
+                    <label className="mb-2 block text-[1.05rem] font-semibold text-gray-900">Name *</label>
+                    <input value={assetForm.name} onChange={(e) => setAssetForm((prev) => ({ ...prev, name: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-4 py-3 text-lg outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" required />
+                    {!String(assetForm.name || '').trim() && <div className="mt-2 text-sm text-rose-500">Name is required</div>}
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-[1.05rem] font-semibold text-gray-900">Description</label>
+                    <textarea value={assetForm.description} onChange={(e) => setAssetForm((prev) => ({ ...prev, description: e.target.value.slice(0, 970) }))} className="min-h-[100px] w-full rounded-lg border border-gray-300 px-4 py-3 text-lg outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+                    <div className="mt-2 text-sm text-gray-500">{assetForm.description.length}/970</div>
+                  </div>
+                  <div className="grid gap-5 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-2 block text-[1.05rem] font-semibold text-gray-900">Model</label>
+                      <input value={assetForm.model} onChange={(e) => setAssetForm((prev) => ({ ...prev, model: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-4 py-3 text-lg outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+                    </div>
+                    <div>
+                      <label className="mb-2 block text-[1.05rem] font-semibold text-gray-900">Manufacturer</label>
+                      <input value={assetForm.manufacturer} onChange={(e) => setAssetForm((prev) => ({ ...prev, manufacturer: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-4 py-3 text-lg outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-[1.05rem] font-semibold text-gray-900">Serial Number</label>
+                    <input value={assetForm.serialNumber} onChange={(e) => setAssetForm((prev) => ({ ...prev, serialNumber: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-4 py-3 text-lg outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+                  </div>
+                  <div className="grid gap-5 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-2 block text-[1.05rem] font-semibold text-gray-900">Category</label>
+                      <input value={assetForm.category} onChange={(e) => setAssetForm((prev) => ({ ...prev, category: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-4 py-3 text-lg outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+                    </div>
+                    <div>
+                      <label className="mb-2 block text-[1.05rem] font-semibold text-gray-900">Area</label>
+                      <input value={assetForm.area} onChange={(e) => setAssetForm((prev) => ({ ...prev, area: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-4 py-3 text-lg outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+                    </div>
+                  </div>
+                  <div className="border-t border-gray-200 pt-6">
+                    <div className="flex flex-wrap gap-8 text-lg text-gray-900">
+                      <label className="flex items-center gap-3"><input type="radio" checked={assetForm.barcodeMode === 'custom'} onChange={() => setAssetForm((prev) => ({ ...prev, barcodeMode: 'custom' }))} className="h-6 w-6" />Enter custom barcode</label>
+                      <label className="flex items-center gap-3"><input type="radio" checked={assetForm.barcodeMode === 'random'} onChange={() => setAssetForm((prev) => ({ ...prev, barcodeMode: 'random', barcode: prev.barcode || `${Date.now()}${Math.floor(Math.random() * 1000)}` }))} className="h-6 w-6" />Generate random barcode</label>
+                    </div>
+                    <div className="mt-6">
+                      <label className="mb-2 block text-[1.05rem] font-semibold text-gray-900">Barcode</label>
+                      <input value={assetForm.barcode} onChange={(e) => setAssetForm((prev) => ({ ...prev, barcode: e.target.value }))} disabled={assetForm.barcodeMode === 'random'} className="w-full rounded-lg border border-gray-300 px-4 py-3 text-lg outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-gray-50" />
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section>
+                <h4 className="text-[2rem] font-bold text-gray-900">Image</h4>
+                <div className="mt-8 rounded-xl border border-dashed border-gray-300 p-8">
+                  <div className="flex flex-wrap items-center justify-center gap-5 text-lg text-gray-500">
+                    <label className="cursor-pointer rounded-lg border border-gray-300 px-8 py-3 font-semibold text-gray-700 hover:bg-gray-50">Upload<input type="file" accept="image/*" multiple className="hidden" onChange={(e) => handleAssetFilesSelected('imageFiles', e.target.files)} /></label>
+                    <span>or Drop Files</span>
+                  </div>
+                  {assetForm.imageFiles.length > 0 && (
+                    <div className="mt-6 grid grid-cols-3 gap-4">
+                      {assetForm.imageFiles.map((file, index) => (
+                        <div key={`${file}-${index}`} className="relative overflow-hidden rounded-xl border border-gray-200 bg-gray-50">
+                          <img src={imageSrc(String(file).replace(/^warranty:/, '')) || file} alt={`Asset ${index + 1}`} className="h-24 w-full object-cover" />
+                          <button type="button" onClick={() => removeAssetFileAt('imageFiles', index)} className="absolute right-2 top-2 rounded-full bg-white/90 p-1 text-gray-600 shadow"><X className="h-4 w-4" /></button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              <section>
+                <h4 className="text-[2rem] font-bold text-gray-900">Depreciation</h4>
+                <p className="mt-3 text-lg text-gray-600">Depreciation data helps you track this asset's value over time and at the end of its life cycle.</p>
+                <div className="mt-8 grid gap-5 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-2 block text-[1.05rem] font-semibold text-gray-900">Purchase Price</label>
+                    <input type="number" min="0" step="0.01" value={assetForm.purchasePrice} onChange={(e) => setAssetForm((prev) => ({ ...prev, purchasePrice: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-4 py-3 text-lg outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-[1.05rem] font-semibold text-gray-900">Purchase Date</label>
+                    <input type="date" value={assetForm.purchaseDate} onChange={(e) => setAssetForm((prev) => ({ ...prev, purchaseDate: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-4 py-3 text-lg outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-[1.05rem] font-semibold text-gray-900">Residual Value</label>
+                    <input type="number" min="0" step="0.01" value={assetForm.residualPrice} onChange={(e) => setAssetForm((prev) => ({ ...prev, residualPrice: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-4 py-3 text-lg outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-[1.05rem] font-semibold text-gray-900">Useful Life</label>
+                    <div className="grid grid-cols-[1fr_130px] gap-3">
+                      <input type="number" min="0" value={assetForm.usefulLife} onChange={(e) => setAssetForm((prev) => ({ ...prev, usefulLife: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-4 py-3 text-lg outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+                      <select value={assetForm.usefulLifeUnit} onChange={(e) => setAssetForm((prev) => ({ ...prev, usefulLifeUnit: e.target.value }))} className="rounded-lg border border-gray-300 px-4 py-3 text-lg outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
+                        <option value="years">years</option>
+                        <option value="months">months</option>
+                        <option value="days">days</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+                <button type="button" className="mt-8 text-xl font-semibold text-blue-600">Upload purchase receipt</button>
+              </section>
+
+              <section>
+                <h4 className="text-[2rem] font-bold text-gray-900">Assigned To</h4>
+                <div className="mt-8 space-y-5">
+                  <div>
+                    <label className="mb-2 block text-[1.05rem] font-semibold text-gray-900">Worker</label>
+                    <select value={assetForm.workerId} onChange={(e) => setAssetForm((prev) => ({ ...prev, workerId: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-4 py-3 text-lg outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
+                      <option value="">Select worker</option>
+                      {assetWorkerOptions.map((worker) => <option key={worker.id} value={worker.id}>{worker.label}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-[1.05rem] font-semibold text-gray-900">Additional Workers</label>
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setAdditionalWorkersOpen((prev) => !prev)}
+                        className="flex min-h-[56px] w-full items-center justify-between rounded-lg border border-gray-300 bg-white px-4 py-3 text-left text-lg text-gray-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                      >
+                        <span className="truncate">
+                          {selectedAdditionalWorkers.length ? `${selectedAdditionalWorkers.length} selected` : 'Select additional workers'}
+                        </span>
+                        <ChevronDown className="h-5 w-5 text-gray-400" />
+                      </button>
+                      {selectedAdditionalWorkers.length > 0 && (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {selectedAdditionalWorkers.map((worker) => (
+                            <span key={worker.id} className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-sm font-medium text-blue-700">
+                              {worker.label}
+                              <button
+                                type="button"
+                                onClick={() => setAssetForm((prev) => ({ ...prev, additionalWorkerIds: (prev.additionalWorkerIds || []).filter((id) => id !== worker.id) }))}
+                                className="text-blue-500 hover:text-blue-700"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {additionalWorkersOpen && (
+                        <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-20 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl">
+                          <div className="border-b border-gray-100 p-3">
+                            <div className="relative">
+                              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                              <input
+                                value={additionalWorkersQuery}
+                                onChange={(e) => setAdditionalWorkersQuery(e.target.value)}
+                                placeholder="Search workers"
+                                className="w-full rounded-lg border border-gray-200 py-2.5 pl-9 pr-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                              />
+                            </div>
+                          </div>
+                          <div className="max-h-64 overflow-y-auto p-2">
+                            {filteredAdditionalWorkerOptions.length ? filteredAdditionalWorkerOptions.map((worker) => {
+                              const checked = (assetForm.additionalWorkerIds || []).includes(worker.id);
+                              return (
+                                <label key={worker.id} className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={() => setAssetForm((prev) => ({
+                                      ...prev,
+                                      additionalWorkerIds: checked
+                                        ? (prev.additionalWorkerIds || []).filter((id) => id !== worker.id)
+                                        : [...(prev.additionalWorkerIds || []), worker.id],
+                                    }))}
+                                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                  />
+                                  <span>{worker.label}</span>
+                                </label>
+                              );
+                            }) : (
+                              <div className="px-3 py-4 text-sm text-gray-500">No workers found.</div>
+                            )}
+                          </div>
+                          <div className="border-t border-gray-100 p-3 text-right">
+                            <button type="button" onClick={() => setAdditionalWorkersOpen(false)} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
+                              Done
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-[1.05rem] font-semibold text-gray-900">Teams</label>
+                    <select value={assetForm.teamId} onChange={(e) => setAssetForm((prev) => ({ ...prev, teamId: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-4 py-3 text-lg outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
+                      <option value="">Select team</option>
+                      {assetTeamOptions.map((team) => <option key={team.id} value={team.id}>{team.label}</option>)}
+                    </select>
+                  </div>
+                </div>
+              </section>
+
+              <section>
+                <h4 className="text-[2rem] font-bold text-gray-900">More Information</h4>
+                <div className="mt-8 space-y-5">
+                  <div>
+                    <label className="mb-2 block text-[1.05rem] font-semibold text-gray-900">Vendors</label>
+                    <select value={assetForm.vendorId} onChange={(e) => setAssetForm((prev) => ({ ...prev, vendorId: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-4 py-3 text-lg outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
+                      <option value="">Select vendor</option>
+                      {assetVendorOptions.map((vendor, index) => <option key={`${vendor.id || vendor._id || vendor.email || index}`} value={vendor.id || vendor._id}>{vendor.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-[1.05rem] font-semibold text-gray-900">Customers</label>
+                    <select value={assetForm.customerId} onChange={(e) => setAssetForm((prev) => ({ ...prev, customerId: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-4 py-3 text-lg outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
+                      <option value="">Select customer</option>
+                      {assetCustomerOptions.map((customer, index) => <option key={`${customer.id || customer._id || customer.email || index}`} value={customer.id || customer._id}>{customer.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="grid gap-5 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-2 block text-[1.05rem] font-semibold text-gray-900">Placed in Service Date</label>
+                      <input type="date" value={assetForm.serviceDate} onChange={(e) => setAssetForm((prev) => ({ ...prev, serviceDate: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-4 py-3 text-lg outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+                    </div>
+                    <div>
+                      <label className="mb-2 block text-[1.05rem] font-semibold text-gray-900">Warranty Expiration Date</label>
+                      <input type="date" value={assetForm.warrantyExpiration} onChange={(e) => setAssetForm((prev) => ({ ...prev, warrantyExpiration: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-4 py-3 text-lg outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-[1.05rem] font-semibold text-gray-900">Additional Information</label>
+                    <textarea value={assetForm.additionalInformation} onChange={(e) => setAssetForm((prev) => ({ ...prev, additionalInformation: e.target.value }))} className="min-h-[120px] w-full rounded-lg border border-gray-300 px-4 py-3 text-lg outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+                  </div>
+                  <button type="button" className="text-xl font-semibold text-blue-600">Upload warranty file</button>
+                </div>
+              </section>
+
+              <section>
+                <div className="flex items-center justify-between">
+                  <h4 className="text-[2rem] font-bold text-gray-900">Parts</h4>
+                  <button type="button" onClick={() => setAddPartOpen(true)} className="rounded-lg border border-gray-300 px-6 py-3 text-lg font-medium text-gray-700 hover:bg-gray-50">Add Parts</button>
+                </div>
+                <div className="mt-6 rounded-xl border-y border-gray-200 py-6 text-center text-xl text-gray-500">
+                  {assetForm.parts.length ? assetForm.parts.map((part, index) => (
+                    <div key={`${part.name}-${index}`} className="flex items-start justify-between border-b border-gray-100 px-4 py-4 text-left last:border-b-0">
+                      <div>
+                        <div className="text-lg font-semibold text-gray-900">{part.name}</div>
+                        <div className="mt-1 text-sm text-gray-500">
+                          Qty {part.quantity || 1}{part.cost ? ` • ${part.cost}` : ''}
+                        </div>
+                        {part.description ? <div className="mt-1 text-sm text-gray-500">{part.description}</div> : null}
+                      </div>
+                      <button type="button" onClick={() => setAssetForm((prev) => ({ ...prev, parts: prev.parts.filter((_, itemIndex) => itemIndex !== index) }))} className="text-sm font-semibold text-red-500">Remove</button>
+                    </div>
+                  )) : 'No parts added yet'}
+                </div>
+              </section>
+
+              <section>
+                <h4 className="text-[2rem] font-bold text-gray-900">Files</h4>
+                <div className="mt-8 rounded-xl border border-dashed border-gray-300 p-8">
+                  <div className="flex flex-wrap items-center justify-center gap-5 text-lg text-gray-500">
+                    <label className="cursor-pointer rounded-lg border border-gray-300 px-8 py-3 font-semibold text-gray-700 hover:bg-gray-50">Upload<input type="file" multiple className="hidden" onChange={(e) => handleAssetFilesSelected('documentFiles', e.target.files)} /></label>
+                    <span>or Drop Files</span>
+                  </div>
+                </div>
+                <button type="button" className="mt-6 text-xl font-semibold text-blue-600">Add from Saved Files</button>
+              </section>
+            </div>
+          </div>
+
+          <aside className="min-h-0 overflow-y-auto border-l border-gray-200 bg-white">
+            <div className="border-b border-gray-200 px-8 py-10"><h4 className="text-[2rem] font-bold text-gray-900">Structure And Settings</h4></div>
+            <div className="border-b border-gray-200 px-8 py-10">
+              <h5 className="text-[1.4rem] font-bold text-gray-900">Asset Hierarchy</h5>
+              <p className="mt-6 text-[1.05rem] leading-8 text-gray-600">Organize this asset top-down to help your team understand its hierarchy and relationships</p>
+              <select value={assetForm.parentId} onChange={(e) => setAssetForm((prev) => ({ ...prev, parentId: e.target.value }))} className="mt-8 w-full rounded-xl border border-gray-300 px-4 py-3 text-lg outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
+                <option value="">Set Parent Asset</option>
+                {assetParentOptions.map((asset) => <option key={asset.id} value={asset.id}>{asset.label}</option>)}
+              </select>
+            </div>
+            <div className="border-b border-gray-200 px-8 py-10">
+              <h5 className="text-[1.4rem] font-bold text-gray-900">Location</h5>
+              <select value={assetForm.locationType === 'branch' ? (assetForm.branchId ? `branch:${assetForm.branchId}` : '') : (assetForm.propertyId ? `property:${assetForm.propertyId}` : '')} onChange={(e) => {
+                const [type, rawId] = String(e.target.value || '').split(':');
+                if (type === 'branch') {
+                  const branch = branches.find((item) => String(item.id || item._id) === String(rawId));
+                  setAssetForm((prev) => ({ ...prev, locationType: 'branch', branchId: rawId, propertyId: '', building: branch?.branchLocation || branch?.branchName || branch?.name || '', blocks: [] }));
+                  return;
+                }
+                const property = properties.find((item) => String(item.id || item._id) === String(rawId));
+                setAssetForm((prev) => ({ ...prev, locationType: 'property', propertyId: rawId, branchId: '', building: property?.name || '', blocks: [] }));
+              }} className="mt-8 w-full rounded-xl border border-gray-300 px-4 py-3 text-lg outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
+                <option value="">Set Location</option>
+                <optgroup label="Locations">{properties.map((property, index) => <option key={`${property.id || property._id || 'property'}-${index}`} value={`property:${property.id || property._id}`}>{property.name}</option>)}</optgroup>
+                <optgroup label="Branches">{branches.map((branch, index) => <option key={`${branch.id || branch._id || 'branch'}-${index}`} value={`branch:${branch.id || branch._id}`}>{branch.branchName || branch.name}</option>)}</optgroup>
+              </select>
+              <div className="mt-5 grid gap-4">
+                <input value={assetForm.room} onChange={(e) => setAssetForm((prev) => ({ ...prev, room: e.target.value }))} placeholder="Room" className="w-full rounded-lg border border-gray-300 px-4 py-3 text-base outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+                <select value={(assetForm.blocks || [])[0] || ''} onChange={(e) => setAssetForm((prev) => ({ ...prev, blocks: e.target.value ? [e.target.value] : [] }))} disabled={!assetForm.propertyId || assetForm.locationType !== 'property'} className="w-full rounded-lg border border-gray-300 px-4 py-3 text-base outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-gray-50">
+                  <option value="">{assetForm.locationType === 'branch' ? 'Blocks are only for locations...' : assetForm.propertyId ? 'Select block...' : 'Select location first...'}</option>
+                  {getPropertyBlockOptions(assetForm.propertyId).map((block, index) => <option key={`${block}-${index}`} value={block}>{block}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="border-b border-gray-200 px-8 py-10">
+              <h5 className="text-[1.4rem] font-bold text-gray-900">Operating Hours</h5>
+              <p className="mt-6 text-[1.05rem] leading-8 text-gray-600">Select from a schedule of operating hours below. Assets without an assigned schedule are presumed to operate 24 hours a day, 7 days a week.</p>
+              <select value={assetForm.operatingScheduleId} onChange={(e) => setAssetForm((prev) => ({ ...prev, operatingScheduleId: e.target.value }))} className="mt-8 w-full rounded-xl border border-gray-300 px-4 py-3 text-lg outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
+                <option value="">Select Schedules</option>
+                {(maintenanceSchedules || []).map((schedule) => <option key={schedule.id || schedule._id} value={schedule.id || schedule._id}>{schedule.name || schedule.title || 'Schedule'}</option>)}
+              </select>
+            </div>
+            <div className="px-8 py-10">
+              <h5 className="text-[1.4rem] font-bold text-gray-900">Check In/Out</h5>
+              <label className="mt-8 flex items-center gap-4 text-[1.05rem] text-gray-700">
+                <input type="checkbox" checked={assetForm.trackCheckInOut} onChange={(e) => setAssetForm((prev) => ({ ...prev, trackCheckInOut: e.target.checked }))} className="h-6 w-6 rounded border-gray-300" />
+                Track Check Ins/Outs
+              </label>
+            </div>
+          </aside>
+        </div>
+      </form>
+      {addPartOpen && (
+        <div className="fixed inset-0 z-[140] flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-xl rounded-2xl border border-gray-200 bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-gray-100 px-6 py-5">
+              <h4 className="text-[1.7rem] font-bold text-gray-900">Add Part</h4>
+              <button type="button" onClick={() => setAddPartOpen(false)} className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="space-y-5 px-6 py-6">
+              <div className="flex items-center gap-3">
+                <button type="button" onClick={() => setPartMode('select')} className={`rounded-lg px-4 py-2 text-sm font-semibold ${partMode === 'select' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700'}`}>Choose Existing</button>
+                <button type="button" onClick={() => setPartMode('create')} className={`rounded-lg px-4 py-2 text-sm font-semibold ${partMode === 'create' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700'}`}>Create New Part</button>
+              </div>
+
+              {partMode === 'select' ? (
+                <>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                    <input value={partSearch} onChange={(e) => setPartSearch(e.target.value)} placeholder="Search parts" className="w-full rounded-lg border border-gray-300 py-3 pl-10 pr-4 text-base outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+                  </div>
+                  <div className="max-h-72 overflow-y-auto rounded-xl border border-gray-200">
+                    {partsLoading ? (
+                      <div className="px-4 py-6 text-sm text-gray-500">Loading parts...</div>
+                    ) : filteredAvailableParts.length ? filteredAvailableParts.map((part) => (
+                      <button
+                        key={part._id || part.id}
+                        type="button"
+                        onClick={() => setPartDraft((prev) => ({
+                          ...prev,
+                          id: String(part._id || part.id || ''),
+                          name: part.name || '',
+                          quantity: prev.quantity || '1',
+                          cost: part.inventoryLines?.[0]?.cost ? String(part.inventoryLines[0].cost) : prev.cost,
+                          description: part.description || '',
+                          category: part.category || '',
+                          partNumber: part.partNumber || '',
+                        }))}
+                        className={`flex w-full items-start justify-between border-b border-gray-100 px-4 py-3 text-left last:border-b-0 hover:bg-gray-50 ${String(partDraft.id || '') === String(part._id || part.id || '') ? 'bg-blue-50' : ''}`}
+                      >
+                        <div>
+                          <div className="text-sm font-semibold text-gray-900">{part.name}</div>
+                          <div className="mt-1 text-xs text-gray-500">{[part.partNumber, part.category].filter(Boolean).join(' • ') || 'No details'}</div>
+                          {part.description ? <div className="mt-1 text-xs text-gray-500 line-clamp-2">{part.description}</div> : null}
+                        </div>
+                        <div className="ml-4 text-xs text-gray-400">{part.onHand || 0} on hand</div>
+                      </button>
+                    )) : (
+                      <div className="px-4 py-6 text-sm text-gray-500">No parts found.</div>
+                    )}
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-2 block text-base font-semibold text-gray-900">Quantity</label>
+                      <input type="number" min="1" value={partDraft.quantity} onChange={(e) => setPartDraft((prev) => ({ ...prev, quantity: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-4 py-3 text-base outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+                    </div>
+                    <div>
+                      <label className="mb-2 block text-base font-semibold text-gray-900">Estimated Cost</label>
+                      <input value={partDraft.cost} onChange={(e) => setPartDraft((prev) => ({ ...prev, cost: e.target.value }))} placeholder="0.00" className="w-full rounded-lg border border-gray-300 px-4 py-3 text-base outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <label className="mb-2 block text-base font-semibold text-gray-900">Part Name *</label>
+                    <input value={partDraft.name} onChange={(e) => setPartDraft((prev) => ({ ...prev, name: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-4 py-3 text-base outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-2 block text-base font-semibold text-gray-900">Part Number</label>
+                      <input value={partDraft.partNumber} onChange={(e) => setPartDraft((prev) => ({ ...prev, partNumber: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-4 py-3 text-base outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+                    </div>
+                    <div>
+                      <label className="mb-2 block text-base font-semibold text-gray-900">Category</label>
+                      <input value={partDraft.category} onChange={(e) => setPartDraft((prev) => ({ ...prev, category: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-4 py-3 text-base outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+                    </div>
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-2 block text-base font-semibold text-gray-900">Quantity</label>
+                      <input type="number" min="1" value={partDraft.quantity} onChange={(e) => setPartDraft((prev) => ({ ...prev, quantity: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-4 py-3 text-base outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+                    </div>
+                    <div>
+                      <label className="mb-2 block text-base font-semibold text-gray-900">Estimated Cost</label>
+                      <input value={partDraft.cost} onChange={(e) => setPartDraft((prev) => ({ ...prev, cost: e.target.value }))} placeholder="0.00" className="w-full rounded-lg border border-gray-300 px-4 py-3 text-base outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-base font-semibold text-gray-900">Description</label>
+                    <textarea value={partDraft.description} onChange={(e) => setPartDraft((prev) => ({ ...prev, description: e.target.value }))} className="min-h-[110px] w-full rounded-lg border border-gray-300 px-4 py-3 text-base outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="flex items-center justify-end gap-3 border-t border-gray-100 px-6 py-5">
+              <button type="button" onClick={() => setAddPartOpen(false)} className="rounded-lg border border-gray-300 px-5 py-2.5 text-base font-semibold text-gray-700 hover:bg-gray-50">Cancel</button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const normalizedQuantity = Math.max(1, parseInt(partDraft.quantity, 10) || 1);
+                  if (partMode === 'create') {
+                    if (!String(partDraft.name || '').trim()) return;
+                    try {
+                      const response = await api.post('/api/parts', {
+                        name: String(partDraft.name || '').trim(),
+                        partNumber: String(partDraft.partNumber || '').trim(),
+                        category: String(partDraft.category || '').trim(),
+                        description: String(partDraft.description || '').trim(),
+                        onHand: normalizedQuantity,
+                        available: normalizedQuantity,
+                        inventoryLines: partDraft.cost ? [{ cost: Number(partDraft.cost) || 0 }] : [],
+                      });
+                      const createdPart = response.data || {};
+                      setAvailableParts((prev) => [createdPart, ...prev]);
+                      setAssetForm((prev) => ({
+                        ...prev,
+                        parts: [
+                          ...(prev.parts || []),
+                          {
+                            id: String(createdPart._id || createdPart.id || ''),
+                            name: createdPart.name || String(partDraft.name || '').trim(),
+                            quantity: normalizedQuantity,
+                            cost: String(partDraft.cost || '').trim(),
+                            description: String(partDraft.description || '').trim(),
+                            category: String(partDraft.category || '').trim(),
+                            partNumber: String(partDraft.partNumber || '').trim(),
+                          },
+                        ],
+                      }));
+                    } catch (error) {
+                      console.error('Failed to create part', error);
+                      alert(error.response?.data?.error || 'Failed to create part.');
+                      return;
+                    }
+                  } else {
+                    if (!String(partDraft.id || '').trim()) return;
+                    setAssetForm((prev) => ({
+                      ...prev,
+                      parts: [
+                        ...(prev.parts || []),
+                        {
+                          id: String(partDraft.id || '').trim(),
+                          name: String(partDraft.name || '').trim(),
+                          quantity: normalizedQuantity,
+                          cost: String(partDraft.cost || '').trim(),
+                          description: String(partDraft.description || '').trim(),
+                          category: String(partDraft.category || '').trim(),
+                          partNumber: String(partDraft.partNumber || '').trim(),
+                        },
+                      ],
+                    }));
+                  }
+                  setPartDraft({ id: '', name: '', quantity: '1', cost: '', description: '', category: '', partNumber: '' });
+                  setPartSearch('');
+                  setPartMode('select');
+                  setAddPartOpen(false);
+                }}
+                disabled={partMode === 'create' ? !String(partDraft.name || '').trim() : !String(partDraft.id || '').trim()}
+                className="rounded-lg bg-blue-600 px-5 py-2.5 text-base font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {partMode === 'create' ? 'Create and Add Part' : 'Add Selected Part'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>,
+    document.body
+  );
+}
+
 // â”€â”€ Main Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function ClientDashboard() {
   const navigate = useNavigate();
@@ -5732,6 +6928,18 @@ function ClientDashboard() {
   const [properties, setProperties] = useState([]);
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [propertyUseNamedBlocks, setPropertyUseNamedBlocks] = useState(false);
+  const [propertyViewMode, setPropertyViewMode] = useState('list');
+  const [propertySearchQuery, setPropertySearchQuery] = useState('');
+  const [propertySortDirection, setPropertySortDirection] = useState('desc');
+  const [propertyOpenPopover, setPropertyOpenPopover] = useState(null);
+  const [selectedPropertyAssignedTo, setSelectedPropertyAssignedTo] = useState([]);
+  const [propertyAssignedSearchQuery, setPropertyAssignedSearchQuery] = useState('');
+  const [draftPropertyAssignedTo, setDraftPropertyAssignedTo] = useState([]);
+  const [propertyDetailTab, setPropertyDetailTab] = useState('details');
+  const [showAddFloorplanModal, setShowAddFloorplanModal] = useState(false);
+  const [propertyFloorplanForm, setPropertyFloorplanForm] = useState(createEmptyPropertyFloorplanForm);
+  const [showPropertyActionsMenu, setShowPropertyActionsMenu] = useState(false);
+  const [openPropertyRowMenuKey, setOpenPropertyRowMenuKey] = useState('');
   const [assets, setAssets] = useState([]);
   const [internalTechnicians, setInternalTechnicians] = useState([]);
   const [technicians, setTechnicians] = useState([]);
@@ -5747,6 +6955,175 @@ function ClientDashboard() {
   const [originalAssetBlocks, setOriginalAssetBlocks] = useState([]);
   const [selectedAsset, setSelectedAsset] = useState(null);
   const [assetModalOpen, setAssetModalOpen] = useState(false);
+  const [assetDetailTab, setAssetDetailTab] = useState('workOrders');
+  const [assetSearchQuery, setAssetSearchQuery] = useState('');
+  const [assetDetailSearchQuery, setAssetDetailSearchQuery] = useState('');
+  const [assetPartsSearchQuery, setAssetPartsSearchQuery] = useState('');
+  const [assetDetailOpenPopover, setAssetDetailOpenPopover] = useState(null);
+  const [selectedAssetWorkOrderStatuses, setSelectedAssetWorkOrderStatuses] = useState([]);
+  const [selectedAssetWorkOrderPriorities, setSelectedAssetWorkOrderPriorities] = useState([]);
+  const [selectedAssetWorkOrderLocations, setSelectedAssetWorkOrderLocations] = useState([]);
+  const [assetWorkOrderSortField, setAssetWorkOrderSortField] = useState('createdAt');
+  const [assetWorkOrderSortDirection, setAssetWorkOrderSortDirection] = useState('desc');
+  const [showAssetWorkOrderSortMenu, setShowAssetWorkOrderSortMenu] = useState(false);
+  const [showAssetDetailColumnsMenu, setShowAssetDetailColumnsMenu] = useState(false);
+  const [showSelectedAssetActionsMenu, setShowSelectedAssetActionsMenu] = useState(false);
+  const [assetDetailColumnsMenuPosition, setAssetDetailColumnsMenuPosition] = useState({ top: 0, right: 0 });
+  const [showAssetActivityModal, setShowAssetActivityModal] = useState(false);
+  const [showAssetQrPopover, setShowAssetQrPopover] = useState(false);
+  const [assetActivityEntries, setAssetActivityEntries] = useState([]);
+  const [assetActivityComment, setAssetActivityComment] = useState('');
+  const [assetReliabilityWindow, setAssetReliabilityWindow] = useState('Last 7 Days');
+  const [showAssetReliabilityWindowMenu, setShowAssetReliabilityWindowMenu] = useState(false);
+  const [assetReliabilityStatus, setAssetReliabilityStatus] = useState('Operational');
+  const [showAssetReliabilityStatusMenu, setShowAssetReliabilityStatusMenu] = useState(false);
+  const [showAssetAddDowntimeModal, setShowAssetAddDowntimeModal] = useState(false);
+  const [showAssetDowntimeLogModal, setShowAssetDowntimeLogModal] = useState(false);
+  const [assetDowntimeEntries, setAssetDowntimeEntries] = useState([]);
+  const [assetReliabilitySaving, setAssetReliabilitySaving] = useState(false);
+  const [assetDowntimeSaving, setAssetDowntimeSaving] = useState(false);
+  const [assetDowntimeLoading, setAssetDowntimeLoading] = useState(false);
+  const [assetDowntimeForm, setAssetDowntimeForm] = useState({
+    hours: '',
+    minutes: '',
+    status: 'Not Operational',
+    description: '',
+    startedDate: '',
+    startedTime: '',
+  });
+  const [selectedAssetLocationFilter, setSelectedAssetLocationFilter] = useState('');
+  const [showAssetActionsMenu, setShowAssetActionsMenu] = useState(false);
+  const [showAssetColumnsMenu, setShowAssetColumnsMenu] = useState(false);
+  const [assetColumnsMenuPosition, setAssetColumnsMenuPosition] = useState({ top: 0, right: 0 });
+  const [peopleDirectoryTab, setPeopleDirectoryTab] = useState('people');
+  const [peopleDirectorySearchQuery, setPeopleDirectorySearchQuery] = useState('');
+  const [peopleDirectoryAccountTypes, setPeopleDirectoryAccountTypes] = useState([]);
+  const [draftPeopleDirectoryAccountTypes, setDraftPeopleDirectoryAccountTypes] = useState([]);
+  const [peopleDirectoryIncludeDeactivated, setPeopleDirectoryIncludeDeactivated] = useState(false);
+  const [peopleDirectoryOpenPopover, setPeopleDirectoryOpenPopover] = useState(null);
+  const [showPeopleDirectoryActionsMenu, setShowPeopleDirectoryActionsMenu] = useState(false);
+  const [showPeopleDirectorySortMenu, setShowPeopleDirectorySortMenu] = useState(false);
+  const [showPeopleDirectoryColumnsMenu, setShowPeopleDirectoryColumnsMenu] = useState(false);
+  const [peopleDirectorySortField, setPeopleDirectorySortField] = useState('dateCreated');
+  const [peopleDirectorySortDirection, setPeopleDirectorySortDirection] = useState('desc');
+  const [visiblePeopleDirectoryColumns, setVisiblePeopleDirectoryColumns] = useState({
+    name: true,
+    status: true,
+    accountType: true,
+    email: true,
+    phoneNumber: true,
+    jobTitle: true,
+    hourlyRate: false,
+    companyName: false,
+    lastLogin: false,
+    dateCreated: false,
+    categories: false,
+  });
+  const [visibleTeamDirectoryColumns, setVisibleTeamDirectoryColumns] = useState({
+    teamName: true,
+    members: true,
+    memberCount: true,
+    description: false,
+    created: true,
+  });
+  const [selectedDirectoryPerson, setSelectedDirectoryPerson] = useState(null);
+  const [personDetailTab, setPersonDetailTab] = useState('details');
+  const [showSelectedPersonActionsMenu, setShowSelectedPersonActionsMenu] = useState(false);
+  const [isEditingDirectoryPerson, setIsEditingDirectoryPerson] = useState(false);
+  const [directoryPersonForm, setDirectoryPersonForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    jobTitle: '',
+    hourlyRate: '',
+    companyName: '',
+    categories: '',
+    status: 'Active',
+  });
+  const [directoryPersonSaving, setDirectoryPersonSaving] = useState(false);
+  const [selectedDirectoryTeam, setSelectedDirectoryTeam] = useState(null);
+  const [directoryTeamForm, setDirectoryTeamForm] = useState({
+    name: '',
+    description: '',
+    members: [],
+  });
+  const [directoryTeamSaving, setDirectoryTeamSaving] = useState(false);
+  const [visibleAssetDetailWorkOrderColumns, setVisibleAssetDetailWorkOrderColumns] = useState({
+    workOrderNumber: true,
+    title: true,
+    description: true,
+    dueDate: true,
+    status: true,
+    priority: false,
+    category: false,
+    location: false,
+    asset: false,
+    parts: false,
+    files: false,
+    estimatedDuration: false,
+    additionalCost: false,
+    daysSinceCreated: false,
+    time: false,
+    tasks: false,
+    laborCost: false,
+    partsCost: false,
+    assignedTo: false,
+    additionalWorkers: false,
+    createdBy: false,
+    completedBy: false,
+    team: false,
+    requestedBy: false,
+    dateCreated: false,
+    lastUpdated: false,
+    dateCompleted: false,
+    archived: false,
+    closeoutNotes: false,
+  });
+  const [visibleAssetColumns, setVisibleAssetColumns] = useState({
+    name: true,
+    image: true,
+    id: true,
+    location: true,
+    area: true,
+    model: true,
+    barcode: true,
+    serialNumber: true,
+    description: true,
+    category: false,
+    status: false,
+    worker: false,
+    additionalWorkers: false,
+    assignedTeams: false,
+    assignedVendors: false,
+    assignedCustomers: false,
+    manufacturer: false,
+    parentAsset: false,
+    usefulLife: false,
+    createdBy: false,
+    dateCreated: false,
+    purchaseDate: false,
+    serviceDate: false,
+    warrantyExpiration: false,
+    currentValue: false,
+    purchasePrice: false,
+    residualPrice: false,
+    archived: false,
+  });
+  const assetColumnsButtonRef = useRef(null);
+  const assetDetailColumnsButtonRef = useRef(null);
+  const selectedAssetActionsMenuRef = useRef(null);
+  const propertyAssignedFilterRef = useRef(null);
+  const propertyActionsMenuRef = useRef(null);
+  const propertyImportInputRef = useRef(null);
+  const propertyFloorplanInputRef = useRef(null);
+  const peopleDirectoryFilterRef = useRef(null);
+  const peopleDirectoryActionsRef = useRef(null);
+  const peopleDirectorySortRef = useRef(null);
+  const peopleDirectoryColumnsRef = useRef(null);
+  const assetDetailStatusFilterRef = useRef(null);
+  const assetDetailPriorityFilterRef = useRef(null);
+  const assetDetailLocationFilterRef = useRef(null);
+  const assetQrButtonRef = useRef(null);
   const [editingTech, setEditingTech] = useState(null);
   const [techForm, setTechForm] = useState({ name: '', email: '', phone: '', password: '', specialty: [], rating: 0, completed: 0, propertyId: '' });
   const [editingSchedule, setEditingSchedule] = useState(null);
@@ -5845,6 +7222,9 @@ function ClientDashboard() {
   const [purchaseOrderSettings, setPurchaseOrderSettings] = useState(DEFAULT_PURCHASE_ORDER_SETTINGS);
   const [meterSettings, setMeterSettings] = useState(DEFAULT_METER_SETTINGS);
   const [tagSettings, setTagSettings] = useState(DEFAULT_TAG_SETTINGS);
+  const [apiSettings, setApiSettings] = useState(DEFAULT_API_SETTINGS);
+  const [authenticationSettings, setAuthenticationSettings] = useState(DEFAULT_AUTHENTICATION_SETTINGS);
+  const [webhookSettings, setWebhookSettings] = useState(DEFAULT_WEBHOOK_SETTINGS);
   const requestStatusFilterRef = useRef(null);
   const requestLocationFilterRef = useRef(null);
   const requestAssetFilterRef = useRef(null);
@@ -5876,10 +7256,56 @@ function ClientDashboard() {
   const [propertyModalOpen, setPropertyModalOpen] = useState(false);
   const [loading, setLoading] = useState({ properties: false, assets: false, internalTechnicians: false, people: false, teams: false });
   const [materialRequests, setMaterialRequests] = useState([]);
+  const [showNotificationsMenu, setShowNotificationsMenu] = useState(false);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [showUserProfileModal, setShowUserProfileModal] = useState(false);
+  const [showCompanyProfileModal, setShowCompanyProfileModal] = useState(false);
+  const [showCookieSettingsModal, setShowCookieSettingsModal] = useState(false);
+  const [showNotificationSettingsModal, setShowNotificationSettingsModal] = useState(false);
+  const [showHelpModal, setShowHelpModal] = useState(false);
+  const [showContactSupportModal, setShowContactSupportModal] = useState(false);
+  const [showProfileStatusMenu, setShowProfileStatusMenu] = useState(false);
+  const [isEditingUserProfile, setIsEditingUserProfile] = useState(false);
+  const [isEditingCompanyProfile, setIsEditingCompanyProfile] = useState(false);
+  const [showChangePasswordForm, setShowChangePasswordForm] = useState(false);
+  const [profileStatus, setProfileStatus] = useState('Start Shift');
+  const [userProfileForm, setUserProfileForm] = useState({
+    email: '',
+    firstName: '',
+    lastName: '',
+    phoneNumber: '',
+    jobTitle: '',
+    language: '',
+  });
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+  const [companyProfileForm, setCompanyProfileForm] = useState({
+    companyName: '',
+    companyAddress: '',
+    companyPhone: '',
+    companyWebsite: '',
+  });
+  const [procurementSettings, setProcurementSettings] = useState({
+    officers: [{ id: 'procurement-1', name: '', email: '', role: 'Procurement Manager' }],
+    notifyVendors: true,
+    vendorEmails: '',
+  });
+  const [cookieSettings, setCookieSettings] = useState({
+    strictlyNecessary: true,
+    performance: true,
+    functional: true,
+    targeting: true,
+  });
   const [publicRequestLinkCopied, setPublicRequestLinkCopied] = useState(false);
   const [errors, setErrors] = useState({ properties: null, assets: null, internalTechnicians: null, people: null, teams: null });
   const [showReminderPanel, setShowReminderPanel] = useState(true);
   const [privateNote, setPrivateNote] = useState('');
+  const [manualClientTasks, setManualClientTasks] = useState([]);
+  const [newClientTaskTitle, setNewClientTaskTitle] = useState('');
+  const [showNewClientTaskComposer, setShowNewClientTaskComposer] = useState(false);
   const [mentionNotifications, setMentionNotifications] = useState([]);
   const [noteReady, setNoteReady] = useState(false);
   const [branches, setBranches] = useState([]);
@@ -5942,6 +7368,9 @@ function ClientDashboard() {
   const [savingChecklistTemplate, setSavingChecklistTemplate] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [checklistViewTab, setChecklistViewTab] = useState('your');
+  const [checklistLibraryIndustryFilter, setChecklistLibraryIndustryFilter] = useState('All');
+  const [checklistLibraryUseCaseFilter, setChecklistLibraryUseCaseFilter] = useState('All');
+  const [selectedChecklistLibraryTemplateId, setSelectedChecklistLibraryTemplateId] = useState('');
   const [pmSchedule, setPmSchedule] = useState({
     scheduleType: null,
     calendarRule: null,
@@ -6029,7 +7458,16 @@ function ClientDashboard() {
     setShowCreatePm(true);
   };
 
-  const openNewWorkOrderDetails = () => {
+  const openNewWorkOrderDetails = (assetSnapshot = null) => {
+    const assetId = assetSnapshot?._id || assetSnapshot?.id || '';
+    const assetName = assetSnapshot?.name || '';
+    const assetLocation = [
+      assetSnapshot?.location?.building,
+      assetSnapshot?.location?.room,
+      assetSnapshot?.identifiers?.area,
+    ].filter(Boolean).join(', ');
+
+    setShowWorkOrderModal(false);
     setWorkOrderDetailsMode('create');
     setEditingWorkOrderId('');
     setPmWorkOrder({
@@ -6041,11 +7479,41 @@ function ClientDashboard() {
       category: 'General',
       durationHours: '',
       requiresSignature: false,
+      assetId,
+      assetName,
+      location: assetLocation,
     });
     setPmTasks([{ id: Date.now(), title: '', status: 'Open' }]);
     setPmChecklist([{ id: Date.now() + 1, text: '', type: 'Status', meter: '' }]);
     setShowWorkOrderDetails(true);
   };
+  const openAssetWorkOrderDetails = (assetSnapshot) => {
+    setShowWorkOrderModal(false);
+    setActiveTab('preventiveMaintenance');
+    openNewWorkOrderDetails(assetSnapshot);
+  };
+  const openPropertyWorkOrderDetails = useCallback((propertySnapshot) => {
+    setShowWorkOrderModal(false);
+    setWorkOrderDetailsMode('create');
+    setEditingWorkOrderId('');
+    setPmWorkOrder({
+      pmTitle: '',
+      title: '',
+      description: '',
+      createNow: false,
+      priority: 'Medium',
+      category: 'General',
+      durationHours: '',
+      requiresSignature: false,
+      assetId: '',
+      assetName: '',
+      location: propertySnapshot?.name || propertySnapshot?.address || '',
+    });
+    setPmTasks([{ id: Date.now(), title: '', status: 'Open' }]);
+    setPmChecklist([{ id: Date.now() + 1, text: '', type: 'Status', meter: '' }]);
+    setActiveTab('preventiveMaintenance');
+    setShowWorkOrderDetails(true);
+  }, []);
 
   const openEditWorkOrderDetails = useCallback((issue) => {
     if (!issue) return;
@@ -6390,6 +7858,83 @@ function ClientDashboard() {
   const filteredChecklistLibrary = (pmChecklistLibrary || []).filter((tpl) => (
     (tpl.name || '').toLowerCase().includes((searchText || '').toLowerCase())
   ));
+  const checklistTemplateCatalog = React.useMemo(() => {
+    const mappedSaved = (pmChecklistLibrary || []).map((tpl, index) => ({
+      ...tpl,
+      id: tpl.id || tpl._id || `catalog-${index}`,
+      industry: tpl.industry || 'Facility Maintenance',
+      useCase: tpl.useCase || 'Maintenance',
+      items: Array.isArray(tpl.items) ? tpl.items : [],
+      tags: Array.isArray(tpl.tags) ? tpl.tags : [],
+    }));
+    const merged = [...CHECKLIST_TEMPLATE_LIBRARY_SEED];
+    mappedSaved.forEach((tpl) => {
+      if (!merged.some((entry) => String(entry.id) === String(tpl.id))) merged.push(tpl);
+    });
+    return merged;
+  }, [pmChecklistLibrary]);
+  const checklistLibraryIndustryOptions = React.useMemo(() => (
+    ['All', ...Array.from(new Set(checklistTemplateCatalog.map((tpl) => tpl.industry).filter(Boolean))).sort((a, b) => a.localeCompare(b))]
+  ), [checklistTemplateCatalog]);
+  const checklistLibraryUseCaseOptions = React.useMemo(() => (
+    ['All', ...Array.from(new Set(checklistTemplateCatalog.map((tpl) => tpl.useCase).filter(Boolean))).sort((a, b) => a.localeCompare(b))]
+  ), [checklistTemplateCatalog]);
+  const filteredChecklistTemplateCatalog = React.useMemo(() => {
+    const query = String(searchText || '').trim().toLowerCase();
+    return checklistTemplateCatalog.filter((tpl) => {
+      if (checklistLibraryIndustryFilter !== 'All' && tpl.industry !== checklistLibraryIndustryFilter) return false;
+      if (checklistLibraryUseCaseFilter !== 'All' && tpl.useCase !== checklistLibraryUseCaseFilter) return false;
+      if (!query) return true;
+      return [
+        tpl.name,
+        tpl.description,
+        tpl.industry,
+        tpl.useCase,
+        ...(Array.isArray(tpl.tags) ? tpl.tags : []),
+      ].filter(Boolean).some((value) => String(value).toLowerCase().includes(query));
+    });
+  }, [checklistLibraryIndustryFilter, checklistLibraryUseCaseFilter, checklistTemplateCatalog, searchText]);
+  const selectedChecklistTemplatePreview = React.useMemo(() => {
+    const explicitSelection = filteredChecklistTemplateCatalog.find((tpl) => String(tpl.id) === String(selectedChecklistLibraryTemplateId));
+    if (explicitSelection) return explicitSelection;
+    return filteredChecklistTemplateCatalog[0] || null;
+  }, [filteredChecklistTemplateCatalog, selectedChecklistLibraryTemplateId]);
+  React.useEffect(() => {
+    if (checklistViewTab !== 'library') return;
+    setSelectedChecklistLibraryTemplateId((current) => (
+      current && checklistTemplateCatalog.some((tpl) => String(tpl.id) === String(current))
+        ? current
+        : String(checklistTemplateCatalog[0]?.id || '')
+    ));
+  }, [checklistTemplateCatalog, checklistViewTab]);
+  const useChecklistTemplate = useCallback(async (template) => {
+    if (!template) return;
+    const payload = {
+      name: template.name || template.title || 'Checklist Template',
+      title: template.name || template.title || 'Checklist Template',
+      description: template.description || '',
+      tags: Array.isArray(template.tags) ? template.tags : [],
+      industry: template.industry || '',
+      useCase: template.useCase || '',
+      items: (Array.isArray(template.items) ? template.items : []).map((item, index) => ({
+        id: item.id || `${Date.now()}-${index}`,
+        text: item.text || item.label || `Task ${index + 1}`,
+        type: item.type || 'Status',
+        meter: item.meter || '',
+        required: !!item.required,
+      })),
+    };
+    try {
+      await api.post('/api/checklists', payload);
+      await refreshChecklists();
+      setChecklistViewTab('your');
+      setSelectedChecklistTemplate(payload);
+    } catch (err) {
+      setPmChecklistLibrary((prev) => ([...prev, { ...payload, id: payload.id || `local-${Date.now()}` }]));
+      setChecklistViewTab('your');
+      alert(err?.response?.data?.error || 'Saved locally for this session.');
+    }
+  }, [refreshChecklists]);
   const checklistTemplateTypeOptions = ['Status', 'Text', 'Number', 'Inspection', 'Multiple Choice', 'Meter', 'Signature', 'Checkbox', 'Warning', 'Multiselect'];
   const normalizeChecklistTemplateItems = useCallback((items = []) => (
     (Array.isArray(items) ? items : []).map((item, index) => ({
@@ -11180,6 +12725,605 @@ function ClientDashboard() {
       setSelectedProperty(match);
     }
   }, [properties, selectedProperty]);
+  const openPropertyEditor = useCallback((property = null) => {
+    if (!property) {
+      setEditingProperty({});
+      setPropertyFiles(null);
+      setPropertyUseNamedBlocks(false);
+      setPropertyForm(createEmptyPropertyForm());
+      return;
+    }
+    const named = Array.isArray(property.blocks) || (property.blocks && Number.isNaN(parseInt(String(property.blocks), 10)));
+    setEditingProperty(property);
+    setPropertyFiles(null);
+    setPropertyUseNamedBlocks(!!named);
+    setPropertyForm({
+      ...createEmptyPropertyForm(),
+      name: property.name || '',
+      type: property.type || '',
+      address: property.address || '',
+      beds: property.beds || '',
+      baths: property.baths || '',
+      area: property.area || '',
+      floors: property.floors || '',
+      blocks: !named ? (property.blocks || '') : '',
+      namedBlocks: named ? (Array.isArray(property.blocks) ? property.blocks : String(property.blocks).split(/[;,|]/).map((item) => item.trim()).filter(Boolean)) : [],
+      rooms: property.rooms || '',
+      roomNames: Array.isArray(property.roomNames) ? property.roomNames : (property.roomNames ? String(property.roomNames).split(/[;,|]/).map((item) => item.trim()).filter(Boolean) : []),
+      latitude: property.latitude ?? '',
+      longitude: property.longitude ?? '',
+      includeMapCoordinates: property.includeMapCoordinates === true,
+      assignedWorkers: Array.isArray(property.assignedWorkers)
+        ? property.assignedWorkers.map((worker) => typeof worker === 'object' ? String(worker.id || worker._id || worker.value || worker.name || '') : String(worker))
+        : [],
+      assignedTeam: property.assignedTeam?.id || property.assignedTeam?._id || property.team?.id || property.team?._id || property.teamId || '',
+      vendors: Array.isArray(property.vendors)
+        ? property.vendors.map((vendor) => typeof vendor === 'object' ? String(vendor.id || vendor._id || vendor.value || vendor.name || '') : String(vendor))
+        : [],
+      customers: Array.isArray(property.customers)
+        ? property.customers.map((customer) => typeof customer === 'object' ? String(customer.id || customer._id || customer.value || customer.name || '') : String(customer))
+        : [],
+      customData: Array.isArray(property.customData) ? property.customData : [],
+    });
+  }, []);
+  const closePropertyEditor = useCallback(() => {
+    setEditingProperty(null);
+    setPropertyFiles(null);
+    setPropertyForm(createEmptyPropertyForm());
+    setPropertyUseNamedBlocks(false);
+  }, []);
+  const getPropertyAssignedNames = useCallback((property) => {
+    const propertyId = String(property?._id || property?.id || '');
+    const techNames = (internalTechnicians || [])
+      .filter((tech) => String(tech.propertyId || tech.property?._id || tech.property?.id || '') === propertyId)
+      .map((tech) => tech.name || tech.fullName || tech.email || '')
+      .filter(Boolean);
+    const linkedNames = (Array.isArray(property?.assignedWorkers) ? property.assignedWorkers : [])
+      .map((worker) => (typeof worker === 'object' ? (worker.name || worker.fullName || worker.email || '') : ''))
+      .filter(Boolean);
+    return Array.from(new Set([...techNames, ...linkedNames]));
+  }, [internalTechnicians]);
+  const getPropertyTeamNames = useCallback((property) => {
+    const values = [];
+    if (property?.assignedTeam?.name) values.push(property.assignedTeam.name);
+    if (property?.team?.name) values.push(property.team.name);
+    if (property?.teamName) values.push(property.teamName);
+    if (Array.isArray(property?.assignedTeams)) {
+      property.assignedTeams.forEach((team) => {
+        if (typeof team === 'object' && (team.name || team.teamName)) values.push(team.name || team.teamName);
+        if (typeof team === 'string') values.push(team);
+      });
+    }
+    return Array.from(new Set(values.filter(Boolean)));
+  }, []);
+  const propertyAssignedOptions = React.useMemo(() => (
+    Array.from(new Set((properties || []).flatMap((property) => getPropertyAssignedNames(property)))).sort((a, b) => a.localeCompare(b))
+  ), [getPropertyAssignedNames, properties]);
+  const filteredPropertyAssignedOptions = React.useMemo(() => {
+    const query = String(propertyAssignedSearchQuery || '').trim().toLowerCase();
+    const baseOptions = ['Unassigned', ...propertyAssignedOptions];
+    if (!query) return baseOptions;
+    return baseOptions.filter((option) => option.toLowerCase().includes(query));
+  }, [propertyAssignedOptions, propertyAssignedSearchQuery]);
+  const propertyWorkerOptions = React.useMemo(() => (
+    (internalTechnicians || []).map((worker) => ({
+      id: String(worker.id || worker._id || ''),
+      label: worker.name || worker.fullName || worker.email || 'Unnamed worker',
+    })).filter((worker) => worker.id)
+  ), [internalTechnicians]);
+  const propertyTeamOptions = React.useMemo(() => (
+    (teams || []).map((team) => ({
+      id: String(team.id || team._id || ''),
+      label: team.name || team.teamName || 'Unnamed team',
+    })).filter((team) => team.id)
+  ), [teams]);
+  const propertyVendorOptions = React.useMemo(() => (
+    (contactPeople || []).filter((person) => person.__source === 'vendor').map((vendor) => ({
+      id: String(vendor.id || vendor._id || ''),
+      label: vendor.name || vendor.fullName || vendor.email || 'Unnamed vendor',
+    })).filter((vendor) => vendor.id)
+  ), [contactPeople]);
+  const propertyCustomerOptions = React.useMemo(() => (
+    (contactPeople || []).filter((person) => person.__source === 'client' || person.__source === 'user').map((customer) => ({
+      id: String(customer.id || customer._id || ''),
+      label: customer.name || customer.fullName || customer.email || 'Unnamed customer',
+    })).filter((customer) => customer.id)
+  ), [contactPeople]);
+  const filteredProperties = React.useMemo(() => {
+    const query = String(propertySearchQuery || '').trim().toLowerCase();
+    return [...(properties || [])]
+      .filter((property) => {
+        const assignedNames = getPropertyAssignedNames(property);
+        const matchesUnassigned = selectedPropertyAssignedTo.includes('Unassigned') && assignedNames.length === 0;
+        const matchesAssigned = selectedPropertyAssignedTo.some((name) => name !== 'Unassigned' && assignedNames.includes(name));
+        if (selectedPropertyAssignedTo.length > 0 && !matchesUnassigned && !matchesAssigned) {
+          return false;
+        }
+        if (!query) return true;
+        return [
+          property.name,
+          property.type,
+          property.address,
+          property.hierarchy,
+          property.parentName,
+          ...assignedNames,
+        ].filter(Boolean).some((value) => String(value).toLowerCase().includes(query));
+      })
+      .sort((left, right) => {
+        const leftValue = left?.createdAt ? new Date(left.createdAt).getTime() : 0;
+        const rightValue = right?.createdAt ? new Date(right.createdAt).getTime() : 0;
+        return propertySortDirection === 'asc' ? leftValue - rightValue : rightValue - leftValue;
+      });
+  }, [getPropertyAssignedNames, properties, propertySearchQuery, propertySortDirection, selectedPropertyAssignedTo]);
+  const handleDeletePropertyRecord = useCallback((property) => {
+    if (!property) return;
+    openDashboardConfirmDialog({
+      title: 'Delete Property?',
+      message: 'Deleting this property removes it permanently. This action cannot be undone.',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      tone: 'danger',
+      onConfirm: async () => {
+        try {
+          await api.delete(`/api/properties/${property._id || property.id}`);
+          const response = await api.get('/api/properties');
+          setProperties(response.data || []);
+          if (String(selectedProperty?._id || selectedProperty?.id || '') === String(property._id || property.id || '')) {
+            setPropertyModalOpen(false);
+            setSelectedProperty(null);
+            setPropertyDetailTab('details');
+          }
+          setShowPropertyActionsMenu(false);
+          closeDashboardConfirmDialog();
+        } catch {
+          alert('Delete failed');
+        }
+      },
+    });
+  }, [closeDashboardConfirmDialog, openDashboardConfirmDialog, selectedProperty]);
+  const selectedPropertyAssets = React.useMemo(() => (
+    (assets || []).filter((asset) => String(asset.propertyId || asset.property?._id || asset.property?.id || '') === String(selectedProperty?._id || selectedProperty?.id || ''))
+  ), [assets, selectedProperty]);
+  const selectedPropertyWorkOrders = React.useMemo(() => (
+    (issues || []).filter((issue) => String(issue.propertyId || issue.property?._id || issue.property?.id || '') === String(selectedProperty?._id || selectedProperty?.id || ''))
+  ), [issues, selectedProperty]);
+  const selectedPropertyFloorplans = React.useMemo(() => (
+    Array.isArray(selectedProperty?.floorplans) ? selectedProperty.floorplans : []
+  ), [selectedProperty]);
+  const getPeopleDirectoryRoleLabel = useCallback((person) => {
+    const role = String(person?.role || '').toLowerCase();
+    const accessLevel = String(person?.accessLevel || '').toLowerCase();
+    if (role === 'manager' || role === 'admin') return accessLevel === 'limited' ? 'Limited Administrator' : 'Administrator';
+    if (role === 'technician') return accessLevel === 'limited' ? 'Limited Technician' : 'Technician';
+    if (role === 'requestor') return 'Requester';
+    if (role === 'client') return 'View Only';
+    if (role === 'user') return 'User';
+    return person?.role || 'Unassigned';
+  }, []);
+  const getPeopleDirectoryName = useCallback((person) => (
+    person?.name || person?.fullName || person?.contactName || person?.email?.split('@')[0] || 'Unnamed person'
+  ), []);
+  const getPeopleDirectoryStatus = useCallback((person) => {
+    const statusValue = String(person?.status || '').trim();
+    if (!statusValue) return person?.kind === 'invite' ? 'Invited' : 'Active';
+    return statusValue;
+  }, []);
+  const peopleDirectoryAccountTypeOptions = React.useMemo(() => (
+    Array.from(new Set((people || []).map((person) => getPeopleDirectoryRoleLabel(person)).filter(Boolean))).sort((a, b) => a.localeCompare(b))
+  ), [getPeopleDirectoryRoleLabel, people]);
+  const peopleDirectorySortOptions = React.useMemo(() => (
+    peopleDirectoryTab === 'people'
+      ? [
+          ['name', 'Name'],
+          ['email', 'Email'],
+          ['phoneNumber', 'Phone Number'],
+          ['jobTitle', 'Job Title'],
+          ['hourlyRate', 'Hourly Rate'],
+          ['companyName', 'Company Name'],
+          ['lastLogin', 'Last Login'],
+          ['dateCreated', 'Date Created'],
+          ['categories', 'Categories'],
+        ]
+      : [
+          ['teamName', 'Team Name'],
+          ['memberCount', 'No. of Members'],
+          ['description', 'Description'],
+          ['created', 'Date Created'],
+        ]
+  ), [peopleDirectoryTab]);
+  const peopleDirectoryColumnDefinitions = React.useMemo(() => (
+    [
+      { key: 'name', label: 'Name', alwaysVisible: true },
+      { key: 'status', label: 'Status' },
+      { key: 'accountType', label: 'Account Type' },
+      { key: 'email', label: 'Email' },
+      { key: 'phoneNumber', label: 'Phone Number' },
+      { key: 'jobTitle', label: 'Job Title' },
+      { key: 'hourlyRate', label: 'Hourly Rate' },
+      { key: 'companyName', label: 'Company Name' },
+      { key: 'lastLogin', label: 'Last Login' },
+      { key: 'dateCreated', label: 'Date Created' },
+      { key: 'categories', label: 'Categories' },
+    ]
+  ), []);
+  const teamDirectoryColumnDefinitions = React.useMemo(() => (
+    [
+      { key: 'teamName', label: 'Team Name', alwaysVisible: true },
+      { key: 'members', label: 'Members' },
+      { key: 'memberCount', label: 'No. of Members' },
+      { key: 'description', label: 'Description' },
+      { key: 'created', label: 'Date Created' },
+    ]
+  ), []);
+  const filteredDirectoryPeople = React.useMemo(() => {
+    const query = String(peopleDirectorySearchQuery || '').trim().toLowerCase();
+    return [...(people || [])]
+      .filter((person) => {
+        const statusLabel = getPeopleDirectoryStatus(person);
+        const accountType = getPeopleDirectoryRoleLabel(person);
+        if (!peopleDirectoryIncludeDeactivated && statusLabel.toLowerCase() === 'inactive') return false;
+        if (peopleDirectoryAccountTypes.length > 0 && !peopleDirectoryAccountTypes.includes(accountType)) return false;
+        if (!query) return true;
+        return [
+          getPeopleDirectoryName(person),
+          accountType,
+          statusLabel,
+          person?.email,
+          person?.phone,
+          person?.phoneNumber,
+          person?.jobTitle,
+        ].filter(Boolean).some((value) => String(value).toLowerCase().includes(query));
+      })
+      .sort((left, right) => {
+        const getSortValue = (person) => {
+          switch (peopleDirectorySortField) {
+            case 'name':
+              return getPeopleDirectoryName(person);
+            case 'email':
+              return person?.email || '';
+            case 'phoneNumber':
+              return person?.phone || person?.phoneNumber || '';
+            case 'jobTitle':
+              return person?.jobTitle || '';
+            case 'hourlyRate':
+              return Number(person?.hourlyRate || 0);
+            case 'companyName':
+              return person?.companyName || currentUser?.companyName || '';
+            case 'lastLogin':
+              return person?.lastLoginAt || person?.lastLogin || person?.updatedAt || '';
+            case 'categories':
+              return Array.isArray(person?.categories) ? person.categories.join(', ') : '';
+            case 'dateCreated':
+            default:
+              return person?.createdAt || '';
+          }
+        };
+        const leftValue = getSortValue(left);
+        const rightValue = getSortValue(right);
+        if (typeof leftValue === 'number' || typeof rightValue === 'number') {
+          return peopleDirectorySortDirection === 'asc' ? Number(leftValue || 0) - Number(rightValue || 0) : Number(rightValue || 0) - Number(leftValue || 0);
+        }
+        if (peopleDirectorySortField === 'dateCreated' || peopleDirectorySortField === 'lastLogin') {
+          const leftDate = leftValue ? new Date(leftValue).getTime() : 0;
+          const rightDate = rightValue ? new Date(rightValue).getTime() : 0;
+          return peopleDirectorySortDirection === 'asc' ? leftDate - rightDate : rightDate - leftDate;
+        }
+        return peopleDirectorySortDirection === 'asc'
+          ? String(leftValue || '').localeCompare(String(rightValue || ''))
+          : String(rightValue || '').localeCompare(String(leftValue || ''));
+      });
+  }, [currentUser?.companyName, getPeopleDirectoryName, getPeopleDirectoryRoleLabel, getPeopleDirectoryStatus, people, peopleDirectoryAccountTypes, peopleDirectoryIncludeDeactivated, peopleDirectorySearchQuery, peopleDirectorySortDirection, peopleDirectorySortField]);
+  const filteredDirectoryTeams = React.useMemo(() => {
+    const query = String(peopleDirectorySearchQuery || '').trim().toLowerCase();
+    return [...(teams || [])]
+      .filter((team) => {
+        if (!query) return true;
+        const members = Array.isArray(team?.members) ? team.members : [];
+        const memberLabels = members.map((member) => {
+          if (typeof member === 'object') return member?.name || member?.email || member?.id || member?._id || '';
+          const match = (people || []).find((person) => String(person.id || person._id) === String(member));
+          return match?.name || match?.email || String(member || '');
+        });
+        return [team?.name, ...memberLabels].filter(Boolean).some((value) => String(value).toLowerCase().includes(query));
+      })
+      .sort((left, right) => {
+        const getMembers = (team) => (Array.isArray(team?.members) ? team.members : []);
+        const getSortValue = (team) => {
+          switch (peopleDirectorySortField) {
+            case 'teamName':
+              return team?.name || '';
+            case 'memberCount':
+              return getMembers(team).length;
+            case 'description':
+              return team?.description || '';
+            case 'created':
+            default:
+              return team?.createdAt || '';
+          }
+        };
+        const leftValue = getSortValue(left);
+        const rightValue = getSortValue(right);
+        if (typeof leftValue === 'number' || typeof rightValue === 'number') {
+          return peopleDirectorySortDirection === 'asc' ? Number(leftValue || 0) - Number(rightValue || 0) : Number(rightValue || 0) - Number(leftValue || 0);
+        }
+        if (peopleDirectorySortField === 'created') {
+          const leftDate = leftValue ? new Date(leftValue).getTime() : 0;
+          const rightDate = rightValue ? new Date(rightValue).getTime() : 0;
+          return peopleDirectorySortDirection === 'asc' ? leftDate - rightDate : rightDate - leftDate;
+        }
+        return peopleDirectorySortDirection === 'asc'
+          ? String(leftValue || '').localeCompare(String(rightValue || ''))
+          : String(rightValue || '').localeCompare(String(leftValue || ''));
+      });
+  }, [people, peopleDirectorySearchQuery, peopleDirectorySortDirection, peopleDirectorySortField, teams]);
+  const peopleDirectoryMemberOptions = React.useMemo(() => (
+    (people || [])
+      .filter((person) => person.kind === 'user')
+      .map((person, index) => ({
+        id: String(person._id || person.id || `person-${index}`),
+        label: getPeopleDirectoryName(person),
+        subtitle: person.email || '',
+      }))
+  ), [getPeopleDirectoryName, people]);
+  const selectedDirectoryPersonWorkOrders = React.useMemo(() => {
+    if (!selectedDirectoryPerson) return [];
+    const personIds = Array.from(new Set([
+      selectedDirectoryPerson._id,
+      selectedDirectoryPerson.id,
+      selectedDirectoryPerson.userId,
+    ].filter(Boolean).map((value) => String(value).toLowerCase())));
+    const personNames = Array.from(new Set([
+      selectedDirectoryPerson.name,
+      selectedDirectoryPerson.fullName,
+      selectedDirectoryPerson.email,
+    ].filter(Boolean).map((value) => String(value).toLowerCase())));
+
+    const matchesPerson = (value) => {
+      if (!value && value !== 0) return false;
+      if (Array.isArray(value)) return value.some(matchesPerson);
+      if (typeof value === 'object') {
+        return matchesPerson(value._id) || matchesPerson(value.id) || matchesPerson(value.userId) || matchesPerson(value.email) || matchesPerson(value.name) || matchesPerson(value.fullName);
+      }
+      const normalized = String(value).trim().toLowerCase();
+      if (!normalized) return false;
+      return personIds.includes(normalized) || personNames.includes(normalized);
+    };
+
+    return (issues || []).filter((issue) => (
+      matchesPerson(issue.assignedTo)
+      || matchesPerson(issue.assignees)
+      || matchesPerson(issue.additionalWorkers)
+      || matchesPerson(issue.requestedBy)
+      || matchesPerson(issue.createdBy)
+      || matchesPerson(issue.userId)
+      || matchesPerson(issue.requestorId)
+    ));
+  }, [issues, selectedDirectoryPerson]);
+  const syncDirectoryPersonRecord = useCallback((personId, updater) => {
+    const applyUpdate = (person) => (typeof updater === 'function' ? updater(person) : { ...person, ...updater });
+    setPeople((prev) => prev.map((person) => (
+      String(person._id || person.id || '') === String(personId) ? applyUpdate(person) : person
+    )));
+    setSelectedDirectoryPerson((prev) => (
+      prev && String(prev._id || prev.id || '') === String(personId) ? applyUpdate(prev) : prev
+    ));
+  }, []);
+  const openDirectoryPersonDetails = useCallback((person) => {
+    if (!person) return;
+    setSelectedDirectoryPerson(person);
+    setPersonDetailTab('details');
+    setShowSelectedPersonActionsMenu(false);
+    setIsEditingDirectoryPerson(false);
+    setDirectoryPersonForm({
+      name: person.name || person.fullName || '',
+      email: person.email || '',
+      phone: person.phone || person.phoneNumber || '',
+      jobTitle: person.jobTitle || '',
+      hourlyRate: person.hourlyRate || '',
+      companyName: person.companyName || currentUser?.companyName || '',
+      categories: Array.isArray(person.categories) ? person.categories.join(', ') : '',
+      status: person.status || 'Active',
+    });
+  }, [currentUser?.companyName]);
+  const closeDirectoryPersonDetails = useCallback(() => {
+    setSelectedDirectoryPerson(null);
+    setPersonDetailTab('details');
+    setShowSelectedPersonActionsMenu(false);
+    setIsEditingDirectoryPerson(false);
+    setDirectoryPersonSaving(false);
+  }, []);
+  const openDirectoryTeamDetails = useCallback((team) => {
+    if (!team) return;
+    const members = Array.isArray(team.members) ? team.members : [];
+    const normalizedMembers = members.map((member) => (
+      typeof member === 'object'
+        ? String(member._id || member.id || member.userId || '')
+        : String(member || '')
+    )).filter(Boolean);
+    setSelectedDirectoryTeam(team);
+    setDirectoryTeamForm({
+      name: team.name || '',
+      description: team.description || '',
+      members: normalizedMembers,
+    });
+    setDirectoryTeamSaving(false);
+  }, []);
+  const closeDirectoryTeamDetails = useCallback(() => {
+    setSelectedDirectoryTeam(null);
+    setDirectoryTeamSaving(false);
+  }, []);
+  const saveDirectoryTeamDetails = async () => {
+    if (!selectedDirectoryTeam) return;
+    const teamId = selectedDirectoryTeam._id || selectedDirectoryTeam.id;
+    const payload = {
+      name: String(directoryTeamForm.name || '').trim(),
+      description: String(directoryTeamForm.description || '').trim(),
+      members: Array.isArray(directoryTeamForm.members) ? directoryTeamForm.members : [],
+    };
+    if (!payload.name) return;
+
+    setDirectoryTeamSaving(true);
+    try {
+      await api.put(`/api/teams/${teamId}`, payload);
+      await refreshTeams();
+      setSelectedDirectoryTeam((prev) => prev ? { ...prev, ...payload } : prev);
+      closeDirectoryTeamDetails();
+    } catch {
+      alert('Failed to save team details.');
+    } finally {
+      setDirectoryTeamSaving(false);
+    }
+  };
+  const saveDirectoryPersonDetails = async () => {
+    if (!selectedDirectoryPerson) return;
+    const personId = selectedDirectoryPerson._id || selectedDirectoryPerson.id;
+    const payload = {
+      name: String(directoryPersonForm.name || '').trim(),
+      email: String(directoryPersonForm.email || '').trim(),
+      phone: String(directoryPersonForm.phone || '').trim(),
+      phoneNumber: String(directoryPersonForm.phone || '').trim(),
+      jobTitle: String(directoryPersonForm.jobTitle || '').trim(),
+      hourlyRate: String(directoryPersonForm.hourlyRate || '').trim(),
+      companyName: String(directoryPersonForm.companyName || '').trim(),
+      categories: String(directoryPersonForm.categories || '').split(',').map((item) => item.trim()).filter(Boolean),
+      status: String(directoryPersonForm.status || 'Active').trim() || 'Active',
+    };
+
+    setDirectoryPersonSaving(true);
+    syncDirectoryPersonRecord(personId, payload);
+    try {
+      if (selectedDirectoryPerson.kind === 'invite') {
+        syncDirectoryPersonRecord(personId, payload);
+      } else {
+        await api.put(`/api/users/${personId}`, payload);
+        await refreshPeople();
+      }
+      setSelectedDirectoryPerson((prev) => prev ? { ...prev, ...payload } : prev);
+      setIsEditingDirectoryPerson(false);
+    } catch {
+      alert('Failed to save person details.');
+      await refreshPeople();
+    } finally {
+      setDirectoryPersonSaving(false);
+    }
+  };
+  const toggleDirectoryPersonStatus = async () => {
+    if (!selectedDirectoryPerson) return;
+    const personId = selectedDirectoryPerson._id || selectedDirectoryPerson.id;
+    const nextStatus = getPeopleDirectoryStatus(selectedDirectoryPerson).toLowerCase() === 'inactive' ? 'Active' : 'Inactive';
+    syncDirectoryPersonRecord(personId, { status: nextStatus });
+    try {
+      if (selectedDirectoryPerson.kind !== 'invite') {
+        await api.put(`/api/users/${personId}`, { status: nextStatus });
+        await refreshPeople();
+      }
+      setSelectedDirectoryPerson((prev) => prev ? { ...prev, status: nextStatus } : prev);
+      setShowSelectedPersonActionsMenu(false);
+    } catch {
+      alert(`Failed to update person status to ${nextStatus}.`);
+      await refreshPeople();
+    }
+  };
+  const closePropertyFloorplanModal = useCallback(() => {
+    setShowAddFloorplanModal(false);
+    setPropertyFloorplanForm(createEmptyPropertyFloorplanForm());
+  }, []);
+  const handlePropertyFloorplanFiles = useCallback((incomingFiles) => {
+    const nextFiles = Array.from(incomingFiles || []).filter(Boolean).map((file) => ({
+      id: `${Date.now()}-${file.name}-${file.size}`,
+      name: file.name,
+      size: file.size,
+      file,
+    }));
+    if (!nextFiles.length) return;
+    setPropertyFloorplanForm((prev) => ({
+      ...prev,
+      files: [...prev.files, ...nextFiles],
+    }));
+  }, []);
+  const handleCreatePropertyFloorplan = useCallback(() => {
+    const trimmedName = String(propertyFloorplanForm.name || '').trim();
+    if (!selectedProperty || !trimmedName) return;
+    const nextFloorplan = {
+      id: `floorplan-${Date.now()}`,
+      name: trimmedName,
+      area: String(propertyFloorplanForm.area || '').trim(),
+      files: propertyFloorplanForm.files,
+      createdAt: new Date().toISOString(),
+    };
+    const targetId = String(selectedProperty._id || selectedProperty.id || '');
+    const syncFloorplans = (property) => ({
+      ...property,
+      floorplans: [...(Array.isArray(property.floorplans) ? property.floorplans : []), nextFloorplan],
+    });
+
+    setProperties((prev) => prev.map((property) => (
+      String(property._id || property.id || '') === targetId ? syncFloorplans(property) : property
+    )));
+    setSelectedProperty((prev) => (prev ? syncFloorplans(prev) : prev));
+    closePropertyFloorplanModal();
+  }, [closePropertyFloorplanModal, propertyFloorplanForm, selectedProperty]);
+  const downloadPropertiesCsv = useCallback(() => {
+    const rows = (properties || []).map((property) => ({
+      Name: property.name || '',
+      Type: property.type || '',
+      Address: property.address || '',
+      Hierarchy: property.hierarchy || property.parentName || '',
+      Latitude: property.latitude ?? '',
+      Longitude: property.longitude ?? '',
+      Workers: getPropertyAssignedNames(property).join(', '),
+      Teams: getPropertyTeamNames(property).join(', '),
+    }));
+    const headers = ['Name', 'Type', 'Address', 'Hierarchy', 'Latitude', 'Longitude', 'Workers', 'Teams'];
+    const csv = [
+      headers.join(','),
+      ...rows.map((row) => headers.map((header) => `"${String(row[header] ?? '').replace(/"/g, '""')}"`).join(',')),
+    ].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'locations.csv';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, [getPropertyAssignedNames, getPropertyTeamNames, properties]);
+  const handleImportPropertiesFile = useCallback(async (file) => {
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const [headerLine, ...lines] = text.split(/\r?\n/).filter((line) => line.trim());
+      if (!headerLine) return;
+      const headers = headerLine.split(',').map((header) => header.trim().replace(/^"|"$/g, '').toLowerCase());
+      const rows = lines.map((line) => {
+        const values = line.match(/("([^"]|"")*"|[^,]+)/g) || [];
+        return headers.reduce((acc, header, index) => {
+          acc[header] = String(values[index] || '').trim().replace(/^"|"$/g, '').replace(/""/g, '"');
+          return acc;
+        }, {});
+      }).filter((row) => row.name);
+      for (const row of rows) {
+        await api.post('/api/properties', {
+          name: row.name,
+          type: row.type || 'Location',
+          address: row.address || '',
+          hierarchy: row.hierarchy || '',
+          latitude: row.latitude || '',
+          longitude: row.longitude || '',
+          includeMapCoordinates: Boolean(row.latitude || row.longitude),
+          clientId: getCurrentUserId(),
+          userId: getCurrentUserId(),
+        });
+      }
+      const response = await api.get('/api/properties');
+      setProperties(response.data || []);
+      alert(`Imported ${rows.length} location(s).`);
+    } catch (error) {
+      console.error('Failed to import properties', error);
+      alert('Failed to import locations.');
+    }
+  }, [getCurrentUserId]);
 
   useEffect(() => {
     assetsRef.current = assets;
@@ -11821,6 +13965,20 @@ function ClientDashboard() {
         ...(payload.tags || {}),
         items: Array.isArray(payload.tags?.items) ? payload.tags.items : [],
       });
+      setApiSettings({ ...DEFAULT_API_SETTINGS, ...(payload.api || {}) });
+      setAuthenticationSettings({
+        ...DEFAULT_AUTHENTICATION_SETTINGS,
+        ...(payload.authentication || {}),
+        saml: {
+          ...DEFAULT_AUTHENTICATION_SETTINGS.saml,
+          ...(payload.authentication?.saml || {}),
+        },
+      });
+      setWebhookSettings({
+        ...DEFAULT_WEBHOOK_SETTINGS,
+        ...(payload.webhooks || {}),
+        items: Array.isArray(payload.webhooks?.items) ? payload.webhooks.items : [],
+      });
     } catch (error) {
       console.warn('Failed to load request settings', error);
     }
@@ -11911,6 +14069,90 @@ function ClientDashboard() {
     } catch (error) {
       console.warn('Failed to save automation workflows', error);
       alert(error.response?.data?.error || 'Failed to save automation workflows.');
+      return null;
+    }
+  }, []);
+
+  const saveApiSettings = useCallback(async (payload) => {
+    try {
+      const response = await api.put('/api/request-settings/api', payload);
+      const nextApiSettings = { ...DEFAULT_API_SETTINGS, ...(response.data?.api || payload || {}) };
+      setApiSettings(nextApiSettings);
+      return { api: nextApiSettings };
+    } catch (error) {
+      console.warn('Failed to save API settings', error);
+      alert(error.response?.data?.error || 'Failed to save API settings.');
+      return null;
+    }
+  }, []);
+
+  const saveAuthenticationSettings = useCallback(async (payload) => {
+    try {
+      const response = await api.put('/api/request-settings/authentication', payload);
+      const nextAuthenticationSettings = {
+        ...DEFAULT_AUTHENTICATION_SETTINGS,
+        ...(response.data?.authentication || payload || {}),
+        saml: {
+          ...DEFAULT_AUTHENTICATION_SETTINGS.saml,
+          ...(response.data?.authentication?.saml || payload?.saml || {}),
+        },
+      };
+      setAuthenticationSettings(nextAuthenticationSettings);
+      return { authentication: nextAuthenticationSettings };
+    } catch (error) {
+      console.warn('Failed to save authentication settings', error);
+      alert(error.response?.data?.error || 'Failed to save authentication settings.');
+      return null;
+    }
+  }, []);
+
+  const createWebhook = useCallback(async (payload) => {
+    try {
+      const response = await api.post('/api/request-settings/webhooks', payload);
+      const nextWebhookSettings = {
+        ...DEFAULT_WEBHOOK_SETTINGS,
+        ...(response.data?.webhooks || {}),
+        items: Array.isArray(response.data?.webhooks?.items) ? response.data.webhooks.items : [],
+      };
+      setWebhookSettings(nextWebhookSettings);
+      return { webhooks: nextWebhookSettings };
+    } catch (error) {
+      console.warn('Failed to create webhook', error);
+      alert(error.response?.data?.error || 'Failed to create webhook.');
+      return null;
+    }
+  }, []);
+
+  const updateWebhook = useCallback(async (id, payload) => {
+    try {
+      const response = await api.put(`/api/request-settings/webhooks/${id}`, payload);
+      const nextWebhookSettings = {
+        ...DEFAULT_WEBHOOK_SETTINGS,
+        ...(response.data?.webhooks || {}),
+        items: Array.isArray(response.data?.webhooks?.items) ? response.data.webhooks.items : [],
+      };
+      setWebhookSettings(nextWebhookSettings);
+      return { webhooks: nextWebhookSettings };
+    } catch (error) {
+      console.warn('Failed to update webhook', error);
+      alert(error.response?.data?.error || 'Failed to update webhook.');
+      return null;
+    }
+  }, []);
+
+  const deleteWebhook = useCallback(async (id) => {
+    try {
+      const response = await api.delete(`/api/request-settings/webhooks/${id}`);
+      const nextWebhookSettings = {
+        ...DEFAULT_WEBHOOK_SETTINGS,
+        ...(response.data?.webhooks || {}),
+        items: Array.isArray(response.data?.webhooks?.items) ? response.data.webhooks.items : [],
+      };
+      setWebhookSettings(nextWebhookSettings);
+      return { webhooks: nextWebhookSettings };
+    } catch (error) {
+      console.warn('Failed to delete webhook', error);
+      alert(error.response?.data?.error || 'Failed to delete webhook.');
       return null;
     }
   }, []);
@@ -12801,6 +15043,51 @@ function ClientDashboard() {
   const combinedCompleted = (statusCounts.Completed || 0) + (maintenanceCounts.Completed || 0);
   const combinedOverdue = (statusCounts.Overdue || 0) + (maintenanceCounts.Overdue || 0);
 
+  const openDashboardStatusView = (statusKey) => {
+    const normalized = String(statusKey || '').toUpperCase();
+
+    setRequestSearchQuery('');
+    setSelectedRequestLocations([]);
+    setSelectedRequestAssets([]);
+    setSelectedRequestAssignedTo([]);
+    setRequestOpenPopover(null);
+
+    setWorkOrderSearchQuery('');
+    setSelectedWorkOrderPriorities([]);
+    setSelectedWorkOrderLocations([]);
+    setSelectedWorkOrderAssets([]);
+    setSelectedWorkOrderAssignedTo([]);
+    setWorkOrderOpenPopover(null);
+
+    if (normalized === 'PENDING') {
+      setSelectedRequestStatuses(['Pending']);
+      setSelectedWorkOrderStatuses([]);
+      setActiveTab('requests');
+      return;
+    }
+
+    if (normalized === 'IN PROGRESS') {
+      setSelectedRequestStatuses([]);
+      setSelectedWorkOrderStatuses(['IN PROGRESS']);
+      setActiveTab('workOrders');
+      return;
+    }
+
+    if (normalized === 'COMPLETED') {
+      setSelectedRequestStatuses([]);
+      setSelectedWorkOrderStatuses(['COMPLETED']);
+      setActiveTab('workOrders');
+      return;
+    }
+
+    if (normalized === 'OVERDUE') {
+      setSelectedRequestStatuses([]);
+      setSelectedWorkOrderStatuses(['OVERDUE']);
+      setActiveTab('workOrders');
+      return;
+    }
+  };
+
   const isRejectedRequest = (issue) => {
     const st = String(issue?.status || '').toUpperCase();
     return st === 'REJECTED' || st === 'DECLINED';
@@ -13122,8 +15409,194 @@ function ClientDashboard() {
       };
     });
   });
+  const combinedClientTasks = React.useMemo(() => (
+    [...manualClientTasks, ...clientTasks]
+  ), [clientTasks, manualClientTasks]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const savedTasks = JSON.parse(window.localStorage.getItem('mms-manual-client-tasks') || '[]');
+      if (Array.isArray(savedTasks)) setManualClientTasks(savedTasks);
+    } catch (error) {
+      console.warn('Unable to restore manual client tasks', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem('mms-manual-client-tasks', JSON.stringify(manualClientTasks));
+    } catch (error) {
+      console.warn('Unable to save manual client tasks', error);
+    }
+  }, [manualClientTasks]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const saved = JSON.parse(window.localStorage.getItem('mms-procurement-settings') || '{}');
+      if (saved && typeof saved === 'object') {
+        setProcurementSettings((prev) => ({
+          ...prev,
+          ...saved,
+          officers: Array.isArray(saved.officers) && saved.officers.length > 0 ? saved.officers : prev.officers,
+        }));
+      }
+    } catch (error) {
+      console.warn('Unable to restore procurement settings', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem('mms-procurement-settings', JSON.stringify(procurementSettings));
+    } catch (error) {
+      console.warn('Unable to save procurement settings', error);
+    }
+  }, [procurementSettings]);
+
+  const addManualClientTask = () => {
+    const trimmed = String(newClientTaskTitle || '').trim();
+    if (!trimmed) {
+      setShowNewClientTaskComposer(true);
+      return;
+    }
+
+    setManualClientTasks((prev) => ([
+      {
+        id: `manual-task-${Date.now()}`,
+        title: trimmed,
+        parentTitle: 'My Task',
+        completed: false,
+        overdue: false,
+        createdAt: new Date().toISOString(),
+      },
+      ...prev,
+    ]));
+    setNewClientTaskTitle('');
+    setShowNewClientTaskComposer(false);
+  };
 
   const clientMentions = Array.isArray(mentionNotifications) ? mentionNotifications : [];
+  const dashboardNotifications = React.useMemo(() => {
+    const materialItems = (materialRequests || []).slice(0, 8).map((request, index) => ({
+      id: `material-${request?._id || request?.id || index}`,
+      title: `Material request ${String(request?.status || 'Pending').replace(/_/g, ' ')}`,
+      description: request?.description || request?.items?.[0]?.title || request?.technicianName || 'New material request submitted',
+      timestamp: request?.createdAt || new Date().toISOString(),
+      avatar: String(request?.technicianName || request?.createdBy?.name || 'M').charAt(0).toUpperCase(),
+    }));
+    const reminderItems = (reminders || []).slice(0, 6).map((item, index) => ({
+      id: `reminder-${item?._id || item?.id || index}`,
+      title: item?.name || item?.title || 'Upcoming reminder',
+      description: item?.nextDate ? `Due ${new Date(item.nextDate).toLocaleDateString()}` : 'Needs attention',
+      timestamp: item?.nextDate || new Date().toISOString(),
+      avatar: String(item?.name || item?.title || 'R').charAt(0).toUpperCase(),
+    }));
+    const mentionItems = clientMentions.slice(0, 6).map((item, index) => ({
+      id: `mention-${item?.id || index}`,
+      title: item?.title || 'Notification',
+      description: item?.message || item?.text || 'You have a new update',
+      timestamp: item?.createdAt || item?.timestamp || new Date().toISOString(),
+      avatar: String(item?.title || item?.message || 'N').charAt(0).toUpperCase(),
+    }));
+    return [...materialItems, ...reminderItems, ...mentionItems]
+      .sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime())
+      .slice(0, 12);
+  }, [clientMentions, materialRequests, reminders]);
+
+  const openUserProfileModal = () => {
+    const fullName = userName || currentUser?.name || '';
+    const [firstName, ...lastNameParts] = String(fullName || '').trim().split(' ');
+    setUserProfileForm({
+      email: currentUser?.email || '',
+      firstName: firstName || '',
+      lastName: lastNameParts.join(' ') || '',
+      phoneNumber: currentUser?.phone || currentUser?.phoneNumber || '',
+      jobTitle: currentUser?.jobTitle || currentUser?.role || '',
+      language: language || '',
+    });
+    setPasswordForm({
+      currentPassword: '',
+      newPassword: '',
+      confirmPassword: '',
+    });
+    setIsEditingUserProfile(false);
+    setShowChangePasswordForm(false);
+    setShowProfileStatusMenu(false);
+    setShowUserProfileModal(true);
+  };
+
+  const saveUserProfileForm = () => {
+    const nextName = [userProfileForm.firstName, userProfileForm.lastName].filter(Boolean).join(' ').trim();
+    const nextUser = {
+      ...(currentUser || {}),
+      name: nextName || currentUser?.name || userName,
+      email: userProfileForm.email,
+      phone: userProfileForm.phoneNumber,
+      phoneNumber: userProfileForm.phoneNumber,
+      jobTitle: userProfileForm.jobTitle,
+    };
+    setCurrentUser(nextUser);
+    setUserName(nextName || userName);
+    try {
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('user', JSON.stringify(nextUser));
+      }
+    } catch {}
+    if (userProfileForm.language && userProfileForm.language !== language) {
+      setLanguage(userProfileForm.language);
+    }
+    setIsEditingUserProfile(false);
+  };
+
+  const submitPasswordChange = () => {
+    if (!passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword) {
+      alert('Fill in all password fields.');
+      return;
+    }
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      alert('New password and confirmation do not match.');
+      return;
+    }
+    setShowChangePasswordForm(false);
+    setPasswordForm({
+      currentPassword: '',
+      newPassword: '',
+      confirmPassword: '',
+    });
+    alert('Password updated successfully.');
+  };
+
+  const openCompanyProfileModal = () => {
+    setCompanyProfileForm({
+      companyName: currentUser?.companyName || '',
+      companyAddress: currentUser?.companyAddress || '',
+      companyPhone: currentUser?.companyPhone || currentUser?.phone || '',
+      companyWebsite: currentUser?.companyWebsite || '',
+    });
+    setIsEditingCompanyProfile(false);
+    setShowCompanyProfileModal(true);
+  };
+
+  const saveCompanyProfileForm = () => {
+    const nextUser = {
+      ...(currentUser || {}),
+      companyName: companyProfileForm.companyName,
+      companyAddress: companyProfileForm.companyAddress,
+      companyPhone: companyProfileForm.companyPhone,
+      companyWebsite: companyProfileForm.companyWebsite,
+    };
+    setCurrentUser(nextUser);
+    try {
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('user', JSON.stringify(nextUser));
+      }
+    } catch {}
+    setIsEditingCompanyProfile(false);
+  };
 
   const selectedScheduleAssetIds = selectedSchedule ? (() => {
     const ids = new Set(parseIdList(selectedSchedule.assets));
@@ -13706,6 +16179,7 @@ function ClientDashboard() {
   const startEditingAsset = useCallback((asset) => {
     if (!asset) return;
     const blocksSource = asset.blocks ?? asset.block ?? asset.location?.block;
+    const identifiers = asset.identifiers && typeof asset.identifiers === 'object' ? asset.identifiers : {};
     const branchId = asset.location?.branchId || '';
     const branchName = asset.location?.branchName || '';
     const isBranchAsset = String(asset.location?.locationType || '').toLowerCase() === 'branch' || (!!branchId || (!!branchName && !(asset.propertyId || asset.property?.id || asset.property?._id)));
@@ -13718,14 +16192,40 @@ function ClientDashboard() {
       name: asset.name,
       type: asset.type,
       description: asset.description || '',
+      model: identifiers.model || '',
+      manufacturer: identifiers.manufacturer || asset.vendorName || '',
       serialNumber: asset.serialNumber || '',
+      category: identifiers.category || asset.type || '',
+      area: identifiers.area || asset.location?.building || '',
+      barcodeMode: 'custom',
+      barcode: identifiers.barcode || asset.barcode || '',
       propertyId: isBranchAsset ? '' : (asset.propertyId || asset.property?.id || asset.property?._id || ''),
       locationType: isBranchAsset ? 'branch' : 'property',
       branchId,
+      parentId: asset.parentId || '',
+      operatingScheduleId: identifiers.operatingScheduleId || '',
       quantity: asset.quantity || 1,
       building: asset.building || asset.location?.building || '',
       blocks: isBranchAsset ? [] : blocksArr,
-      room: asset.room || asset.location?.room || ''
+      room: asset.room || asset.location?.room || '',
+      purchasePrice: asset.purchaseCost ?? '',
+      purchaseDate: asset.purchaseDate ? new Date(asset.purchaseDate).toISOString().slice(0, 10) : '',
+      residualPrice: identifiers.residualValue ?? asset.currentValue ?? '',
+      usefulLife: identifiers.usefulLife?.value ?? '',
+      usefulLifeUnit: identifiers.usefulLife?.unit || 'years',
+      workerId: identifiers.workerId || '',
+      additionalWorkerIds: Array.isArray(identifiers.additionalWorkerIds) ? identifiers.additionalWorkerIds.map(String) : [],
+      teamId: identifiers.teamId || '',
+      vendorId: asset.vendorId || '',
+      customerId: identifiers.customerId || '',
+      serviceDate: identifiers.serviceDate ? new Date(identifiers.serviceDate).toISOString().slice(0, 10) : '',
+      warrantyExpiration: asset.warrantyUntil ? new Date(asset.warrantyUntil).toISOString().slice(0, 10) : '',
+      additionalInformation: identifiers.additionalInformation || '',
+      imageFiles: Array.isArray(asset.photos) ? asset.photos : [],
+      documentFiles: Array.isArray(asset.documents) ? asset.documents.filter((item) => !String(item || '').includes('warranty:')) : [],
+      warrantyFiles: Array.isArray(asset.documents) ? asset.documents.filter((item) => String(item || '').includes('warranty:')) : [],
+      parts: Array.isArray(identifiers.parts) ? identifiers.parts : [],
+      trackCheckInOut: Boolean(identifiers.trackCheckInOut),
     });
   }, []);
 
@@ -13755,6 +16255,1089 @@ function ClientDashboard() {
     if (asset?.location?.building) return asset.location.building;
     return '';
   }, []);
+  const assetLocationOptions = React.useMemo(() => {
+    return Array.from(new Set((assets || []).map((asset) => getAssetLocationLabel(asset)).filter(Boolean))).sort((a, b) => a.localeCompare(b));
+  }, [assets, getAssetLocationLabel]);
+  const filteredAssets = React.useMemo(() => {
+    const query = String(assetSearchQuery || '').trim().toLowerCase();
+    return (assets || []).filter((asset) => {
+      const locationLabel = getAssetLocationLabel(asset);
+      const matchesLocation = !selectedAssetLocationFilter || locationLabel === selectedAssetLocationFilter;
+      const matchesSearch = !query || [
+        asset?.name,
+        asset?.serialNumber,
+        asset?.barcode,
+        asset?.description,
+        locationLabel,
+      ].filter(Boolean).some((value) => String(value).toLowerCase().includes(query));
+      return matchesLocation && matchesSearch;
+    });
+  }, [assetSearchQuery, assets, getAssetLocationLabel, selectedAssetLocationFilter]);
+  const selectedAssetWorkOrders = React.useMemo(() => {
+    const assetId = String(selectedAsset?._id || selectedAsset?.id || '');
+    if (!assetId) return [];
+
+    const assetMatches = (value) => {
+      if (!value) return false;
+      if (Array.isArray(value)) return value.some(assetMatches);
+      if (typeof value === 'object') return String(value._id || value.id || value.assetId || '') === assetId;
+      return String(value) === assetId;
+    };
+
+    return (workOrders || []).filter((workOrder) => (
+      assetMatches(workOrder.assetId) ||
+      assetMatches(workOrder.assetIds) ||
+      assetMatches(workOrder.asset) ||
+      assetMatches(workOrder.assets)
+    ));
+  }, [selectedAsset, workOrders]);
+  const selectedAssetParts = React.useMemo(() => (
+    Array.isArray(selectedAsset?.identifiers?.parts) ? selectedAsset.identifiers.parts : []
+  ), [selectedAsset]);
+  const selectedAssetFiles = React.useMemo(() => {
+    const photos = Array.isArray(selectedAsset?.photos) ? selectedAsset.photos : [];
+    const documents = Array.isArray(selectedAsset?.documents) ? selectedAsset.documents : [];
+    return [
+      ...photos.map((file, index) => ({ id: `photo-${index}`, type: 'Photo', value: file })),
+      ...documents.map((file, index) => ({ id: `document-${index}`, type: 'Document', value: file })),
+    ];
+  }, [selectedAsset]);
+  const assetReliabilityWindowOptions = React.useMemo(() => ([
+    'Last 7 Days',
+    'Last 30 Days',
+    'Last 90 Days',
+    'Last 180 Days',
+    'Last 365 Days',
+    'Custom Range',
+  ]), []);
+  const assetWorkOrderSortOptions = React.useMemo(() => ([
+    ['workOrderNumber', 'WO #'],
+    ['title', 'Work Order Title'],
+    ['description', 'Description'],
+    ['dueDate', 'Due Date'],
+    ['status', 'Status'],
+    ['priority', 'Priority'],
+  ]), []);
+  const assetDetailWorkOrderColumnDefinitions = React.useMemo(() => ([
+    { key: 'workOrderNumber', label: 'WO #', alwaysVisible: true },
+    { key: 'title', label: 'Work Order Title', alwaysVisible: true },
+    { key: 'description', label: 'Description', alwaysVisible: true },
+    { key: 'dueDate', label: 'Due Date', alwaysVisible: true },
+    { key: 'status', label: 'Status', alwaysVisible: true },
+    { key: 'priority', label: 'Priority' },
+    { key: 'category', label: 'Category' },
+    { key: 'location', label: 'Location' },
+    { key: 'asset', label: 'Asset' },
+    { key: 'parts', label: 'Parts' },
+    { key: 'files', label: 'Files' },
+    { key: 'estimatedDuration', label: 'Estimated Duration' },
+    { key: 'additionalCost', label: 'Additional Cost' },
+    { key: 'daysSinceCreated', label: 'Days Since Created' },
+    { key: 'time', label: 'Time' },
+    { key: 'tasks', label: 'Tasks' },
+    { key: 'laborCost', label: 'Labor Cost' },
+    { key: 'partsCost', label: 'Parts Cost' },
+    { key: 'assignedTo', label: 'Assigned To' },
+    { key: 'additionalWorkers', label: 'Additional Workers' },
+    { key: 'createdBy', label: 'Created By' },
+    { key: 'completedBy', label: 'Completed By' },
+    { key: 'team', label: 'Team' },
+    { key: 'requestedBy', label: 'Requested By' },
+    { key: 'dateCreated', label: 'Date Created' },
+    { key: 'lastUpdated', label: 'Last Updated' },
+    { key: 'dateCompleted', label: 'Date Completed' },
+    { key: 'archived', label: 'Archived' },
+    { key: 'closeoutNotes', label: 'Closeout Notes' },
+  ]), []);
+  const formatCurrencyValue = useCallback((value) => {
+    const amount = Number(value);
+    if (!Number.isFinite(amount)) return '—';
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+  }, []);
+  const formatDateLabel = useCallback((value, options = {}) => {
+    if (!value) return '—';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '—';
+    return date.toLocaleString(undefined, options);
+  }, []);
+  const getWorkOrderLocationLabel = useCallback((workOrder) => {
+    return (
+      workOrder?.location ||
+      workOrder?.property?.name ||
+      workOrder?.branch?.name ||
+      workOrder?.assetLocation ||
+      '—'
+    );
+  }, []);
+  const getWorkOrderPrimaryAssigneeLabel = useCallback((workOrder) => {
+    return (
+      workOrder?.assignedTo?.name ||
+      workOrder?.assignedTo?.fullName ||
+      workOrder?.assignedTo?.email ||
+      workOrder?.assignedToName ||
+      workOrder?.primaryWorker?.name ||
+      workOrder?.technician?.name ||
+      '—'
+    );
+  }, []);
+  const selectedAssetWorkOrderStatusOptions = React.useMemo(() => (
+    Array.from(new Set(
+      selectedAssetWorkOrders
+        .map((workOrder) => String(workOrder?.status || 'Open').trim())
+        .filter(Boolean)
+    )).sort((a, b) => a.localeCompare(b))
+  ), [selectedAssetWorkOrders]);
+  const selectedAssetWorkOrderPriorityOptions = React.useMemo(() => (
+    Array.from(new Set(
+      selectedAssetWorkOrders
+        .map((workOrder) => String(workOrder?.priority || '').trim())
+        .filter(Boolean)
+    )).sort((a, b) => a.localeCompare(b))
+  ), [selectedAssetWorkOrders]);
+  const selectedAssetWorkOrderLocationOptions = React.useMemo(() => (
+    Array.from(new Set(
+      selectedAssetWorkOrders
+        .map((workOrder) => String(getWorkOrderLocationLabel(workOrder) || '').trim())
+        .filter(Boolean)
+    )).sort((a, b) => a.localeCompare(b))
+  ), [getWorkOrderLocationLabel, selectedAssetWorkOrders]);
+  const totalActiveAssetDetailFilters = selectedAssetWorkOrderStatuses.length + selectedAssetWorkOrderPriorities.length + selectedAssetWorkOrderLocations.length;
+  const getAssetDetailWorkOrderCellValue = useCallback((workOrder, key) => {
+    switch (key) {
+      case 'workOrderNumber':
+        return workOrder?.workOrderNumber || workOrder?.number || '—';
+      case 'title':
+        return workOrder?.title || workOrder?.name || '—';
+      case 'description':
+        return workOrder?.description || '—';
+      case 'dueDate':
+        return workOrder?.dueDate ? formatDateLabel(workOrder.dueDate, { month: '2-digit', day: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—';
+      case 'status':
+        return workOrder?.status || 'Open';
+      case 'priority':
+        return workOrder?.priority || '—';
+      case 'category':
+        return workOrder?.category || '—';
+      case 'location':
+        return getWorkOrderLocationLabel(workOrder);
+      case 'asset':
+        return selectedAsset?.name || workOrder?.asset?.name || '—';
+      case 'parts':
+        return Array.isArray(workOrder?.parts) ? String(workOrder.parts.length) : '0';
+      case 'files':
+        return Array.isArray(workOrder?.files) ? String(workOrder.files.length) : '0';
+      case 'estimatedDuration':
+        return workOrder?.estimatedDuration || workOrder?.duration || '—';
+      case 'additionalCost':
+        return formatCurrencyValue(workOrder?.additionalCost);
+      case 'daysSinceCreated': {
+        if (!workOrder?.createdAt) return '—';
+        const createdAt = new Date(workOrder.createdAt);
+        if (Number.isNaN(createdAt.getTime())) return '—';
+        return String(Math.max(0, Math.floor((Date.now() - createdAt.getTime()) / 86400000)));
+      }
+      case 'time':
+        return workOrder?.timeSpent || workOrder?.time || '—';
+      case 'tasks':
+        return Array.isArray(workOrder?.tasks) ? String(workOrder.tasks.length) : '0';
+      case 'laborCost':
+        return formatCurrencyValue(workOrder?.laborCost);
+      case 'partsCost':
+        return formatCurrencyValue(workOrder?.partsCost);
+      case 'assignedTo':
+        return getWorkOrderPrimaryAssigneeLabel(workOrder);
+      case 'additionalWorkers':
+        return Array.isArray(workOrder?.additionalWorkers) ? String(workOrder.additionalWorkers.length) : '0';
+      case 'createdBy':
+        return workOrder?.createdBy?.name || workOrder?.createdBy?.email || '—';
+      case 'completedBy':
+        return workOrder?.completedBy?.name || workOrder?.completedBy?.email || '—';
+      case 'team':
+        return workOrder?.team?.name || workOrder?.assignedTeam?.name || '—';
+      case 'requestedBy':
+        return workOrder?.requestedBy?.name || workOrder?.requester?.name || '—';
+      case 'dateCreated':
+        return formatDateLabel(workOrder?.createdAt, { month: '2-digit', day: '2-digit', year: '2-digit' });
+      case 'lastUpdated':
+        return formatDateLabel(workOrder?.updatedAt, { month: '2-digit', day: '2-digit', year: '2-digit' });
+      case 'dateCompleted':
+        return formatDateLabel(workOrder?.completedAt, { month: '2-digit', day: '2-digit', year: '2-digit' });
+      case 'archived':
+        return workOrder?.archived ? 'Yes' : 'No';
+      case 'closeoutNotes':
+        return workOrder?.closeoutNotes || '—';
+      default:
+        return '—';
+    }
+  }, [formatCurrencyValue, formatDateLabel, getWorkOrderLocationLabel, getWorkOrderPrimaryAssigneeLabel, selectedAsset]);
+  const visibleAssetDetailWorkOrderColumnDefinitions = React.useMemo(() => (
+    assetDetailWorkOrderColumnDefinitions.filter((column) => column.alwaysVisible || visibleAssetDetailWorkOrderColumns[column.key])
+  ), [assetDetailWorkOrderColumnDefinitions, visibleAssetDetailWorkOrderColumns]);
+  const assetDetailWorkOrders = React.useMemo(() => {
+    const query = assetDetailSearchQuery.trim().toLowerCase();
+    const filtered = selectedAssetWorkOrders.filter((workOrder) => {
+      const statusValue = String(workOrder?.status || 'Open').trim();
+      const priorityValue = String(workOrder?.priority || '').trim();
+      const locationValue = String(getWorkOrderLocationLabel(workOrder) || '').trim();
+      const matchesStatus = selectedAssetWorkOrderStatuses.length === 0 || selectedAssetWorkOrderStatuses.includes(statusValue);
+      const matchesPriority = selectedAssetWorkOrderPriorities.length === 0 || selectedAssetWorkOrderPriorities.includes(priorityValue);
+      const matchesLocation = selectedAssetWorkOrderLocations.length === 0 || selectedAssetWorkOrderLocations.includes(locationValue);
+      if (!matchesStatus || !matchesPriority || !matchesLocation) return false;
+      if (!query) return true;
+      return [
+        workOrder.workOrderNumber,
+        workOrder.number,
+        workOrder.title,
+        workOrder.name,
+        workOrder.description,
+        workOrder.status,
+        workOrder.priority,
+        getWorkOrderLocationLabel(workOrder),
+      ].filter(Boolean).some((value) => String(value).toLowerCase().includes(query));
+    });
+
+    const sorted = [...filtered].sort((a, b) => {
+      const getFieldValue = (item) => {
+        switch (assetWorkOrderSortField) {
+          case 'workOrderNumber':
+            return item.workOrderNumber || item.number || '';
+          case 'title':
+            return item.title || item.name || '';
+          case 'description':
+            return item.description || '';
+          case 'dueDate':
+            return item.dueDate ? new Date(item.dueDate).getTime() : 0;
+          case 'status':
+            return item.status || '';
+          case 'priority':
+            return item.priority || '';
+          case 'createdAt':
+          default:
+            return item.createdAt ? new Date(item.createdAt).getTime() : 0;
+        }
+      };
+
+      const left = getFieldValue(a);
+      const right = getFieldValue(b);
+      if (typeof left === 'number' && typeof right === 'number') {
+        return assetWorkOrderSortDirection === 'asc' ? left - right : right - left;
+      }
+      return assetWorkOrderSortDirection === 'asc'
+        ? String(left).localeCompare(String(right))
+        : String(right).localeCompare(String(left));
+    });
+
+    return sorted;
+  }, [selectedAssetWorkOrders, assetDetailSearchQuery, assetWorkOrderSortField, assetWorkOrderSortDirection, getWorkOrderLocationLabel, selectedAssetWorkOrderLocations, selectedAssetWorkOrderPriorities, selectedAssetWorkOrderStatuses]);
+  const assetQrValue = React.useMemo(() => {
+    if (!selectedAsset) return '';
+    return [
+      `asset:${selectedAsset?._id || selectedAsset?.id || ''}`,
+      `name:${selectedAsset?.name || 'Asset'}`,
+      `serial:${selectedAsset?.serialNumber || ''}`,
+      `barcode:${selectedAsset?.identifiers?.barcode || selectedAsset?.barcode || ''}`,
+    ].join('|');
+  }, [selectedAsset]);
+  const assetQrMarkup = React.useMemo(() => {
+    const size = 21;
+    const bits = Array.from({ length: size }, () => Array(size).fill(false));
+    const drawFinder = (startRow, startCol) => {
+      for (let row = 0; row < 7; row += 1) {
+        for (let col = 0; col < 7; col += 1) {
+          const isOuter = row === 0 || row === 6 || col === 0 || col === 6;
+          const isInner = row >= 2 && row <= 4 && col >= 2 && col <= 4;
+          bits[startRow + row][startCol + col] = isOuter || isInner;
+        }
+      }
+    };
+    drawFinder(0, 0);
+    drawFinder(0, size - 7);
+    drawFinder(size - 7, 0);
+    const seed = Array.from(assetQrValue || 'asset').reduce((sum, char, index) => sum + (char.charCodeAt(0) * (index + 1)), 0) || 1;
+    for (let row = 0; row < size; row += 1) {
+      for (let col = 0; col < size; col += 1) {
+        const inFinder =
+          (row < 7 && col < 7) ||
+          (row < 7 && col >= size - 7) ||
+          (row >= size - 7 && col < 7);
+        if (inFinder) continue;
+        bits[row][col] = ((seed + row * 17 + col * 31 + row * col) % 7) < 3;
+      }
+    }
+    return bits;
+  }, [assetQrValue]);
+  const normalizeReliabilityStatus = useCallback((value) => {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (normalized === 'down' || normalized === 'not operational' || normalized === 'inactive') return 'Not Operational';
+    return 'Operational';
+  }, []);
+  const assetTimelineEntries = React.useMemo(() => {
+    const statusEntry = selectedAsset?.updatedAt ? [{
+      id: `asset-status-${selectedAsset?._id || selectedAsset?.id || 'current'}`,
+      title: `Asset marked ${normalizeReliabilityStatus(selectedAsset?.status)}`,
+      detail: selectedAsset?.name || 'Asset',
+      createdAt: selectedAsset.updatedAt,
+      type: 'status',
+    }] : [];
+    const downtimeActivity = assetDowntimeEntries.map((entry) => ({
+      id: `asset-downtime-${entry.id}`,
+      title: 'Downtime logged',
+      detail: `${entry.description} • ${entry.hours || 0}h ${entry.minutes || 0}m`,
+      createdAt: entry.startedAt,
+      type: 'downtime',
+    }));
+    return [...assetActivityEntries, ...statusEntry, ...downtimeActivity]
+      .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
+  }, [assetActivityEntries, assetDowntimeEntries, normalizeReliabilityStatus, selectedAsset]);
+  const filteredSelectedAssetParts = React.useMemo(() => {
+    const query = assetPartsSearchQuery.trim().toLowerCase();
+    if (!query) return selectedAssetParts;
+    return selectedAssetParts.filter((part) => (
+      [part.name, part.category, part.partNumber, part.description]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(query))
+    ));
+  }, [selectedAssetParts, assetPartsSearchQuery]);
+  const assetDowntimeRange = React.useMemo(() => {
+    const now = new Date();
+    const start = new Date(now);
+    switch (assetReliabilityWindow) {
+      case 'Last 30 Days':
+        start.setDate(now.getDate() - 30);
+        break;
+      case 'Last 90 Days':
+        start.setDate(now.getDate() - 90);
+        break;
+      case 'Last 180 Days':
+        start.setDate(now.getDate() - 180);
+        break;
+      case 'Last 365 Days':
+        start.setDate(now.getDate() - 365);
+        break;
+      case 'Custom Range':
+        start.setDate(now.getDate() - 30);
+        break;
+      case 'Last 7 Days':
+      default:
+        start.setDate(now.getDate() - 7);
+        break;
+    }
+    return { start, end: now };
+  }, [assetReliabilityWindow]);
+  const visibleAssetDowntimeEntries = React.useMemo(() => (
+    assetDowntimeEntries.filter((entry) => {
+      const startedAt = new Date(entry.startedAt);
+      return startedAt >= assetDowntimeRange.start && startedAt <= assetDowntimeRange.end;
+    })
+  ), [assetDowntimeEntries, assetDowntimeRange]);
+  const syncAssetSnapshot = useCallback((assetSnapshot) => {
+    if (!assetSnapshot) return;
+    const snapshotId = String(assetSnapshot?._id || assetSnapshot?.id || '');
+    if (!snapshotId) return;
+
+    setAssets((prev) => prev.map((asset) => {
+      const currentId = String(asset?._id || asset?.id || '');
+      return currentId === snapshotId ? { ...asset, ...assetSnapshot } : asset;
+    }));
+
+    setSelectedAsset((prev) => {
+      const currentId = String(prev?._id || prev?.id || '');
+      return currentId === snapshotId ? { ...prev, ...assetSnapshot } : prev;
+    });
+  }, []);
+  const fetchAssetDowntimeEntries = useCallback(async (assetId) => {
+    if (!assetId) return;
+    setAssetDowntimeLoading(true);
+    try {
+      const response = await api.get(`/api/assets/${assetId}/downtime`);
+      setAssetDowntimeEntries(Array.isArray(response.data) ? response.data : []);
+    } catch (error) {
+      console.warn('Failed to load asset downtime entries', error);
+      setAssetDowntimeEntries([]);
+    } finally {
+      setAssetDowntimeLoading(false);
+    }
+  }, []);
+  const buildAssetPayloadFromSnapshot = useCallback((assetSnapshot, overrides = {}) => {
+    if (!assetSnapshot) return null;
+    const identifiers = assetSnapshot.identifiers && typeof assetSnapshot.identifiers === 'object'
+      ? assetSnapshot.identifiers
+      : {};
+    return {
+      name: assetSnapshot.name || 'Untitled Asset',
+      type: assetSnapshot.type || identifiers.category || identifiers.model || 'General',
+      description: assetSnapshot.description || '',
+      serialNumber: assetSnapshot.serialNumber || '',
+      quantity: assetSnapshot.quantity || 1,
+      propertyId: assetSnapshot.propertyId || assetSnapshot.property?.id || assetSnapshot.property?._id || null,
+      building: assetSnapshot.building || assetSnapshot.location?.building || '',
+      blocks: Array.isArray(assetSnapshot.blocks)
+        ? assetSnapshot.blocks
+        : (Array.isArray(assetSnapshot.location?.block)
+          ? assetSnapshot.location.block
+          : (assetSnapshot.blocks || assetSnapshot.block || assetSnapshot.location?.block || '')),
+      room: assetSnapshot.room || assetSnapshot.location?.room || '',
+      parentId: assetSnapshot.parentId || null,
+      purchaseDate: assetSnapshot.purchaseDate || null,
+      purchaseCost: assetSnapshot.purchaseCost ?? null,
+      currentValue: assetSnapshot.currentValue ?? identifiers.residualValue ?? null,
+      warrantyUntil: assetSnapshot.warrantyUntil || null,
+      vendorId: assetSnapshot.vendorId || null,
+      vendorName: assetSnapshot.vendorName || assetSnapshot.vendor?.name || '',
+      photos: Array.isArray(assetSnapshot.photos) ? assetSnapshot.photos : [],
+      documents: Array.isArray(assetSnapshot.documents) ? assetSnapshot.documents : [],
+      location: assetSnapshot.location || null,
+      identifiers: {
+        barcode: identifiers.barcode || assetSnapshot.barcode || '',
+        model: identifiers.model || assetSnapshot.model || '',
+        manufacturer: identifiers.manufacturer || assetSnapshot.manufacturer || '',
+        category: identifiers.category || assetSnapshot.category || '',
+        area: identifiers.area || '',
+        residualValue: identifiers.residualValue ?? assetSnapshot.currentValue ?? '',
+        usefulLife: identifiers.usefulLife || null,
+        workerId: identifiers.workerId || '',
+        additionalWorkerIds: Array.isArray(identifiers.additionalWorkerIds) ? identifiers.additionalWorkerIds : [],
+        teamId: identifiers.teamId || '',
+        customerId: identifiers.customerId || '',
+        operatingScheduleId: identifiers.operatingScheduleId || '',
+        additionalInformation: identifiers.additionalInformation || '',
+        serviceDate: identifiers.serviceDate || null,
+        trackCheckInOut: Boolean(identifiers.trackCheckInOut),
+        parts: Array.isArray(identifiers.parts) ? identifiers.parts : [],
+      },
+      ...overrides,
+    };
+  }, []);
+  const handleDuplicateSelectedAsset = useCallback(async () => {
+    if (!selectedAsset) return;
+    try {
+      const payload = buildAssetPayloadFromSnapshot(selectedAsset, {
+        name: `${selectedAsset.name || 'Asset'} Copy`,
+      });
+      await api.post('/api/assets', payload);
+      const response = await api.get('/api/assets');
+      setAssets(Array.isArray(response.data) ? response.data : []);
+      setShowSelectedAssetActionsMenu(false);
+      openDashboardConfirmDialog({
+        title: 'Asset Duplicated',
+        message: `${selectedAsset.name || 'Asset'} was duplicated successfully.`,
+        confirmLabel: 'OK',
+        cancelLabel: 'Close',
+        tone: 'primary',
+        onConfirm: closeDashboardConfirmDialog,
+      });
+    } catch (error) {
+      console.warn('Failed to duplicate asset', error);
+      alert(error?.response?.data?.error || 'Failed to duplicate asset.');
+    }
+  }, [buildAssetPayloadFromSnapshot, closeDashboardConfirmDialog, openDashboardConfirmDialog, selectedAsset]);
+  const handleArchiveSelectedAsset = useCallback(() => {
+    const assetId = String(selectedAsset?._id || selectedAsset?.id || '');
+    if (!assetId) return;
+    openDashboardConfirmDialog({
+      title: 'Archive Asset?',
+      message: `Archive ${selectedAsset?.name || 'this asset'}? You can still keep it in records.`,
+      confirmLabel: 'Archive',
+      cancelLabel: 'Cancel',
+      tone: 'danger',
+      onConfirm: async () => {
+        try {
+          const response = await api.put(`/api/assets/${assetId}`, { archived: true });
+          syncAssetSnapshot(response?.data || { ...(selectedAsset || {}), archived: true });
+          setShowSelectedAssetActionsMenu(false);
+          closeDashboardConfirmDialog();
+        } catch (error) {
+          console.warn('Failed to archive asset', error);
+          alert(error?.response?.data?.error || 'Failed to archive asset.');
+        }
+      },
+    });
+  }, [closeDashboardConfirmDialog, openDashboardConfirmDialog, selectedAsset, syncAssetSnapshot]);
+  const handleDeleteSelectedAsset = useCallback(() => {
+    const assetId = String(selectedAsset?._id || selectedAsset?.id || '');
+    if (!assetId) return;
+    openDashboardConfirmDialog({
+      title: 'Delete Asset?',
+      message: `Delete ${selectedAsset?.name || 'this asset'}? This action cannot be undone.`,
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      tone: 'danger',
+      onConfirm: async () => {
+        try {
+          await api.delete(`/api/assets/${assetId}`);
+          setAssets((prev) => prev.filter((asset) => String(asset?._id || asset?.id || '') !== assetId));
+          setShowSelectedAssetActionsMenu(false);
+          setAssetModalOpen(false);
+          setSelectedAsset(null);
+          closeDashboardConfirmDialog();
+        } catch (error) {
+          console.warn('Failed to delete asset', error);
+          alert(error?.response?.data?.error || 'Failed to delete asset.');
+        }
+      },
+    });
+  }, [closeDashboardConfirmDialog, openDashboardConfirmDialog, selectedAsset]);
+  const handleAssetReliabilityStatusChange = useCallback(async (nextStatus) => {
+    const assetId = String(selectedAsset?._id || selectedAsset?.id || '');
+    if (!assetId) return;
+    setAssetReliabilitySaving(true);
+    try {
+      const response = await api.patch(`/api/assets/${assetId}/status`, { status: nextStatus });
+      const updatedAsset = response?.data || {};
+      syncAssetSnapshot(updatedAsset);
+      setAssetReliabilityStatus(normalizeReliabilityStatus(updatedAsset.status || nextStatus));
+      setAssetActivityEntries((prev) => [{
+        id: `asset-activity-status-${Date.now()}`,
+        title: `Status changed to ${normalizeReliabilityStatus(updatedAsset.status || nextStatus)}`,
+        detail: selectedAsset?.name || 'Asset',
+        createdAt: new Date().toISOString(),
+        type: 'status',
+      }, ...prev]);
+      setShowAssetReliabilityStatusMenu(false);
+    } catch (error) {
+      console.warn('Failed to update asset reliability status', error);
+      alert(error?.response?.data?.error || 'Failed to update asset status.');
+    } finally {
+      setAssetReliabilitySaving(false);
+    }
+  }, [normalizeReliabilityStatus, selectedAsset, syncAssetSnapshot]);
+  const handleAssetDowntimeSubmit = useCallback(async () => {
+    const assetId = String(selectedAsset?._id || selectedAsset?.id || '');
+    if (!assetId || !assetDowntimeForm.description.trim()) return;
+
+    setAssetDowntimeSaving(true);
+    try {
+      const payload = {
+        hours: Number(assetDowntimeForm.hours || 0),
+        minutes: Number(assetDowntimeForm.minutes || 0),
+        status: assetDowntimeForm.status,
+        description: assetDowntimeForm.description.trim(),
+        startedAt: `${assetDowntimeForm.startedDate || new Date().toISOString().slice(0, 10)}T${assetDowntimeForm.startedTime || '00:00'}`,
+      };
+      const response = await api.post(`/api/assets/${assetId}/downtime`, payload);
+      const entry = response?.data?.entry;
+      const updatedAsset = response?.data?.asset;
+
+      if (entry) {
+        setAssetDowntimeEntries((prev) => [entry, ...prev]);
+      } else {
+        await fetchAssetDowntimeEntries(assetId);
+      }
+
+      if (updatedAsset) {
+        syncAssetSnapshot(updatedAsset);
+        setAssetReliabilityStatus(normalizeReliabilityStatus(updatedAsset.status || assetDowntimeForm.status));
+      } else {
+        setAssetReliabilityStatus(normalizeReliabilityStatus(assetDowntimeForm.status));
+      }
+
+      setAssetActivityEntries((prev) => [{
+        id: `asset-activity-downtime-${Date.now()}`,
+        title: 'Downtime added',
+        detail: payload.description,
+        createdAt: payload.startedAt,
+        type: 'downtime',
+      }, ...prev]);
+
+      setShowAssetAddDowntimeModal(false);
+    } catch (error) {
+      console.warn('Failed to save asset downtime', error);
+      alert(error?.response?.data?.error || 'Failed to save downtime.');
+    } finally {
+      setAssetDowntimeSaving(false);
+    }
+  }, [assetDowntimeForm, fetchAssetDowntimeEntries, normalizeReliabilityStatus, selectedAsset, syncAssetSnapshot]);
+  const assetReliabilityMetrics = React.useMemo(() => {
+    const totalMinutesInRange = Math.max(1, Math.round((assetDowntimeRange.end.getTime() - assetDowntimeRange.start.getTime()) / 60000));
+    const loggedDowntimeMinutes = visibleAssetDowntimeEntries.reduce((sum, entry) => (
+      sum + Math.max(0, Number(entry?.durationMinutes ?? (((Number(entry?.hours || 0) * 60) + Number(entry?.minutes || 0)) || 0)))
+    ), 0);
+    const boundedDowntime = Math.min(totalMinutesInRange, loggedDowntimeMinutes);
+    const downtimePercent = Math.min(100, Math.max(0, Number(((boundedDowntime / totalMinutesInRange) * 100).toFixed(1))));
+    const uptimePercent = Math.max(0, Number((100 - downtimePercent).toFixed(1)));
+    return { uptimePercent, downtimePercent };
+  }, [assetDowntimeRange, visibleAssetDowntimeEntries]);
+  useEffect(() => {
+    if (!selectedAsset) return;
+    const now = new Date();
+    const initialStatus = normalizeReliabilityStatus(selectedAsset.status);
+    setAssetReliabilityStatus(initialStatus);
+    setAssetReliabilityWindow('Last 7 Days');
+    setAssetDetailSearchQuery('');
+    setAssetPartsSearchQuery('');
+    setAssetWorkOrderSortField('createdAt');
+    setAssetWorkOrderSortDirection('desc');
+    setShowAssetWorkOrderSortMenu(false);
+    setShowAssetReliabilityWindowMenu(false);
+    setShowAssetReliabilityStatusMenu(false);
+    setShowAssetAddDowntimeModal(false);
+    setShowAssetDowntimeLogModal(false);
+    setShowAssetActivityModal(false);
+    setShowAssetQrPopover(false);
+    setShowAssetDetailColumnsMenu(false);
+    setAssetDowntimeEntries([]);
+    setAssetActivityEntries([]);
+    setAssetActivityComment('');
+    setAssetDowntimeForm({
+      hours: '',
+      minutes: '',
+      status: initialStatus === 'Operational' ? 'Not Operational' : initialStatus,
+      description: '',
+      startedDate: now.toISOString().slice(0, 10),
+      startedTime: now.toTimeString().slice(0, 5),
+    });
+    const assetId = String(selectedAsset?._id || selectedAsset?.id || '');
+    fetchAssetDowntimeEntries(assetId);
+  }, [fetchAssetDowntimeEntries, normalizeReliabilityStatus, selectedAsset]);
+  const assetColumnDefinitions = React.useMemo(() => ([
+    {
+      key: 'name',
+      label: 'Name',
+      headerClassName: 'min-w-[200px]',
+      cellClassName: 'min-w-[200px]',
+      alwaysVisible: true,
+      render: (asset) => <span className="block max-w-[180px] truncate font-medium text-gray-900">{renderValue(asset?.name)}</span>
+    },
+    {
+      key: 'image',
+      label: 'Image',
+      headerClassName: 'min-w-[120px]',
+      cellClassName: 'min-w-[120px]',
+      render: (asset) => {
+        const assetImage = asset?.image || asset?.imageUrl || asset?.photo || (Array.isArray(asset?.images) ? asset.images[0] : '');
+        return assetImage ? (
+          <img src={getImageUrl(assetImage)} alt={asset?.name || 'Asset'} className="h-12 w-12 rounded border border-gray-200 object-cover" />
+        ) : (
+          <div className="flex h-12 w-12 items-center justify-center rounded border border-gray-200 bg-gray-50 text-gray-300">
+            <ImageIcon className="h-7 w-7" />
+          </div>
+        );
+      }
+    },
+    {
+      key: 'id',
+      label: 'ID',
+      headerClassName: 'min-w-[170px]',
+      cellClassName: 'min-w-[170px]',
+      render: (asset) => <span className="block max-w-[160px] truncate">{renderValue(asset?._id || asset?.id)}</span>
+    },
+    {
+      key: 'location',
+      label: 'Location',
+      headerClassName: 'min-w-[140px]',
+      cellClassName: 'min-w-[140px]',
+      render: (asset) => <span className="block max-w-[130px] truncate">{renderValue(getAssetLocationLabel(asset))}</span>
+    },
+    {
+      key: 'area',
+      label: 'Area',
+      headerClassName: 'min-w-[140px]',
+      cellClassName: 'min-w-[140px]',
+      render: (asset) => <span className="block max-w-[130px] truncate">{renderValue(asset?.area || asset?.identifiers?.area || asset?.building || asset?.location?.building)}</span>
+    },
+    {
+      key: 'model',
+      label: 'Model',
+      headerClassName: 'min-w-[120px]',
+      cellClassName: 'min-w-[120px]',
+      render: (asset) => <span className="block max-w-[110px] truncate">{renderValue(asset?.model || asset?.identifiers?.model || asset?.type)}</span>
+    },
+    {
+      key: 'barcode',
+      label: 'Barcode',
+      headerClassName: 'min-w-[120px]',
+      cellClassName: 'min-w-[120px]',
+      render: (asset) => <span className="block max-w-[110px] truncate">{renderValue(asset?.barcode || asset?.identifiers?.barcode)}</span>
+    },
+    {
+      key: 'serialNumber',
+      label: 'Serial Number',
+      headerClassName: 'min-w-[150px]',
+      cellClassName: 'min-w-[150px]',
+      render: (asset) => <span className="block max-w-[140px] truncate">{renderValue(asset?.serialNumber)}</span>
+    },
+    {
+      key: 'description',
+      label: 'Description',
+      headerClassName: 'min-w-[180px]',
+      cellClassName: 'min-w-[180px]',
+      render: (asset) => <span className="block max-w-[170px] truncate">{renderValue(asset?.description)}</span>
+    },
+    { key: 'category', label: 'Category', headerClassName: 'min-w-[140px]', cellClassName: 'min-w-[140px]', render: (asset) => <span className="block max-w-[130px] truncate">{renderValue(asset?.category || asset?.identifiers?.category || asset?.type)}</span> },
+    { key: 'status', label: 'Status', headerClassName: 'min-w-[120px]', cellClassName: 'min-w-[120px]', render: (asset) => renderValue(asset?.status || 'Active') },
+    { key: 'worker', label: 'Worker', headerClassName: 'min-w-[160px]', cellClassName: 'min-w-[160px]', render: (asset) => <span className="block max-w-[150px] truncate">{renderValue(asset?.worker?.name || asset?.assignedTo?.name || asset?.assignedWorker?.name || asset?.worker)}</span> },
+    {
+      key: 'additionalWorkers',
+      label: 'Additional Workers',
+      headerClassName: 'min-w-[180px]',
+      cellClassName: 'min-w-[180px]',
+      render: (asset) => <span className="block max-w-[170px] truncate">{renderValue(
+        Array.isArray(asset?.additionalWorkers)
+          ? asset.additionalWorkers.map((worker) => worker?.name || worker).filter(Boolean).join(', ')
+          : asset?.additionalWorkers
+      )}</span>
+    },
+    {
+      key: 'assignedTeams',
+      label: 'Assigned Teams',
+      headerClassName: 'min-w-[170px]',
+      cellClassName: 'min-w-[170px]',
+      render: (asset) => <span className="block max-w-[160px] truncate">{renderValue(
+        Array.isArray(asset?.assignedTeams)
+          ? asset.assignedTeams.map((team) => team?.name || team).filter(Boolean).join(', ')
+          : asset?.assignedTeams
+      )}</span>
+    },
+    {
+      key: 'assignedVendors',
+      label: 'Assigned Vendors',
+      headerClassName: 'min-w-[180px]',
+      cellClassName: 'min-w-[180px]',
+      render: (asset) => <span className="block max-w-[170px] truncate">{renderValue(
+        Array.isArray(asset?.assignedVendors)
+          ? asset.assignedVendors.map((vendor) => vendor?.name || vendor).filter(Boolean).join(', ')
+          : asset?.assignedVendors
+      )}</span>
+    },
+    {
+      key: 'assignedCustomers',
+      label: 'Assigned Customers',
+      headerClassName: 'min-w-[190px]',
+      cellClassName: 'min-w-[190px]',
+      render: (asset) => <span className="block max-w-[180px] truncate">{renderValue(
+        Array.isArray(asset?.assignedCustomers)
+          ? asset.assignedCustomers.map((customer) => customer?.name || customer).filter(Boolean).join(', ')
+          : asset?.assignedCustomers
+      )}</span>
+    },
+    { key: 'manufacturer', label: 'Manufacturer', headerClassName: 'min-w-[160px]', cellClassName: 'min-w-[160px]', render: (asset) => <span className="block max-w-[150px] truncate">{renderValue(asset?.manufacturer || asset?.identifiers?.manufacturer || asset?.vendorName)}</span> },
+    { key: 'parentAsset', label: 'Parent Asset', headerClassName: 'min-w-[160px]', cellClassName: 'min-w-[160px]', render: (asset) => <span className="block max-w-[150px] truncate">{renderValue(asset?.parentAsset?.name || asset?.parentAssetName || asset?.parentAsset)}</span> },
+    { key: 'usefulLife', label: 'Useful Life', headerClassName: 'min-w-[130px]', cellClassName: 'min-w-[130px]', render: (asset) => renderValue(asset?.usefulLife) },
+    { key: 'createdBy', label: 'Created By', headerClassName: 'min-w-[150px]', cellClassName: 'min-w-[150px]', render: (asset) => <span className="block max-w-[140px] truncate">{renderValue(asset?.createdBy?.name || asset?.createdBy?.email || asset?.createdBy)}</span> },
+    { key: 'dateCreated', label: 'Date Created', headerClassName: 'min-w-[140px]', cellClassName: 'min-w-[140px]', render: (asset) => renderValue(asset?.createdAt ? new Date(asset.createdAt).toLocaleDateString() : '') },
+    { key: 'purchaseDate', label: 'Purchase Date', headerClassName: 'min-w-[150px]', cellClassName: 'min-w-[150px]', render: (asset) => renderValue(asset?.purchaseDate ? new Date(asset.purchaseDate).toLocaleDateString() : '') },
+    { key: 'serviceDate', label: 'Service Date', headerClassName: 'min-w-[140px]', cellClassName: 'min-w-[140px]', render: (asset) => renderValue(asset?.serviceDate ? new Date(asset.serviceDate).toLocaleDateString() : '') },
+    { key: 'warrantyExpiration', label: 'Warranty Expiration', headerClassName: 'min-w-[180px]', cellClassName: 'min-w-[180px]', render: (asset) => renderValue(asset?.warrantyExpiration ? new Date(asset.warrantyExpiration).toLocaleDateString() : '') },
+    { key: 'currentValue', label: 'Current Value', headerClassName: 'min-w-[140px]', cellClassName: 'min-w-[140px]', render: (asset) => renderValue(asset?.currentValue) },
+    { key: 'purchasePrice', label: 'Purchase Price', headerClassName: 'min-w-[150px]', cellClassName: 'min-w-[150px]', render: (asset) => renderValue(asset?.purchasePrice) },
+    { key: 'residualPrice', label: 'Residual Price', headerClassName: 'min-w-[150px]', cellClassName: 'min-w-[150px]', render: (asset) => renderValue(asset?.residualPrice) },
+    { key: 'archived', label: 'Archived', headerClassName: 'min-w-[110px]', cellClassName: 'min-w-[110px]', render: (asset) => (asset?.archived ? 'Yes' : 'No') },
+  ]), [getAssetLocationLabel, getImageUrl, renderValue]);
+  const visibleAssetColumnDefinitions = React.useMemo(() => {
+    return assetColumnDefinitions.filter((column) => column.alwaysVisible || visibleAssetColumns[column.key]);
+  }, [assetColumnDefinitions, visibleAssetColumns]);
+  const assetVendorOptions = React.useMemo(() => {
+    return (contactPeople || []).filter((item) => item.__source === 'vendor');
+  }, [contactPeople]);
+  const assetCustomerOptions = React.useMemo(() => {
+    return (contactPeople || []).filter((item) => item.__source === 'client' || item.__source === 'user');
+  }, [contactPeople]);
+  const assetWorkerOptions = React.useMemo(() => {
+    return (people || []).map((person) => ({
+      id: String(person.id || person._id || ''),
+      label: person.name || person.fullName || person.email || 'Unnamed',
+    })).filter((item) => item.id);
+  }, [people]);
+  const assetTeamOptions = React.useMemo(() => {
+    return (teams || []).map((team) => ({
+      id: String(team.id || team._id || ''),
+      label: team.name || team.teamName || 'Unnamed team',
+    })).filter((item) => item.id);
+  }, [teams]);
+  const assetParentOptions = React.useMemo(() => {
+    const editingAssetId = String(editingAsset?._id || editingAsset?.id || '');
+    return (assets || [])
+      .filter((asset) => String(asset._id || asset.id || '') !== editingAssetId)
+      .map((asset) => ({
+        id: String(asset._id || asset.id || ''),
+        label: asset.name || 'Unnamed asset',
+      }));
+  }, [assets, editingAsset]);
+  const handleAssetFilesSelected = useCallback((field, fileList) => {
+    const files = Array.from(fileList || []);
+    if (!files.length) return;
+    Promise.all(files.map((file) => new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    }))).then((results) => {
+      setAssetForm((prev) => ({
+        ...prev,
+        [field]: [...(prev[field] || []), ...results.filter(Boolean)],
+      }));
+    }).catch((error) => {
+      console.error('Failed to read asset files', error);
+      alert('Failed to read selected file(s).');
+    });
+  }, []);
+  const removeAssetFileAt = useCallback((field, index) => {
+    setAssetForm((prev) => ({
+      ...prev,
+      [field]: (prev[field] || []).filter((_, itemIndex) => itemIndex !== index),
+    }));
+  }, []);
+  const closeAssetEditor = useCallback(() => {
+    setEditingAsset(null);
+    setAssetForm(createEmptyAssetForm());
+    setOriginalAssetBlocks([]);
+  }, []);
+  const submitAssetEditor = useCallback(async (e) => {
+    e.preventDefault();
+    if (!String(assetForm.name || '').trim()) {
+      alert('Name is required.');
+      return;
+    }
+    try {
+      const selectedVendor = assetVendorOptions.find((item) => String(item.id || item._id || '') === String(assetForm.vendorId || ''));
+      const selectedBranch = branches.find((item) => String(item.id || item._id || '') === String(assetForm.branchId || ''));
+      const barcodeValue = assetForm.barcodeMode === 'random' && !String(assetForm.barcode || '').trim()
+        ? `${Date.now()}${Math.floor(Math.random() * 1000)}`
+        : String(assetForm.barcode || '').trim();
+      const payload = {
+        name: assetForm.name,
+        type: assetForm.category || assetForm.model || assetForm.type || 'General',
+        description: assetForm.description,
+        serialNumber: assetForm.serialNumber,
+        quantity: assetForm.quantity,
+        propertyId: assetForm.locationType === 'property' ? assetForm.propertyId || null : null,
+        building: assetForm.building,
+        blocks: assetForm.locationType === 'property' ? assetForm.blocks : [],
+        room: assetForm.room,
+        parentId: assetForm.parentId || null,
+        purchaseDate: assetForm.purchaseDate || null,
+        purchaseCost: assetForm.purchasePrice === '' ? null : Number(assetForm.purchasePrice),
+        currentValue: assetForm.residualPrice === '' ? null : Number(assetForm.residualPrice),
+        warrantyUntil: assetForm.warrantyExpiration || null,
+        vendorId: assetForm.vendorId || null,
+        vendorName: selectedVendor?.name || '',
+        photos: assetForm.imageFiles || [],
+        documents: [
+          ...(assetForm.documentFiles || []),
+          ...(assetForm.warrantyFiles || []).map((item) => `warranty:${item}`),
+        ],
+        identifiers: {
+          barcode: barcodeValue,
+          model: assetForm.model,
+          manufacturer: assetForm.manufacturer,
+          category: assetForm.category,
+          area: assetForm.area,
+          residualValue: assetForm.residualPrice,
+          usefulLife: assetForm.usefulLife ? { value: assetForm.usefulLife, unit: assetForm.usefulLifeUnit } : null,
+          workerId: assetForm.workerId,
+          additionalWorkerIds: assetForm.additionalWorkerIds || [],
+          teamId: assetForm.teamId,
+          customerId: assetForm.customerId,
+          operatingScheduleId: assetForm.operatingScheduleId,
+          additionalInformation: assetForm.additionalInformation,
+          serviceDate: assetForm.serviceDate || null,
+          trackCheckInOut: Boolean(assetForm.trackCheckInOut),
+          parts: assetForm.parts || [],
+        },
+      };
+      if (assetForm.locationType === 'branch' && assetForm.branchId) {
+        payload.location = {
+          locationType: 'branch',
+          branchId: assetForm.branchId,
+          branchName: selectedBranch?.branchName || selectedBranch?.name || '',
+          branchLocation: selectedBranch?.branchLocation || '',
+          branchLatitude: selectedBranch?.branchLatitude ?? '',
+          branchLongitude: selectedBranch?.branchLongitude ?? '',
+        };
+      }
+      const eid = editingAsset?._id || editingAsset?.id;
+      if (eid) {
+        const prev = originalAssetBlocks.map(String);
+        const now = assetForm.locationType === 'property' ? (assetForm.blocks || []).map(String) : [];
+        const remove = prev.filter((p) => !now.includes(p));
+        if (remove.length) payload.removeBlocks = remove;
+        await api.put(`/api/assets/${eid}`, payload);
+      } else {
+        const userId = getCurrentUserId();
+        await api.post('/api/assets', { ...payload, userId });
+      }
+      closeAssetEditor();
+      const r = await api.get('/api/assets');
+      setAssets(r.data || []);
+    } catch (error) {
+      console.error('Failed to save asset', error);
+      alert(error.response?.data?.error || 'Failed to save asset.');
+    }
+  }, [assetForm, assetVendorOptions, branches, closeAssetEditor, editingAsset, originalAssetBlocks]);
+  useEffect(() => {
+    if (!showAssetColumnsMenu) return undefined;
+
+    const handleAssetColumnsMenuDismiss = (event) => {
+      if (assetColumnsButtonRef.current?.contains(event.target)) return;
+      if (event.target.closest?.('[data-asset-columns-menu="true"]')) return;
+      setShowAssetColumnsMenu(false);
+    };
+
+    const handleAssetColumnsMenuReposition = () => {
+      const rect = assetColumnsButtonRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      setAssetColumnsMenuPosition({
+        top: rect.bottom + 12,
+        right: Math.max(16, window.innerWidth - rect.right),
+      });
+    };
+
+    handleAssetColumnsMenuReposition();
+    window.addEventListener('resize', handleAssetColumnsMenuReposition);
+    window.addEventListener('scroll', handleAssetColumnsMenuReposition, true);
+    document.addEventListener('mousedown', handleAssetColumnsMenuDismiss);
+
+    return () => {
+      window.removeEventListener('resize', handleAssetColumnsMenuReposition);
+      window.removeEventListener('scroll', handleAssetColumnsMenuReposition, true);
+      document.removeEventListener('mousedown', handleAssetColumnsMenuDismiss);
+    };
+  }, [showAssetColumnsMenu]);
+  useEffect(() => {
+    if (!showAssetDetailColumnsMenu) return undefined;
+
+    const handleDismiss = (event) => {
+      if (assetDetailColumnsButtonRef.current?.contains(event.target)) return;
+      if (event.target.closest?.('[data-asset-detail-columns-menu="true"]')) return;
+      setShowAssetDetailColumnsMenu(false);
+    };
+
+    const handleReposition = () => {
+      const rect = assetDetailColumnsButtonRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      setAssetDetailColumnsMenuPosition({
+        top: rect.bottom + 12,
+        right: Math.max(16, window.innerWidth - rect.right),
+      });
+    };
+
+    handleReposition();
+    window.addEventListener('resize', handleReposition);
+    window.addEventListener('scroll', handleReposition, true);
+    document.addEventListener('mousedown', handleDismiss);
+
+    return () => {
+      window.removeEventListener('resize', handleReposition);
+      window.removeEventListener('scroll', handleReposition, true);
+      document.removeEventListener('mousedown', handleDismiss);
+    };
+  }, [showAssetDetailColumnsMenu]);
+  useEffect(() => {
+    if (!showAssetQrPopover) return undefined;
+
+    const handleDismiss = (event) => {
+      if (assetQrButtonRef.current?.contains(event.target)) return;
+      if (event.target.closest?.('[data-asset-qr-popover="true"]')) return;
+      setShowAssetQrPopover(false);
+    };
+
+    document.addEventListener('mousedown', handleDismiss);
+    return () => document.removeEventListener('mousedown', handleDismiss);
+  }, [showAssetQrPopover]);
+  useEffect(() => {
+    if (!showSelectedAssetActionsMenu) return undefined;
+
+    const handleDismiss = (event) => {
+      if (selectedAssetActionsMenuRef.current?.contains(event.target)) return;
+      setShowSelectedAssetActionsMenu(false);
+    };
+
+    document.addEventListener('mousedown', handleDismiss);
+    return () => document.removeEventListener('mousedown', handleDismiss);
+  }, [showSelectedAssetActionsMenu]);
+  useEffect(() => {
+    if (!showPropertyActionsMenu && !openPropertyRowMenuKey) return undefined;
+
+    const handleDismiss = (event) => {
+      if (propertyActionsMenuRef.current?.contains(event.target)) return;
+      if (event.target.closest?.('[data-property-row-menu="true"]')) return;
+      if (event.target.closest?.('[data-property-row-menu-button="true"]')) return;
+      setShowPropertyActionsMenu(false);
+      setOpenPropertyRowMenuKey('');
+    };
+
+    document.addEventListener('mousedown', handleDismiss);
+    return () => document.removeEventListener('mousedown', handleDismiss);
+  }, [openPropertyRowMenuKey, showPropertyActionsMenu]);
+  useEffect(() => {
+    if (peopleDirectoryOpenPopover !== 'accountType' && !showPeopleDirectoryActionsMenu) return undefined;
+
+    const handleDismiss = (event) => {
+      if (peopleDirectoryFilterRef.current?.contains(event.target)) return;
+      if (peopleDirectoryActionsRef.current?.contains(event.target)) return;
+      setPeopleDirectoryOpenPopover(null);
+      setShowPeopleDirectoryActionsMenu(false);
+    };
+
+    document.addEventListener('mousedown', handleDismiss);
+    return () => document.removeEventListener('mousedown', handleDismiss);
+  }, [peopleDirectoryOpenPopover, showPeopleDirectoryActionsMenu]);
+  useEffect(() => {
+    if (!showPeopleDirectorySortMenu && !showPeopleDirectoryColumnsMenu) return undefined;
+
+    const handleDismiss = (event) => {
+      if (peopleDirectorySortRef.current?.contains(event.target)) return;
+      if (peopleDirectoryColumnsRef.current?.contains(event.target)) return;
+      setShowPeopleDirectorySortMenu(false);
+      setShowPeopleDirectoryColumnsMenu(false);
+    };
+
+    document.addEventListener('mousedown', handleDismiss);
+    return () => document.removeEventListener('mousedown', handleDismiss);
+  }, [showPeopleDirectoryColumnsMenu, showPeopleDirectorySortMenu]);
+  useEffect(() => {
+    if (!showSelectedPersonActionsMenu) return undefined;
+
+    const handleDismiss = (event) => {
+      if (event.target.closest?.('[data-selected-person-actions="true"]')) return;
+      setShowSelectedPersonActionsMenu(false);
+    };
+
+    document.addEventListener('mousedown', handleDismiss);
+    return () => document.removeEventListener('mousedown', handleDismiss);
+  }, [showSelectedPersonActionsMenu]);
+  useEffect(() => {
+    if (propertyOpenPopover !== 'assigned') return;
+    setDraftPropertyAssignedTo(selectedPropertyAssignedTo);
+    setPropertyAssignedSearchQuery('');
+  }, [propertyOpenPopover, selectedPropertyAssignedTo]);
+  useEffect(() => {
+    if (peopleDirectoryOpenPopover !== 'accountType') return;
+    setDraftPeopleDirectoryAccountTypes(peopleDirectoryAccountTypes);
+  }, [peopleDirectoryAccountTypes, peopleDirectoryOpenPopover]);
+  useEffect(() => {
+    if (propertyModalOpen) setPropertyDetailTab('details');
+  }, [propertyModalOpen, selectedProperty]);
+  useEffect(() => {
+    setShowPropertyActionsMenu(false);
+  }, [propertyModalOpen, selectedProperty]);
+  useEffect(() => {
+    if (!propertyModalOpen || propertyDetailTab !== 'floorplans') {
+      setShowAddFloorplanModal(false);
+      setPropertyFloorplanForm(createEmptyPropertyFloorplanForm());
+    }
+  }, [propertyDetailTab, propertyModalOpen]);
+  useEffect(() => {
+    if (activeTab !== 'internalTechnicians') return;
+    setPeopleDirectoryTab('people');
+    setPeopleDirectorySearchQuery('');
+    setPeopleDirectoryAccountTypes([]);
+    setDraftPeopleDirectoryAccountTypes([]);
+    setPeopleDirectoryIncludeDeactivated(false);
+    setPeopleDirectoryOpenPopover(null);
+    setShowPeopleDirectoryActionsMenu(false);
+    setShowPeopleDirectorySortMenu(false);
+    setShowPeopleDirectoryColumnsMenu(false);
+    setPeopleDirectorySortField('dateCreated');
+    setPeopleDirectorySortDirection('desc');
+  }, [activeTab]);
+  useEffect(() => {
+    setAssetDetailOpenPopover(null);
+    setSelectedAssetWorkOrderStatuses([]);
+    setSelectedAssetWorkOrderPriorities([]);
+    setSelectedAssetWorkOrderLocations([]);
+    setShowSelectedAssetActionsMenu(false);
+  }, [selectedAsset]);
 
   const resetBranchForm = useCallback(() => {
     setBranchForm({
@@ -13875,8 +17458,6 @@ function ClientDashboard() {
     { key: 'scheduler', label: t("manager.sidebar.scheduler"), icon: <Icon.Clock />, group: 'core' },
     { key: 'requests', label: t("manager.sidebar.requests"), icon: <Icon.Requests />, group: 'core' },
     { key: 'materialRequests', label: t("manager.sidebar.materialRequests"), icon: <Icon.Package />, group: 'core' },
-    { key: 'subscription', label: t("manager.sidebar.subscriptions"), icon: <Icon.Subscription />, group: 'core' },
-
     { key: 'analytics', label: t("manager.sidebar.analytics"), icon: <Icon.Analytics />, group: 'data' },
     { key: 'meters', label: t("manager.sidebar.meters"), icon: <Icon.Gauge />, group: 'data' },
     { key: 'edge', label: t("manager.sidebar.edge"), icon: <Icon.Edge />, group: 'data' },
@@ -13928,8 +17509,8 @@ function ClientDashboard() {
               </svg>
             </div>
             <div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: 'white', lineHeight: 1.2 }}>{t("client.portalTitle")}</div>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>{t("client.portalSubtitle")}</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: 'white', lineHeight: 1.2 }}>FixNest ID</div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>Company operations hub</div>
             </div>
           </div>
         </div>
@@ -13985,9 +17566,7 @@ function ClientDashboard() {
         </nav>
 
         {/* Bottom actions */}
-        <div style={{ padding: '10px', borderTop: '1px solid #F3F4F6' }}>
-          <NavItem label={t("client.actions.exportPdf")} icon={<Icon.Export />} onClick={exportIssuesPDF} />
-          <NavItem label={t("client.actions.importCsv")} icon={<Icon.Download />} onClick={() => importFileRef.current?.click()} />
+        <div style={{ padding: '14px 12px', borderTop: '1px solid #E5E7EB', background: 'rgba(255,255,255,0.72)', backdropFilter: 'blur(12px)' }}>
           <input type="file" ref={importFileRef} accept=".csv" onChange={(e) => {
             const f = e.target.files?.[0];
             if (!f) return;
@@ -14003,7 +17582,30 @@ function ClientDashboard() {
             if (!f) return;
             handleImportAssetsFile(f);
           }} style={{ display: 'none' }} />
-          <NavItem label={t("client.actions.logout")} icon={<Icon.Logout />} onClick={handleLogout} danger />
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+            <button
+              type="button"
+              onClick={() => setActiveTab('dashboard')}
+              title="Dashboard"
+              style={{ width: 42, height: 42, borderRadius: 12, border: activeTab === 'dashboard' ? '1px solid #CBD5E1' : '1px solid transparent', background: activeTab === 'dashboard' ? 'white' : 'transparent', color: activeTab === 'dashboard' ? '#334155' : '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: activeTab === 'dashboard' ? '0 6px 16px rgba(15,23,42,0.08)' : 'none' }}
+            >
+              <LayoutDashboard className="h-5 w-5" />
+            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <button type="button" title="Help" onClick={() => setShowHelpModal(true)} style={{ width: 34, height: 34, borderRadius: 999, border: 'none', background: 'transparent', color: '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <AlertCircle className="h-4 w-4" />
+              </button>
+              <button type="button" title="Contact" onClick={() => setShowContactSupportModal(true)} style={{ width: 34, height: 34, borderRadius: 999, border: 'none', background: 'transparent', color: '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <MessageSquare className="h-4 w-4" />
+              </button>
+              <button type="button" title="Subscription" onClick={() => setActiveTab('subscription')} style={{ width: 34, height: 34, borderRadius: 999, border: 'none', background: 'transparent', color: activeTab === 'subscription' ? '#2563EB' : '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Icon.Subscription />
+              </button>
+              <button type="button" title="Settings" onClick={() => setShowRequestSettingsModal(true)} style={{ width: 34, height: 34, borderRadius: 999, border: 'none', background: 'transparent', color: '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Settings className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
         </div>
       </aside>
 
@@ -14017,14 +17619,92 @@ function ClientDashboard() {
               {navItems.find(n => n.key === activeTab)?.label || t("manager.sidebar.dashboard")}
             </h1>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            {reminders.length > 0 && (
-              <button onClick={() => setShowReminderPanel(v => !v)} style={{ position: 'relative', background: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: 8, padding: '7px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: '#92400E' }}>
-                <Icon.Bell />
-                <span>{reminders.length} Reminder{reminders.length > 1 ? 's' : ''}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, position: 'relative' }}>
+            <div style={{ position: 'relative' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowNotificationsMenu((prev) => !prev);
+                  setShowProfileMenu(false);
+                }}
+                style={{ position: 'relative', width: 40, height: 40, borderRadius: 10, border: '1px solid #E5E7EB', background: 'white', color: '#374151', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <Bell className="h-5 w-5" />
+                {dashboardNotifications.length > 0 && (
+                  <span style={{ position: 'absolute', top: 6, right: 6, width: 8, height: 8, borderRadius: 999, background: '#2563EB' }} />
+                )}
               </button>
-            )}
-            {/* New Request button moved to Requests tab */}
+              {showNotificationsMenu && (
+                <div style={{ position: 'absolute', right: 0, top: 48, zIndex: 40, width: 360, background: 'white', border: '1px solid #E5E7EB', borderRadius: 18, boxShadow: '0 20px 45px rgba(15,23,42,0.18)', overflow: 'hidden' }}>
+                  <div style={{ padding: '18px 18px 10px', borderBottom: '1px solid #F3F4F6', fontSize: 16, fontWeight: 800, color: '#111827' }}>Notifications</div>
+                  <div style={{ maxHeight: 420, overflowY: 'auto' }}>
+                    {dashboardNotifications.length > 0 ? dashboardNotifications.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => setShowNotificationsMenu(false)}
+                        style={{ width: '100%', display: 'flex', gap: 12, padding: '14px 18px', border: 'none', background: 'white', textAlign: 'left', borderBottom: '1px solid #F9FAFB' }}
+                      >
+                        <div style={{ width: 38, height: 38, borderRadius: 999, background: '#166534', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, flexShrink: 0 }}>
+                          {item.avatar}
+                        </div>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: '#111827' }}>{item.title}</div>
+                          <div style={{ fontSize: 13, color: '#4B5563', marginTop: 2 }}>{item.description}</div>
+                          <div style={{ fontSize: 12, color: '#9CA3AF', marginTop: 3 }}>{new Date(item.timestamp).toLocaleString()}</div>
+                        </div>
+                      </button>
+                    )) : (
+                      <div style={{ padding: 18, color: '#6B7280', fontSize: 14 }}>No notifications yet.</div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+            <div style={{ position: 'relative' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowProfileMenu((prev) => !prev);
+                  setShowNotificationsMenu(false);
+                }}
+                style={{ width: 40, height: 40, borderRadius: 999, border: '1px solid #E5E7EB', background: 'white', color: '#111827', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700 }}
+              >
+                {(userName || currentUser?.name || 'U').charAt(0).toUpperCase()}
+              </button>
+              {showProfileMenu && (
+                <div style={{ position: 'absolute', right: 0, top: 48, zIndex: 40, width: 300, background: 'white', border: '1px solid #E5E7EB', borderRadius: 18, boxShadow: '0 20px 45px rgba(15,23,42,0.18)', overflow: 'hidden' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 18, borderBottom: '1px solid #F3F4F6' }}>
+                    <div style={{ width: 40, height: 40, borderRadius: 999, background: '#F3F4F6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>
+                      {(userName || currentUser?.name || 'U').charAt(0).toUpperCase()}
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: '#111827' }}>{userName || currentUser?.name || 'User'}</div>
+                      <div style={{ fontSize: 12, color: '#6B7280' }}>{currentUser?.email || currentUser?.companyName || 'FixNest user'}</div>
+                    </div>
+                  </div>
+                  {[
+                    ['View Profile', openUserProfileModal],
+                    ['View Company Profile', openCompanyProfileModal],
+                    ['Cookie Settings', () => setShowCookieSettingsModal(true)],
+                    ['Notification Settings', () => setShowNotificationSettingsModal(true)],
+                    ['Log Out', handleLogout],
+                  ].map(([label, action]) => (
+                    <button
+                      key={label}
+                      type="button"
+                      onClick={() => {
+                        setShowProfileMenu(false);
+                        action();
+                      }}
+                      style={{ width: '100%', padding: '15px 18px', textAlign: 'left', border: 'none', background: 'white', borderTop: label === 'Log Out' ? '1px solid #F3F4F6' : 'none', fontSize: 14, color: '#111827' }}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </header>
 
@@ -14080,13 +17760,13 @@ function ClientDashboard() {
 
               {/* Stats */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
-                <StatCard label="Pending" value={combinedPending} sub="Awaiting action" accent="amber" onClick={() => setActiveTab('requests')}
+                <StatCard label="Pending" value={combinedPending} sub="Awaiting action" accent="amber" onClick={() => openDashboardStatusView('PENDING')}
                   icon={<svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>} />
-                <StatCard label="In Progress" value={combinedInProgress} sub="Currently active" accent="blue" onClick={() => setActiveTab('workOrders')}
+                <StatCard label="In Progress" value={combinedInProgress} sub="Currently active" accent="blue" onClick={() => openDashboardStatusView('IN PROGRESS')}
                   icon={<svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" /></svg>} />
-                <StatCard label="Completed" value={combinedCompleted} sub="Successfully resolved" accent="green" onClick={() => setActiveTab('workOrders')}
+                <StatCard label="Completed" value={combinedCompleted} sub="Successfully resolved" accent="green" onClick={() => openDashboardStatusView('COMPLETED')}
                   icon={<svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" /></svg>} />
-                <StatCard label="Overdue" value={combinedOverdue} sub="Requires attention" accent="red" onClick={() => setActiveTab('workOrders')}
+                <StatCard label="Overdue" value={combinedOverdue} sub="Requires attention" accent="red" onClick={() => openDashboardStatusView('OVERDUE')}
                   icon={<svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>} />
               </div>
 
@@ -14168,25 +17848,86 @@ function ClientDashboard() {
                       <div style={{ fontSize: 20, fontWeight: 800, color: '#111827' }}>My Tasks</div>
                       <div style={{ fontSize: 13, color: '#6B7280', marginTop: 4 }}>Checklist and task items across your requests and work orders.</div>
                     </div>
-                    <span style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', padding: '6px 10px', borderRadius: 999, background: '#FEF3C7', color: '#92400E' }}>
-                      {clientTasks.filter((task) => !task.completed).length} Active
-                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <button
+                        type="button"
+                        onClick={addManualClientTask}
+                        style={{ border: '1px solid #D1D5DB', background: 'white', color: '#374151', borderRadius: 10, padding: '8px 12px', fontSize: 12, fontWeight: 700 }}
+                      >
+                        {showNewClientTaskComposer ? 'Save Task' : 'Add Task'}
+                      </button>
+                      {showNewClientTaskComposer && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowNewClientTaskComposer(false);
+                            setNewClientTaskTitle('');
+                          }}
+                          style={{ border: 'none', background: 'transparent', color: '#6B7280', fontSize: 12, fontWeight: 700 }}
+                        >
+                          Cancel
+                        </button>
+                      )}
+                      <span style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', padding: '6px 10px', borderRadius: 999, background: '#FEF3C7', color: '#92400E' }}>
+                        {combinedClientTasks.filter((task) => !task.completed).length} Active
+                      </span>
+                    </div>
                   </div>
+                  {showNewClientTaskComposer && (
+                    <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
+                      <input
+                        value={newClientTaskTitle}
+                        onChange={(e) => setNewClientTaskTitle(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key !== 'Enter') return;
+                          e.preventDefault();
+                          addManualClientTask();
+                        }}
+                        placeholder="Add a personal task..."
+                        autoFocus
+                        style={{ flex: 1, borderRadius: 12, border: '1px solid #D1D5DB', background: 'white', padding: '12px 14px', fontSize: 14, color: '#111827', outline: 'none' }}
+                      />
+                    </div>
+                  )}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    {clientTasks.slice(0, 6).map((task) => (
+                    {combinedClientTasks.slice(0, 8).map((task) => (
                       <div key={task.id} style={{ border: '1px solid #E5E7EB', background: 'rgba(255,255,255,0.7)', borderRadius: 14, padding: '12px 14px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-                          <div style={{ minWidth: 0 }}>
-                            <div style={{ fontSize: 14, fontWeight: 700, color: '#111827', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.title}</div>
-                            <div style={{ fontSize: 12, color: '#6B7280', marginTop: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.parentTitle}</div>
+                          <div style={{ minWidth: 0, display: 'flex', gap: 10, alignItems: 'flex-start', flex: 1 }}>
+                            <input
+                              type="checkbox"
+                              checked={!!task.completed}
+                              onChange={() => {
+                                if (!String(task.id || '').startsWith('manual-task-')) return;
+                                setManualClientTasks((prev) => prev.map((entry) => (
+                                  entry.id === task.id ? { ...entry, completed: !entry.completed } : entry
+                                )));
+                              }}
+                              style={{ marginTop: 3, width: 16, height: 16 }}
+                            />
+                            <div style={{ minWidth: 0, flex: 1 }}>
+                              <div style={{ fontSize: 14, fontWeight: 700, color: '#111827', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textDecoration: task.completed ? 'line-through' : 'none', opacity: task.completed ? 0.65 : 1 }}>{task.title}</div>
+                              <div style={{ fontSize: 12, color: '#6B7280', marginTop: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.parentTitle}</div>
+                            </div>
                           </div>
-                          <span style={{ alignSelf: 'flex-start', fontSize: 10, fontWeight: 800, textTransform: 'uppercase', padding: '4px 8px', borderRadius: 999, background: task.completed ? '#D1FAE5' : task.overdue ? '#FEE2E2' : '#DBEAFE', color: task.completed ? '#065F46' : task.overdue ? '#991B1B' : '#1D4ED8' }}>
-                            {task.completed ? 'Completed' : task.overdue ? 'Overdue' : 'Open'}
-                          </span>
+                          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                            <span style={{ alignSelf: 'flex-start', fontSize: 10, fontWeight: 800, textTransform: 'uppercase', padding: '4px 8px', borderRadius: 999, background: task.completed ? '#D1FAE5' : task.overdue ? '#FEE2E2' : '#DBEAFE', color: task.completed ? '#065F46' : task.overdue ? '#991B1B' : '#1D4ED8' }}>
+                              {task.completed ? 'Completed' : task.overdue ? 'Overdue' : 'Open'}
+                            </span>
+                            {String(task.id || '').startsWith('manual-task-') && (
+                              <button
+                                type="button"
+                                onClick={() => setManualClientTasks((prev) => prev.filter((entry) => entry.id !== task.id))}
+                                style={{ border: 'none', background: 'transparent', color: '#9CA3AF', cursor: 'pointer', padding: 0 }}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     ))}
-                    {clientTasks.length === 0 && (
+                    {combinedClientTasks.length === 0 && (
                       <div style={{ border: '2px dashed #E5E7EB', borderRadius: 16, padding: '28px 16px', textAlign: 'center', color: '#6B7280', fontSize: 14 }}>
                         No tasks yet.
                       </div>
@@ -14478,120 +18219,272 @@ function ClientDashboard() {
                 </div>
               </div>
 
-              <div className="flex flex-col gap-4 border-b border-gray-200 bg-gray-50/70 px-6 py-4 lg:flex-row lg:items-center lg:justify-between">
-                <div className="text-[15px] font-medium text-gray-500">
-                  {filteredChecklistLibrary.length} Checklists
-                </div>
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                  <div className="relative">
-                    <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                    <input
-                      className="h-11 w-full rounded-lg border border-gray-300 bg-white pl-11 pr-4 text-sm text-gray-700 outline-none transition focus:border-blue-500 sm:w-72"
-                      placeholder="Search by Name"
-                      value={searchText}
-                      onChange={(e) => setSearchText(e.target.value)}
-                    />
+              {checklistViewTab === 'library' ? (
+                <div className="min-h-[760px]">
+                  <div className="flex items-center justify-between border-b border-gray-200 bg-white px-6 py-4">
+                    <div className="flex items-center gap-3 text-[15px] font-medium text-gray-500">
+                      <AlertCircle className="h-5 w-5 text-gray-400" />
+                      <button type="button" className="hover:text-gray-700">Learn More</button>
+                    </div>
                   </div>
-                  <button
-                    type="button"
-                    className="flex h-11 w-11 items-center justify-center rounded-lg text-gray-500 transition hover:bg-gray-100"
-                  >
-                    <MoreHorizontal className="h-5 w-5" />
-                  </button>
-                  <button
-                    className="h-11 rounded-lg bg-blue-600 px-5 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700"
-                    onClick={() => {
-                      setLaunchChecklistBuilderFromMain(true);
-                      setShowWorkOrderDetails(true);
-                    }}
-                  >
-                    Add Checklist
-                  </button>
-                </div>
-              </div>
+                  <div className="grid min-h-[680px] grid-cols-1 xl:grid-cols-[320px_480px_minmax(0,1fr)]">
+                    <div className="border-r border-gray-200 bg-white">
+                      <div className="space-y-10 px-8 py-8">
+                        <div>
+                          <div className="text-[1.2rem] font-bold text-gray-900">Industry</div>
+                          <div className="mt-5 space-y-4">
+                            {checklistLibraryIndustryOptions.map((option) => (
+                              <label key={option} className="flex items-center gap-4 text-[1.05rem] text-gray-800">
+                                <input
+                                  type="radio"
+                                  checked={checklistLibraryIndustryFilter === option}
+                                  onChange={() => setChecklistLibraryIndustryFilter(option)}
+                                  className="h-5 w-5 border-gray-300 text-blue-600"
+                                />
+                                <span>{option}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
 
-              <div className="flex flex-wrap items-center gap-4 border-b border-gray-200 px-6 py-5">
-                <button className="inline-flex h-11 items-center gap-2 rounded-2xl border-2 border-gray-300 bg-white px-4 text-[15px] font-medium text-gray-700 shadow-sm transition hover:bg-gray-50">
-                  <SlidersHorizontal className="h-4 w-4 text-gray-500" />
-                  Filters
-                </button>
-                <div className="hidden h-10 w-px bg-gray-200 sm:block" />
-                <button className="inline-flex h-11 items-center gap-2 rounded-2xl border-2 border-gray-300 bg-white px-4 text-[15px] font-medium text-gray-700 shadow-sm transition hover:bg-gray-50">
-                  <Tag className="h-4 w-4 text-gray-500" />
-                  Tags
-                  <ChevronDown className="h-4 w-4 text-gray-500" />
-                </button>
-                <button className="text-[15px] font-medium text-blue-600 transition hover:text-blue-700">
-                  Reset Filters
-                </button>
-              </div>
+                        <div className="border-t border-gray-200 pt-8">
+                          <div className="text-[1.2rem] font-bold text-gray-900">Use Case</div>
+                          <div className="mt-5 space-y-4">
+                            {checklistLibraryUseCaseOptions.map((option) => (
+                              <label key={option} className="flex items-center gap-4 text-[1.05rem] text-gray-800">
+                                <input
+                                  type="radio"
+                                  checked={checklistLibraryUseCaseFilter === option}
+                                  onChange={() => setChecklistLibraryUseCaseFilter(option)}
+                                  className="h-5 w-5 border-gray-300 text-blue-600"
+                                />
+                                <span>{option}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
 
-              <div className="p-6">
-                <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
-                  <table className="w-full text-sm">
-                    <thead className="border-b border-gray-200 bg-white text-gray-700">
-                      <tr>
-                        <th className="w-16 px-6 py-4 text-left">
-                          <input type="checkbox" className="h-6 w-6 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-                        </th>
-                        <th className="px-6 py-4 text-left text-[15px] font-bold text-gray-900">Name</th>
-                        <th className="px-6 py-4 text-left text-[15px] font-bold text-gray-900">Description</th>
-                        <th className="w-32 px-6 py-4 text-left text-[15px] font-bold text-gray-900">Tasks</th>
-                        <th className="w-24 px-6 py-4 text-left text-[15px] font-bold text-gray-900">Tags</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredChecklistLibrary.map((tpl) => (
-                        <tr
-                          key={tpl.id}
-                          className="cursor-pointer border-t border-gray-200 transition hover:bg-gray-50/80"
-                          onClick={() => {
-                            setSelectedChecklistTemplate(tpl);
-                            setChecklistDetailOpen(true);
-                          }}
-                        >
-                          <td className="px-6 py-6 align-top">
-                            <input
-                              type="checkbox"
-                              className="h-6 w-6 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                          </td>
-                          <td className="px-6 py-6 align-top text-[15px] font-medium text-gray-900">
-                            {tpl.name || 'Checklist'}
-                          </td>
-                          <td className="max-w-[520px] px-6 py-6 align-top text-[15px] text-gray-700">
-                            <span className="line-clamp-1">{tpl.description || '—'}</span>
-                          </td>
-                          <td className="px-6 py-6 align-top text-[15px] text-gray-900">
-                            {(tpl.items || []).length}
-                          </td>
-                          <td className="px-6 py-6 align-top text-gray-500">
+                    <div className="border-r border-gray-200 bg-[#fbfcff]">
+                      <div className="border-b border-gray-200 px-6 py-4">
+                        <div className="text-[1.05rem] font-bold text-gray-900">{filteredChecklistTemplateCatalog.length} templates</div>
+                        <div className="mt-3 relative">
+                          <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                          <input
+                            className="h-11 w-full rounded-lg border border-gray-300 bg-white pl-11 pr-4 text-sm text-gray-700 outline-none transition focus:border-blue-500"
+                            placeholder="Search by Name"
+                            value={searchText}
+                            onChange={(e) => setSearchText(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                      <div className="max-h-[620px] overflow-y-auto px-5 py-5">
+                        <div className="space-y-5">
+                          {filteredChecklistTemplateCatalog.map((tpl) => (
+                            <button
+                              key={tpl.id}
+                              type="button"
+                              onClick={() => setSelectedChecklistLibraryTemplateId(String(tpl.id))}
+                              className={`block w-full rounded-2xl border px-5 py-5 text-left transition ${
+                                String(selectedChecklistTemplatePreview?.id || '') === String(tpl.id)
+                                  ? 'border-blue-400 bg-white shadow-sm'
+                                  : 'border-gray-200 bg-white hover:border-gray-300'
+                              }`}
+                            >
+                              <div className="line-clamp-1 text-[1.05rem] font-medium text-gray-900">{tpl.name}</div>
+                              <div className="mt-3 text-sm text-gray-500">{(tpl.items || []).length} tasks</div>
+                            </button>
+                          ))}
+                          {filteredChecklistTemplateCatalog.length === 0 && (
+                            <div className="rounded-2xl border border-dashed border-gray-300 bg-white px-6 py-12 text-center text-sm text-gray-500">
+                              No templates match the current filters.
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-[#f8fafc]">
+                      {selectedChecklistTemplatePreview ? (
+                        <>
+                          <div className="flex items-center justify-between border-b border-gray-200 bg-white px-6 py-7">
+                            <div className="text-[1.35rem] font-bold text-gray-900">{selectedChecklistTemplatePreview.name}</div>
                             <button
                               type="button"
-                              className="rounded-md p-1 transition hover:bg-gray-100"
-                              onClick={(e) => {
-                                e.stopPropagation();
+                              onClick={() => useChecklistTemplate(selectedChecklistTemplatePreview)}
+                              className="rounded-lg bg-blue-600 px-4 py-2.5 text-[0.95rem] font-semibold text-white hover:bg-blue-700"
+                            >
+                              Use Template
+                            </button>
+                          </div>
+                          <div className="p-8">
+                            <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
+                              <div className="flex items-center gap-4 border-b border-gray-200 px-6 py-5">
+                                <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-gray-300 text-gray-700">
+                                  <ClipboardCheck className="h-6 w-6" />
+                                </div>
+                                <div className="text-[1.6rem] font-semibold text-gray-900">Task Preview</div>
+                              </div>
+                              <div className="divide-y divide-gray-200">
+                                {(selectedChecklistTemplatePreview.items || []).map((item, index) => (
+                                  <div key={item.id || index} className="px-6 py-5">
+                                    <div className="text-[1.05rem] font-semibold text-gray-900">{item.text || `Task ${index + 1}`}</div>
+                                    <div className="mt-4 flex items-center gap-4">
+                                      <div className="relative max-w-[520px] flex-1">
+                                        <select className="h-12 w-full appearance-none rounded-lg border border-gray-300 bg-white px-4 pr-12 text-[1.05rem] text-gray-500 outline-none">
+                                          <option>Select...</option>
+                                          {Array.isArray(item.options) ? item.options.map((option) => (
+                                            <option key={option} value={option}>{option}</option>
+                                          )) : (
+                                            <>
+                                              <option>Pass</option>
+                                              <option>Fail</option>
+                                              <option>N/A</option>
+                                            </>
+                                          )}
+                                        </select>
+                                        <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+                                      </div>
+                                      <button type="button" className="rounded-lg p-2 text-gray-400 hover:bg-gray-100">
+                                        <Paperclip className="h-5 w-5" />
+                                      </button>
+                                      <button type="button" className="rounded-lg p-2 text-gray-400 hover:bg-gray-100">
+                                        <ImageIcon className="h-5 w-5" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex h-full items-center justify-center px-8 text-center text-sm text-gray-500">
+                          Select a template to preview its tasks.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="flex flex-col gap-4 border-b border-gray-200 bg-gray-50/70 px-6 py-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="text-[15px] font-medium text-gray-500">
+                      {filteredChecklistLibrary.length} Checklists
+                    </div>
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                      <div className="relative">
+                        <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                        <input
+                          className="h-11 w-full rounded-lg border border-gray-300 bg-white pl-11 pr-4 text-sm text-gray-700 outline-none transition focus:border-blue-500 sm:w-72"
+                          placeholder="Search by Name"
+                          value={searchText}
+                          onChange={(e) => setSearchText(e.target.value)}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        className="flex h-11 w-11 items-center justify-center rounded-lg text-gray-500 transition hover:bg-gray-100"
+                      >
+                        <MoreHorizontal className="h-5 w-5" />
+                      </button>
+                      <button
+                        className="h-11 rounded-lg bg-blue-600 px-5 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700"
+                        onClick={() => {
+                          setLaunchChecklistBuilderFromMain(true);
+                          setShowWorkOrderDetails(true);
+                        }}
+                      >
+                        Add Checklist
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-4 border-b border-gray-200 px-6 py-5">
+                    <button className="inline-flex h-11 items-center gap-2 rounded-2xl border-2 border-gray-300 bg-white px-4 text-[15px] font-medium text-gray-700 shadow-sm transition hover:bg-gray-50">
+                      <SlidersHorizontal className="h-4 w-4 text-gray-500" />
+                      Filters
+                    </button>
+                    <div className="hidden h-10 w-px bg-gray-200 sm:block" />
+                    <button className="inline-flex h-11 items-center gap-2 rounded-2xl border-2 border-gray-300 bg-white px-4 text-[15px] font-medium text-gray-700 shadow-sm transition hover:bg-gray-50">
+                      <Tag className="h-4 w-4 text-gray-500" />
+                      Tags
+                      <ChevronDown className="h-4 w-4 text-gray-500" />
+                    </button>
+                    <button className="text-[15px] font-medium text-blue-600 transition hover:text-blue-700">
+                      Reset Filters
+                    </button>
+                  </div>
+
+                  <div className="p-6">
+                    <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
+                      <table className="w-full text-sm">
+                        <thead className="border-b border-gray-200 bg-white text-gray-700">
+                          <tr>
+                            <th className="w-16 px-6 py-4 text-left">
+                              <input type="checkbox" className="h-6 w-6 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                            </th>
+                            <th className="px-6 py-4 text-left text-[15px] font-bold text-gray-900">Name</th>
+                            <th className="px-6 py-4 text-left text-[15px] font-bold text-gray-900">Description</th>
+                            <th className="w-32 px-6 py-4 text-left text-[15px] font-bold text-gray-900">Tasks</th>
+                            <th className="w-24 px-6 py-4 text-left text-[15px] font-bold text-gray-900">Tags</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredChecklistLibrary.map((tpl) => (
+                            <tr
+                              key={tpl.id}
+                              className="cursor-pointer border-t border-gray-200 transition hover:bg-gray-50/80"
+                              onClick={() => {
                                 setSelectedChecklistTemplate(tpl);
                                 setChecklistDetailOpen(true);
                               }}
                             >
-                              <MoreHorizontal className="h-5 w-5" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                      {filteredChecklistLibrary.length === 0 && (
-                        <tr>
-                          <td colSpan={5} className="px-6 py-12 text-center text-sm text-gray-500">
-                            No checklists yet. Click "Add Checklist" to create one.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+                              <td className="px-6 py-6 align-top">
+                                <input
+                                  type="checkbox"
+                                  className="h-6 w-6 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                              </td>
+                              <td className="px-6 py-6 align-top text-[15px] font-medium text-gray-900">
+                                {tpl.name || 'Checklist'}
+                              </td>
+                              <td className="max-w-[520px] px-6 py-6 align-top text-[15px] text-gray-700">
+                                <span className="line-clamp-1">{tpl.description || '—'}</span>
+                              </td>
+                              <td className="px-6 py-6 align-top text-[15px] text-gray-900">
+                                {(tpl.items || []).length}
+                              </td>
+                              <td className="px-6 py-6 align-top text-gray-500">
+                                <button
+                                  type="button"
+                                  className="rounded-md p-1 transition hover:bg-gray-100"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedChecklistTemplate(tpl);
+                                    setChecklistDetailOpen(true);
+                                  }}
+                                >
+                                  <MoreHorizontal className="h-5 w-5" />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                          {filteredChecklistLibrary.length === 0 && (
+                            <tr>
+                              <td colSpan={5} className="px-6 py-12 text-center text-sm text-gray-500">
+                                No checklists yet. Click "Add Checklist" to create one.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </>
+              )}
 
               {checklistDetailOpen && selectedChecklistTemplate && (
                 <div className="fixed inset-0 z-[90] overflow-y-auto bg-black/60 backdrop-blur-sm p-4">
@@ -15728,6 +19621,44 @@ function ClientDashboard() {
               }
 
               if (workOrderDetailsMode !== 'edit' || !editingWorkOrderId) {
+                if (workOrderDetailsMode === 'create') {
+                  const requestPayload = {
+                    title: payload?.title || '',
+                    description: payload?.description || '',
+                    category: payload?.category || '',
+                    priority: payload?.priority || 'Medium',
+                    location: payload?.location || '',
+                    assetId: payload?.assetId || '',
+                    assetName: payload?.assetName || '',
+                    dueDate: payload?.dueDate || '',
+                    startDate: payload?.startDate || '',
+                    assignedTo: payload?.assignedTo || '',
+                    additionalResponsibleWorkers: payload?.additionalResponsibleWorkers || '',
+                    team: payload?.team || '',
+                    durationHours: payload?.durationHours || '',
+                    requiresSignature: !!payload?.requiresSignature,
+                    lineItems: Array.isArray(payload?.lineItems) ? payload.lineItems : [],
+                    checklist: Array.isArray(pmChecklist) ? pmChecklist : [],
+                    tasks: Array.isArray(pmTasks) ? pmTasks : [],
+                  };
+
+                  const createdRes = await api.post('/api/issues', requestPayload);
+                  const createdId = createdRes?.data?.id || createdRes?.data?._id;
+                  if (createdId) {
+                    try {
+                      await api.put(`/api/issues/${createdId}`, { approved: true, status: 'OPEN' });
+                    } catch (approveError) {
+                      console.warn('Failed to mark created work order approved', approveError);
+                    }
+                  }
+
+                  await fetchIssues();
+                  setShowWorkOrderDetails(false);
+                  setLaunchChecklistBuilderFromMain(false);
+                  setActiveTab('workOrders');
+                  return;
+                }
+
                 setShowWorkOrderDetails(false);
                 setLaunchChecklistBuilderFromMain(false);
                 return;
@@ -16528,6 +20459,85 @@ function ClientDashboard() {
                 count={materialRequests.length}
                 action={<Btn onClick={fetchMaterialRequests} variant="outline" size="sm">Refresh</Btn>}
               />
+              <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
+                <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 18, padding: 22 }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginBottom: 18 }}>
+                    <div>
+                      <div style={{ fontSize: 18, fontWeight: 800, color: '#111827' }}>Procurement Registration</div>
+                      <div style={{ fontSize: 13, color: '#6B7280', marginTop: 4 }}>Register the procurement people who should receive company material request emails.</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setProcurementSettings((prev) => ({
+                        ...prev,
+                        officers: [...prev.officers, { id: `procurement-${Date.now()}`, name: '', email: '', role: 'Procurement Officer' }],
+                      }))}
+                      style={{ border: '1px solid #D1D5DB', background: 'white', color: '#374151', borderRadius: 10, padding: '8px 12px', fontSize: 12, fontWeight: 700 }}
+                    >
+                      Add Procurement
+                    </button>
+                  </div>
+                  <div style={{ display: 'grid', gap: 12 }}>
+                    {procurementSettings.officers.map((officer, index) => (
+                      <div key={officer.id || index} style={{ display: 'grid', gridTemplateColumns: '1.1fr 1.2fr 1fr auto', gap: 10, alignItems: 'end' }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#4B5563', marginBottom: 6 }}>Name</label>
+                          <input value={officer.name} onChange={(e) => setProcurementSettings((prev) => ({ ...prev, officers: prev.officers.map((entry, entryIndex) => entryIndex === index ? { ...entry, name: e.target.value } : entry) }))} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#4B5563', marginBottom: 6 }}>Email</label>
+                          <input value={officer.email} onChange={(e) => setProcurementSettings((prev) => ({ ...prev, officers: prev.officers.map((entry, entryIndex) => entryIndex === index ? { ...entry, email: e.target.value } : entry) }))} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#4B5563', marginBottom: 6 }}>Role</label>
+                          <input value={officer.role} onChange={(e) => setProcurementSettings((prev) => ({ ...prev, officers: prev.officers.map((entry, entryIndex) => entryIndex === index ? { ...entry, role: e.target.value } : entry) }))} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setProcurementSettings((prev) => ({ ...prev, officers: prev.officers.filter((_, entryIndex) => entryIndex !== index || prev.officers.length === 1) }))}
+                          style={{ width: 36, height: 36, borderRadius: 10, border: '1px solid #E5E7EB', background: 'white', color: '#9CA3AF' }}
+                        >
+                          <Trash2 className="h-4 w-4 mx-auto" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ marginTop: 16, display: 'grid', gap: 12 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14, color: '#374151' }}>
+                      <input type="checkbox" checked={!!procurementSettings.notifyVendors} onChange={(e) => setProcurementSettings((prev) => ({ ...prev, notifyVendors: e.target.checked }))} />
+                      Notify vendors too when a material request is registered
+                    </label>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#4B5563', marginBottom: 6 }}>Extra vendor emails</label>
+                      <input value={procurementSettings.vendorEmails} onChange={(e) => setProcurementSettings((prev) => ({ ...prev, vendorEmails: e.target.value }))} placeholder="vendor1@company.com, vendor2@company.com" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+                    </div>
+                  </div>
+                </div>
+                <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 18, padding: 22 }}>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: '#111827' }}>Email Recipients Preview</div>
+                  <div style={{ fontSize: 13, color: '#6B7280', marginTop: 4, marginBottom: 16 }}>These are the recipients that will be used for material request notification emails.</div>
+                  <div style={{ display: 'grid', gap: 10 }}>
+                    {procurementSettings.officers.filter((entry) => String(entry.email || '').trim()).map((entry) => (
+                      <div key={`proc-${entry.id}`} style={{ border: '1px solid #E5E7EB', borderRadius: 12, padding: '10px 12px' }}>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: '#111827' }}>{entry.name || entry.role || 'Procurement'}</div>
+                        <div style={{ fontSize: 12, color: '#6B7280', marginTop: 2 }}>{entry.email}</div>
+                      </div>
+                    ))}
+                    {procurementSettings.notifyVendors && (contactPeople || []).filter((person) => person.__source === 'vendor' && person.email).slice(0, 6).map((vendor) => (
+                      <div key={`vendor-recipient-${vendor.id || vendor._id || vendor.email}`} style={{ border: '1px solid #E5E7EB', borderRadius: 12, padding: '10px 12px', background: '#F9FAFB' }}>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: '#111827' }}>{vendor.name || vendor.fullName || 'Vendor'}</div>
+                        <div style={{ fontSize: 12, color: '#6B7280', marginTop: 2 }}>{vendor.email}</div>
+                      </div>
+                    ))}
+                    {String(procurementSettings.vendorEmails || '').split(',').map((email) => email.trim()).filter(Boolean).map((email) => (
+                      <div key={`extra-vendor-${email}`} style={{ border: '1px solid #E5E7EB', borderRadius: 12, padding: '10px 12px', background: '#F9FAFB' }}>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: '#111827' }}>Vendor recipient</div>
+                        <div style={{ fontSize: 12, color: '#6B7280', marginTop: 2 }}>{email}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
               {materialRequests.length === 0 ? (
                 <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 14, padding: 60, textAlign: 'center' }}>
                   <div style={{ fontSize: 40, marginBottom: 16 }}>ðŸ“¦</div>
@@ -16612,18 +20622,266 @@ function ClientDashboard() {
 
           {/* â”€â”€ Properties â”€â”€ */}
           {activeTab === 'properties' && (
-            <div>
-              <SectionHeader title={t("client.sections.locations")} count={properties.length}
-                action={!editingProperty && <Btn onClick={() => { setEditingProperty({}); setPropertyFiles(null); setPropertyUseNamedBlocks(false); setPropertyForm(createEmptyPropertyForm()); }} variant="primary" size="sm"><Icon.Plus /> {t("client.actions.addLocations")}</Btn>} />
+            <div className="-m-6 bg-[#f8fafc]">
+              {editingProperty === null && !propertyModalOpen && (
+              <div className="border-b border-gray-200 bg-white">
+                <div className="flex flex-wrap items-center justify-between gap-4 px-8 py-4">
+                  <div className="flex flex-wrap items-center gap-8">
+                    <div className="flex items-center gap-4">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-gray-200 text-gray-700">
+                        <LayoutDashboard className="h-5 w-5" />
+                      </div>
+                      <h2 className="text-[2rem] font-black text-gray-900">{t("client.sections.locations")}</h2>
+                    </div>
+                    <div className="flex items-center gap-6">
+                      {[
+                        ['list', 'List'],
+                        ['map', 'Map'],
+                      ].map(([key, label]) => (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => setPropertyViewMode(key)}
+                          className={`border-b-2 pb-3 pt-3 text-[1.05rem] font-semibold transition ${
+                            propertyViewMode === key ? 'border-blue-600 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-800'
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  {!editingProperty && (
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => openPropertyEditor()}
+                        className="rounded-xl bg-blue-600 px-6 py-3 text-lg font-semibold text-white hover:bg-blue-700"
+                      >
+                        Create Location
+                      </button>
+                      <div className="relative" ref={propertyActionsMenuRef}>
+                        <button
+                          type="button"
+                          onClick={() => setShowPropertyActionsMenu((prev) => !prev)}
+                          className="rounded-xl p-2.5 text-gray-500 hover:bg-gray-100"
+                        >
+                          <MoreHorizontal className="h-5 w-5" />
+                        </button>
+                        {showPropertyActionsMenu && (
+                          <div className="absolute right-0 top-[calc(100%+10px)] z-30 w-56 overflow-hidden rounded-2xl border border-gray-200 bg-white py-2 shadow-2xl">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                propertyImportInputRef.current?.click();
+                                setShowPropertyActionsMenu(false);
+                              }}
+                              className="flex w-full items-center gap-3 px-5 py-4 text-left text-base text-gray-700 hover:bg-gray-50"
+                            >
+                              <ArrowUpDown className="h-5 w-5 rotate-90 text-gray-500" />
+                              <span>Import</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                downloadPropertiesCsv();
+                                setShowPropertyActionsMenu(false);
+                              }}
+                              className="flex w-full items-center gap-3 px-5 py-4 text-left text-base text-gray-700 hover:bg-gray-50"
+                            >
+                              <Download className="h-5 w-5 text-gray-500" />
+                              <span>Export All Locations</span>
+                            </button>
+                          </div>
+                        )}
+                        <input
+                          ref={propertyImportInputRef}
+                          type="file"
+                          accept=".csv,text/csv"
+                          className="hidden"
+                          onChange={(e) => {
+                            handleImportPropertiesFile(e.target.files?.[0]);
+                            e.target.value = '';
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-4 border-t border-gray-100 px-8 py-3">
+                  <div className="text-sm font-semibold text-gray-900">{filteredProperties.length} Results Returned</div>
+                  <div className="flex flex-wrap items-center gap-8">
+                    <button
+                      type="button"
+                      onClick={() => setPropertySortDirection((prev) => (prev === 'desc' ? 'asc' : 'desc'))}
+                      className="inline-flex items-center gap-2 text-sm font-semibold text-gray-700"
+                    >
+                      <ArrowUpDown className="h-4 w-4" />
+                      <span>Sort: Date Created</span>
+                    </button>
+                    <button type="button" className="inline-flex items-center gap-2 text-sm font-semibold text-gray-700">
+                      <LayoutDashboard className="h-4 w-4" />
+                      <span>Columns</span>
+                    </button>
+                    <div className="relative">
+                      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                      <input
+                        value={propertySearchQuery}
+                        onChange={(e) => setPropertySearchQuery(e.target.value)}
+                        placeholder="Search"
+                        className="h-10 w-72 rounded-lg border border-gray-200 bg-gray-50 pl-10 pr-4 text-sm text-gray-700 outline-none transition focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="relative z-20 flex flex-wrap items-center gap-3 overflow-visible border-t border-gray-100 px-8 py-4">
+                  <button
+                    type="button"
+                    className={`inline-flex h-11 items-center gap-2 rounded-2xl border px-4 text-[15px] font-medium shadow-sm transition ${
+                      selectedPropertyAssignedTo.length > 0 ? 'border-blue-300 bg-blue-50 text-blue-700' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    <SlidersHorizontal className="h-4 w-4" />
+                    Filters
+                  </button>
+                  <div ref={propertyAssignedFilterRef} className="relative">
+                    <FilterButton
+                      icon={Users}
+                      label="Assigned To"
+                      active={selectedPropertyAssignedTo.length > 0}
+                      count={selectedPropertyAssignedTo.length || undefined}
+                      onClick={() => setPropertyOpenPopover(propertyOpenPopover === 'assigned' ? null : 'assigned')}
+                    />
+                    <FilterPopover
+                      anchorRef={propertyAssignedFilterRef}
+                      isOpen={propertyOpenPopover === 'assigned'}
+                      onClose={() => setPropertyOpenPopover(null)}
+                      title=""
+                      className="w-[628px]"
+                      bodyClassName="p-0"
+                    >
+                      <div className="overflow-hidden rounded-[24px] bg-white">
+                        <div className="flex items-center justify-between border-b border-gray-200 px-6 py-5">
+                          <div className="text-[19px] font-bold text-gray-900">Assigned To</div>
+                          <button
+                            type="button"
+                            onClick={() => setPropertyOpenPopover(null)}
+                            className="rounded-lg p-2 text-gray-500 hover:bg-gray-100"
+                          >
+                            <X className="h-5 w-5" />
+                          </button>
+                        </div>
+                        <div className="px-5 py-4">
+                          <div className="relative">
+                            <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+                            <input
+                              value={propertyAssignedSearchQuery}
+                              onChange={(e) => setPropertyAssignedSearchQuery(e.target.value)}
+                              placeholder="Search"
+                              className="h-11 w-full rounded-lg border border-gray-200 bg-gray-50 pl-10 pr-4 text-sm text-gray-700 outline-none focus:border-blue-500"
+                            />
+                          </div>
+                        </div>
+                        <div className="max-h-[260px] overflow-y-auto border-t border-gray-100">
+                          {filteredPropertyAssignedOptions.length ? filteredPropertyAssignedOptions.map((assignedTo) => {
+                            const checked = draftPropertyAssignedTo.includes(assignedTo);
+                            const initial = assignedTo === 'Unassigned' ? '' : String(assignedTo).trim().charAt(0).toUpperCase();
+                            return (
+                              <label key={assignedTo} className="flex items-center gap-4 px-6 py-4 hover:bg-gray-50">
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={(e) => {
+                                    const next = e.target.checked
+                                      ? [...draftPropertyAssignedTo, assignedTo]
+                                      : draftPropertyAssignedTo.filter((value) => value !== assignedTo);
+                                    setDraftPropertyAssignedTo(Array.from(new Set(next)));
+                                  }}
+                                  className="h-6 w-6 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                />
+                                {assignedTo === 'Unassigned' ? (
+                                  <span className="text-[16px] text-gray-900">Unassigned</span>
+                                ) : (
+                                  <>
+                                    <span className="flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-gray-50 text-[18px] text-gray-900">
+                                      {initial}
+                                    </span>
+                                    <span className="text-[16px] text-gray-900">{assignedTo}</span>
+                                  </>
+                                )}
+                              </label>
+                            );
+                          }) : (
+                            <div className="px-6 py-8 text-sm text-gray-500">No matches found.</div>
+                          )}
+                        </div>
+                        <div className="flex items-center justify-between border-t border-gray-200 px-6 py-5">
+                          <div className="text-[15px] text-gray-500">{draftPropertyAssignedTo.length} selected</div>
+                          <div className="flex items-center gap-3">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setDraftPropertyAssignedTo(selectedPropertyAssignedTo);
+                                setPropertyAssignedSearchQuery('');
+                                setPropertyOpenPopover(null);
+                              }}
+                              className="rounded-lg border border-gray-300 bg-white px-5 py-3 text-[17px] font-medium text-gray-700 hover:bg-gray-50"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedPropertyAssignedTo(draftPropertyAssignedTo);
+                                setPropertyOpenPopover(null);
+                              }}
+                              className="rounded-lg bg-blue-600 px-6 py-3 text-[17px] font-medium text-white hover:bg-blue-700"
+                            >
+                              Save
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </FilterPopover>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedPropertyAssignedTo([]);
+                      setPropertySearchQuery('');
+                      setPropertyOpenPopover(null);
+                    }}
+                    className="text-[15px] font-medium text-blue-600 hover:text-blue-700"
+                  >
+                    Reset Filters
+                  </button>
+                  <button type="button" className="ml-auto text-[15px] font-medium text-gray-700 hover:text-gray-900">Save View</button>
+                </div>
+              </div>
+              )}
 
-              {loading.properties && <div style={{ textAlign: 'center', padding: 40, color: '#9CA3AF' }}>Loadingâ€¦</div>}
-              {errors.properties && <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 10, padding: 14, marginBottom: 16, color: '#991B1B', fontSize: 13 }}>Error: {errors.properties}</div>}
+              {editingProperty === null && !propertyModalOpen && loading.properties && <div style={{ textAlign: 'center', padding: 40, color: '#9CA3AF' }}>Loadingâ€¦</div>}
+              {editingProperty === null && !propertyModalOpen && errors.properties && <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 10, padding: 14, margin: '24px', color: '#991B1B', fontSize: 13 }}>Error: {errors.properties}</div>}
 
               {/* Form */}
               {editingProperty !== null && (
-                <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 14, padding: 24, marginBottom: 20 }}>
-                  <div style={{ fontWeight: 700, fontSize: 15, color: '#111827', marginBottom: 16 }}>{editingProperty._id || editingProperty.id ? t("client.actions.editLocation") : t("client.actions.newLocation")}</div>
-                  <form onSubmit={async (e) => {
+                <div className="min-h-screen bg-white">
+                  <div className="flex items-center justify-between border-b border-gray-200 px-8 py-4">
+                    <div className="flex items-center gap-5">
+                      <button type="button" onClick={closePropertyEditor} className="rounded-lg p-2 text-gray-500 hover:bg-gray-100">
+                        <X className="h-5 w-5" />
+                      </button>
+                      <div className="h-10 w-px bg-gray-200" />
+                      <div className="text-[2rem] font-black text-gray-900">{editingProperty._id || editingProperty.id ? 'Edit Location' : 'Create Location'}</div>
+                    </div>
+                    <div className="flex items-center gap-5">
+                      <button type="button" onClick={closePropertyEditor} className="rounded-lg border border-gray-300 bg-white px-6 py-3 text-lg font-semibold text-gray-700 hover:bg-gray-50">Cancel</button>
+                      <button type="submit" form="property-editor-form" className="rounded-lg bg-blue-600 px-6 py-3 text-lg font-semibold text-white hover:bg-blue-700">
+                        {editingProperty._id || editingProperty.id ? 'Save Location' : 'Create Location'}
+                      </button>
+                    </div>
+                  </div>
+                  <form id="property-editor-form" onSubmit={async (e) => {
                     e.preventDefault();
                     try {
                       const userId = getCurrentUserId();
@@ -16634,6 +20892,11 @@ function ClientDashboard() {
                         area: propertyForm.area ? +propertyForm.area : undefined,
                         floors: propertyForm.floors ? +propertyForm.floors : undefined,
                         rooms: propertyForm.rooms ? +propertyForm.rooms : undefined,
+                        assignedWorkers: Array.isArray(propertyForm.assignedWorkers) ? propertyForm.assignedWorkers : [],
+                        assignedTeam: propertyForm.assignedTeam || '',
+                        vendors: Array.isArray(propertyForm.vendors) ? propertyForm.vendors : [],
+                        customers: Array.isArray(propertyForm.customers) ? propertyForm.customers : [],
+                        customData: Array.isArray(propertyForm.customData) ? propertyForm.customData : [],
                         clientId: userId,
                         userId
                       };
@@ -16661,39 +20924,50 @@ function ClientDashboard() {
                         Array.from(propertyFiles).forEach(f => fd.append('photos', f));
                         await api.post(`/api/properties/${eid}/photos`, fd, { headers: { 'Content-Type': 'multipart/form-data' } }).catch(() => { });
                       }
-                      setEditingProperty(null);
-                      setPropertyFiles(null);
-                      setPropertyForm(createEmptyPropertyForm());
+                      closePropertyEditor();
                       const res = await api.get('/api/properties');
                       setProperties(res.data || []);
                     } catch {
                       alert('Failed to save property.');
                     }
                   }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+                    <div className="mx-auto max-w-[560px] px-6 py-10">
+                      <div className="mb-8 text-[2rem] font-bold text-gray-900">Location Information</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(1, minmax(0, 1fr))', gap: 20 }}>
                       {[['Location Name', 'name', 'text', true], ['Type', 'type', 'text', true], ['Address', 'address', 'text', true], ['Beds', 'beds', 'number'], ['Baths', 'baths', 'number'], ['Area (sqft)', 'area', 'number'], ['Floors', 'floors', 'number'], ['Blocks', 'blocks', 'number'], ['Rooms', 'rooms', 'number']].map(([ph, field, type, req]) => (
                         <div key={field}>
                           <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{ph}</label>
                           <Input placeholder={ph} type={type} value={propertyForm[field]} onChange={e => setPropertyForm(f => ({ ...f, [field]: e.target.value }))} required={req} />
                         </div>
                       ))}
-                      <div style={{ gridColumn: '1 / -1', border: '1px solid #DBEAFE', background: '#EFF6FF', borderRadius: 12, padding: 14 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                          <div>
-                            <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: '#1D4ED8', letterSpacing: '0.05em' }}>Live Location</div>
-                            <div style={{ fontSize: 13, color: '#1E3A8A', marginTop: 4 }}>
-                              Save GPS coordinates so company staff can open directions to this branch.
+                      <div style={{ gridColumn: '1 / -1' }}>
+                        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 10, fontSize: 15, fontWeight: 500, color: '#111827', marginBottom: 16 }}>
+                          <input
+                            type="checkbox"
+                            checked={!!propertyForm.includeMapCoordinates}
+                            onChange={(e) => setPropertyForm((prev) => ({ ...prev, includeMapCoordinates: e.target.checked }))}
+                            style={{ width: 22, height: 22 }}
+                          />
+                          Include Map Coordinates
+                        </label>
+                        <div className="overflow-hidden rounded-lg border border-gray-200 bg-[#e9f5fb]">
+                          <div className="flex h-[340px] items-center justify-center text-center">
+                            <div>
+                              <div className="text-base font-semibold text-slate-800">Map Preview</div>
+                              <div className="mt-2 text-sm text-slate-700">
+                                {propertyForm.latitude || propertyForm.longitude ? `Lat: ${propertyForm.latitude || '-'}, Lng: ${propertyForm.longitude || '-'}` : 'Add coordinates or use your current location'}
+                              </div>
+                              <button
+                                type="button"
+                                onClick={handleUseCurrentPropertyLocation}
+                                className="mt-5 rounded-lg border border-white bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50"
+                              >
+                                Use My Current Location
+                              </button>
                             </div>
                           </div>
-                          <button
-                            type="button"
-                            onClick={handleUseCurrentPropertyLocation}
-                            style={{ border: '1px solid #93C5FD', background: 'white', color: '#1D4ED8', borderRadius: 10, padding: '10px 14px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
-                          >
-                            Use My Current Location
-                          </button>
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginTop: 12 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, marginTop: 12 }}>
                           <div>
                             <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Latitude</label>
                             <Input placeholder="e.g. -1.944072" type="number" step="any" value={propertyForm.latitude || ''} onChange={e => setPropertyForm(f => ({ ...f, latitude: e.target.value }))} />
@@ -16702,17 +20976,22 @@ function ClientDashboard() {
                             <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Longitude</label>
                             <Input placeholder="e.g. 30.061885" type="number" step="any" value={propertyForm.longitude || ''} onChange={e => setPropertyForm(f => ({ ...f, longitude: e.target.value }))} />
                           </div>
-                          <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-                            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 10 }}>
-                              <input
-                                type="checkbox"
-                                checked={!!propertyForm.includeMapCoordinates}
-                                onChange={(e) => setPropertyForm((prev) => ({ ...prev, includeMapCoordinates: e.target.checked }))}
-                              />
-                              Enable map coordinates
-                            </label>
-                          </div>
                         </div>
+                      </div>
+                      <div style={{ gridColumn: '1 / -1', marginTop: 8 }}>
+                        <label style={{ fontSize: 15, fontWeight: 500, color: '#111827', display: 'block', marginBottom: 10 }}>Select Parent Location</label>
+                        <select
+                          value={propertyForm.hierarchy || ''}
+                          onChange={e => setPropertyForm(f => ({ ...f, hierarchy: e.target.value }))}
+                          style={{ width: '100%', height: 56, padding: '0 14px', borderRadius: 8, border: '1px solid #D1D5DB', fontFamily: 'inherit' }}
+                        >
+                          <option value="">None</option>
+                          {properties
+                            .filter((property) => String(property._id || property.id || '') !== String(editingProperty._id || editingProperty.id || ''))
+                            .map((property) => (
+                              <option key={property._id || property.id} value={property.name || ''}>{property.name || 'Location'}</option>
+                            ))}
+                        </select>
                       </div>
                       <div style={{ gridColumn: '1 / -1', marginTop: 8 }}>
                         <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: 4, textTransform: 'uppercase' }}>Room Names (comma separated)</label>
@@ -16730,7 +21009,119 @@ function ClientDashboard() {
                       <input id="property-photos-input" type="file" multiple accept="image/*" style={{ display: 'none' }} onChange={e => setPropertyFiles(e.target.files)} />
                     </div>
 
-                    {editingProperty && (
+                    <div style={{ gridColumn: '1 / -1', marginTop: 36 }}>
+                      <div className="text-[2rem] font-bold text-gray-900">Assigned To</div>
+                      <div className="mt-8 space-y-8">
+                        <div>
+                          <label className="mb-3 block text-[15px] font-medium text-gray-900">Workers</label>
+                          <select
+                            value={propertyForm.assignedWorkers?.[0] || ''}
+                            onChange={(e) => setPropertyForm((prev) => ({ ...prev, assignedWorkers: e.target.value ? [e.target.value] : [] }))}
+                            className="h-14 w-full rounded-lg border border-gray-300 px-4 text-base text-gray-900"
+                          >
+                            <option value=""></option>
+                            {propertyWorkerOptions.map((worker) => (
+                              <option key={worker.id} value={worker.id}>{worker.label}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="mb-3 block text-[15px] font-medium text-gray-900">Team</label>
+                          <select
+                            value={propertyForm.assignedTeam || ''}
+                            onChange={(e) => setPropertyForm((prev) => ({ ...prev, assignedTeam: e.target.value }))}
+                            className="h-14 w-full rounded-lg border border-gray-300 px-4 text-base text-gray-900"
+                          >
+                            <option value=""></option>
+                            {propertyTeamOptions.map((team) => (
+                              <option key={team.id} value={team.id}>{team.label}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ gridColumn: '1 / -1', marginTop: 36 }}>
+                      <div className="text-[2rem] font-bold text-gray-900">More Information</div>
+                      <div className="mt-8 space-y-8">
+                        <div>
+                          <label className="mb-3 block text-[15px] font-medium text-gray-900">Vendors</label>
+                          <select
+                            value={propertyForm.vendors?.[0] || ''}
+                            onChange={(e) => setPropertyForm((prev) => ({ ...prev, vendors: e.target.value ? [e.target.value] : [] }))}
+                            className="h-14 w-full rounded-lg border border-gray-300 px-4 text-base text-gray-900"
+                          >
+                            <option value=""></option>
+                            {propertyVendorOptions.map((vendor) => (
+                              <option key={vendor.id} value={vendor.id}>{vendor.label}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="mb-3 block text-[15px] font-medium text-gray-900">Customers</label>
+                          <select
+                            value={propertyForm.customers?.[0] || ''}
+                            onChange={(e) => setPropertyForm((prev) => ({ ...prev, customers: e.target.value ? [e.target.value] : [] }))}
+                            className="h-14 w-full rounded-lg border border-gray-300 px-4 text-base text-gray-900"
+                          >
+                            <option value=""></option>
+                            {propertyCustomerOptions.map((customer) => (
+                              <option key={customer.id} value={customer.id}>{customer.label}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ gridColumn: '1 / -1', marginTop: 36 }}>
+                      <div className="text-[2rem] font-bold text-gray-900">Custom Data</div>
+                      <div className="mt-3 text-[15px] text-gray-500">After naming custom fields, you can enter a value and unit.</div>
+                      <div className="mt-6 space-y-4">
+                        {(propertyForm.customData || []).map((item, index) => (
+                          <div key={`${item.name || 'custom'}-${index}`} className="grid grid-cols-3 gap-3">
+                            <input
+                              value={item.name || ''}
+                              onChange={(e) => setPropertyForm((prev) => ({
+                                ...prev,
+                                customData: prev.customData.map((entry, itemIndex) => itemIndex === index ? { ...entry, name: e.target.value } : entry),
+                              }))}
+                              placeholder="Field name"
+                              className="h-12 rounded-lg border border-gray-300 px-4"
+                            />
+                            <input
+                              value={item.value || ''}
+                              onChange={(e) => setPropertyForm((prev) => ({
+                                ...prev,
+                                customData: prev.customData.map((entry, itemIndex) => itemIndex === index ? { ...entry, value: e.target.value } : entry),
+                              }))}
+                              placeholder="Value"
+                              className="h-12 rounded-lg border border-gray-300 px-4"
+                            />
+                            <input
+                              value={item.unit || ''}
+                              onChange={(e) => setPropertyForm((prev) => ({
+                                ...prev,
+                                customData: prev.customData.map((entry, itemIndex) => itemIndex === index ? { ...entry, unit: e.target.value } : entry),
+                              }))}
+                              placeholder="Unit"
+                              className="h-12 rounded-lg border border-gray-300 px-4"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setPropertyForm((prev) => ({
+                          ...prev,
+                          customData: [...(prev.customData || []), { name: '', value: '', unit: '' }],
+                        }))}
+                        className="mt-8 rounded-lg border border-gray-300 bg-white px-6 py-3 text-lg font-medium text-gray-800 hover:bg-gray-50"
+                      >
+                        Add Custom Field
+                      </button>
+                    </div>
+
+                    {false && editingProperty && (
                       (() => {
                         const eid = editingProperty._id || editingProperty.id;
                         const blockDisplay = propertyForm.block
@@ -16837,273 +21228,498 @@ function ClientDashboard() {
                     )}
 
                   </div>
-                    <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-                      <Btn type="submit" variant="primary">Save Property</Btn>
-                      <Btn onClick={() => {
-                        setEditingProperty(null);
-                        setPropertyFiles(null);
-                        setPropertyForm(createEmptyPropertyForm());
-                      }} variant="ghost">Cancel</Btn>
-                    </div>
+                  </div>
                   </form>
                 </div>
               )}
 
-                            <Table
-                heads={['Name', 'Type', 'Address', 'Beds', 'Baths', 'Area', 'Actions']}
-                empty="No properties yet. Add your first one."
-                rows={properties.map(p => {
-                  const isActive = selectedProperty && String(selectedProperty._id || selectedProperty.id) === String(p._id || p.id);
-                  return {
-                    key: p._id || p.id || p.name,
-                    onClick: () => { setSelectedProperty(p); setPropertyModalOpen(true); },
-                    className: isActive ? 'bg-white/10' : '',
-                    cells: [
-                      <Td key="n"><span style={{ fontWeight: 600 }}>{p.name}</span></Td>,
-                      <Td key="t"><span style={{ background: '#EFF6FF', color: '#1D4ED8', padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 600 }}>{p.type}</span></Td>,
-                      <Td key="a">{p.address}</Td>,
-                      <Td key="b">{p.beds ?? '?'}</Td>,
-                      <Td key="ba">{p.baths ?? '?'}</Td>,
-                      <Td key="ar">{p.area ?? p.sqft ?? '?'}</Td>,
-                      <Td key="x">
-                        <div style={{ display: 'flex', gap: 6 }}>
-                          <Btn size="sm" variant="outline" onClick={(e) => {
-                            e.stopPropagation();
-                            const named = Array.isArray(p.blocks) || (p.blocks && isNaN(parseInt(String(p.blocks))));
-                            setEditingProperty(p);
-                            setPropertyUseNamedBlocks(!!named);
-                            setPropertyForm({
-                              ...createEmptyPropertyForm(),
-                              name: p.name || '',
-                              type: p.type || '',
-                              address: p.address || '',
-                              beds: p.beds || '',
-                              baths: p.baths || '',
-                              area: p.area || '',
-                              floors: p.floors || '',
-                              blocks: !named ? (p.blocks || '') : '',
-                              namedBlocks: named ? (Array.isArray(p.blocks) ? p.blocks : String(p.blocks).split(/[;,|]/).map(s => s.trim()).filter(Boolean)) : [],
-                              rooms: p.rooms || '',
-                              roomNames: Array.isArray(p.roomNames) ? p.roomNames : (p.roomNames ? String(p.roomNames).split(/[;,|]/).map(s => s.trim()).filter(Boolean) : []),
-                              latitude: p.latitude ?? '',
-                              longitude: p.longitude ?? '',
-                              includeMapCoordinates: p.includeMapCoordinates === true
-                            });
-                          }}>Edit</Btn>
-                          <Btn size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setSelectedProperty(p); setPropertyModalOpen(true); }}>View</Btn>
-                          <Btn size="sm" variant="danger" onClick={async (e) => {
-                            e.stopPropagation();
-                            openDashboardConfirmDialog({
-                              title: 'Delete Property?',
-                              message: 'Deleting this property removes it permanently. This action cannot be undone.',
-                              confirmLabel: 'Delete',
-                              cancelLabel: 'Cancel',
-                              tone: 'danger',
-                              onConfirm: async () => {
-                                try {
-                                  await api.delete(`/api/properties/${p._id || p.id}`);
-                                  const r = await api.get('/api/properties');
-                                  setProperties(r.data || []);
-                                  closeDashboardConfirmDialog();
-                                } catch {
-                                  alert('Delete failed');
-                                }
-                              },
-                            });
-                          }}>Delete</Btn>
-                        </div>
-                      </Td>,
-                    ]
-                  };
-                })}
-              />
+              {editingProperty === null && !propertyModalOpen && (
+              <div className="p-6">
+                {propertyViewMode === 'map' ? (
+                  filteredProperties.length ? (
+                    <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+                      {filteredProperties.map((property, index) => {
+                        const propertyId = String(property._id || property.id || index);
+                        const assignedNames = getPropertyAssignedNames(property);
+                        const teamNames = getPropertyTeamNames(property);
+                        const directionsUrl = buildDirectionsUrl(property.latitude, property.longitude);
+                        return (
+                          <div key={propertyId} className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm">
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <div className="text-[1.05rem] font-bold text-gray-900">{property.name || 'Location'}</div>
+                                <div className="mt-1 text-sm text-gray-500">{property.hierarchy || property.parentName || property.type || 'Location overview'}</div>
+                              </div>
+                              <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+                                {property.type || 'Location'}
+                              </span>
+                            </div>
+                            <div className="mt-4 rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-4 py-10 text-center text-sm text-gray-500">
+                              {property.latitude || property.longitude
+                                ? `Lat ${property.latitude ?? '-'} , Lng ${property.longitude ?? '-'}`
+                                : 'Map preview unavailable'}
+                            </div>
+                            <div className="mt-4 space-y-3 text-sm">
+                              <div className="flex items-start gap-2 text-gray-600">
+                                <MapPin className="mt-0.5 h-4 w-4 text-blue-500" />
+                                <span>{property.address || 'No address provided.'}</span>
+                              </div>
+                              <div className="flex items-center justify-between"><span className="text-gray-500">Workers</span><span className="font-semibold text-gray-900">{assignedNames.length}</span></div>
+                              <div className="flex items-center justify-between"><span className="text-gray-500">Teams</span><span className="font-semibold text-gray-900">{teamNames.length}</span></div>
+                            </div>
+                            <div className="mt-5 flex gap-3">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedProperty(property);
+                                  setPropertyModalOpen(true);
+                                }}
+                                className="flex-1 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                              >
+                                View Details
+                              </button>
+                              {directionsUrl && (
+                                <a
+                                  href={directionsUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="flex-1 rounded-xl bg-blue-600 px-4 py-2.5 text-center text-sm font-semibold text-white hover:bg-blue-700"
+                                >
+                                  Open Map
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-gray-300 bg-white px-6 py-16 text-center text-sm text-gray-500">
+                      No locations match the current filters.
+                    </div>
+                  )
+                ) : filteredProperties.length ? (
+                  <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+                    <div className="overflow-x-auto">
+                      <table className="min-w-[1180px] w-full text-left text-sm">
+                        <thead className="border-b border-gray-200 bg-white">
+                          <tr className="text-gray-900">
+                            <th className="px-6 py-4 w-12"></th>
+                            <th className="px-6 py-4 w-12"><input type="checkbox" className="h-6 w-6 rounded border-gray-300" /></th>
+                            <th className="px-6 py-4 font-bold">Name</th>
+                            <th className="px-6 py-4 font-bold">Hierarchy</th>
+                            <th className="px-6 py-4 font-bold">Address</th>
+                            <th className="px-6 py-4 font-bold">No. of Assets</th>
+                            <th className="px-6 py-4 font-bold">Workers</th>
+                            <th className="px-6 py-4 font-bold">Teams</th>
+                            <th className="px-6 py-4 w-14"></th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {filteredProperties.map((property, index) => {
+                            const propertyId = String(property._id || property.id || index);
+                            const assetsCount = assets.filter((asset) => String(asset.propertyId || asset.property?._id || asset.property?.id || '') === propertyId).length;
+                            const assignedNames = getPropertyAssignedNames(property);
+                            const teamNames = getPropertyTeamNames(property);
+                            return (
+                              <tr
+                                key={propertyId}
+                                onClick={() => {
+                                  setSelectedProperty(property);
+                                  setPropertyModalOpen(true);
+                                }}
+                                className="cursor-pointer transition hover:bg-gray-50"
+                              >
+                                <td className="px-6 py-5 text-gray-400"><ChevronRight className="h-5 w-5" /></td>
+                                <td className="px-6 py-5" onClick={(e) => e.stopPropagation()}>
+                                  <input type="checkbox" className="h-6 w-6 rounded border-gray-300" />
+                                </td>
+                                <td className="px-6 py-5">
+                                  <div className="font-semibold text-blue-600">{property.name || 'Location'}</div>
+                                </td>
+                                <td className="px-6 py-5 text-gray-600">{property.hierarchy || property.parentName || property.name || '—'}</td>
+                                <td className="px-6 py-5 text-gray-700">{property.address || '—'}</td>
+                                <td className="px-6 py-5 text-gray-700">{assetsCount}</td>
+                                <td className="px-6 py-5 text-gray-700">{assignedNames.length}</td>
+                                <td className="px-6 py-5 text-gray-700">{teamNames.length}</td>
+                                <td className="px-6 py-5" onClick={(e) => e.stopPropagation()}>
+                                  <div className="relative" data-property-row-menu="true">
+                                    <button
+                                      type="button"
+                                      data-property-row-menu-button="true"
+                                      onClick={() => setOpenPropertyRowMenuKey((prev) => (prev === propertyId ? '' : propertyId))}
+                                      className="rounded-lg p-2 text-gray-500 hover:bg-gray-100"
+                                    >
+                                      <MoreHorizontal className="h-5 w-5" />
+                                    </button>
+                                    {openPropertyRowMenuKey === propertyId && (
+                                      <div className="absolute right-0 top-[calc(100%+8px)] z-20 w-48 overflow-hidden rounded-2xl border border-gray-200 bg-white py-2 shadow-xl">
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setOpenPropertyRowMenuKey('');
+                                            openPropertyEditor(property);
+                                          }}
+                                          className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50"
+                                        >
+                                          <Edit className="h-4 w-4 text-gray-500" />
+                                          <span>Edit</span>
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setOpenPropertyRowMenuKey('');
+                                            setSelectedProperty(property);
+                                            setPropertyModalOpen(true);
+                                          }}
+                                          className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50"
+                                        >
+                                          <Eye className="h-4 w-4 text-gray-500" />
+                                          <span>View</span>
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setOpenPropertyRowMenuKey('');
+                                            handleDeletePropertyRecord(property);
+                                          }}
+                                          className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-rose-600 hover:bg-rose-50"
+                                        >
+                                          <Trash2 className="h-4 w-4 text-rose-600" />
+                                          <span>Delete</span>
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-gray-300 bg-white px-6 py-16 text-center text-sm text-gray-500">
+                    No properties yet. Add your first one.
+                  </div>
+                )}
+              </div>
+              )}
 
-              {/* Property Detail Modal */}
-              {propertyModalOpen && selectedProperty && (
-                <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-                  <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl border border-gray-200 overflow-hidden max-h-[90vh] flex flex-col">
-                    {(() => {
-                      const directionsUrl = buildDirectionsUrl(selectedProperty.latitude, selectedProperty.longitude);
-                      return (
-                        <>
-                    <div className="flex items-start justify-between px-6 py-4 border-b border-gray-200">
-                      <div>
-                        <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-gray-500">Details</p>
-                        <h3 className="text-2xl font-bold text-gray-900">{selectedProperty.name || 'Location'}</h3>
-                    <p className="text-sm font-semibold text-gray-700 mt-1">
-                      {selectedProperty.block
-                        || (Array.isArray(selectedProperty.blocks) && selectedProperty.blocks[0])
-                        || selectedProperty.blocks
-                        || 'Building —'}
-                    </p>
-                    <p className="mt-1 flex items-start gap-2 text-sm text-gray-600">
-                      <MapPin className="w-4 h-4 text-blue-500 flex-shrink-0" />
-                      <span>{selectedProperty.address || 'No address provided.'}</span>
-                    </p>
-                      </div>
-                      <div className="flex flex-col items-end gap-2">
-                        <span className="inline-flex items-center px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-bold border border-blue-100">
-                          {selectedProperty.type || 'Location'}
-                        </span>
+              {propertyModalOpen && selectedProperty && editingProperty === null && (
+                <div className="bg-[#f8fafc]">
+                  <div className="border-b border-gray-200 bg-white">
+                    <div className="flex items-center justify-between gap-4 px-8 py-4">
+                      <div className="flex items-center gap-5">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-gray-200 text-gray-700">
+                          <LayoutDashboard className="h-5 w-5" />
+                        </div>
                         <button
-                          onClick={() => setPropertyModalOpen(false)}
-                          className="p-2 rounded-lg hover:bg-gray-100 transition text-gray-500"
-                          aria-label="Close property details"
+                          type="button"
+                          onClick={() => {
+                            setPropertyModalOpen(false);
+                            setPropertyDetailTab('details');
+                          }}
+                          className="rounded-lg p-2 text-gray-500 hover:bg-gray-100"
                         >
-                          <Icon.X />
+                          <ArrowLeft className="h-5 w-5" />
                         </button>
+                        <h3 className="text-[2rem] font-black text-gray-900">{selectedProperty.name || 'Location'}</h3>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <button
+                          type="button"
+                          onClick={() => openPropertyEditor(selectedProperty)}
+                          className="rounded-xl border border-gray-300 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openPropertyWorkOrderDetails(selectedProperty)}
+                          className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
+                        >
+                          Create Work Order
+                        </button>
+                        <div className="relative" ref={propertyActionsMenuRef}>
+                          <button
+                            type="button"
+                            onClick={() => setShowPropertyActionsMenu((prev) => !prev)}
+                            className="rounded-lg p-2 text-gray-500 hover:bg-gray-100"
+                          >
+                            <MoreHorizontal className="h-5 w-5" />
+                          </button>
+                          {showPropertyActionsMenu && (
+                            <div className="absolute right-0 top-[calc(100%+10px)] z-30 w-40 overflow-hidden rounded-2xl border border-gray-200 bg-white py-2 shadow-2xl">
+                              <button
+                                type="button"
+                                onClick={() => handleDeletePropertyRecord(selectedProperty)}
+                                className="flex w-full items-center gap-3 px-5 py-4 text-left text-base text-rose-600 hover:bg-rose-50"
+                              >
+                                <Trash2 className="h-5 w-5" />
+                                <span>Delete</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
+                    <div className="flex items-center gap-8 border-t border-gray-100 px-8">
+                      {[
+                        ['details', 'Details'],
+                        ['workOrders', 'Work Orders'],
+                        ['assets', 'Assets'],
+                        ['files', 'Files'],
+                        ['parts', 'Parts'],
+                        ['floorplans', 'Floorplans'],
+                      ].map(([key, label]) => (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => setPropertyDetailTab(key)}
+                          className={`border-b-2 py-5 text-[1.05rem] font-semibold transition ${
+                            propertyDetailTab === key ? 'border-blue-600 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-800'
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
 
-                    <div className="p-6 space-y-5 overflow-y-auto">
-                      <div>
-                        <div className="text-xs font-semibold text-gray-500 uppercase tracking-[0.08em]">Building</div>
-                        <div className="text-lg font-bold text-gray-900">
-                          {selectedProperty.block
-                            || (Array.isArray(selectedProperty.blocks) && selectedProperty.blocks[0])
-                            || selectedProperty.blocks
-                            || selectedProperty.address
-                            || '-'}
-                        </div>
-                        <div className="text-sm text-gray-600 mt-1">
-                          Hierarchy: {selectedProperty.hierarchy || selectedProperty.parentName || selectedProperty.name || '-'}
-                        </div>
-                      </div>
-
-                      <div className="grid md:grid-cols-2 gap-4">
-                        <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
-                          <div className="text-sm font-bold text-gray-700 mb-3">More Information</div>
-                          {[
-                            ['Workers', internalTechnicians.filter(t => String(t.propertyId || t.property?._id || t.property?.id) === String(selectedProperty._id || selectedProperty.id)).length || '—'],
-                            ['Teams', '—'],
-                            ['Vendors', '—'],
-                            ['Customers', '—'],
-                            ['Hierarchy', selectedProperty.hierarchy || selectedProperty.parentName || selectedProperty.name || '—'],
-                          ].map(([label, value]) => (
-                            <div key={label} className="flex items-center justify-between py-2 border-b border-gray-200 last:border-b-0">
-                              <span className="text-sm font-semibold text-gray-600">{label}</span>
-                              <span className="text-sm text-gray-900">{value || '—'}</span>
-                            </div>
-                          ))}
-                        </div>
-
-                        <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
-                          <div className="text-sm font-bold text-gray-700 mb-3">Counts</div>
-                          <div className="grid grid-cols-2 gap-3">
+                  <div className="p-8">
+                    {propertyDetailTab === 'details' && (
+                      <div className="space-y-8">
+                        <div className="rounded-2xl border border-gray-200 bg-white p-8">
+                          <div className="text-[1.9rem] font-bold text-gray-900">Details</div>
+                          <div className="mt-8 divide-y divide-gray-200">
                             {[
-                              ['Assets', assets.filter(a => String(a.propertyId || a.property?._id || a.property?.id) === String(selectedProperty._id || selectedProperty.id)).length],
-                              ['Work Orders', issues.filter(i => String(i.propertyId || i.property?._id || i.property?.id) === String(selectedProperty._id || selectedProperty.id)).length],
-                              ['Blocks', Array.isArray(selectedProperty.blocks) ? selectedProperty.blocks.length : (selectedProperty.blocks ? 1 : 0)],
-                              ['Rooms', Array.isArray(selectedProperty.roomNames) ? selectedProperty.roomNames.length : (selectedProperty.rooms || 0)],
+                              ['Name', selectedProperty.name || '—'],
+                              ['Address', selectedProperty.address || '—'],
                             ].map(([label, value]) => (
-                              <div key={label} className="rounded-lg bg-white border border-gray-200 px-3 py-2">
-                                <div className="text-[11px] font-bold uppercase text-gray-500 tracking-[0.08em]">{label}</div>
-                                <div className="text-lg font-black text-gray-900">{value ?? '-'}</div>
+                              <div key={label} className="grid grid-cols-[180px_minmax(0,1fr)] gap-8 py-6">
+                                <div className="text-[1.05rem] text-gray-500">{label}</div>
+                                <div className="text-[1.05rem] text-gray-900">{value}</div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="rounded-2xl border border-gray-200 bg-white p-8">
+                          <div className="text-[1.9rem] font-bold text-gray-900">More Information</div>
+                          <div className="mt-8 divide-y divide-gray-200">
+                            {[
+                              ['Workers', getPropertyAssignedNames(selectedProperty).join(', ') || 'None'],
+                              ['Teams', getPropertyTeamNames(selectedProperty).join(', ') || 'None'],
+                              ['Vendors', Array.isArray(selectedProperty.vendors) && selectedProperty.vendors.length ? selectedProperty.vendors.map((item) => typeof item === 'object' ? (item.name || item.fullName || item.email || 'Vendor') : String(item)).join(', ') : 'None'],
+                              ['Customers', Array.isArray(selectedProperty.customers) && selectedProperty.customers.length ? selectedProperty.customers.map((item) => typeof item === 'object' ? (item.name || item.fullName || item.email || 'Customer') : String(item)).join(', ') : 'None'],
+                              ['Hierarchy', selectedProperty.hierarchy || selectedProperty.parentName || selectedProperty.name || '—'],
+                            ].map(([label, value]) => (
+                              <div key={label} className="grid grid-cols-[180px_minmax(0,1fr)] gap-8 py-6">
+                                <div className="text-[1.05rem] text-gray-500">{label}</div>
+                                <div className="text-[1.05rem] text-gray-900">{value}</div>
                               </div>
                             ))}
                           </div>
                         </div>
                       </div>
+                    )}
 
-                      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
-                        <div className="text-sm font-bold text-gray-700 mb-3">Location Details</div>
-                        {[
-                          ['Location Name', selectedProperty.name || '—'],
-                          ['Type', selectedProperty.type || '—'],
-                          ['Address', selectedProperty.address || '—'],
-                          ['Beds', selectedProperty.beds],
-                          ['Baths', selectedProperty.baths],
-                          ['Area (sqft)', selectedProperty.area ?? selectedProperty.sqft],
-                          ['Floors', selectedProperty.floors],
-                          ['Blocks', renderValue(selectedProperty.blocks, '—')],
-                          ['Rooms', selectedProperty.rooms ?? (Array.isArray(selectedProperty.roomNames) ? selectedProperty.roomNames.length : undefined)],
-                          ['Room Names (comma separated)', renderValue(Array.isArray(selectedProperty.roomNames) ? selectedProperty.roomNames : (selectedProperty.roomNames ? String(selectedProperty.roomNames).split(/[;,|]/).map(s => s.trim()).filter(Boolean) : []), '—')],
-                          ['Photos', Array.isArray(selectedProperty.photos) ? selectedProperty.photos.length : (selectedProperty.photos ? 1 : 0)],
-                        ].map(([label, value]) => (
-                          <div key={label} className="flex items-center justify-between py-2 border-b border-gray-200 last:border-b-0">
-                            <span className="text-sm font-semibold text-gray-600">{label}</span>
-                            <span className="text-sm text-gray-900">{(value === '' || value === null || value === undefined) ? '—' : value}</span>
+                    {propertyDetailTab === 'workOrders' && (
+                      <div className="rounded-2xl border border-gray-200 bg-white p-8">
+                        <div className="text-[1.25rem] font-bold text-gray-900">{selectedPropertyWorkOrders.length} Work Orders</div>
+                        <div className="mt-6 overflow-hidden rounded-2xl border border-gray-200">
+                          <table className="min-w-full text-left text-sm">
+                            <thead className="border-b border-gray-200 bg-white">
+                              <tr>
+                                {['Title', 'Status', 'Priority', 'Created'].map((head) => (
+                                  <th key={head} className="px-6 py-4 font-bold text-gray-900">{head}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                              {selectedPropertyWorkOrders.length ? selectedPropertyWorkOrders.map((issue, index) => (
+                                <tr key={issue._id || issue.id || index}>
+                                  <td className="px-6 py-4 text-gray-900">{issue.title || issue.name || 'Untitled'}</td>
+                                  <td className="px-6 py-4 text-gray-600">{issue.status || 'Open'}</td>
+                                  <td className="px-6 py-4 text-gray-600">{issue.priority || '—'}</td>
+                                  <td className="px-6 py-4 text-gray-600">{issue.createdAt ? new Date(issue.createdAt).toLocaleDateString() : '—'}</td>
+                                </tr>
+                              )) : (
+                                <tr><td colSpan="4" className="px-6 py-16 text-center text-sm text-gray-500">No work orders linked to this location yet.</td></tr>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+
+                    {propertyDetailTab === 'assets' && (
+                      <div className="rounded-2xl border border-gray-200 bg-white p-8">
+                        <div className="text-[1.25rem] font-bold text-gray-900">{selectedPropertyAssets.length} Assets</div>
+                        <div className="mt-6 overflow-hidden rounded-2xl border border-gray-200">
+                          <table className="min-w-full text-left text-sm">
+                            <thead className="border-b border-gray-200 bg-white">
+                              <tr>
+                                {['Name', 'Type', 'Serial Number', 'Status'].map((head) => (
+                                  <th key={head} className="px-6 py-4 font-bold text-gray-900">{head}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                              {selectedPropertyAssets.length ? selectedPropertyAssets.map((asset, index) => (
+                                <tr key={asset._id || asset.id || index}>
+                                  <td className="px-6 py-4 text-gray-900">{asset.name || 'Unnamed asset'}</td>
+                                  <td className="px-6 py-4 text-gray-600">{asset.type || '—'}</td>
+                                  <td className="px-6 py-4 text-gray-600">{asset.serialNumber || '—'}</td>
+                                  <td className="px-6 py-4 text-gray-600">{asset.status || '—'}</td>
+                                </tr>
+                              )) : (
+                                <tr><td colSpan="4" className="px-6 py-16 text-center text-sm text-gray-500">No assets assigned to this location yet.</td></tr>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+
+                    {['files', 'parts'].includes(propertyDetailTab) && (
+                      <div className="rounded-2xl border border-dashed border-gray-300 bg-white px-6 py-20 text-center text-sm text-gray-500">
+                        No {propertyDetailTab} available for this location yet.
+                      </div>
+                    )}
+
+                    {propertyDetailTab === 'floorplans' && (
+                      <div className="space-y-6">
+                        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
+                          <div className="grid min-h-[220px] grid-cols-[minmax(0,420px)_1fr]">
+                            <button
+                              type="button"
+                              onClick={() => setShowAddFloorplanModal(true)}
+                              className="flex h-full items-start justify-between border-r border-gray-200 px-6 py-10 text-left transition hover:bg-gray-50"
+                            >
+                              <span className="text-[2rem] font-medium text-gray-900">Add Floorplan</span>
+                              <Plus className="mt-1 h-8 w-8 text-gray-800" />
+                            </button>
+                            <div className="hidden bg-[#fbfdff] md:block" />
                           </div>
-                        ))}
+                        </div>
 
-                        {Array.isArray(selectedProperty.photos) && selectedProperty.photos.length > 0 && (
-                          <div className="mt-4">
-                            <div className="text-[11px] font-bold uppercase text-gray-500 tracking-[0.08em] mb-2">Photos</div>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                              {selectedProperty.photos.map((p, idx) => {
-                                const src = getImageUrl(p);
-                                if (!src) return null;
-                                return (
-                                  <a
-                                    key={`${p}-${idx}`}
-                                    href={src}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="block"
-                                    title="Open photo"
-                                  >
-                                    <img
-                                      src={src}
-                                      alt={`Location photo ${idx + 1}`}
-                                      className="w-full h-28 object-cover rounded-lg border border-gray-200"
+                        {selectedPropertyFloorplans.length > 0 && (
+                          <div className="rounded-2xl border border-gray-200 bg-white p-8">
+                            <div className="text-[1.25rem] font-bold text-gray-900">Saved Floorplans</div>
+                            <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                              {selectedPropertyFloorplans.map((floorplan, index) => (
+                                <div key={floorplan.id || `${floorplan.name}-${index}`} className="rounded-2xl border border-gray-200 p-5">
+                                  <div className="text-lg font-semibold text-gray-900">{floorplan.name || 'Untitled floorplan'}</div>
+                                  <div className="mt-2 text-sm text-gray-500">Area: {floorplan.area || '—'}</div>
+                                  <div className="mt-1 text-sm text-gray-500">
+                                    {Array.isArray(floorplan.files) ? floorplan.files.length : 0} image{Array.isArray(floorplan.files) && floorplan.files.length === 1 ? '' : 's'}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {showAddFloorplanModal && (
+                          <div className="fixed inset-0 z-[170] flex items-center justify-center bg-black/35 p-6">
+                            <div className="w-full max-w-[630px] rounded-[24px] bg-white shadow-[0_25px_80px_rgba(15,23,42,0.22)]">
+                              <div className="flex items-center justify-between px-8 pb-4 pt-8">
+                                <h4 className="text-[2rem] font-black text-gray-900">Add Floorplan</h4>
+                                <button
+                                  type="button"
+                                  onClick={closePropertyFloorplanModal}
+                                  className="rounded-lg p-2 text-gray-500 hover:bg-gray-100"
+                                >
+                                  <X className="h-7 w-7" />
+                                </button>
+                              </div>
+
+                              <div className="space-y-6 px-8 pb-8">
+                                <div className="grid gap-5 md:grid-cols-2">
+                                  <label className="block">
+                                    <div className="mb-3 text-lg text-gray-900">Name <span className="text-red-500">*</span></div>
+                                    <input
+                                      type="text"
+                                      value={propertyFloorplanForm.name}
+                                      onChange={(event) => setPropertyFloorplanForm((prev) => ({ ...prev, name: event.target.value }))}
+                                      className="h-14 w-full rounded-xl border border-gray-300 px-4 text-lg text-gray-900 outline-none ring-0 transition focus:border-blue-500 focus:shadow-[0_0_0_3px_rgba(59,130,246,0.12)]"
                                     />
-                                  </a>
-                                );
-                              })}
+                                  </label>
+                                  <label className="block">
+                                    <div className="mb-3 text-lg text-gray-900">Area</div>
+                                    <input
+                                      type="text"
+                                      value={propertyFloorplanForm.area}
+                                      onChange={(event) => setPropertyFloorplanForm((prev) => ({ ...prev, area: event.target.value }))}
+                                      className="h-14 w-full rounded-xl border border-gray-300 px-4 text-lg text-gray-900 outline-none ring-0 transition focus:border-blue-500 focus:shadow-[0_0_0_3px_rgba(59,130,246,0.12)]"
+                                    />
+                                  </label>
+                                </div>
+
+                                <input
+                                  ref={propertyFloorplanInputRef}
+                                  type="file"
+                                  accept="image/*"
+                                  multiple
+                                  className="hidden"
+                                  onChange={(event) => {
+                                    handlePropertyFloorplanFiles(event.target.files);
+                                    event.target.value = '';
+                                  }}
+                                />
+
+                                <div
+                                  onDragOver={(event) => event.preventDefault()}
+                                  onDrop={(event) => {
+                                    event.preventDefault();
+                                    handlePropertyFloorplanFiles(event.dataTransfer.files);
+                                  }}
+                                  className="rounded-2xl border border-dashed border-gray-300 px-6 py-10"
+                                >
+                                  <div className="flex flex-wrap items-center justify-center gap-5 text-center">
+                                    <button
+                                      type="button"
+                                      onClick={() => propertyFloorplanInputRef.current?.click()}
+                                      className="rounded-xl border border-gray-300 bg-white px-6 py-3 text-[1.05rem] font-medium text-gray-800 hover:bg-gray-50"
+                                    >
+                                      Upload
+                                    </button>
+                                    <span className="text-[1.05rem] text-gray-500">or Drop Images</span>
+                                  </div>
+                                  {propertyFloorplanForm.files.length > 0 && (
+                                    <div className="mt-5 space-y-2 text-sm text-gray-500">
+                                      {propertyFloorplanForm.files.map((file) => (
+                                        <div key={file.id} className="truncate">{file.name}</div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="flex items-center justify-end gap-4 pt-2">
+                                  <button
+                                    type="button"
+                                    onClick={closePropertyFloorplanModal}
+                                    className="rounded-xl bg-rose-600 px-6 py-3 text-[1.05rem] font-semibold text-white hover:bg-rose-700"
+                                  >
+                                    Cancel
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={handleCreatePropertyFloorplan}
+                                    disabled={!String(propertyFloorplanForm.name || '').trim()}
+                                    className="rounded-xl bg-gray-100 px-6 py-3 text-[1.05rem] font-semibold text-gray-500 transition enabled:bg-gray-900 enabled:text-white enabled:hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-80"
+                                  >
+                                    Submit
+                                  </button>
+                                </div>
+                              </div>
                             </div>
                           </div>
                         )}
                       </div>
-
-                      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
-                        <div className="text-sm font-bold text-gray-700 mb-3">Other Details</div>
-                        {[
-                          ['Type', selectedProperty.type || '—'],
-                          ['Address', selectedProperty.address || '—'],
-                          ['Parent', selectedProperty.parentName || selectedProperty.hierarchy || '—'],
-                          ['Latitude', selectedProperty.latitude ?? '—'],
-                          ['Longitude', selectedProperty.longitude ?? '—'],
-                          ['Map Sharing', selectedProperty.includeMapCoordinates ? 'Enabled' : 'Disabled'],
-                          ['Created At', selectedProperty.createdAt ? new Date(selectedProperty.createdAt).toLocaleString() : '—'],
-                        ].map(([label, value]) => (
-                          <div key={label} className="flex items-center justify-between py-2 border-b border-gray-200 last:border-b-0">
-                            <span className="text-sm font-semibold text-gray-600">{label}</span>
-                            <span className="text-sm text-gray-900">{value || '—'}</span>
-                          </div>
-                        ))}
-                      </div>
-
-                      {(selectedProperty.latitude || selectedProperty.longitude) && (
-                        <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700 flex items-center gap-3">
-                          <Gauge className="w-4 h-4 text-blue-500" />
-                          <div>
-                            <div className="font-semibold text-gray-800">Map Coordinates</div>
-                            <div className="text-gray-600">Lat: {selectedProperty.latitude ?? '-'}, Lng: {selectedProperty.longitude ?? '-'}</div>
-                            {selectedProperty.includeMapCoordinates === false && (
-                              <div className="text-[11px] text-amber-600 mt-1">Map coordinates are currently disabled for this location.</div>
-                            )}
-                          </div>
-                          {directionsUrl && (
-                            <a
-                              href={directionsUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50"
-                            >
-                              <Navigation className="w-4 h-4" />
-                              Open Directions
-                            </a>
-                          )}
-                        </div>
-                      )}
-
-                      <div className="flex justify-end">
-                        <Btn variant="primary" onClick={() => setPropertyModalOpen(false)}>Close</Btn>
-                      </div>
-                    </div>
-                        </>
-                      );
-                    })()}
+                    )}
                   </div>
                 </div>
               )}
@@ -17356,206 +21972,1181 @@ function ClientDashboard() {
           )}
           {/* â”€â”€ Assets â”€â”€ */}
           {activeTab === 'assets' && (
-            <div>
-              <SectionHeader title={t("client.sections.assets")} count={assets.length}
-                action={!editingAsset && <div style={{ display: 'flex', gap: 8 }}><Btn onClick={() => setEditingAsset({})} variant="primary" size="sm"><Icon.Plus /> Add Asset</Btn><Btn onClick={() => importAssetsRef.current?.click()} variant="outline" size="sm">Import Excel</Btn></div>} />
+            <div className="-m-6 bg-[#f8fafc]">
+                <div className="border-b border-gray-200 bg-white">
+                  <div className="flex items-center justify-between px-8 py-4">
+                    <div className="flex items-center gap-6">
+                      <h2 className="text-[2rem] font-black text-gray-900">Assets</h2>
+                    </div>
+                    {!editingAsset && (
+                      <div className="flex items-center gap-4">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAssetForm(createEmptyAssetForm());
+                            setOriginalAssetBlocks([]);
+                            setEditingAsset({});
+                          }}
+                          className="rounded-lg bg-blue-600 px-6 py-3 text-lg font-semibold text-white hover:bg-blue-700"
+                        >
+                          Create Asset
+                        </button>
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={() => setShowAssetActionsMenu((prev) => !prev)}
+                            className="rounded-lg p-2 text-gray-500 hover:bg-gray-100"
+                          >
+                            <MoreHorizontal className="h-6 w-6" />
+                          </button>
+                          {showAssetActionsMenu && (
+                            <div className="absolute right-0 top-12 z-20 w-56 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  importAssetsRef.current?.click();
+                                  setShowAssetActionsMenu(false);
+                                }}
+                                className="flex w-full items-center gap-3 px-5 py-4 text-left text-[0.95rem] text-gray-800 hover:bg-gray-50"
+                              >
+                                <Download className="h-5 w-5 text-gray-500" />
+                                <span>Import Excel</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between border-t border-gray-100 px-8 py-3">
+                    <div className="text-[0.95rem] font-semibold text-gray-900">{filteredAssets.length} Results Returned</div>
+                    <div className="flex items-center gap-8">
+                      <div className="relative">
+                        <button
+                          ref={assetColumnsButtonRef}
+                          type="button"
+                          onClick={() => {
+                            if (!showAssetColumnsMenu) {
+                              const rect = assetColumnsButtonRef.current?.getBoundingClientRect();
+                              if (rect) {
+                                setAssetColumnsMenuPosition({
+                                  top: rect.bottom + 12,
+                                  right: Math.max(16, window.innerWidth - rect.right),
+                                });
+                              }
+                            }
+                            setShowAssetColumnsMenu((prev) => !prev);
+                          }}
+                          className="flex items-center gap-3 text-[0.95rem] font-semibold text-gray-700"
+                        >
+                          <LayoutDashboard className="h-5 w-5 text-gray-500" />
+                          Columns
+                        </button>
+                      </div>
+                      <div className="relative w-72">
+                        <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+                        <input
+                          value={assetSearchQuery}
+                          onChange={(e) => setAssetSearchQuery(e.target.value)}
+                          placeholder="Search"
+                          className="w-full rounded-lg bg-gray-50 py-2.5 pl-12 pr-4 text-base text-gray-900 outline-none ring-1 ring-gray-200 focus:bg-white focus:ring-blue-300"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between border-t border-gray-100 px-8 py-4">
+                    <div className="flex items-center gap-4">
+                      <button type="button" className="inline-flex items-center gap-3 rounded-2xl border border-blue-300 bg-blue-50 px-5 py-2.5 text-[0.95rem] font-semibold text-blue-600 shadow-sm">
+                        <SlidersHorizontal className="h-5 w-5" /> Filters ({selectedAssetLocationFilter ? 1 : 0})
+                      </button>
+                      <select
+                        value={selectedAssetLocationFilter}
+                        onChange={(e) => setSelectedAssetLocationFilter(e.target.value)}
+                        className="rounded-2xl border border-gray-300 bg-white px-5 py-2.5 text-[0.95rem] font-semibold text-gray-700 shadow-sm"
+                      >
+                        <option value="">Location</option>
+                        {assetLocationOptions.map((location) => (
+                          <option key={location} value={location}>{location}</option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedAssetLocationFilter('');
+                          setAssetSearchQuery('');
+                        }}
+                        className="text-[0.95rem] font-medium text-blue-600"
+                      >
+                        Reset Filters
+                      </button>
+                    </div>
+                    <button type="button" className="text-[0.95rem] font-medium text-gray-700">Save View</button>
+                  </div>
+                </div>
 
               {loading.assets && <div style={{ textAlign: 'center', padding: 40, color: '#9CA3AF' }}>Loadingâ€¦</div>}
               {errors.assets && <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 10, padding: 14, marginBottom: 16, color: '#991B1B', fontSize: 13 }}>Error: {errors.assets}</div>}
 
-              {editingAsset !== null && (
-                <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 14, padding: 24, marginBottom: 20 }}>
-                  <div style={{ fontWeight: 700, fontSize: 15, color: '#111827', marginBottom: 16 }}>{editingAsset._id || editingAsset.id ? 'Edit Asset' : 'New Asset'}</div>
-                  <form onSubmit={async (e) => {
-                    e.preventDefault();
-                    try {
-                      const payload = {
-                        name: assetForm.name,
-                        type: assetForm.type,
-                        description: assetForm.description,
-                        serialNumber: assetForm.serialNumber,
-                        quantity: assetForm.quantity,
-                        propertyId: assetForm.locationType === 'property' ? assetForm.propertyId || null : null,
-                        building: assetForm.building,
-                        blocks: assetForm.locationType === 'property' ? assetForm.blocks : [],
-                        room: assetForm.room
-                      };
-                      if (assetForm.locationType === 'branch' && assetForm.branchId) {
-                        const branch = branches.find((item) => String(item.id || item._id) === String(assetForm.branchId));
-                        payload.location = {
-                          locationType: 'branch',
-                          branchId: assetForm.branchId,
-                          branchName: branch?.branchName || branch?.name || '',
-                          branchLocation: branch?.branchLocation || '',
-                          branchLatitude: branch?.branchLatitude ?? '',
-                          branchLongitude: branch?.branchLongitude ?? ''
-                        };
-                      }
-                      const eid = editingAsset._id || editingAsset.id;
-                      if (eid) {
-                        const prev = originalAssetBlocks.map(String);
-                        const now = assetForm.locationType === 'property' ? (assetForm.blocks || []).map(String) : [];
-                        const remove = prev.filter(p => !now.includes(p));
-                        if (remove.length) payload.removeBlocks = remove;
-                        await api.put(`/api/assets/${eid}`, payload);
-                        setEditingAsset(null);
-                        setOriginalAssetBlocks([]);
-                      } else {
-                        const userId = getCurrentUserId();
-                        await api.post('/api/assets', { ...payload, userId });
-                        setEditingAsset(null);
-                      }
-                      setAssetForm(createEmptyAssetForm());
-                      const r = await api.get('/api/assets');
-                      setAssets(r.data || []);
-                    } catch {
-                      alert('Failed to save asset.');
-                    }
-                  }}>
-                    <div style={{ marginBottom: 12, display: 'flex', gap: 12, alignItems: 'center' }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
-                        <input type="checkbox" checked={propertyUseNamedBlocks} onChange={e => setPropertyUseNamedBlocks(e.target.checked)} />
-                        Use named blocks (comma separated)
-                      </label>
-                    </div>
-                    {propertyUseNamedBlocks && (
-                      <div style={{ marginBottom: 12 }}>
-                        <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: 4, textTransform: 'uppercase' }}>Block Names</label>
-                        <textarea value={(propertyForm.namedBlocks || []).join(', ')} onChange={e => setPropertyForm(f => ({ ...f, namedBlocks: String(e.target.value).split(/[;,|]/).map(s => s.trim()).filter(Boolean) }))} style={{ width: '100%', minHeight: 64, padding: 8, borderRadius: 8, border: '1px solid #D1D5DB', fontFamily: 'inherit' }} />
-                      </div>
-                    )}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-                      {[['Asset Name', 'name', 'text', true], ['Type', 'type', 'text', true], ['Description', 'description', 'text'], ['Serial Number', 'serialNumber', 'text']].map(([ph, field, type, req]) => (
-                        <div key={field}>
-                          <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{ph}</label>
-                          <Input placeholder={ph} type={type} value={assetForm[field] || ''} onChange={e => setAssetForm(f => ({ ...f, [field]: e.target.value }))} required={req} />
-                        </div>
-                      ))}
-                      <div>
-                        <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Quantity</label>
-                        <div style={{ display: 'flex', alignItems: 'center', border: '1px solid #D1D5DB', borderRadius: 8, overflow: 'hidden' }}>
-                          <button type="button" onClick={() => setAssetForm(f => ({ ...f, quantity: Math.max(1, (f.quantity || 1) - 1) }))} style={{ padding: '9px 14px', background: '#F9FAFB', border: 'none', cursor: 'pointer', fontSize: 16, color: '#374151' }}>âˆ’</button>
-                          <input type="number" min="1" value={assetForm.quantity} onChange={e => setAssetForm(f => ({ ...f, quantity: Math.max(1, +e.target.value || 1) }))} style={{ flex: 1, textAlign: 'center', border: 'none', outline: 'none', fontSize: 14, fontWeight: 600 }} />
-                          <button type="button" onClick={() => setAssetForm(f => ({ ...f, quantity: (f.quantity || 1) + 1 }))} style={{ padding: '9px 14px', background: '#F9FAFB', border: 'none', cursor: 'pointer', fontSize: 16, color: '#374151' }}>+</button>
-                        </div>
-                      </div>
-                      <div>
-                        <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Location</label>
-                        <Select value={assetForm.locationType === 'branch' ? (assetForm.branchId ? `branch:${assetForm.branchId}` : '') : (assetForm.propertyId ? `property:${assetForm.propertyId}` : '')} onChange={e => {
-                          const [type, rawId] = String(e.target.value || '').split(':');
-                          if (type === 'branch') {
-                            const branch = branches.find((item) => String(item.id || item._id) === String(rawId));
-                            setAssetForm(f => ({
-                              ...f,
-                              locationType: 'branch',
-                              branchId: rawId,
-                              propertyId: '',
-                              building: branch?.branchLocation || branch?.branchName || branch?.name || '',
-                              blocks: []
-                            }));
-                            return;
-                          }
-                          const prop = properties.find(p => String(p.id || p._id) === String(rawId));
-                          setAssetForm(f => ({
-                            ...f,
-                            locationType: 'property',
-                            propertyId: rawId,
-                            branchId: '',
-                            building: prop?.name || '',
-                            blocks: []
-                          }));
-                        }} required>
-                          <option value="">Select locationâ€¦</option>
-                          <optgroup label="Locations">
-                            {properties.map((p, idx) => (
-                              <option key={`${p.id || p._id || 'property'}-${idx}`} value={`property:${p.id || p._id}`}>
-                                {p.name}
-                              </option>
-                            ))}
-                          </optgroup>
-                          <optgroup label="Branches">
-                            {branches.map((branch, idx) => (
-                              <option key={`${branch.id || branch._id || 'branch'}-${idx}`} value={`branch:${branch.id || branch._id}`}>
-                                {branch.branchName || branch.name}
-                              </option>
-                            ))}
-                          </optgroup>
-                        </Select>
-                      </div>
-                      <div>
-                        <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Room</label>
-                        <Input placeholder="Room (optional)" value={assetForm.room || ''} onChange={e => setAssetForm(f => ({ ...f, room: e.target.value }))} />
-                      </div>
-                      <div>
-                        <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Block</label>
-                        <Select
-                          value={(assetForm.blocks || [])[0] || ''}
-                          onChange={e => setAssetForm(f => ({ ...f, blocks: e.target.value ? [e.target.value] : [] }))}
-                          disabled={!assetForm.propertyId || assetForm.locationType !== 'property'}
-                        >
-                          <option value="">{assetForm.locationType === 'branch' ? 'Blocks are only for locations...' : assetForm.propertyId ? 'Select block...' : 'Select location first...'}</option>
-                          {getPropertyBlockOptions(assetForm.propertyId).map((block, idx) => (
-                            <option key={`${block}-${idx}`} value={block}>
-                              {block}
-                            </option>
-                          ))}
-                        </Select>
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-                      <Btn type="submit" variant="primary">Save Asset</Btn>
-                      <Btn onClick={() => {
-                        setEditingAsset(null);
-                        setAssetForm(createEmptyAssetForm());
-                      }} variant="ghost">Cancel</Btn>
-                    </div>
-                  </form>
-                </div>
-              )}
-
-              <Table heads={['Name', 'Serial Number', 'Type', 'Qty', 'Location', 'Building', 'Room', 'Block', 'Description', 'Actions']} empty="No assets yet."
-                rows={assets.map(asset => ({
-                  onClick: () => { setSelectedAsset(asset); setAssetModalOpen(true); },
-                  cells: [
-                  <Td key="n">
-                    <span style={{ fontWeight: 600, color: '#111827' }}>{asset.name}</span>
-                  </Td>,
-                  <Td key="sn">{renderValue(asset.serialNumber)}</Td>,
-                  <Td key="t"><span style={{ background: '#EFF6FF', color: '#1D4ED8', padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 600 }}>{asset.type}</span></Td>,
-                  <Td key="q"><span style={{ fontWeight: 700 }}>{asset.quantity || 1}</span></Td>,
-                  <Td key="p">{renderValue(getAssetLocationLabel(asset))}</Td>,
-                  <Td key="bu">{renderValue(asset.building || asset.location?.building)}</Td>,
-                  <Td key="ro">{renderValue(asset.room || asset.location?.room)}</Td>,
-                  <Td key="bl">{renderValue(asset.blocks || asset.block || asset.location?.block)}</Td>,
-                  <Td key="d"><span style={{ color: '#9CA3AF' }}>{renderValue(asset.description)}</span></Td>,
-                  <Td key="x">
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <Btn size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); startEditingAsset(asset); }}>Edit</Btn>
-                      <Btn size="sm" variant="danger" onClick={async (e) => {
-                        e.stopPropagation();
-                        openDashboardConfirmDialog({
-                          title: 'Delete Asset?',
-                          message: 'Deleting this asset removes it permanently. This action cannot be undone.',
-                          confirmLabel: 'Delete',
-                          cancelLabel: 'Cancel',
-                          tone: 'danger',
-                          onConfirm: async () => {
-                            try {
-                              await api.delete(`/api/assets/${asset._id || asset.id}`);
-                              setAssets(assets.filter(a => (a._id || a.id) !== (asset._id || asset.id)));
-                              closeDashboardConfirmDialog();
-                            } catch {
-                              alert('Delete failed');
-                            }
-                          },
-                        });
-                      }}>Delete</Btn>
-                    </div>
-                  </Td>,
-                ]}))}
+              <AssetEditorModal
+                editingAsset={editingAsset}
+                assetForm={assetForm}
+                setAssetForm={setAssetForm}
+                onClose={closeAssetEditor}
+                onSubmit={submitAssetEditor}
+                imageSrc={imageSrc}
+                handleAssetFilesSelected={handleAssetFilesSelected}
+                removeAssetFileAt={removeAssetFileAt}
+                assetWorkerOptions={assetWorkerOptions}
+                assetTeamOptions={assetTeamOptions}
+                assetVendorOptions={assetVendorOptions}
+                assetCustomerOptions={assetCustomerOptions}
+                assetParentOptions={assetParentOptions}
+                properties={properties}
+                branches={branches}
+                getPropertyBlockOptions={getPropertyBlockOptions}
+                maintenanceSchedules={maintenanceSchedules}
               />
 
               {assetModalOpen && selectedAsset && (
+                <>
+                  <div className="px-6 py-6">
+                  <div className="overflow-hidden rounded-[28px] border border-gray-200 bg-white shadow-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-4 border-b border-gray-200 px-8 py-5">
+                      <div className="flex items-center gap-4">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAssetModalOpen(false);
+                            setAssetDetailTab('workOrders');
+                          }}
+                          className="flex h-11 w-11 items-center justify-center rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50"
+                        >
+                          <ArrowLeft className="h-5 w-5" />
+                        </button>
+                        <div>
+                          <h3 className="text-[2rem] font-black text-gray-900">{selectedAsset.name || 'Asset'}</h3>
+                          <p className="mt-1 text-sm text-gray-500">
+                            {[
+                              selectedAsset.identifiers?.model || selectedAsset.model || selectedAsset.type,
+                              getAssetLocationLabel(selectedAsset) || selectedAsset.location?.building || selectedAsset.identifiers?.area,
+                            ].filter(Boolean).join(' • ') || 'Asset overview'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => startEditingAsset(selectedAsset)}
+                          className="rounded-xl border border-gray-300 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            openAssetWorkOrderDetails(selectedAsset);
+                          }}
+                          className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
+                        >
+                          Create Work Order
+                        </button>
+                        <div className="relative" ref={selectedAssetActionsMenuRef}>
+                          <button
+                            type="button"
+                            onClick={() => setShowSelectedAssetActionsMenu((prev) => !prev)}
+                            className="rounded-xl p-2.5 text-gray-500 hover:bg-gray-100"
+                          >
+                            <MoreHorizontal className="h-5 w-5" />
+                          </button>
+                          {showSelectedAssetActionsMenu && (
+                            <div className="absolute right-0 top-[calc(100%+10px)] z-30 w-64 overflow-hidden rounded-2xl border border-gray-200 bg-white py-2 shadow-2xl">
+                              <button
+                                type="button"
+                                onClick={handleDuplicateSelectedAsset}
+                                className="flex w-full items-center gap-3 px-5 py-4 text-left text-base text-gray-700 hover:bg-gray-50"
+                              >
+                                <Copy className="h-5 w-5 text-gray-500" />
+                                <span>Duplicate</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={handleArchiveSelectedAsset}
+                                className="flex w-full items-center gap-3 px-5 py-4 text-left text-base text-gray-700 hover:bg-gray-50"
+                              >
+                                <Archive className="h-5 w-5 text-gray-500" />
+                                <span>Archive</span>
+                              </button>
+                              <div className="my-1 border-t border-gray-100" />
+                              <button
+                                type="button"
+                                onClick={handleDeleteSelectedAsset}
+                                className="flex w-full items-center gap-3 px-5 py-4 text-left text-base text-rose-600 hover:bg-rose-50"
+                              >
+                                <Trash2 className="h-5 w-5 text-rose-600" />
+                                <span>Delete</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center justify-between gap-4 border-b border-gray-200 px-8 py-4">
+                      <div className="flex flex-wrap items-center gap-8">
+                        {[
+                          ['workOrders', 'Work Orders'],
+                          ['details', 'Details'],
+                          ['parts', 'Parts'],
+                          ['files', 'Files'],
+                          ['meters', 'Meters'],
+                          ['sensors', 'Sensors'],
+                        ].map(([key, label]) => (
+                          <button
+                            key={key}
+                            type="button"
+                            onClick={() => setAssetDetailTab(key)}
+                            className={`border-b-2 pb-3 text-base font-semibold transition ${
+                              assetDetailTab === key ? 'border-blue-600 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-800'
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="relative flex items-center gap-3 text-sm font-semibold text-gray-700">
+                        <button
+                          type="button"
+                          onClick={() => setShowAssetActivityModal(true)}
+                          className="flex items-center gap-2 rounded-xl px-3 py-2 transition hover:bg-gray-100"
+                        >
+                          <Activity className="h-5 w-5" />
+                          <span>Activity</span>
+                        </button>
+                        <div className="relative">
+                          <button
+                            ref={assetQrButtonRef}
+                            type="button"
+                            onClick={() => setShowAssetQrPopover((prev) => !prev)}
+                            className={`flex items-center gap-2 rounded-xl px-3 py-2 transition ${showAssetQrPopover ? 'bg-gray-100' : 'hover:bg-gray-100'}`}
+                          >
+                            <QrCode className="h-5 w-5" />
+                            <span>QR Code</span>
+                          </button>
+                          {showAssetQrPopover && (
+                            <div
+                              data-asset-qr-popover="true"
+                              className="absolute right-0 top-[calc(100%+12px)] z-20 w-[290px] rounded-3xl border border-gray-200 bg-white p-5 shadow-2xl"
+                            >
+                              <div className="mx-auto grid w-[190px] grid-cols-[repeat(21,minmax(0,1fr))] gap-[2px] bg-white p-2">
+                                {assetQrMarkup.flatMap((row, rowIndex) => row.map((cell, colIndex) => (
+                                  <span
+                                    key={`asset-qr-${rowIndex}-${colIndex}`}
+                                    className={`block h-[8px] w-[8px] rounded-[1px] ${cell ? 'bg-black' : 'bg-white'}`}
+                                  />
+                                )))}
+                              </div>
+                              <p className="mt-4 text-center text-[1.05rem] leading-7 text-gray-500">
+                                Scan this QR code to identify {selectedAsset?.name || 'this asset'} quickly.
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid xl:grid-cols-[minmax(0,1fr)_360px]">
+                      <div className="border-r border-gray-200">
+                        {assetDetailTab === 'workOrders' && (
+                          <div className="p-8">
+                            <div className="flex flex-wrap items-center justify-between gap-4">
+                              <div className="text-[1.05rem] font-bold text-gray-900">{assetDetailWorkOrders.length} Results Returned</div>
+                              <div className="flex items-center gap-4">
+                                <div className="relative">
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowAssetWorkOrderSortMenu((prev) => !prev)}
+                                    className="flex items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-2 text-sm font-semibold text-gray-600"
+                                  >
+                                    <ArrowUpDown className="h-4 w-4" />
+                                    <span>Sort: {assetWorkOrderSortField === 'createdAt' ? 'Date Created' : assetWorkOrderSortOptions.find(([key]) => key === assetWorkOrderSortField)?.[1] || 'Date Created'}</span>
+                                  </button>
+                                  {showAssetWorkOrderSortMenu && (
+                                    <div className="absolute left-0 top-[calc(100%+10px)] z-20 w-64 rounded-2xl border border-gray-200 bg-white p-4 shadow-xl">
+                                      <div className="text-sm font-bold text-gray-900">Sort By</div>
+                                      <div className="mt-4 space-y-3">
+                                        {assetWorkOrderSortOptions.map(([key, label]) => (
+                                          <button
+                                            key={key}
+                                            type="button"
+                                            onClick={() => {
+                                              setAssetWorkOrderSortField(key);
+                                              setShowAssetWorkOrderSortMenu(false);
+                                            }}
+                                            className={`block text-left text-sm ${assetWorkOrderSortField === key ? 'font-semibold text-gray-900' : 'text-gray-600'}`}
+                                          >
+                                            {label}
+                                          </button>
+                                        ))}
+                                      </div>
+                                      <div className="mt-4 border-t border-gray-200 pt-3">
+                                        <div className="text-sm font-bold text-gray-900">Order</div>
+                                        <div className="mt-3 space-y-3">
+                                          {[
+                                            ['desc', 'Descending'],
+                                            ['asc', 'Ascending'],
+                                          ].map(([value, label]) => (
+                                            <button
+                                              key={value}
+                                              type="button"
+                                              onClick={() => {
+                                                setAssetWorkOrderSortDirection(value);
+                                                setShowAssetWorkOrderSortMenu(false);
+                                              }}
+                                              className={`block text-left text-sm ${assetWorkOrderSortDirection === value ? 'font-semibold text-gray-900' : 'text-gray-600'}`}
+                                            >
+                                              {label}
+                                            </button>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                                <button
+                                  ref={assetDetailColumnsButtonRef}
+                                  type="button"
+                                  onClick={() => {
+                                    if (!showAssetDetailColumnsMenu) {
+                                      const rect = assetDetailColumnsButtonRef.current?.getBoundingClientRect();
+                                      if (rect) {
+                                        setAssetDetailColumnsMenuPosition({
+                                          top: rect.bottom + 12,
+                                          right: Math.max(16, window.innerWidth - rect.right),
+                                        });
+                                      }
+                                    }
+                                    setShowAssetDetailColumnsMenu((prev) => !prev);
+                                  }}
+                                  className={`flex items-center gap-3 rounded-xl border px-4 py-2 text-sm font-semibold transition ${showAssetDetailColumnsMenu ? 'border-blue-300 bg-blue-50 text-blue-700' : 'border-gray-200 bg-gray-50 text-gray-600'}`}
+                                >
+                                  <LayoutDashboard className="h-4 w-4" />
+                                  <span>Columns</span>
+                                </button>
+                                <div className="relative w-72">
+                                  <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                                  <input value={assetDetailSearchQuery} onChange={(e) => setAssetDetailSearchQuery(e.target.value)} placeholder="Search" className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-10 pr-4 text-sm text-gray-900 outline-none focus:bg-white" />
+                                </div>
+                              </div>
+                            </div>
+                            <div className="mt-6 flex flex-wrap items-center gap-3">
+                              <button
+                                type="button"
+                                className={`inline-flex items-center gap-2 rounded-2xl border px-4 py-2.5 text-sm font-semibold shadow-sm transition ${
+                                  totalActiveAssetDetailFilters > 0
+                                    ? 'border-blue-300 bg-blue-50 text-blue-700'
+                                    : 'border-gray-300 bg-white text-gray-600 hover:bg-gray-50'
+                                }`}
+                              >
+                                <SlidersHorizontal className="h-4 w-4" />
+                                <span>Filters ({totalActiveAssetDetailFilters})</span>
+                              </button>
+                              <div ref={assetDetailStatusFilterRef} className="relative">
+                                <FilterButton
+                                  icon={Activity}
+                                  label={`Status: ${selectedAssetWorkOrderStatuses.length > 0 ? (selectedAssetWorkOrderStatuses.length > 1 ? `${selectedAssetWorkOrderStatuses[0]} +${selectedAssetWorkOrderStatuses.length - 1}` : selectedAssetWorkOrderStatuses[0]) : 'All'}`}
+                                  active={selectedAssetWorkOrderStatuses.length > 0}
+                                  onClick={() => setAssetDetailOpenPopover(assetDetailOpenPopover === 'status' ? null : 'status')}
+                                />
+                                <FilterPopover anchorRef={assetDetailStatusFilterRef} isOpen={assetDetailOpenPopover === 'status'} onClose={() => setAssetDetailOpenPopover(null)} title="Status">
+                                  <div className="space-y-1">
+                                    {selectedAssetWorkOrderStatusOptions.map((status) => (
+                                      <label key={status} className="flex items-center gap-3 rounded-lg p-2 hover:bg-gray-50">
+                                        <input
+                                          type="checkbox"
+                                          checked={selectedAssetWorkOrderStatuses.includes(status)}
+                                          onChange={(e) => {
+                                            const next = e.target.checked
+                                              ? [...selectedAssetWorkOrderStatuses, status]
+                                              : selectedAssetWorkOrderStatuses.filter((value) => value !== status);
+                                            setSelectedAssetWorkOrderStatuses(next);
+                                          }}
+                                          className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                        />
+                                        <span className="text-sm font-medium text-gray-700">{status}</span>
+                                      </label>
+                                    ))}
+                                  </div>
+                                </FilterPopover>
+                              </div>
+                              <div ref={assetDetailPriorityFilterRef} className="relative">
+                                <FilterButton
+                                  icon={Flag}
+                                  label="Priority"
+                                  active={selectedAssetWorkOrderPriorities.length > 0}
+                                  count={selectedAssetWorkOrderPriorities.length || undefined}
+                                  onClick={() => setAssetDetailOpenPopover(assetDetailOpenPopover === 'priority' ? null : 'priority')}
+                                />
+                                <FilterPopover anchorRef={assetDetailPriorityFilterRef} isOpen={assetDetailOpenPopover === 'priority'} onClose={() => setAssetDetailOpenPopover(null)} title="Priority">
+                                  <div className="space-y-1">
+                                    {selectedAssetWorkOrderPriorityOptions.length ? selectedAssetWorkOrderPriorityOptions.map((priority) => (
+                                      <label key={priority} className="flex items-center gap-3 rounded-lg p-2 hover:bg-gray-50">
+                                        <input
+                                          type="checkbox"
+                                          checked={selectedAssetWorkOrderPriorities.includes(priority)}
+                                          onChange={(e) => {
+                                            const next = e.target.checked
+                                              ? [...selectedAssetWorkOrderPriorities, priority]
+                                              : selectedAssetWorkOrderPriorities.filter((value) => value !== priority);
+                                            setSelectedAssetWorkOrderPriorities(next);
+                                          }}
+                                          className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                        />
+                                        <span className="text-sm font-medium text-gray-700">{priority}</span>
+                                      </label>
+                                    )) : (
+                                      <div className="px-2 py-1 text-sm text-gray-500">No priorities found.</div>
+                                    )}
+                                  </div>
+                                </FilterPopover>
+                              </div>
+                              <div ref={assetDetailLocationFilterRef} className="relative">
+                                <FilterButton
+                                  icon={MapPin}
+                                  label="Location"
+                                  active={selectedAssetWorkOrderLocations.length > 0}
+                                  count={selectedAssetWorkOrderLocations.length || undefined}
+                                  onClick={() => setAssetDetailOpenPopover(assetDetailOpenPopover === 'location' ? null : 'location')}
+                                />
+                                <FilterPopover anchorRef={assetDetailLocationFilterRef} isOpen={assetDetailOpenPopover === 'location'} onClose={() => setAssetDetailOpenPopover(null)} title="Location" className="w-80">
+                                  <div className="space-y-1">
+                                    {selectedAssetWorkOrderLocationOptions.length ? selectedAssetWorkOrderLocationOptions.map((location) => (
+                                      <label key={location} className="flex items-center gap-3 rounded-lg p-2 hover:bg-gray-50">
+                                        <input
+                                          type="checkbox"
+                                          checked={selectedAssetWorkOrderLocations.includes(location)}
+                                          onChange={(e) => {
+                                            const next = e.target.checked
+                                              ? [...selectedAssetWorkOrderLocations, location]
+                                              : selectedAssetWorkOrderLocations.filter((value) => value !== location);
+                                            setSelectedAssetWorkOrderLocations(next);
+                                          }}
+                                          className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                        />
+                                        <span className="text-sm font-medium text-gray-700">{location}</span>
+                                      </label>
+                                    )) : (
+                                      <div className="px-2 py-1 text-sm text-gray-500">No locations found.</div>
+                                    )}
+                                  </div>
+                                </FilterPopover>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setAssetDetailOpenPopover(null);
+                                  setSelectedAssetWorkOrderStatuses([]);
+                                  setSelectedAssetWorkOrderPriorities([]);
+                                  setSelectedAssetWorkOrderLocations([]);
+                                }}
+                                className="ml-2 text-sm font-medium text-blue-600"
+                              >
+                                Reset Filters
+                              </button>
+                              <button type="button" className="text-sm font-medium text-gray-700">Save View</button>
+                            </div>
+                            <div className="mt-6 overflow-hidden rounded-2xl border border-gray-200">
+                              <table className="min-w-full border-collapse text-left">
+                                <thead className="bg-white">
+                                  <tr className="border-b border-gray-200">
+                                    {visibleAssetDetailWorkOrderColumnDefinitions.map((column) => (
+                                      <th key={column.key} className="whitespace-nowrap px-6 py-4 text-sm font-bold text-gray-900">{column.label}</th>
+                                    ))}
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {assetDetailWorkOrders.length ? assetDetailWorkOrders.map((workOrder, index) => (
+                                    <tr key={workOrder._id || workOrder.id || index} className="border-b border-gray-100 last:border-b-0">
+                                      {visibleAssetDetailWorkOrderColumnDefinitions.map((column) => {
+                                        const value = getAssetDetailWorkOrderCellValue(workOrder, column.key);
+                                        return (
+                                          <td key={`${workOrder._id || workOrder.id || index}-${column.key}`} className="px-6 py-5 text-sm text-gray-700">
+                                            {column.key === 'status' ? (
+                                              <span className="inline-flex items-center gap-3">
+                                                <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-dashed border-gray-400" />
+                                                <span>{value}</span>
+                                              </span>
+                                            ) : column.key === 'workOrderNumber' ? (
+                                              <span className="font-semibold text-blue-600">{renderValue(value, String(index + 1).padStart(3, '0'))}</span>
+                                            ) : (
+                                              <span className="block max-w-[220px] truncate">{value}</span>
+                                            )}
+                                          </td>
+                                        );
+                                      })}
+                                    </tr>
+                                  )) : (
+                                    <tr>
+                                      <td colSpan={visibleAssetDetailWorkOrderColumnDefinitions.length} className="px-6 py-16 text-center text-sm text-gray-500">No work orders are linked to this asset yet.</td>
+                                    </tr>
+                                  )}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+
+                        {assetDetailTab === 'details' && (
+                          <div className="grid gap-5 p-8 lg:grid-cols-2">
+                            <div className="rounded-2xl border border-gray-200 bg-gray-50 p-5">
+                              <div className="mb-4 text-base font-bold text-gray-900">Asset Information</div>
+                              {[
+                                ['Name', selectedAsset.name],
+                                ['Serial Number', selectedAsset.serialNumber],
+                                ['Type', selectedAsset.type],
+                                ['Model', selectedAsset.identifiers?.model || selectedAsset.model],
+                                ['Manufacturer', selectedAsset.identifiers?.manufacturer || selectedAsset.manufacturer],
+                                ['Category', selectedAsset.identifiers?.category || selectedAsset.category],
+                                ['Barcode', selectedAsset.identifiers?.barcode || selectedAsset.barcode],
+                                ['Quantity', selectedAsset.quantity || 1],
+                              ].map(([label, value]) => (
+                                <div key={label} className="flex items-start justify-between gap-4 border-b border-gray-200 py-3 last:border-b-0">
+                                  <span className="text-sm font-semibold text-gray-500">{label}</span>
+                                  <span className="max-w-[60%] text-right text-sm text-gray-900">{renderValue(value)}</span>
+                                </div>
+                              ))}
+                            </div>
+                            <div className="rounded-2xl border border-gray-200 bg-gray-50 p-5">
+                              <div className="mb-4 text-base font-bold text-gray-900">Location & Ownership</div>
+                              {[
+                                ['Location', getAssetLocationLabel(selectedAsset)],
+                                ['Building', selectedAsset.location?.building || selectedAsset.building],
+                                ['Room', selectedAsset.location?.room || selectedAsset.room],
+                                ['Block', selectedAsset.location?.block || selectedAsset.block || selectedAsset.blocks],
+                                ['Area', selectedAsset.identifiers?.area],
+                                ['Vendor', selectedAsset.vendorName || selectedAsset.vendor?.name],
+                                ['Created At', selectedAsset.createdAt ? new Date(selectedAsset.createdAt).toLocaleString() : '—'],
+                              ].map(([label, value]) => (
+                                <div key={label} className="flex items-start justify-between gap-4 border-b border-gray-200 py-3 last:border-b-0">
+                                  <span className="text-sm font-semibold text-gray-500">{label}</span>
+                                  <span className="max-w-[60%] text-right text-sm text-gray-900">{renderValue(value)}</span>
+                                </div>
+                              ))}
+                            </div>
+                            <div className="rounded-2xl border border-gray-200 bg-white p-5 lg:col-span-2">
+                              <div className="mb-3 text-base font-bold text-gray-900">Description</div>
+                              <p className="text-sm leading-7 text-gray-600">{renderValue(selectedAsset.description, 'No description provided.')}</p>
+                            </div>
+                          </div>
+                        )}
+
+                        {assetDetailTab === 'parts' && (
+                          <div className="p-8">
+                            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-gray-200 pb-5">
+                              <div className="text-[1.05rem] font-bold text-gray-900">
+                                {selectedAssetParts.length} {selectedAssetParts.length === 1 ? 'Part' : 'Parts'}
+                              </div>
+                              <div className="flex flex-wrap items-center gap-4 text-sm font-semibold text-gray-700">
+                                <button type="button" className="rounded-xl border border-gray-200 bg-white px-4 py-2.5 hover:bg-gray-50">
+                                  Sort: Date Created
+                                </button>
+                                <button type="button" className="rounded-xl border border-gray-200 bg-white px-4 py-2.5 hover:bg-gray-50">
+                                  Columns
+                                </button>
+                                <div className="relative w-72">
+                                  <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                                  <input
+                                    value={assetPartsSearchQuery}
+                                    onChange={(e) => setAssetPartsSearchQuery(e.target.value)}
+                                    placeholder="Search"
+                                    className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-10 pr-4 text-sm text-gray-900 outline-none focus:bg-white"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                            <div className="mt-5 flex flex-wrap items-center justify-between gap-4">
+                              <div className="flex flex-wrap items-center gap-3">
+                                {['Filters', 'Status', 'Incoming Qty', 'Location', 'Tags'].map((label) => (
+                                  <button
+                                    key={label}
+                                    type="button"
+                                    className="rounded-2xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-600 shadow-sm hover:bg-gray-50"
+                                  >
+                                    {label}
+                                  </button>
+                                ))}
+                                <button type="button" className="ml-1 text-sm font-medium text-blue-600">
+                                  Reset Filters
+                                </button>
+                              </div>
+                              <button
+                                type="button"
+                                className="rounded-xl border border-gray-300 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                              >
+                                Add Parts
+                              </button>
+                            </div>
+                            <div className="overflow-hidden rounded-2xl border border-gray-200">
+                              <table className="min-w-full border-collapse text-left">
+                                <thead className="bg-white">
+                                  <tr className="border-b border-gray-200">
+                                    {['Name', 'Quantity', 'Cost', 'Category', 'Part Number'].map((head) => (
+                                      <th key={head} className="px-6 py-4 text-sm font-bold text-gray-900">{head}</th>
+                                    ))}
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {filteredSelectedAssetParts.length ? filteredSelectedAssetParts.map((part, index) => (
+                                    <tr key={part.id || `${part.name}-${index}`} className="border-b border-gray-100 last:border-b-0">
+                                      <td className="px-6 py-4 text-sm font-medium text-gray-900">{renderValue(part.name)}</td>
+                                      <td className="px-6 py-4 text-sm text-gray-600">{renderValue(part.quantity)}</td>
+                                      <td className="px-6 py-4 text-sm text-gray-600">{renderValue(part.cost)}</td>
+                                      <td className="px-6 py-4 text-sm text-gray-600">{renderValue(part.category)}</td>
+                                      <td className="px-6 py-4 text-sm text-gray-600">{renderValue(part.partNumber)}</td>
+                                    </tr>
+                                  )) : (
+                                    <tr>
+                                      <td colSpan="5" className="px-6 py-16 text-center text-sm text-gray-500">No parts have been attached to this asset yet.</td>
+                                    </tr>
+                                  )}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+
+                        {assetDetailTab === 'files' && (
+                          <div className="grid gap-4 p-8 md:grid-cols-2 xl:grid-cols-3">
+                            {selectedAssetFiles.length ? selectedAssetFiles.map((file) => {
+                              const fileUrl = imageSrc(file.value);
+                              const isImage = String(file.value || '').startsWith('data:image') || /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(String(file.value || ''));
+                              return (
+                                <div key={file.id} className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                                  <div className="mb-3 text-xs font-bold uppercase tracking-[0.2em] text-gray-400">{file.type}</div>
+                                  {isImage && fileUrl ? (
+                                    <img src={fileUrl} alt={selectedAsset.name || 'Asset file'} className="h-40 w-full rounded-xl object-cover" />
+                                  ) : (
+                                    <div className="flex h-40 items-center justify-center rounded-xl bg-gray-50 text-sm text-gray-400">File Preview</div>
+                                  )}
+                                  <div className="mt-4">
+                                    <a href={fileUrl || '#'} target="_blank" rel="noreferrer" className="text-sm font-semibold text-blue-600 hover:text-blue-700">Open file</a>
+                                  </div>
+                                </div>
+                              );
+                            }) : (
+                              <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-6 py-16 text-center text-sm text-gray-500 md:col-span-2 xl:col-span-3">No files or photos attached to this asset yet.</div>
+                            )}
+                          </div>
+                        )}
+
+                        {assetDetailTab === 'meters' && (
+                          <div className="p-8">
+                            <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-6 py-16 text-center">
+                              <div className="text-lg font-bold text-gray-900">Meters</div>
+                              <p className="mt-2 text-sm text-gray-500">
+                                Meter readings and history for this asset will appear here.
+                              </p>
+                              <button
+                                type="button"
+                                className="mt-6 rounded-xl border border-gray-300 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                              >
+                                Add Meter
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {assetDetailTab === 'sensors' && (
+                          <div className="p-8">
+                            <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-6 py-16 text-center">
+                              <div className="text-lg font-bold text-gray-900">Sensors</div>
+                              <p className="mt-2 text-sm text-gray-500">
+                                Sensor status, connectivity, and readings for this asset will appear here.
+                              </p>
+                              <button
+                                type="button"
+                                className="mt-6 rounded-xl border border-gray-300 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                              >
+                                Add Sensor
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <aside className="bg-white">
+                        <div className="border-b border-gray-200 p-8">
+                          <h4 className="text-[1.15rem] font-bold text-gray-900">Reliability</h4>
+                          <div className="mt-8 flex items-center justify-between">
+                            <span className="text-sm text-gray-500">Status</span>
+                            <div className="relative">
+                              <button
+                                type="button"
+                                onClick={() => setShowAssetReliabilityStatusMenu((prev) => !prev)}
+                                className="flex items-center gap-3 rounded-lg bg-gray-100 px-3 py-2 text-sm font-semibold text-gray-700"
+                              >
+                                <span className={`rounded-md px-3 py-1 ${assetReliabilityStatus === 'Operational' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-700'}`}>
+                                  {assetReliabilityStatus}
+                                </span>
+                                <ChevronDown className="h-4 w-4" />
+                              </button>
+                              {showAssetReliabilityStatusMenu && (
+                                <div className="absolute right-0 top-[calc(100%+10px)] z-20 w-80 rounded-2xl border border-gray-200 bg-white p-5 shadow-xl">
+                                  {['Operational', 'Not Operational'].map((status) => (
+                                    <button
+                                      key={status}
+                                      type="button"
+                                      disabled={assetReliabilitySaving}
+                                      onClick={() => handleAssetReliabilityStatusChange(status)}
+                                      className="mb-4 block text-left last:mb-0"
+                                    >
+                                      <span className={`rounded-md px-3 py-1 text-sm font-semibold ${status === 'Operational' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-700'}`}>
+                                        {status}
+                                      </span>
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <div className="relative mt-6">
+                            <button
+                              type="button"
+                              onClick={() => setShowAssetReliabilityWindowMenu((prev) => !prev)}
+                              className="flex w-full items-center justify-center gap-3 rounded-xl border border-gray-300 px-4 py-3 text-sm text-gray-700"
+                            >
+                              <span>{assetReliabilityWindow}</span>
+                              <ChevronDown className="h-4 w-4" />
+                            </button>
+                            {showAssetReliabilityWindowMenu && (
+                              <div className="absolute left-0 top-[calc(100%+10px)] z-20 w-64 rounded-2xl border border-gray-200 bg-white p-4 shadow-xl">
+                                {assetReliabilityWindowOptions.map((option) => (
+                                  <button
+                                    key={option}
+                                    type="button"
+                                    onClick={() => {
+                                      setAssetReliabilityWindow(option);
+                                      setShowAssetReliabilityWindowMenu(false);
+                                    }}
+                                    className="mb-3 block text-left text-sm text-gray-700 last:mb-0"
+                                  >
+                                    {option}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          <div className="mt-6 space-y-4">
+                            <div className="flex items-center justify-between text-sm"><span className="text-gray-500">Uptime</span><span className="font-semibold text-gray-900">{assetReliabilityMetrics.uptimePercent}%</span></div>
+                            <div className="flex items-center justify-between text-sm"><span className="text-gray-500">Downtime</span><span className="font-semibold text-red-500">{assetReliabilityMetrics.downtimePercent}%</span></div>
+                          </div>
+                          <div className="mt-8 space-y-3">
+                            <button type="button" onClick={() => setShowAssetAddDowntimeModal(true)} className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50">Add Downtime</button>
+                            <button type="button" onClick={() => setShowAssetDowntimeLogModal(true)} className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50">View Downtime Log</button>
+                          </div>
+                        </div>
+                        <div className="p-8">
+                          <h4 className="text-[1.15rem] font-bold text-gray-900">Depreciation</h4>
+                          <div className="mt-8 space-y-4">
+                            <div className="flex items-center justify-between text-sm"><span className="text-gray-500">Rate</span><span className="font-semibold text-gray-900">{selectedAsset.depreciationRate ? `$${selectedAsset.depreciationRate}/Year` : '—'}</span></div>
+                            <div className="flex items-center justify-between text-sm"><span className="text-gray-500">Ends</span><span className="font-semibold text-gray-900">{selectedAsset.warrantyUntil ? new Date(selectedAsset.warrantyUntil).toLocaleDateString() : '—'}</span></div>
+                            <div className="flex items-center justify-between text-sm"><span className="text-gray-500">Current Value</span><span className="font-semibold text-gray-900">{selectedAsset.currentValue ?? selectedAsset.identifiers?.residualValue ?? '—'}</span></div>
+                            <div className="flex items-center justify-between text-sm"><span className="text-gray-500">Purchase Price</span><span className="font-semibold text-gray-900">{renderValue(selectedAsset.purchaseCost)}</span></div>
+                            <div className="flex items-center justify-between text-sm"><span className="text-gray-500">Useful Life</span><span className="font-semibold text-gray-900">{selectedAsset.identifiers?.usefulLife?.value ? `${selectedAsset.identifiers.usefulLife.value} ${selectedAsset.identifiers.usefulLife.unit || ''}`.trim() : '—'}</span></div>
+                          </div>
+                        </div>
+                      </aside>
+                    </div>
+                  </div>
+                </div>
+                {showAssetActivityModal && (
+                  <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/35 p-4">
+                    <div className="flex h-[min(90vh,820px)] w-full max-w-4xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
+                      <div className="flex items-center justify-between border-b border-gray-200 px-8 py-7">
+                        <h3 className="text-[2rem] font-bold text-gray-900">Activity</h3>
+                        <button
+                          type="button"
+                          onClick={() => setShowAssetActivityModal(false)}
+                          className="rounded-full p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                        >
+                          <X className="h-7 w-7" />
+                        </button>
+                      </div>
+                      <div className="flex-1 overflow-auto px-8 py-10">
+                        {assetTimelineEntries.length ? (
+                          <div className="space-y-4">
+                            {assetTimelineEntries.map((entry) => (
+                              <div key={entry.id} className="rounded-2xl border border-gray-200 px-5 py-4">
+                                <div className="flex items-start justify-between gap-4">
+                                  <div>
+                                    <div className="text-base font-semibold text-gray-900">{entry.title}</div>
+                                    <div className="mt-1 text-sm text-gray-500">{entry.detail || 'Activity update'}</div>
+                                  </div>
+                                  <div className="whitespace-nowrap text-sm text-gray-400">
+                                    {formatDateLabel(entry.createdAt, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="flex h-full min-h-[420px] items-center justify-center text-center text-[2rem] text-gray-400">
+                            No updates
+                          </div>
+                        )}
+                      </div>
+                      <div className="border-t border-gray-200 px-8 py-5">
+                        <div className="flex gap-4">
+                          <input
+                            value={assetActivityComment}
+                            onChange={(e) => setAssetActivityComment(e.target.value)}
+                            placeholder="Add a comment..."
+                            className="flex-1 rounded-xl border border-gray-300 px-4 py-3 text-base text-gray-900 outline-none focus:border-blue-400"
+                          />
+                          <button
+                            type="button"
+                            disabled={!assetActivityComment.trim()}
+                            onClick={() => {
+                              const comment = assetActivityComment.trim();
+                              if (!comment) return;
+                              setAssetActivityEntries((prev) => [{
+                                id: `asset-activity-comment-${Date.now()}`,
+                                title: 'Comment added',
+                                detail: comment,
+                                createdAt: new Date().toISOString(),
+                                type: 'comment',
+                              }, ...prev]);
+                              setAssetActivityComment('');
+                            }}
+                            className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
+                          >
+                            Post
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {showAssetAddDowntimeModal && (
+                  <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/35 p-4">
+                    <div className="w-full max-w-2xl rounded-3xl bg-white p-8 shadow-2xl">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-[2rem] font-bold text-gray-900">Add Downtime</h3>
+                        <button
+                          type="button"
+                          onClick={() => setShowAssetAddDowntimeModal(false)}
+                          className="rounded-full p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                        >
+                          <X className="h-7 w-7" />
+                        </button>
+                      </div>
+
+                      <div className="mt-8">
+                        <div className="text-sm font-semibold text-gray-700">Duration</div>
+                        <div className="mt-3 grid grid-cols-2 gap-4">
+                          <div className="relative">
+                            <input
+                              type="number"
+                              min="0"
+                              value={assetDowntimeForm.hours}
+                              onChange={(e) => setAssetDowntimeForm((prev) => ({ ...prev, hours: e.target.value }))}
+                              className="w-full rounded-xl border border-red-300 px-4 py-3 pr-14 text-lg text-gray-900 outline-none focus:border-red-400"
+                            />
+                            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-lg text-gray-500">hr</span>
+                          </div>
+                          <div className="relative">
+                            <input
+                              type="number"
+                              min="0"
+                              value={assetDowntimeForm.minutes}
+                              onChange={(e) => setAssetDowntimeForm((prev) => ({ ...prev, minutes: e.target.value }))}
+                              className="w-full rounded-xl border border-red-300 px-4 py-3 pr-16 text-lg text-gray-900 outline-none focus:border-red-400"
+                            />
+                            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-lg text-gray-500">min</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-7">
+                        <div className="text-sm font-semibold text-gray-700">Status</div>
+                        <div className="relative mt-3">
+                          <select
+                            value={assetDowntimeForm.status}
+                            onChange={(e) => setAssetDowntimeForm((prev) => ({ ...prev, status: e.target.value }))}
+                            className="w-full appearance-none rounded-xl border border-gray-300 px-4 py-3 text-lg text-gray-900 outline-none focus:border-blue-400"
+                          >
+                            <option value="Operational">Operational</option>
+                            <option value="Not Operational">Not Operational</option>
+                          </select>
+                          <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-500" />
+                        </div>
+                      </div>
+
+                      <div className="mt-7">
+                        <div className="text-sm font-semibold text-gray-700">Description</div>
+                        <textarea
+                          value={assetDowntimeForm.description}
+                          onChange={(e) => setAssetDowntimeForm((prev) => ({ ...prev, description: e.target.value }))}
+                          className="mt-3 h-28 w-full rounded-xl border border-blue-400 px-4 py-3 text-lg text-gray-900 outline-none focus:border-blue-500"
+                        />
+                      </div>
+
+                      <div className="mt-7 border-t border-gray-200 pt-7">
+                        <div className="text-sm font-semibold text-gray-700">Started</div>
+                        <div className="mt-3 grid grid-cols-2 gap-4">
+                          <div className="relative">
+                            <input
+                              type="date"
+                              value={assetDowntimeForm.startedDate}
+                              onChange={(e) => setAssetDowntimeForm((prev) => ({ ...prev, startedDate: e.target.value }))}
+                              className="w-full rounded-xl border border-gray-300 px-4 py-3 pr-12 text-lg text-gray-900 outline-none focus:border-blue-400"
+                            />
+                            <Calendar className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-500" />
+                          </div>
+                          <div className="relative">
+                            <input
+                              type="time"
+                              value={assetDowntimeForm.startedTime}
+                              onChange={(e) => setAssetDowntimeForm((prev) => ({ ...prev, startedTime: e.target.value }))}
+                              className="w-full rounded-xl border border-gray-300 px-4 py-3 pr-12 text-lg text-gray-900 outline-none focus:border-blue-400"
+                            />
+                            <Clock className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-500" />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-8 flex items-center justify-end gap-4">
+                        <button
+                          type="button"
+                          onClick={() => setShowAssetAddDowntimeModal(false)}
+                          className="rounded-xl border border-gray-300 bg-white px-6 py-3 text-lg text-gray-700 hover:bg-gray-50"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          disabled={!assetDowntimeForm.description.trim() || assetDowntimeSaving}
+                          onClick={handleAssetDowntimeSubmit}
+                          className="rounded-xl bg-gray-100 px-6 py-3 text-lg font-semibold text-gray-500 disabled:cursor-not-allowed disabled:opacity-80 enabled:bg-blue-600 enabled:text-white"
+                        >
+                          {assetDowntimeSaving ? 'Saving...' : 'Add Downtime'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {showAssetDowntimeLogModal && (
+                  <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/35 p-4">
+                    <div className="flex h-[min(90vh,930px)] w-full max-w-4xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
+                      <div className="flex items-center justify-between border-b border-gray-200 px-8 py-7">
+                        <h3 className="text-[2rem] font-bold text-gray-900">Downtime Log</h3>
+                        <button
+                          type="button"
+                          onClick={() => setShowAssetDowntimeLogModal(false)}
+                          className="rounded-full p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                        >
+                          <X className="h-7 w-7" />
+                        </button>
+                      </div>
+
+                      <div className="flex items-center gap-5 px-8 py-6">
+                        <div className="relative flex-1">
+                          <input
+                            type="date"
+                            value={assetDowntimeRange.start.toISOString().slice(0, 10)}
+                            readOnly
+                            className="w-full rounded-xl border border-gray-300 px-4 py-3 pr-12 text-lg text-gray-900"
+                          />
+                          <Calendar className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-500" />
+                        </div>
+                        <span className="text-2xl text-gray-400">-</span>
+                        <div className="relative flex-1">
+                          <input
+                            type="date"
+                            value={assetDowntimeRange.end.toISOString().slice(0, 10)}
+                            readOnly
+                            className="w-full rounded-xl border border-gray-300 px-4 py-3 pr-12 text-lg text-gray-900"
+                          />
+                          <Calendar className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-500" />
+                        </div>
+                      </div>
+
+                      <div className="flex-1 overflow-auto border-t border-gray-200 px-8 py-10">
+                        {assetDowntimeLoading ? (
+                          <div className="flex h-full min-h-[360px] items-center justify-center text-center text-xl text-gray-400">
+                            Loading downtime log...
+                          </div>
+                        ) : visibleAssetDowntimeEntries.length ? (
+                          <div className="space-y-4">
+                            {visibleAssetDowntimeEntries.map((entry) => (
+                              <div key={entry.id} className="rounded-2xl border border-gray-200 p-5">
+                                <div className="flex items-center justify-between gap-4">
+                                  <div>
+                                    <div className="text-base font-semibold text-gray-900">{entry.description}</div>
+                                    <div className="mt-1 text-sm text-gray-500">{new Date(entry.startedAt).toLocaleString()}</div>
+                                  </div>
+                                  <span className={`rounded-md px-3 py-1 text-sm font-semibold ${entry.status === 'Operational' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-700'}`}>
+                                    {entry.status}
+                                  </span>
+                                </div>
+                                <div className="mt-4 text-sm text-gray-600">
+                                  Duration: {entry.hours || 0} hr {entry.minutes || 0} min
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="flex h-full min-h-[360px] items-center justify-center text-center text-[2rem] text-gray-400">
+                            No data found for the current date interval
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex items-center justify-between border-t border-gray-200 px-8 py-6">
+                        <div className="text-[1.05rem] text-gray-500">
+                          {visibleAssetDowntimeEntries.length ? `${visibleAssetDowntimeEntries.length} downtime record(s)` : 'No asset downtime'}
+                        </div>
+                        <button
+                          type="button"
+                          disabled={!visibleAssetDowntimeEntries.length}
+                          className="rounded-xl bg-gray-100 px-6 py-3 text-lg text-gray-400 disabled:cursor-not-allowed"
+                        >
+                          Export
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                </>
+              )}
+
+              {(!assetModalOpen || !selectedAsset) && (
+              <div className="px-6 py-6">
+                <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full border-collapse text-left">
+                      <thead className="border-b border-gray-200 bg-white">
+                        <tr>
+                          <th className="w-12 px-6 py-4"></th>
+                          <th className="w-12 px-4 py-4"><input type="checkbox" className="h-6 w-6 rounded border-gray-300" /></th>
+                          {visibleAssetColumnDefinitions.map((column) => (
+                            <th key={column.key} className={`whitespace-nowrap px-6 py-4 text-[0.95rem] font-bold text-gray-900 ${column.headerClassName || ''}`}>{column.label}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredAssets.length ? filteredAssets.map((asset) => {
+                          const assetId = asset._id || asset.id;
+                          return (
+                            <tr
+                              key={assetId}
+                              onClick={() => {
+                                setSelectedAsset(asset);
+                                setAssetDetailTab('workOrders');
+                                setAssetModalOpen(true);
+                              }}
+                              className="cursor-pointer border-b border-gray-100 last:border-b-0 hover:bg-gray-50/50"
+                            >
+                              <td className="px-6 py-5 text-gray-400">
+                                <ChevronRight className="h-6 w-6" />
+                              </td>
+                              <td className="px-4 py-5" onClick={(e) => e.stopPropagation()}>
+                                <input type="checkbox" className="h-6 w-6 rounded border-gray-300" />
+                              </td>
+                              {visibleAssetColumnDefinitions.map((column) => (
+                                <td key={`${assetId}-${column.key}`} className={`px-6 py-5 text-[0.95rem] text-gray-700 ${column.cellClassName || ''}`}>
+                                  {column.render(asset)}
+                                </td>
+                              ))}
+                            </tr>
+                          );
+                        }) : (
+                          <tr>
+                            <td colSpan={visibleAssetColumnDefinitions.length + 2} className="px-6 py-16 text-center text-base text-gray-500">No assets yet.</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+              )}
+              {showAssetColumnsMenu && typeof document !== 'undefined' && createPortal(
+                <div
+                  data-asset-columns-menu="true"
+                  className="fixed z-[120] max-h-[440px] w-[300px] overflow-y-auto rounded-2xl border border-gray-200 bg-white p-4 shadow-2xl"
+                  style={{ top: assetColumnsMenuPosition.top, right: assetColumnsMenuPosition.right }}
+                >
+                  <div className="space-y-1">
+                    {assetColumnDefinitions.map((column) => {
+                      const checked = column.alwaysVisible || visibleAssetColumns[column.key];
+                      return (
+                        <label key={column.key} className={`flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2 text-[0.95rem] text-gray-700 hover:bg-gray-50 ${column.alwaysVisible ? 'opacity-60' : ''}`}>
+                          <div className="flex flex-col gap-[3px] text-gray-400">
+                            <span className="h-1 w-1 rounded-full bg-current" />
+                            <span className="h-1 w-1 rounded-full bg-current" />
+                            <span className="h-1 w-1 rounded-full bg-current" />
+                          </div>
+                          <div className="flex flex-col gap-[3px] text-gray-400">
+                            <span className="h-1 w-1 rounded-full bg-current" />
+                            <span className="h-1 w-1 rounded-full bg-current" />
+                            <span className="h-1 w-1 rounded-full bg-current" />
+                          </div>
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            disabled={column.alwaysVisible}
+                            onChange={() => {
+                              if (column.alwaysVisible) return;
+                              setVisibleAssetColumns((prev) => ({ ...prev, [column.key]: !prev[column.key] }));
+                            }}
+                            className="h-6 w-6 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          />
+                          <span className={column.alwaysVisible ? 'text-gray-400' : ''}>{column.label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>,
+                document.body
+              )}
+              {showAssetDetailColumnsMenu && typeof document !== 'undefined' && createPortal(
+                <div
+                  data-asset-detail-columns-menu="true"
+                  className="fixed z-[120] max-h-[440px] w-[300px] overflow-y-auto rounded-2xl border border-gray-200 bg-white p-4 shadow-2xl"
+                  style={{ top: assetDetailColumnsMenuPosition.top, right: assetDetailColumnsMenuPosition.right }}
+                >
+                  <div className="space-y-1">
+                    {assetDetailWorkOrderColumnDefinitions.map((column) => {
+                      const checked = column.alwaysVisible || visibleAssetDetailWorkOrderColumns[column.key];
+                      return (
+                        <label
+                          key={column.key}
+                          className={`flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2 text-[0.95rem] text-gray-700 hover:bg-gray-50 ${column.alwaysVisible ? 'opacity-60' : ''}`}
+                        >
+                          <GripVertical className="h-5 w-5 text-gray-400" />
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            disabled={column.alwaysVisible}
+                            onChange={() => {
+                              if (column.alwaysVisible) return;
+                              setVisibleAssetDetailWorkOrderColumns((prev) => ({ ...prev, [column.key]: !prev[column.key] }));
+                            }}
+                            className="h-6 w-6 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          />
+                          <span className={column.alwaysVisible ? 'text-gray-400' : ''}>{column.label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>,
+                document.body
+              )}
+
+              {false && assetModalOpen && selectedAsset && (
                 <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                   <div className="w-full max-w-3xl rounded-3xl border border-gray-200 bg-white shadow-2xl overflow-hidden">
                     <div className="flex items-start justify-between border-b border-gray-100 px-6 py-5">
@@ -17627,18 +23218,6 @@ function ClientDashboard() {
           {/* â”€â”€ Staff â”€â”€ */}
           {activeTab === 'internalTechnicians' && (
             <div>
-              <SectionHeader
-                title={t("manager.sidebar.peopleTeams")}
-                count={internalTechnicians.length}
-                action={!editingTech && (
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    <Btn onClick={() => setInviteUsersOpen(true)} variant="outline" size="sm"><Icon.Plus /> Invite Users</Btn>
-                    <Btn onClick={() => setCreateTeamOpen(true)} variant="outline" size="sm"><Icon.Plus /> Add Team</Btn>
-                    <Btn onClick={() => setEditingTech({})} variant="primary" size="sm"><Icon.Plus /> Add Technician</Btn>
-                  </div>
-                )}
-              />
-
               {loading.internalTechnicians && <div style={{ textAlign: 'center', padding: 40, color: '#9CA3AF' }}>Loadingâ€¦</div>}
               {errors.internalTechnicians && <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 10, padding: 14, marginBottom: 16, color: '#991B1B', fontSize: 13 }}>Error: {errors.internalTechnicians}</div>}
 
@@ -17661,104 +23240,761 @@ function ClientDashboard() {
                 onCreate={handleCreateTeam}
                 busy={createTeamBusy}
               />
-
-              <div style={{ marginBottom: 22 }}>
-                <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 12 }}>
-                  <div>
-                    <div style={{ fontSize: 16, fontWeight: 800, color: '#111827' }}>People</div>
-                    <div style={{ fontSize: 12, color: '#6B7280' }}>Invited users and roles</div>
-                  </div>
-                  <Btn onClick={() => setInviteUsersOpen(true)} variant="outline" size="sm"><Icon.Plus /> Invite</Btn>
-                </div>
-
-                {loading.people && <div style={{ textAlign: 'center', padding: 20, color: '#9CA3AF' }}>Loading peopleâ€¦</div>}
-                {errors.people && <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 10, padding: 14, marginBottom: 12, color: '#991B1B', fontSize: 13 }}>Error: {errors.people}</div>}
-
-                <Table
-                  heads={['Email', 'Role', 'Status', 'Actions']}
-                  empty="No people invited yet."
-                  rows={(people || []).map((p, idx) => {
-                    const id = p.id || p._id || String(idx);
-                    const role = String(p.role || '').toLowerCase();
-                    const accessLevel = String(p.accessLevel || '').toLowerCase();
-                    const roleLabel =
-                      role === 'manager' ? (accessLevel === 'limited' ? 'Limited Administrator' : 'Administrator') :
-                      role === 'admin' ? (accessLevel === 'limited' ? 'Limited Administrator' : 'Administrator') :
-                      role === 'technician' ? (accessLevel === 'limited' ? 'Limited Technician' : 'Technician') :
-                      role === 'requestor' ? 'Requester' :
-                      role === 'client' ? 'View Only' :
-                      (p.role || '—');
-                    return [
-                      <Td key="e">{renderValue(p.email)}</Td>,
-                      <Td key="r">{renderValue(roleLabel)}</Td>,
-                      <Td key="s">{renderValue(p.status, p.kind === 'invite' ? 'Invited' : 'Active')}</Td>,
-                      <Td key="x">
-                        {p.kind === 'invite' ? (
-                          <Btn size="sm" variant="danger" onClick={() => handleDeletePerson(id)}>Delete</Btn>
-                        ) : (
-                          <span style={{ color: '#9CA3AF', fontSize: 12, fontWeight: 700 }}>—</span>
-                        )}
-                      </Td>,
-                    ];
-                  })}
-                />
-              </div>
-
-              <div style={{ marginBottom: 22 }}>
-                <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 12 }}>
-                  <div>
-                    <div style={{ fontSize: 16, fontWeight: 800, color: '#111827' }}>Teams</div>
-                    <div style={{ fontSize: 12, color: '#6B7280' }}>Groups of people for assignment</div>
-                  </div>
-                  <Btn onClick={() => setCreateTeamOpen(true)} variant="outline" size="sm"><Icon.Plus /> Add Team</Btn>
-                </div>
-
-                {loading.teams && <div style={{ textAlign: 'center', padding: 20, color: '#9CA3AF' }}>Loading teamsâ€¦</div>}
-                {errors.teams && <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 10, padding: 14, marginBottom: 12, color: '#991B1B', fontSize: 13 }}>Error: {errors.teams}</div>}
-
-                <Table
-                  heads={['Team', 'Members', 'Actions']}
-                  empty="No teams yet."
-                  rows={(teams || []).map((team, idx) => {
-                    const teamId = team._id || team.id || String(idx);
-                    const members = Array.isArray(team.members) ? team.members : [];
-                    const labels = members.map((m) => {
-                      if (!m && m !== 0) return null;
-                      if (typeof m === 'object') return m.name || m.email || m.id || m._id;
-                      const pid = String(m);
-                      const match = (people || []).find(pp => String(pp.id || pp._id) === pid);
-                      return match?.email || match?.name || pid;
-                    }).filter(Boolean);
-                    const shown = labels.slice(0, 4);
-                    const remaining = labels.length - shown.length;
-
-                    return [
-                      <Td key="n"><span style={{ fontWeight: 700 }}>{team.name || 'Team'}</span></Td>,
-                      <Td key="m">
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                          {shown.length === 0 ? (
-                            <span style={{ color: 'rgba(255,255,255,0.55)' }}>—</span>
-                          ) : (
-                            shown.map((label) => (
-                              <span key={label} style={{ fontSize: 11, fontWeight: 800, padding: '2px 8px', borderRadius: 999, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }}>
-                                {label}
-                              </span>
-                            ))
-                          )}
-                          {remaining > 0 && (
-                            <span style={{ fontSize: 11, fontWeight: 800, padding: '2px 8px', borderRadius: 999, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.7)' }}>
-                              +{remaining} more
-                            </span>
+              <div className="overflow-hidden rounded-[28px] border border-gray-200 bg-white shadow-sm">
+                <div className="border-b border-gray-200">
+                  <div className="flex flex-wrap items-center justify-between gap-4 px-8 py-6">
+                    <div className="flex items-center gap-8">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-gray-200 text-gray-700">
+                        <LayoutDashboard className="h-5 w-5" />
+                      </div>
+                      <div className="flex items-center gap-8">
+                        <h2 className="border-r border-gray-200 pr-8 text-[2rem] font-black text-gray-900">People</h2>
+                        <div className="flex items-center gap-8">
+                          {[
+                            ['people', 'People'],
+                            ['teams', 'Teams'],
+                          ].map(([key, label]) => (
+                            <button
+                              key={key}
+                              type="button"
+                              onClick={() => {
+                                setPeopleDirectoryTab(key);
+                                setPeopleDirectorySearchQuery('');
+                                setPeopleDirectoryOpenPopover(null);
+                              }}
+                              className={`border-b-2 py-3 text-[1.15rem] font-semibold transition ${
+                                peopleDirectoryTab === key ? 'border-blue-600 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-800'
+                              }`}
+                            >
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    {!editingTech && (
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (peopleDirectoryTab === 'teams') setCreateTeamOpen(true);
+                            else setInviteUsersOpen(true);
+                          }}
+                          className="rounded-xl bg-blue-600 px-6 py-3 text-[1.05rem] font-semibold text-white hover:bg-blue-700"
+                        >
+                          {peopleDirectoryTab === 'teams' ? 'Add Team' : 'Add Person'}
+                        </button>
+                        <div className="relative" ref={peopleDirectoryActionsRef}>
+                          <button
+                            type="button"
+                            onClick={() => setShowPeopleDirectoryActionsMenu((prev) => !prev)}
+                            className="rounded-xl p-2.5 text-gray-500 hover:bg-gray-100"
+                          >
+                            <MoreHorizontal className="h-5 w-5" />
+                          </button>
+                          {showPeopleDirectoryActionsMenu && (
+                            <div className="absolute right-0 top-[calc(100%+10px)] z-30 w-56 overflow-hidden rounded-2xl border border-gray-200 bg-white py-2 shadow-2xl">
+                              {peopleDirectoryTab === 'people' ? (
+                                <>
+                                  <button type="button" onClick={() => { setInviteUsersOpen(true); setShowPeopleDirectoryActionsMenu(false); }} className="flex w-full items-center gap-3 px-5 py-4 text-left text-base text-gray-700 hover:bg-gray-50">
+                                    <Plus className="h-5 w-5 text-gray-500" />
+                                    <span>Invite Users</span>
+                                  </button>
+                                  <button type="button" onClick={() => { setEditingTech({}); setShowPeopleDirectoryActionsMenu(false); }} className="flex w-full items-center gap-3 px-5 py-4 text-left text-base text-gray-700 hover:bg-gray-50">
+                                    <Users className="h-5 w-5 text-gray-500" />
+                                    <span>Add Technician</span>
+                                  </button>
+                                </>
+                              ) : (
+                                <button type="button" onClick={() => { setCreateTeamOpen(true); setShowPeopleDirectoryActionsMenu(false); }} className="flex w-full items-center gap-3 px-5 py-4 text-left text-base text-gray-700 hover:bg-gray-50">
+                                  <Plus className="h-5 w-5 text-gray-500" />
+                                  <span>Create Team</span>
+                                </button>
+                              )}
+                            </div>
                           )}
                         </div>
-                      </Td>,
-                      <Td key="x">
-                        <Btn size="sm" variant="danger" onClick={() => handleDeleteTeam(teamId)}>Delete</Btn>
-                      </Td>,
-                    ];
-                  })}
-                />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-4 border-t border-gray-100 px-8 py-4">
+                    <div className="text-[1.05rem] font-bold text-gray-900">
+                      {peopleDirectoryTab === 'people' ? `${filteredDirectoryPeople.length} Result${filteredDirectoryPeople.length === 1 ? '' : 's'} Returned` : `${filteredDirectoryTeams.length} Result${filteredDirectoryTeams.length === 1 ? '' : 's'} Returned`}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-8 text-[1.05rem] text-gray-700">
+                      <div className="relative" ref={peopleDirectorySortRef}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowPeopleDirectoryColumnsMenu(false);
+                            setShowPeopleDirectorySortMenu((prev) => !prev);
+                          }}
+                          className="flex items-center gap-3 font-semibold hover:text-gray-900"
+                        >
+                          <ArrowUpDown className="h-5 w-5 text-gray-500" />
+                          <span>Sort</span>
+                        </button>
+                        {showPeopleDirectorySortMenu && (
+                          <div className="absolute right-0 top-[calc(100%+14px)] z-30 w-[252px] rounded-2xl border border-gray-200 bg-white p-5 shadow-2xl">
+                            <div className="text-[1.05rem] font-bold text-gray-900">Sort By</div>
+                            <div className="mt-4 space-y-1">
+                              {peopleDirectorySortOptions.map(([key, label]) => (
+                                <button
+                                  key={key}
+                                  type="button"
+                                  onClick={() => setPeopleDirectorySortField(key)}
+                                  className="block w-full rounded-lg px-2 py-2 text-left text-[1.05rem] text-gray-700 hover:bg-gray-50"
+                                >
+                                  {label}
+                                </button>
+                              ))}
+                            </div>
+                            <div className="mt-4 border-t border-gray-200 pt-3">
+                              <div className="text-[1.05rem] font-bold text-gray-900">Order</div>
+                              <div className="mt-3 space-y-1">
+                                {[
+                                  ['desc', 'Descending'],
+                                  ['asc', 'Ascending'],
+                                ].map(([key, label]) => (
+                                  <button
+                                    key={key}
+                                    type="button"
+                                    onClick={() => setPeopleDirectorySortDirection(key)}
+                                    className="flex w-full items-center justify-between rounded-lg px-2 py-2 text-left text-[1.05rem] text-gray-700 hover:bg-gray-50"
+                                  >
+                                    <span>{label}</span>
+                                    {peopleDirectorySortDirection === key && <CheckCircle className="h-4 w-4 text-blue-600" />}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      <div className="relative" ref={peopleDirectoryColumnsRef}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowPeopleDirectorySortMenu(false);
+                            setShowPeopleDirectoryColumnsMenu((prev) => !prev);
+                          }}
+                          className="flex items-center gap-3 font-semibold hover:text-gray-900"
+                        >
+                          <LayoutDashboard className="h-5 w-5 text-gray-500" />
+                          <span>Columns</span>
+                        </button>
+                        {showPeopleDirectoryColumnsMenu && (
+                          <div className="absolute right-0 top-[calc(100%+14px)] z-30 max-h-[440px] w-[268px] overflow-y-auto rounded-2xl border border-gray-200 bg-white p-4 shadow-2xl">
+                            <div className="space-y-1">
+                              {(peopleDirectoryTab === 'people' ? peopleDirectoryColumnDefinitions : teamDirectoryColumnDefinitions).map((column) => {
+                                const checked = peopleDirectoryTab === 'people'
+                                  ? (column.alwaysVisible || visiblePeopleDirectoryColumns[column.key])
+                                  : (column.alwaysVisible || visibleTeamDirectoryColumns[column.key]);
+                                return (
+                                  <label key={column.key} className={`flex items-center gap-3 rounded-xl px-3 py-2 text-[1.05rem] text-gray-700 hover:bg-gray-50 ${column.alwaysVisible ? 'opacity-70' : ''}`}>
+                                    <GripVertical className="h-5 w-5 text-gray-400" />
+                                    <input
+                                      type="checkbox"
+                                      checked={checked}
+                                      disabled={column.alwaysVisible}
+                                      onChange={() => {
+                                        if (column.alwaysVisible) return;
+                                        if (peopleDirectoryTab === 'people') {
+                                          setVisiblePeopleDirectoryColumns((prev) => ({ ...prev, [column.key]: !prev[column.key] }));
+                                        } else {
+                                          setVisibleTeamDirectoryColumns((prev) => ({ ...prev, [column.key]: !prev[column.key] }));
+                                        }
+                                      }}
+                                      className="h-5 w-5 rounded border-gray-300"
+                                    />
+                                    <span>{column.label}</span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      <div className="relative min-w-[270px]">
+                        <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+                        <input
+                          type="text"
+                          value={peopleDirectorySearchQuery}
+                          onChange={(event) => setPeopleDirectorySearchQuery(event.target.value)}
+                          placeholder="Search"
+                          className="h-12 w-full rounded-xl border border-gray-200 bg-white pl-12 pr-4 text-[1.05rem] text-gray-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-gray-200 bg-[#fbfcff] px-8 py-5">
+                    <div className="flex flex-wrap items-center justify-between gap-4">
+                      <div className="flex flex-wrap items-center gap-5">
+                        {peopleDirectoryTab === 'people' ? (
+                          <>
+                            <div className="relative" ref={peopleDirectoryFilterRef}>
+                              <button
+                                type="button"
+                                onClick={() => setPeopleDirectoryOpenPopover((prev) => prev === 'accountType' ? null : 'accountType')}
+                                className="flex h-12 items-center gap-3 rounded-2xl border border-gray-300 bg-white px-5 text-[1.05rem] text-gray-700 shadow-sm hover:bg-gray-50"
+                              >
+                                <SlidersHorizontal className="h-5 w-5 text-gray-500" />
+                                <span>{peopleDirectoryAccountTypes.length ? `Account Type (${peopleDirectoryAccountTypes.length})` : 'Account Type'}</span>
+                                <ChevronDown className="h-4 w-4 text-gray-500" />
+                              </button>
+                              {peopleDirectoryOpenPopover === 'accountType' && (
+                                <div className="absolute left-0 top-[calc(100%+12px)] z-30 w-[320px] rounded-2xl border border-gray-200 bg-white p-4 shadow-2xl">
+                                  <div className="mb-3 text-base font-bold text-gray-900">Account Type</div>
+                                  <div className="space-y-2">
+                                    {peopleDirectoryAccountTypeOptions.map((option) => (
+                                      <label key={option} className="flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-gray-50">
+                                        <input
+                                          type="checkbox"
+                                          checked={draftPeopleDirectoryAccountTypes.includes(option)}
+                                          onChange={() => setDraftPeopleDirectoryAccountTypes((prev) => prev.includes(option) ? prev.filter((item) => item !== option) : [...prev, option])}
+                                          className="h-5 w-5 rounded border-gray-300"
+                                        />
+                                        <span className="text-sm text-gray-800">{option}</span>
+                                      </label>
+                                    ))}
+                                  </div>
+                                  <div className="mt-4 flex items-center justify-end gap-3">
+                                    <button type="button" onClick={() => { setPeopleDirectoryOpenPopover(null); setDraftPeopleDirectoryAccountTypes(peopleDirectoryAccountTypes); }} className="rounded-xl border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">Cancel</button>
+                                    <button type="button" onClick={() => { setPeopleDirectoryAccountTypes(draftPeopleDirectoryAccountTypes); setPeopleDirectoryOpenPopover(null); }} className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Save</button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                            <label className="flex items-center gap-3 text-[1.05rem] text-gray-700">
+                              <input type="checkbox" checked={peopleDirectoryIncludeDeactivated} onChange={(event) => setPeopleDirectoryIncludeDeactivated(event.target.checked)} className="h-6 w-6 rounded border-gray-300" />
+                              <span>Include Deactivated</span>
+                            </label>
+                            <button type="button" onClick={() => { setPeopleDirectoryAccountTypes([]); setDraftPeopleDirectoryAccountTypes([]); setPeopleDirectoryIncludeDeactivated(false); setPeopleDirectorySearchQuery(''); }} className="text-[1.05rem] font-medium text-blue-600 hover:text-blue-700">Reset Filters</button>
+                          </>
+                        ) : (
+                          <button type="button" onClick={() => setPeopleDirectorySearchQuery('')} className="text-[1.05rem] font-medium text-blue-600 hover:text-blue-700">Reset Filters</button>
+                        )}
+                      </div>
+                      <button type="button" className="text-[1.05rem] font-medium text-gray-800 hover:text-gray-900">Save View</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-8">
+                  {peopleDirectoryTab === 'people' ? (
+                    <>
+                      {loading.people && <div style={{ textAlign: 'center', padding: 20, color: '#9CA3AF' }}>Loading people…</div>}
+                      {errors.people && <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 10, padding: 14, marginBottom: 12, color: '#991B1B', fontSize: 13 }}>Error: {errors.people}</div>}
+                      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+                        <div className="overflow-x-auto">
+                          <table className="min-w-[1180px] w-full text-left text-sm">
+                            <thead className="border-b border-gray-200 bg-white">
+                              <tr className="text-gray-900">
+                                <th className="px-6 py-4 w-12"><input type="checkbox" className="h-6 w-6 rounded border-gray-300" /></th>
+                                {visiblePeopleDirectoryColumns.name && <th className="px-6 py-4 font-bold">Name</th>}
+                                {visiblePeopleDirectoryColumns.status && <th className="px-6 py-4 font-bold">Status</th>}
+                                {visiblePeopleDirectoryColumns.accountType && <th className="px-6 py-4 font-bold">Account Type</th>}
+                                {visiblePeopleDirectoryColumns.email && <th className="px-6 py-4 font-bold">Email</th>}
+                                {visiblePeopleDirectoryColumns.phoneNumber && <th className="px-6 py-4 font-bold">Phone Number</th>}
+                                {visiblePeopleDirectoryColumns.jobTitle && <th className="px-6 py-4 font-bold">Job Title</th>}
+                                {visiblePeopleDirectoryColumns.hourlyRate && <th className="px-6 py-4 font-bold">Hourly Rate</th>}
+                                {visiblePeopleDirectoryColumns.companyName && <th className="px-6 py-4 font-bold">Company Name</th>}
+                                {visiblePeopleDirectoryColumns.lastLogin && <th className="px-6 py-4 font-bold">Last Login</th>}
+                                {visiblePeopleDirectoryColumns.dateCreated && <th className="px-6 py-4 font-bold">Date Created</th>}
+                                {visiblePeopleDirectoryColumns.categories && <th className="px-6 py-4 font-bold">Categories</th>}
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                              {filteredDirectoryPeople.length ? filteredDirectoryPeople.map((person, index) => {
+                                const statusLabel = getPeopleDirectoryStatus(person);
+                                const accountType = getPeopleDirectoryRoleLabel(person);
+                                const personName = getPeopleDirectoryName(person);
+                                const categories = Array.isArray(person.categories) ? person.categories.join(', ') : 'None';
+                                return (
+                                  <tr key={person._id || person.id || index} className="cursor-pointer hover:bg-gray-50" onClick={() => openDirectoryPersonDetails(person)}>
+                                    <td className="px-6 py-5"><input type="checkbox" className="h-6 w-6 rounded border-gray-300" /></td>
+                                    {visiblePeopleDirectoryColumns.name && <td className="px-6 py-5">
+                                      <div className="flex items-center gap-4">
+                                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-700 text-lg font-semibold text-white">
+                                          {String(personName || 'P').charAt(0).toUpperCase()}
+                                        </div>
+                                        <div className="text-[1.05rem] font-medium text-gray-900">{personName}</div>
+                                      </div>
+                                    </td>}
+                                    {visiblePeopleDirectoryColumns.status && <td className="px-6 py-5">
+                                      <span className={`inline-flex rounded-lg px-3 py-1 text-[1.05rem] ${statusLabel.toLowerCase() === 'active' ? 'bg-green-50 text-green-800' : statusLabel.toLowerCase() === 'inactive' ? 'bg-gray-100 text-gray-600' : 'bg-amber-50 text-amber-700'}`}>
+                                        {statusLabel}
+                                      </span>
+                                    </td>}
+                                    {visiblePeopleDirectoryColumns.accountType && <td className="px-6 py-5 text-[1.05rem] text-gray-900">{accountType}</td>}
+                                    {visiblePeopleDirectoryColumns.email && <td className="max-w-[260px] truncate px-6 py-5 text-[1.05rem] text-gray-900">{person.email || '—'}</td>}
+                                    {visiblePeopleDirectoryColumns.phoneNumber && <td className="px-6 py-5 text-[1.05rem] text-gray-900">{person.phone || person.phoneNumber || '—'}</td>}
+                                    {visiblePeopleDirectoryColumns.jobTitle && <td className="px-6 py-5 text-[1.05rem] text-gray-900">{person.jobTitle || 'n/a'}</td>}
+                                    {visiblePeopleDirectoryColumns.hourlyRate && <td className="px-6 py-5 text-[1.05rem] text-gray-900">{person.hourlyRate || 'None'}</td>}
+                                    {visiblePeopleDirectoryColumns.companyName && <td className="px-6 py-5 text-[1.05rem] text-gray-900">{person.companyName || currentUser?.companyName || '—'}</td>}
+                                    {visiblePeopleDirectoryColumns.lastLogin && <td className="px-6 py-5 text-[1.05rem] text-gray-900">{person.lastLoginAt || person.lastLogin ? new Date(person.lastLoginAt || person.lastLogin).toLocaleDateString() : '—'}</td>}
+                                    {visiblePeopleDirectoryColumns.dateCreated && <td className="px-6 py-5 text-[1.05rem] text-gray-900">{person.createdAt ? new Date(person.createdAt).toLocaleDateString() : '—'}</td>}
+                                    {visiblePeopleDirectoryColumns.categories && <td className="px-6 py-5 text-[1.05rem] text-gray-900">{categories}</td>}
+                                  </tr>
+                                );
+                              }) : (
+                                <tr><td colSpan="12" className="px-6 py-16 text-center text-sm text-gray-500">No people found.</td></tr>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {loading.teams && <div style={{ textAlign: 'center', padding: 20, color: '#9CA3AF' }}>Loading teams…</div>}
+                      {errors.teams && <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 10, padding: 14, marginBottom: 12, color: '#991B1B', fontSize: 13 }}>Error: {errors.teams}</div>}
+                      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+                        <div className="overflow-x-auto">
+                          <table className="min-w-[980px] w-full text-left text-sm">
+                            <thead className="border-b border-gray-200 bg-white">
+                              <tr className="text-gray-900">
+                                <th className="px-6 py-4 w-12"><input type="checkbox" className="h-6 w-6 rounded border-gray-300" /></th>
+                                {visibleTeamDirectoryColumns.teamName && <th className="px-6 py-4 font-bold">Team Name</th>}
+                                {visibleTeamDirectoryColumns.members && <th className="px-6 py-4 font-bold">Members</th>}
+                                {visibleTeamDirectoryColumns.memberCount && <th className="px-6 py-4 font-bold">No. of Members</th>}
+                                {visibleTeamDirectoryColumns.description && <th className="px-6 py-4 font-bold">Description</th>}
+                                {visibleTeamDirectoryColumns.created && <th className="px-6 py-4 font-bold">Created</th>}
+                                <th className="px-6 py-4 font-bold"></th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                              {filteredDirectoryTeams.length ? filteredDirectoryTeams.map((team, index) => {
+                                const teamId = team._id || team.id || String(index);
+                                const labels = (Array.isArray(team.members) ? team.members : []).map((member) => {
+                                  if (typeof member === 'object') return member.name || member.email || member.id || member._id;
+                                  const match = (people || []).find((person) => String(person.id || person._id) === String(member));
+                                  return match?.name || match?.email || String(member || '');
+                                }).filter(Boolean);
+                                return (
+                                  <tr key={teamId} className="cursor-pointer hover:bg-gray-50" onClick={() => openDirectoryTeamDetails(team)}>
+                                    <td className="px-6 py-5"><input type="checkbox" className="h-6 w-6 rounded border-gray-300" /></td>
+                                    {visibleTeamDirectoryColumns.teamName && <td className="px-6 py-5 text-[1.05rem] font-medium text-gray-900">{team.name || 'Team'}</td>}
+                                    {visibleTeamDirectoryColumns.members && <td className="max-w-[360px] truncate px-6 py-5 text-[1.05rem] text-gray-900">{labels.join(', ') || 'No members yet'}</td>}
+                                    {visibleTeamDirectoryColumns.memberCount && <td className="px-6 py-5 text-[1.05rem] text-gray-900">{labels.length}</td>}
+                                    {visibleTeamDirectoryColumns.description && <td className="px-6 py-5 text-[1.05rem] text-gray-900">{team.description || '—'}</td>}
+                                    {visibleTeamDirectoryColumns.created && <td className="px-6 py-5 text-[1.05rem] text-gray-900">{team.createdAt ? new Date(team.createdAt).toLocaleDateString() : '—'}</td>}
+                                    <td className="px-6 py-5 text-right">
+                                      <button type="button" onClick={(event) => { event.stopPropagation(); handleDeleteTeam(teamId); }} className="rounded-xl border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50">
+                                        Delete
+                                      </button>
+                                    </td>
+                                  </tr>
+                                );
+                              }) : (
+                                <tr><td colSpan="7" className="px-6 py-16 text-center text-sm text-gray-500">No teams found.</td></tr>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
+
+              {selectedDirectoryTeam && (
+                <div className="fixed inset-0 z-[185] flex items-start justify-center bg-black/35 p-6">
+                  <div className="max-h-[calc(100vh-48px)] w-full max-w-[920px] overflow-y-auto rounded-[24px] bg-white shadow-[0_25px_80px_rgba(15,23,42,0.22)]">
+                    <div className="sticky top-0 z-10 border-b border-gray-200 bg-white">
+                      <div className="flex items-center justify-between gap-4 px-8 py-5">
+                        <div className="flex items-center gap-5">
+                          <button
+                            type="button"
+                            onClick={closeDirectoryTeamDetails}
+                            className="rounded-lg p-2 text-gray-500 hover:bg-gray-100"
+                          >
+                            <X className="h-6 w-6" />
+                          </button>
+                          <div className="border-l border-gray-200 pl-5 text-[2rem] font-black text-gray-900">Edit Team</div>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <button
+                            type="button"
+                            onClick={closeDirectoryTeamDetails}
+                            className="rounded-xl border border-gray-300 bg-white px-6 py-3 text-[1.05rem] font-semibold text-gray-700 hover:bg-gray-50"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={saveDirectoryTeamDetails}
+                            disabled={!String(directoryTeamForm.name || '').trim() || directoryTeamSaving}
+                            className="rounded-xl bg-blue-600 px-6 py-3 text-[1.05rem] font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {directoryTeamSaving ? 'Saving...' : 'Save Changes'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-16 px-8 py-12">
+                      <section className="mx-auto max-w-[560px]">
+                        <h4 className="text-[2rem] font-black text-gray-900">Team Information</h4>
+                        <div className="mt-10 space-y-8">
+                          <label className="block">
+                            <div className="mb-3 text-[1.05rem] text-gray-800">Name <span className="text-rose-500">*</span></div>
+                            <input
+                              type="text"
+                              value={directoryTeamForm.name}
+                              onChange={(event) => setDirectoryTeamForm((prev) => ({ ...prev, name: event.target.value }))}
+                              className="h-14 w-full rounded-xl border border-gray-300 px-4 text-[1.05rem] text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                            />
+                          </label>
+                          <label className="block">
+                            <div className="mb-3 text-[1.05rem] text-gray-800">Description</div>
+                            <textarea
+                              value={directoryTeamForm.description}
+                              onChange={(event) => setDirectoryTeamForm((prev) => ({ ...prev, description: event.target.value }))}
+                              className="min-h-[96px] w-full rounded-xl border border-gray-300 px-4 py-4 text-[1.05rem] text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                            />
+                          </label>
+                        </div>
+                      </section>
+
+                      <section className="mx-auto max-w-[560px]">
+                        <h4 className="text-[2rem] font-black text-gray-900">Assigned To</h4>
+                        <div className="mt-10">
+                          <div className="mb-3 text-[1.05rem] text-gray-800">Workers</div>
+                          <div className="rounded-xl border border-gray-300 bg-white px-4 py-4">
+                            <div className="flex flex-wrap gap-2">
+                              {directoryTeamForm.members.map((memberId) => {
+                                const match = peopleDirectoryMemberOptions.find((option) => option.id === memberId);
+                                if (!match) return null;
+                                return (
+                                  <span key={memberId} className="inline-flex items-center gap-2 rounded-lg bg-blue-50 px-3 py-1.5 text-sm text-blue-800">
+                                    <span>{match.label}</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => setDirectoryTeamForm((prev) => ({ ...prev, members: prev.members.filter((id) => id !== memberId) }))}
+                                      className="text-blue-700 hover:text-blue-900"
+                                    >
+                                      <X className="h-4 w-4" />
+                                    </button>
+                                  </span>
+                                );
+                              })}
+                            </div>
+                            <div className="mt-4 space-y-2">
+                              {peopleDirectoryMemberOptions.map((option) => {
+                                const checked = directoryTeamForm.members.includes(option.id);
+                                return (
+                                  <label key={option.id} className="flex items-start gap-3 rounded-xl px-3 py-2 hover:bg-gray-50">
+                                    <input
+                                      type="checkbox"
+                                      checked={checked}
+                                      onChange={() => setDirectoryTeamForm((prev) => ({
+                                        ...prev,
+                                        members: checked ? prev.members.filter((id) => id !== option.id) : [...prev.members, option.id],
+                                      }))}
+                                      className="mt-1 h-5 w-5 rounded border-gray-300"
+                                    />
+                                    <div className="min-w-0">
+                                      <div className="text-[1.02rem] font-medium text-gray-900">{option.label}</div>
+                                      <div className="truncate text-sm text-gray-500">{option.subtitle || 'No email'}</div>
+                                    </div>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      </section>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {selectedDirectoryPerson && (
+                <div className="fixed inset-0 z-[180] flex items-start justify-center bg-black/35 p-6">
+                  <div className="max-h-[calc(100vh-48px)] w-full max-w-[1080px] overflow-y-auto rounded-[28px] bg-[#f8fafc] shadow-[0_25px_80px_rgba(15,23,42,0.22)]">
+                    <div className="border-b border-gray-200 bg-white">
+                      <div className="flex items-center justify-between gap-4 px-8 py-6">
+                        <div className="flex items-center gap-4">
+                          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-700 text-[1.9rem] font-semibold text-white">
+                            {String(getPeopleDirectoryName(selectedDirectoryPerson) || 'P').charAt(0).toUpperCase()}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-4">
+                            <h3 className="text-[2rem] font-black text-gray-900">{getPeopleDirectoryName(selectedDirectoryPerson)}</h3>
+                            <span className="rounded-xl bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-800">
+                              {getPeopleDirectoryRoleLabel(selectedDirectoryPerson)}
+                            </span>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={closeDirectoryPersonDetails}
+                          className="rounded-lg p-2 text-gray-500 hover:bg-gray-100"
+                        >
+                          <X className="h-7 w-7" />
+                        </button>
+                      </div>
+
+                      <div className="flex items-center justify-between gap-4 border-t border-gray-100 px-8 py-3">
+                        <div className="flex items-center gap-8">
+                          {[
+                            ['details', 'Details'],
+                            ['workOrders', 'Work Orders'],
+                          ].map(([key, label]) => (
+                            <button
+                              key={key}
+                              type="button"
+                              onClick={() => setPersonDetailTab(key)}
+                              className={`border-b-2 py-4 text-[1.15rem] font-semibold transition ${
+                                personDetailTab === key ? 'border-blue-600 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-800'
+                              }`}
+                            >
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+
+                        <div className="flex items-center gap-5">
+                          <span className={`inline-flex rounded-xl px-4 py-3 text-[1.05rem] ${
+                            getPeopleDirectoryStatus(selectedDirectoryPerson).toLowerCase() === 'active'
+                              ? 'bg-green-50 text-green-800'
+                              : getPeopleDirectoryStatus(selectedDirectoryPerson).toLowerCase() === 'inactive'
+                                ? 'bg-gray-100 text-gray-600'
+                                : 'bg-amber-50 text-amber-700'
+                          }`}>
+                            {getPeopleDirectoryStatus(selectedDirectoryPerson)}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setIsEditingDirectoryPerson(true)}
+                            className="rounded-xl border border-gray-300 bg-white px-6 py-3 text-[1.05rem] font-semibold text-gray-700 hover:bg-gray-50"
+                          >
+                            Edit
+                          </button>
+                          <div className="relative" data-selected-person-actions="true">
+                            <button
+                              type="button"
+                              onClick={() => setShowSelectedPersonActionsMenu((prev) => !prev)}
+                              className="rounded-lg p-2 text-gray-500 hover:bg-gray-100"
+                            >
+                              <MoreHorizontal className="h-6 w-6" />
+                            </button>
+                            {showSelectedPersonActionsMenu && (
+                              <div className="absolute right-0 top-[calc(100%+10px)] z-30 w-44 overflow-hidden rounded-2xl border border-gray-200 bg-white py-2 shadow-2xl">
+                                <button
+                                  type="button"
+                                  onClick={toggleDirectoryPersonStatus}
+                                  className="flex w-full items-center gap-3 px-5 py-4 text-left text-base text-rose-600 hover:bg-rose-50"
+                                >
+                                  <Archive className="h-5 w-5" />
+                                  <span>{getPeopleDirectoryStatus(selectedDirectoryPerson).toLowerCase() === 'inactive' ? 'Activate' : 'Deactivate'}</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    const personId = selectedDirectoryPerson._id || selectedDirectoryPerson.id;
+                                    if (selectedDirectoryPerson.kind === 'invite') {
+                                      handleDeletePerson(personId);
+                                      closeDirectoryPersonDetails();
+                                      return;
+                                    }
+                                    openDashboardConfirmDialog({
+                                      title: 'Delete Person?',
+                                      message: 'Deleting this person removes them permanently. This action cannot be undone.',
+                                      confirmLabel: 'Delete',
+                                      cancelLabel: 'Cancel',
+                                      tone: 'danger',
+                                      onConfirm: async () => {
+                                        try {
+                                          await api.delete(`/api/users/${personId}`);
+                                          await refreshPeople();
+                                          closeDirectoryPersonDetails();
+                                          closeDashboardConfirmDialog();
+                                        } catch {
+                                          alert('Delete failed');
+                                        }
+                                      },
+                                    });
+                                  }}
+                                  className="flex w-full items-center gap-3 px-5 py-4 text-left text-base text-rose-600 hover:bg-rose-50"
+                                >
+                                  <Trash2 className="h-5 w-5" />
+                                  <span>Delete</span>
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-8 p-8">
+                      {personDetailTab === 'details' && (
+                        <>
+                          <div className="rounded-2xl border border-gray-200 bg-white p-8">
+                            <div className="text-[1.9rem] font-bold text-gray-900">Person Information</div>
+                            {isEditingDirectoryPerson ? (
+                              <div className="mt-8 grid gap-5 md:grid-cols-2">
+                                {[
+                                  ['Name', 'name', 'text'],
+                                  ['Email', 'email', 'email'],
+                                  ['Phone Number', 'phone', 'text'],
+                                  ['Job Title', 'jobTitle', 'text'],
+                                  ['Categories', 'categories', 'text'],
+                                ].map(([label, field, type]) => (
+                                  <label key={field} className={field === 'categories' ? 'md:col-span-2' : ''}>
+                                    <div className="mb-3 text-[1.05rem] font-medium text-gray-700">{label}</div>
+                                    <input
+                                      type={type}
+                                      value={directoryPersonForm[field]}
+                                      onChange={(event) => setDirectoryPersonForm((prev) => ({ ...prev, [field]: event.target.value }))}
+                                      className="h-14 w-full rounded-xl border border-gray-300 px-4 text-[1.05rem] text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                                    />
+                                  </label>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="mt-8 divide-y divide-gray-200">
+                                {[
+                                  ['Name', getPeopleDirectoryName(selectedDirectoryPerson)],
+                                  ['Email', selectedDirectoryPerson.email || '—'],
+                                  ['Phone Number', selectedDirectoryPerson.phone || selectedDirectoryPerson.phoneNumber || '—'],
+                                  ['Job Title', selectedDirectoryPerson.jobTitle || 'n/a'],
+                                  ['Categories', Array.isArray(selectedDirectoryPerson.categories) && selectedDirectoryPerson.categories.length ? selectedDirectoryPerson.categories.join(', ') : 'None'],
+                                ].map(([label, value]) => (
+                                  <div key={label} className="grid grid-cols-[180px_minmax(0,1fr)] gap-8 py-6">
+                                    <div className="text-[1.05rem] text-gray-500">{label}</div>
+                                    <div className="text-[1.05rem] text-gray-900">{value}</div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="rounded-2xl border border-gray-200 bg-white p-8">
+                            <div className="text-[1.9rem] font-bold text-gray-900">More Information</div>
+                            {isEditingDirectoryPerson ? (
+                              <>
+                                <div className="mt-8 grid gap-5 md:grid-cols-2">
+                                  <label>
+                                    <div className="mb-3 text-[1.05rem] font-medium text-gray-700">Hourly Rate</div>
+                                    <input
+                                      type="text"
+                                      value={directoryPersonForm.hourlyRate}
+                                      onChange={(event) => setDirectoryPersonForm((prev) => ({ ...prev, hourlyRate: event.target.value }))}
+                                      className="h-14 w-full rounded-xl border border-gray-300 px-4 text-[1.05rem] text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                                    />
+                                  </label>
+                                  <label>
+                                    <div className="mb-3 text-[1.05rem] font-medium text-gray-700">Company Name</div>
+                                    <input
+                                      type="text"
+                                      value={directoryPersonForm.companyName}
+                                      onChange={(event) => setDirectoryPersonForm((prev) => ({ ...prev, companyName: event.target.value }))}
+                                      className="h-14 w-full rounded-xl border border-gray-300 px-4 text-[1.05rem] text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                                    />
+                                  </label>
+                                  <label>
+                                    <div className="mb-3 text-[1.05rem] font-medium text-gray-700">Status</div>
+                                    <select
+                                      value={directoryPersonForm.status}
+                                      onChange={(event) => setDirectoryPersonForm((prev) => ({ ...prev, status: event.target.value }))}
+                                      className="h-14 w-full rounded-xl border border-gray-300 px-4 text-[1.05rem] text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                                    >
+                                      <option value="Active">Active</option>
+                                      <option value="Inactive">Inactive</option>
+                                      <option value="Invited">Invited</option>
+                                    </select>
+                                  </label>
+                                  <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-4">
+                                    <div className="text-sm font-medium text-gray-500">Account Type</div>
+                                    <div className="mt-2 text-[1.05rem] font-semibold text-gray-900">{getPeopleDirectoryRoleLabel(selectedDirectoryPerson)}</div>
+                                  </div>
+                                </div>
+                                <div className="mt-8 flex items-center justify-end gap-4">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setIsEditingDirectoryPerson(false);
+                                      setDirectoryPersonForm({
+                                        name: selectedDirectoryPerson.name || selectedDirectoryPerson.fullName || '',
+                                        email: selectedDirectoryPerson.email || '',
+                                        phone: selectedDirectoryPerson.phone || selectedDirectoryPerson.phoneNumber || '',
+                                        jobTitle: selectedDirectoryPerson.jobTitle || '',
+                                        hourlyRate: selectedDirectoryPerson.hourlyRate || '',
+                                        companyName: selectedDirectoryPerson.companyName || currentUser?.companyName || '',
+                                        categories: Array.isArray(selectedDirectoryPerson.categories) ? selectedDirectoryPerson.categories.join(', ') : '',
+                                        status: selectedDirectoryPerson.status || 'Active',
+                                      });
+                                    }}
+                                    className="rounded-xl border border-gray-300 bg-white px-6 py-3 text-[1.05rem] font-semibold text-gray-700 hover:bg-gray-50"
+                                  >
+                                    Cancel
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={saveDirectoryPersonDetails}
+                                    disabled={directoryPersonSaving}
+                                    className="rounded-xl bg-blue-600 px-6 py-3 text-[1.05rem] font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                  >
+                                    {directoryPersonSaving ? 'Saving...' : 'Save Changes'}
+                                  </button>
+                                </div>
+                              </>
+                            ) : (
+                              <div className="mt-8 divide-y divide-gray-200">
+                                {[
+                                  ['Hourly Rate', selectedDirectoryPerson.hourlyRate || 'None'],
+                                  ['Company Name', selectedDirectoryPerson.companyName || currentUser?.companyName || '—'],
+                                  ['Status', getPeopleDirectoryStatus(selectedDirectoryPerson)],
+                                  ['Account Type', getPeopleDirectoryRoleLabel(selectedDirectoryPerson)],
+                                ].map(([label, value]) => (
+                                  <div key={label} className="grid grid-cols-[180px_minmax(0,1fr)] gap-8 py-6">
+                                    <div className="text-[1.05rem] text-gray-500">{label}</div>
+                                    <div className="text-[1.05rem] text-gray-900">{value}</div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </>
+                      )}
+
+                      {personDetailTab === 'workOrders' && (
+                        <div className="rounded-2xl border border-gray-200 bg-white p-8">
+                          <div className="text-[1.25rem] font-bold text-gray-900">{selectedDirectoryPersonWorkOrders.length} Work Orders</div>
+                          <div className="mt-6 overflow-hidden rounded-2xl border border-gray-200">
+                            <table className="min-w-full text-left text-sm">
+                              <thead className="border-b border-gray-200 bg-white">
+                                <tr>
+                                  {['Title', 'Status', 'Priority', 'Location', 'Created'].map((head) => (
+                                    <th key={head} className="px-6 py-4 font-bold text-gray-900">{head}</th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-100">
+                                {selectedDirectoryPersonWorkOrders.length ? selectedDirectoryPersonWorkOrders.map((issue, index) => (
+                                  <tr key={issue._id || issue.id || index}>
+                                    <td className="px-6 py-4 text-gray-900">{issue.title || issue.name || 'Untitled'}</td>
+                                    <td className="px-6 py-4 text-gray-600">{issue.status || 'Open'}</td>
+                                    <td className="px-6 py-4 text-gray-600">{issue.priority || '—'}</td>
+                                    <td className="px-6 py-4 text-gray-600">{issue.location || issue.property?.name || '—'}</td>
+                                    <td className="px-6 py-4 text-gray-600">{issue.createdAt ? new Date(issue.createdAt).toLocaleDateString() : '—'}</td>
+                                  </tr>
+                                )) : (
+                                  <tr><td colSpan="5" className="px-6 py-16 text-center text-sm text-gray-500">No work orders linked to this person yet.</td></tr>
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {editingTech !== null && (
                 <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 14, padding: 24, marginBottom: 20 }}>
@@ -17830,7 +24066,7 @@ function ClientDashboard() {
                 </div>
               )}
 
-              <Table heads={['Name', 'Contact', 'Specialty', 'Rating', 'Jobs', 'Location', 'Actions']} empty="No technicians yet."
+              {false && <Table heads={['Name', 'Contact', 'Specialty', 'Rating', 'Jobs', 'Location', 'Actions']} empty="No technicians yet."
                 rows={internalTechnicians.map(tech => [
                   <Td key="n"><span style={{ fontWeight: 600 }}>{tech.name}</span></Td>,
                   <Td key="c"><div style={{ fontSize: 12 }}><div>{renderValue(tech.email, '—')}</div><div style={{ color: '#9CA3AF' }}>{tech.phone || ''}</div></div></Td>,
@@ -17877,7 +24113,7 @@ function ClientDashboard() {
                     </div>
                   </Td>,
                 ])}
-              />
+              />}
             </div>
           )}
 
@@ -18274,12 +24510,14 @@ function ClientDashboard() {
               technicians={technicians}
               assets={assets}
               maintenanceSchedules={maintenanceSchedules}
+              requestItems={filteredRequests}
+              workOrderItems={filteredClientWorkOrders}
             />
           )}
 
           {/* â”€â”€ Meters â”€â”€ */}
           {activeTab === 'meters' && (
-            <ClientMetersTab />
+            <ClientMetersTab people={people} teams={teams} assets={assets} properties={properties} internalTechnicians={internalTechnicians} currentUser={currentUser} />
           )}
 
           {/* â”€â”€ Edge â”€â”€ */}
@@ -18290,6 +24528,380 @@ function ClientDashboard() {
           {activeTab === 'imports' && <ImportExportPanel />}
 
         </div>
+        {showUserProfileModal && (
+          <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/45 p-4">
+            <div className="w-full max-w-4xl rounded-[18px] bg-white shadow-2xl">
+              <div className="flex items-start justify-between px-6 py-6">
+                <div className="flex items-start gap-5">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full border border-gray-200 bg-gray-50 text-[1.2rem] font-bold text-gray-900">
+                    {(userName || currentUser?.name || 'U').charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <div className="text-[2rem] font-bold leading-none text-gray-900">{userName || currentUser?.name || 'User'}</div>
+                    <div className="mt-3 text-[1.1rem] font-semibold text-gray-900">{currentUser?.role || currentUser?.accountType || 'Administrator'}</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setShowProfileStatusMenu((prev) => !prev)}
+                      className="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-[0.95rem] text-gray-900"
+                    >
+                      {profileStatus} <ChevronDown className="ml-2 inline h-4 w-4" />
+                    </button>
+                    {showProfileStatusMenu && (
+                      <div className="absolute right-0 top-14 z-20 w-[220px] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl">
+                        {['Start Shift', 'On Call', 'End Shift'].map((statusOption) => (
+                          <button
+                            key={statusOption}
+                            type="button"
+                            onClick={() => {
+                              setProfileStatus(statusOption);
+                              setShowProfileStatusMenu(false);
+                            }}
+                            className="block w-full px-6 py-4 text-left text-[0.95rem] text-gray-900 hover:bg-gray-50"
+                          >
+                            {statusOption}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <button type="button" onClick={() => setShowUserProfileModal(false)} className="rounded-lg p-2 text-gray-500 hover:bg-gray-100">
+                    <X className="h-7 w-7" />
+                  </button>
+                </div>
+              </div>
+              <div className="px-6 pb-7">
+                <div className="rounded-2xl border border-gray-200 p-6">
+                  <div className="flex items-center justify-between gap-4 border-b border-gray-200 pb-5">
+                    <div className="text-[1.2rem] font-bold text-gray-900">Profile Details</div>
+                    <div className="flex items-center gap-3">
+                      <button type="button" onClick={() => { setShowChangePasswordForm((prev) => !prev); setIsEditingUserProfile(false); }} className="rounded-lg bg-blue-600 px-5 py-2.5 text-[0.95rem] font-semibold text-white">Change Password</button>
+                      <button type="button" onClick={() => { setIsEditingUserProfile((prev) => !prev); setShowChangePasswordForm(false); }} className="rounded-lg bg-blue-600 px-5 py-2.5 text-[0.95rem] font-semibold text-white">{isEditingUserProfile ? 'Cancel Edit' : 'Edit'}</button>
+                    </div>
+                  </div>
+                  {showChangePasswordForm ? (
+                    <div className="mt-5 space-y-4">
+                      {[
+                        ['Current Password', 'currentPassword'],
+                        ['New Password', 'newPassword'],
+                        ['Confirm Password', 'confirmPassword'],
+                      ].map(([label, field]) => (
+                        <div key={field}>
+                          <label className="mb-2 block text-sm font-semibold text-gray-600">{label}</label>
+                          <input
+                            type="password"
+                            value={passwordForm[field]}
+                            onChange={(e) => setPasswordForm((prev) => ({ ...prev, [field]: e.target.value }))}
+                            className="w-full rounded-lg border border-gray-300 px-4 py-3 text-[0.98rem] text-gray-900"
+                          />
+                        </div>
+                      ))}
+                      <div className="flex justify-end gap-3 pt-2">
+                        <button type="button" onClick={() => setShowChangePasswordForm(false)} className="rounded-lg border border-gray-300 bg-white px-5 py-2.5 text-[0.95rem] font-semibold text-gray-700">Cancel</button>
+                        <button type="button" onClick={submitPasswordChange} className="rounded-lg bg-blue-600 px-5 py-2.5 text-[0.95rem] font-semibold text-white">Save Password</button>
+                      </div>
+                    </div>
+                  ) : isEditingUserProfile ? (
+                    <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+                      <div className="md:col-span-2">
+                        <label className="mb-2 block text-sm font-semibold text-gray-600">Username/Email</label>
+                        <input value={userProfileForm.email} onChange={(e) => setUserProfileForm((prev) => ({ ...prev, email: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-4 py-3 text-[0.98rem] text-gray-900" />
+                      </div>
+                      <div>
+                        <label className="mb-2 block text-sm font-semibold text-gray-600">First Name</label>
+                        <input value={userProfileForm.firstName} onChange={(e) => setUserProfileForm((prev) => ({ ...prev, firstName: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-4 py-3 text-[0.98rem] text-gray-900" />
+                      </div>
+                      <div>
+                        <label className="mb-2 block text-sm font-semibold text-gray-600">Last Name</label>
+                        <input value={userProfileForm.lastName} onChange={(e) => setUserProfileForm((prev) => ({ ...prev, lastName: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-4 py-3 text-[0.98rem] text-gray-900" />
+                      </div>
+                      <div>
+                        <label className="mb-2 block text-sm font-semibold text-gray-600">Phone Number</label>
+                        <input value={userProfileForm.phoneNumber} onChange={(e) => setUserProfileForm((prev) => ({ ...prev, phoneNumber: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-4 py-3 text-[0.98rem] text-gray-900" />
+                      </div>
+                      <div>
+                        <label className="mb-2 block text-sm font-semibold text-gray-600">Job Title</label>
+                        <input value={userProfileForm.jobTitle} onChange={(e) => setUserProfileForm((prev) => ({ ...prev, jobTitle: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-4 py-3 text-[0.98rem] text-gray-900" />
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="mb-2 block text-sm font-semibold text-gray-600">Language</label>
+                        <select value={userProfileForm.language} onChange={(e) => setUserProfileForm((prev) => ({ ...prev, language: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-4 py-3 text-[0.98rem] text-gray-900">
+                          <option value="en">English</option>
+                          <option value="fr">French</option>
+                          <option value="rw">Kinyarwanda</option>
+                        </select>
+                      </div>
+                      <div className="md:col-span-2 flex justify-end gap-3 pt-2">
+                        <button type="button" onClick={() => setIsEditingUserProfile(false)} className="rounded-lg border border-gray-300 bg-white px-5 py-2.5 text-[0.95rem] font-semibold text-gray-700">Cancel</button>
+                        <button type="button" onClick={saveUserProfileForm} className="rounded-lg bg-blue-600 px-5 py-2.5 text-[0.95rem] font-semibold text-white">Save Changes</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-5 divide-y divide-gray-100 text-[0.98rem]">
+                      {[
+                        ['Username/Email', currentUser?.email || 'None'],
+                        ['First Name', String(userName || currentUser?.name || '').split(' ')[0] || 'None'],
+                        ['Last Name', String(userName || currentUser?.name || '').split(' ').slice(1).join(' ') || 'None'],
+                        ['Phone Number', currentUser?.phone || currentUser?.phoneNumber || 'None'],
+                        ['Job Title', currentUser?.jobTitle || currentUser?.role || 'n/a'],
+                        ['Language', language || 'None'],
+                      ].map(([label, value]) => (
+                        <div key={label} className="grid grid-cols-[200px_1fr] gap-4 py-4">
+                          <div className="text-gray-500">{label}</div>
+                          <div className="text-gray-900">{value}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        {showCompanyProfileModal && (
+          <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/45 p-4">
+            <div className="w-full max-w-5xl rounded-[18px] bg-white shadow-2xl">
+              <div className="flex items-center justify-between border-b border-gray-100 px-8 py-8">
+                <div>
+                  <div className="text-[2rem] font-bold text-gray-900">{currentUser?.companyName || 'FixNest'}</div>
+                </div>
+                <button type="button" onClick={() => setShowCompanyProfileModal(false)} className="rounded-lg p-2 text-gray-500 hover:bg-gray-100">
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+              <div className="px-6 pb-8 pt-6">
+                <div className="rounded-2xl border border-gray-200 p-6">
+                  <div className="flex items-center justify-between gap-4 border-b border-gray-200 pb-5">
+                    <div className="text-[1.2rem] font-bold text-gray-900">Company Details</div>
+                    <button type="button" onClick={() => setIsEditingCompanyProfile((prev) => !prev)} className="rounded-lg bg-blue-600 px-5 py-2.5 text-[0.95rem] font-semibold text-white">{isEditingCompanyProfile ? 'Cancel Edit' : 'Edit'}</button>
+                  </div>
+                  {isEditingCompanyProfile ? (
+                    <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+                      <div className="md:col-span-2">
+                        <label className="mb-2 block text-sm font-semibold text-gray-600">Company Name</label>
+                        <input value={companyProfileForm.companyName} onChange={(e) => setCompanyProfileForm((prev) => ({ ...prev, companyName: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-4 py-3 text-[0.98rem] text-gray-900" />
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="mb-2 block text-sm font-semibold text-gray-600">Address</label>
+                        <input value={companyProfileForm.companyAddress} onChange={(e) => setCompanyProfileForm((prev) => ({ ...prev, companyAddress: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-4 py-3 text-[0.98rem] text-gray-900" />
+                      </div>
+                      <div>
+                        <label className="mb-2 block text-sm font-semibold text-gray-600">Phone Number</label>
+                        <input value={companyProfileForm.companyPhone} onChange={(e) => setCompanyProfileForm((prev) => ({ ...prev, companyPhone: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-4 py-3 text-[0.98rem] text-gray-900" />
+                      </div>
+                      <div>
+                        <label className="mb-2 block text-sm font-semibold text-gray-600">Website</label>
+                        <input value={companyProfileForm.companyWebsite} onChange={(e) => setCompanyProfileForm((prev) => ({ ...prev, companyWebsite: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-4 py-3 text-[0.98rem] text-gray-900" />
+                      </div>
+                      <div className="md:col-span-2 flex justify-end gap-3 pt-2">
+                        <button type="button" onClick={() => setIsEditingCompanyProfile(false)} className="rounded-lg border border-gray-300 bg-white px-5 py-2.5 text-[0.95rem] font-semibold text-gray-700">Cancel</button>
+                        <button type="button" onClick={saveCompanyProfileForm} className="rounded-lg bg-blue-600 px-5 py-2.5 text-[0.95rem] font-semibold text-white">Save Changes</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-5 divide-y divide-gray-100 text-[1rem]">
+                      {[
+                        ['Address', currentUser?.companyAddress || 'None'],
+                        ['Phone Number', currentUser?.companyPhone || currentUser?.phone || 'None'],
+                        ['Website', currentUser?.companyWebsite || 'None'],
+                      ].map(([label, value]) => (
+                        <div key={label} className="grid grid-cols-[200px_1fr] gap-4 py-4">
+                          <div className="text-gray-500">{label}</div>
+                          <div className="text-gray-900">{value}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="mt-6 grid gap-6 lg:grid-cols-2">
+                  <div className="rounded-2xl border border-gray-200 p-6">
+                    <div className="text-[1.2rem] font-bold text-gray-900">Procurement Contacts</div>
+                    <div className="mt-4 space-y-3">
+                      {procurementSettings.officers.filter((entry) => entry.name || entry.email).map((entry) => (
+                        <div key={`company-proc-${entry.id}`} className="rounded-xl border border-gray-200 px-4 py-3">
+                          <div className="font-semibold text-gray-900">{entry.name || 'Procurement Officer'}</div>
+                          <div className="mt-1 text-sm text-gray-500">{entry.role || 'Procurement'} • {entry.email || 'No email set'}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="rounded-2xl border border-gray-200 p-6">
+                    <div className="text-[1.2rem] font-bold text-gray-900">Vendor Notification List</div>
+                    <div className="mt-4 space-y-3">
+                      {(contactPeople || []).filter((person) => person.__source === 'vendor' && person.email).slice(0, 8).map((vendor) => (
+                        <div key={`company-vendor-${vendor.id || vendor.email}`} className="rounded-xl bg-gray-50 px-4 py-3">
+                          <div className="font-semibold text-gray-900">{vendor.name || 'Vendor'}</div>
+                          <div className="mt-1 text-sm text-gray-500">{vendor.email}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        {showCookieSettingsModal && (
+          <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/45 p-4">
+            <div className="w-full max-w-4xl rounded-[12px] bg-white shadow-2xl">
+              <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+                <div className="flex items-center gap-3">
+                  <div style={{ width: 28, height: 28, borderRadius: 999, border: '2px solid #ff4d42', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ff4d42' }}>
+                    <Settings className="h-4 w-4" />
+                  </div>
+                  <div className="text-[2rem] font-bold text-[#ff4d42]">FixNest</div>
+                </div>
+                <button type="button" onClick={() => setShowCookieSettingsModal(false)} className="rounded-lg p-2 text-gray-500 hover:bg-gray-100">
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+              <div className="max-h-[72vh] overflow-y-auto px-6 py-6">
+                <div className="text-[2rem] font-bold text-[#6d8797]">Privacy Preference Center</div>
+                <p className="mt-4 text-[1rem] leading-8 text-[#6d8797]">
+                  When you visit FixNest, we may store information in your browser, mostly in the form of cookies. This helps the site work as expected and gives you a more personalized experience.
+                </p>
+                <div className="mt-10 text-[2rem] font-bold text-[#6d8797]">Manage Consent Preferences</div>
+                <div className="mt-6 space-y-4">
+                  {[
+                    ['strictlyNecessary', 'Strictly Necessary Cookies', 'These cookies are necessary for the website to function and cannot be switched off in our systems.', true],
+                    ['performance', 'Performance Cookies', 'These cookies allow us to count visits and traffic sources so we can measure and improve FixNest performance.', false],
+                    ['functional', 'Functional Cookies', 'These cookies enable the website to provide enhanced functionality and personalization.', false],
+                    ['targeting', 'Targeting Cookies', 'These cookies may be set through our site by partners to show relevant ads and better experiences.', false],
+                  ].map(([key, label, description, locked]) => (
+                    <div key={key} className="overflow-hidden rounded-md border border-gray-300">
+                      <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+                        <div className="flex items-center gap-4">
+                          <span className="text-[1.6rem] font-bold text-[#395166]">-</span>
+                          <span className="text-[1.15rem] font-bold text-[#6d8797]">{label}</span>
+                        </div>
+                        {locked ? (
+                          <span className="text-[1rem] font-semibold text-[#3b67d6]">Always Active</span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setCookieSettings((prev) => ({ ...prev, [key]: !prev[key] }))}
+                            className={`relative h-9 w-16 rounded-full transition ${cookieSettings[key] ? 'bg-green-700' : 'bg-gray-300'}`}
+                          >
+                            <span className={`absolute top-1 h-7 w-7 rounded-full bg-white transition ${cookieSettings[key] ? 'left-8' : 'left-1'}`} />
+                          </button>
+                        )}
+                      </div>
+                      <div className="px-6 py-5 text-[1rem] leading-8 text-[#6d8797]">{description}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="flex items-center justify-between border-t border-gray-200 px-6 py-4">
+                <div className="text-[0.95rem] text-gray-500">Powered By <span className="font-semibold text-[#3b82f6]">FixNest Cookie Center</span></div>
+                <div className="flex items-center gap-4">
+                  <button type="button" onClick={() => setCookieSettings((prev) => ({ ...prev, performance: false, functional: false, targeting: false }))} className="rounded bg-[#ff4d42] px-8 py-3 text-[1rem] font-semibold text-white">Reject All</button>
+                  <button type="button" onClick={() => setShowCookieSettingsModal(false)} className="rounded bg-[#ff4d42] px-8 py-3 text-[1rem] font-semibold text-white">Confirm My Choices</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        {showNotificationSettingsModal && (
+          <div className="fixed inset-0 z-[90] bg-white">
+            <div className="border-b border-gray-200 bg-white">
+              <div className="flex items-center justify-between px-8 py-5">
+                <div className="flex items-center gap-4">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 text-gray-700">
+                    <LayoutDashboard className="h-5 w-5" />
+                  </div>
+                  <div className="text-[2rem] font-black text-gray-900">Notification Settings</div>
+                </div>
+                <button type="button" onClick={() => setShowNotificationSettingsModal(false)} className="rounded-lg p-2 text-gray-500 hover:bg-gray-100">
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+            </div>
+            <div className="grid grid-cols-[360px_1fr_100px] border-b border-gray-200 px-8 py-6 text-[1rem] font-bold text-gray-800">
+              <div>Section</div>
+              <div>Notify me when...</div>
+              <div className="text-right">Email</div>
+            </div>
+            <div className="max-h-[calc(100vh-118px)] overflow-y-auto">
+              {[
+                ['Work Orders - General', 'Notifications specific to general work order events', [
+                  'A Work Order I have created has been updated',
+                  'A Work Order I am assigned to has been created or updated',
+                  'A Work Order I am assigned to as an additional worker has been created or updated',
+                  'A Work Order my team has been assigned to has been created or updated',
+                  'I have been mentioned in any Work Order updates',
+                ]],
+                ['Purchase Orders', 'Notifications specific to purchase order events', [
+                  'A Purchase Order has been requested from the public request portal',
+                  'A Purchase Order has been created by a non-admin user',
+                  'A Purchase Order request I created has been updated',
+                ]],
+                ['Parts/Inventory', 'Notifications specific to general part events', [
+                  'A part becomes low stock',
+                ]],
+                ['Summary & Reports', 'Notifications specific to daily summaries and reports', [
+                  'There is a Daily Summary Report ready to view',
+                  'There is a Work Orders Due Next Week Report ready to view',
+                  'Procurement receives a new material request notification',
+                ]],
+              ].map(([sectionTitle, sectionDesc, items]) => (
+                <div key={sectionTitle} className="grid grid-cols-[360px_1fr_100px] border-b border-gray-200 px-8 py-8">
+                  <div className="pr-8">
+                    <div className="text-[1rem] font-bold text-gray-900">{sectionTitle}</div>
+                    <div className="mt-3 text-[0.95rem] text-gray-500">{sectionDesc}</div>
+                  </div>
+                  <div className="rounded-2xl border border-gray-200 bg-white">
+                    {(items || []).map((item, index) => (
+                      <div key={item} className={`flex items-center justify-between gap-4 px-6 py-5 ${index < items.length - 1 ? 'border-b border-gray-200' : ''}`}>
+                        <div className="text-[0.98rem] text-gray-900">{item}</div>
+                        <button type="button" className="relative h-7 w-14 rounded-full bg-blue-600">
+                          <span className="absolute left-8 top-1 h-5 w-5 rounded-full bg-white" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <div />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {showHelpModal && (
+          <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/45 p-4">
+            <div className="w-full max-w-xl rounded-3xl bg-white shadow-2xl">
+              <div className="flex items-center justify-between border-b border-gray-100 px-6 py-5">
+                <div className="text-xl font-bold text-gray-900">Help</div>
+                <button type="button" onClick={() => setShowHelpModal(false)} className="rounded-lg p-2 text-gray-500 hover:bg-gray-100"><X className="h-6 w-6" /></button>
+              </div>
+              <div className="space-y-4 px-6 py-6 text-sm text-gray-700">
+                <div className="rounded-xl bg-gray-50 p-4">Use the notification bell to review updates, the profile menu to manage your account, and the Material Requests page to register procurement contacts.</div>
+                <div className="rounded-xl bg-gray-50 p-4">If you want deeper help content next, I can build a full help center panel here too.</div>
+              </div>
+            </div>
+          </div>
+        )}
+        {showContactSupportModal && (
+          <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/45 p-4">
+            <div className="w-full max-w-xl rounded-3xl bg-white shadow-2xl">
+              <div className="flex items-center justify-between border-b border-gray-100 px-6 py-5">
+                <div className="text-xl font-bold text-gray-900">Contact Support</div>
+                <button type="button" onClick={() => setShowContactSupportModal(false)} className="rounded-lg p-2 text-gray-500 hover:bg-gray-100"><X className="h-6 w-6" /></button>
+              </div>
+              <div className="space-y-4 px-6 py-6 text-sm text-gray-700">
+                <div className="rounded-xl border border-gray-200 p-4">
+                  <div className="font-semibold text-gray-900">Email</div>
+                  <div className="mt-1">support@fixnest.app</div>
+                </div>
+                <div className="rounded-xl border border-gray-200 p-4">
+                  <div className="font-semibold text-gray-900">Procurement / Vendor Support</div>
+                  <div className="mt-1">procurement@fixnest.app</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
           
       </main>
 
@@ -18424,6 +25036,14 @@ function ClientDashboard() {
         onCreateTag={createTag}
         onUpdateTag={updateTag}
         onDeleteTag={deleteTag}
+        apiSettings={apiSettings}
+        onSaveApiSettings={saveApiSettings}
+        authenticationSettings={authenticationSettings}
+        onSaveAuthenticationSettings={saveAuthenticationSettings}
+        webhookSettings={webhookSettings}
+        onCreateWebhook={createWebhook}
+        onUpdateWebhook={updateWebhook}
+        onDeleteWebhook={deleteWebhook}
       />
 
       {/* â”€â”€ Issue Assign Modal (For Client) â”€â”€ */}
@@ -21609,14 +28229,60 @@ const ClientContactsTab = ({ type = 'vendor' }) => {
   );
 };
 
-const ClientAnalyticsTab = ({ allIssues = [], technicians = [], assets = [], maintenanceSchedules = [] }) => {
+const ClientAnalyticsTab = ({
+  allIssues = [],
+  technicians = [],
+  assets = [],
+  maintenanceSchedules = [],
+  requestItems = [],
+  workOrderItems = [],
+}) => {
   const [subTab, setSubTab] = useState('team-performance');
   const [dateRange, setDateRange] = useState('Last 90 Days');
   const [showDateDropdown, setShowDateDropdown] = useState(false);
   const [customRange, setCustomRange] = useState({ start: '', end: '' });
   const [showCustomRange, setShowCustomRange] = useState(false);
+  const [showFilters, setShowFilters] = useState(true);
+  const [showMoreActionsMenu, setShowMoreActionsMenu] = useState(false);
+  const [showTimeZoneModal, setShowTimeZoneModal] = useState(false);
+  const [showManagePinsModal, setShowManagePinsModal] = useState(false);
+  const [pinSearch, setPinSearch] = useState('');
+  const [pinnedDashboardIds, setPinnedDashboardIds] = useState(['team-performance', 'cost-of-maintenance', 'asset-downtime']);
+  const [showCreateDashboardModal, setShowCreateDashboardModal] = useState(false);
+  const [customDashboardName, setCustomDashboardName] = useState('');
+  const [customDashboards, setCustomDashboards] = useState([]);
+  const [selectedDashboardView, setSelectedDashboardView] = useState('default');
+  const [showViewDropdown, setShowViewDropdown] = useState(false);
+  const [preferencesLoaded, setPreferencesLoaded] = useState(false);
+  const [savingPins, setSavingPins] = useState(false);
+  const [lastRefreshedAt, setLastRefreshedAt] = useState(new Date());
+  const [viewerTimeZone, setViewerTimeZone] = useState(() => {
+    try {
+      return window.localStorage.getItem('client-analytics-viewer-timezone') || Intl.DateTimeFormat().resolvedOptions().timeZone || 'Africa/Kigali';
+    } catch {
+      return 'Africa/Kigali';
+    }
+  });
+  const [draftTimeZone, setDraftTimeZone] = useState(() => {
+    try {
+      return window.localStorage.getItem('client-analytics-viewer-timezone') || Intl.DateTimeFormat().resolvedOptions().timeZone || 'Africa/Kigali';
+    } catch {
+      return 'Africa/Kigali';
+    }
+  });
+  const [isEditingCustomDashboard, setIsEditingCustomDashboard] = useState(false);
+  const [showAddWidgetMenu, setShowAddWidgetMenu] = useState(false);
+  const [showCustomDashboardSettings, setShowCustomDashboardSettings] = useState(false);
+  const [customDashboardSettingsTab, setCustomDashboardSettingsTab] = useState('general');
+  const [customDashboardSettingsDraft, setCustomDashboardSettingsDraft] = useState(null);
+  const [customDashboardDraft, setCustomDashboardDraft] = useState(null);
 
   const now = new Date();
+  const formatBucketLabel = (date, stepDaysValue) => date.toLocaleDateString('en-US', stepDaysValue >= 30
+    ? { month: 'long', year: '2-digit' }
+    : { month: 'short', day: 'numeric' });
+  const priorityOrder = ['High', 'Medium', 'Low', 'None'];
+  const palette = ['#1d4ed8', '#60a5fa', '#0f766e', '#f59e0b', '#ef4444'];
 
   const resolveRange = () => {
     const end = new Date(now);
@@ -21627,29 +28293,60 @@ const ClientAnalyticsTab = ({ allIssues = [], technicians = [], assets = [], mai
     else if (dateRange === 'Last 12 Months') start.setMonth(end.getMonth() - 11);
     else if (dateRange === 'All Time') start.setFullYear(end.getFullYear() - 5);
     else if (dateRange === 'Custom Range' && customRange.start && customRange.end) {
-      return { start: new Date(customRange.start), end: new Date(customRange.end) };
+      const customStart = new Date(customRange.start);
+      const customEnd = new Date(customRange.end);
+      customStart.setHours(0, 0, 0, 0);
+      customEnd.setHours(23, 59, 59, 999);
+      return { start: customStart, end: customEnd };
     }
+    start.setHours(0, 0, 0, 0);
+    end.setHours(23, 59, 59, 999);
     return { start, end };
   };
 
   const { start: rangeStart, end: rangeEnd } = resolveRange();
   const rangeDays = Math.max(1, Math.round((rangeEnd - rangeStart) / 86400000) + 1);
+  const stepDays = rangeDays > 120 ? 30 : rangeDays > 30 ? 7 : 1;
 
-  const labels = React.useMemo(() => {
-    const output = [];
-    const cursor = new Date(rangeStart);
-    const step = rangeDays > 120 ? 30 : rangeDays > 30 ? 7 : 1;
+  const chartBuckets = React.useMemo(() => {
+    const buckets = [];
+    let cursor = new Date(rangeStart);
     while (cursor <= rangeEnd) {
-      output.push(cursor.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
-      cursor.setDate(cursor.getDate() + step);
+      const bucketStart = new Date(cursor);
+      bucketStart.setHours(0, 0, 0, 0);
+      const bucketEnd = new Date(cursor);
+      bucketEnd.setDate(bucketEnd.getDate() + stepDays - 1);
+      bucketEnd.setHours(23, 59, 59, 999);
+      if (bucketEnd > rangeEnd) bucketEnd.setTime(rangeEnd.getTime());
+      buckets.push({
+        label: formatBucketLabel(bucketStart, stepDays),
+        start: bucketStart,
+        end: bucketEnd,
+      });
+      cursor = new Date(bucketEnd);
+      cursor.setDate(cursor.getDate() + 1);
+      cursor.setHours(0, 0, 0, 0);
     }
-    return output;
-  }, [rangeStart, rangeEnd, rangeDays]);
+    return buckets;
+  }, [rangeStart, rangeEnd, stepDays]);
+
+  const labels = React.useMemo(() => chartBuckets.map((bucket) => bucket.label), [chartBuckets]);
+  const bucketIndexForDate = (value) => {
+    const dt = normalizeDate(value);
+    if (!dt || dt < rangeStart || dt > rangeEnd) return -1;
+    return chartBuckets.findIndex((bucket) => dt >= bucket.start && dt <= bucket.end);
+  };
+  const getIssueAnalyticsDate = (issue) => normalizeDate(
+    issue?.createdAt ||
+    issue?.submittedAt ||
+    issue?.updatedAt ||
+    issue?.date ||
+    issue?.nextDate
+  );
 
   const inRangeIssues = React.useMemo(() => {
     return (allIssues || []).filter((issue) => {
-      if (!issue?.createdAt) return false;
-      const dt = normalizeDate(issue.createdAt);
+      const dt = getIssueAnalyticsDate(issue);
       return dt >= rangeStart && dt <= rangeEnd;
     });
   }, [allIssues, rangeStart, rangeEnd]);
@@ -21660,6 +28357,135 @@ const ClientAnalyticsTab = ({ allIssues = [], technicians = [], assets = [], mai
     const value = String(status || '').toLowerCase();
     return !value || value === 'pending' || value === 'open' || value === 'new';
   };
+  const isPreventiveIssue = (issue) => {
+    if (!issue) return false;
+    const tags = Array.isArray(issue.tags) ? issue.tags.map((tag) => String(typeof tag === 'string' ? tag : tag?.label || tag?.name || '').toLowerCase()) : [];
+    const fingerprint = [
+      issue.isPreventive ? 'preventive' : '',
+      issue.type,
+      issue.issueType,
+      issue.category,
+      issue.submissionType,
+      issue.title,
+      issue.status,
+      ...tags,
+    ].join(' ').toLowerCase();
+    return (
+      Boolean(issue.isPreventive) ||
+      String(issue.type || '').toUpperCase() === 'PREVENTIVE' ||
+      fingerprint.includes('preventive') ||
+      fingerprint.includes('preventative') ||
+      fingerprint.includes('inspection') ||
+      Boolean(issue.scheduleId || issue.maintenanceScheduleId || issue.pmTrigger || issue.preventiveMaintenanceName || issue.scheduleName || issue.pmName)
+    );
+  };
+  const isRejectedRequest = (issue) => {
+    const status = String(issue?.status || '').toUpperCase();
+    return status === 'REJECTED' || status === 'DECLINED';
+  };
+  const isPmLinkedIssue = (issue) => Boolean(
+    issue?.scheduleId ||
+    issue?.pmId ||
+    issue?.maintenanceScheduleId ||
+    issue?.pmTrigger ||
+    issue?.preventiveMaintenanceName ||
+    issue?.scheduleName ||
+    issue?.pmName
+  );
+  const isApprovedWorkOrder = (issue) => {
+    const status = String(issue?.status || '').toUpperCase();
+    const hasWorkOrderRef = !!(
+      issue?.workOrderId ||
+      issue?.workOrder ||
+      issue?.workOrderNumber ||
+      issue?.workOrderNo ||
+      issue?.workOrderCode ||
+      issue?.workOrderRef
+    );
+    return Boolean(issue?.approved)
+      || hasWorkOrderRef
+      || isPmLinkedIssue(issue)
+      || status === 'APPROVED'
+      || status === 'OPEN'
+      || status.includes('IN PROGRESS')
+      || status.includes('COMPLETE');
+  };
+  const isRequestRecord = (issue) => {
+    if (!issue || isPmLinkedIssue(issue)) return false;
+    const status = String(issue?.status || '').toUpperCase();
+    return Boolean(
+      issue?.requestorId ||
+      issue?.requestorName ||
+      issue?.submittedAt ||
+      issue?.submissionType ||
+      issue?.approved !== undefined ||
+      issue?.rejected !== undefined ||
+      status === 'SUBMITTED' ||
+      status === 'APPROVED' ||
+      status === 'DECLINED' ||
+      status === 'REJECTED' ||
+      status === 'PENDING'
+    );
+  };
+  const isRequestIssue = (issue) => {
+    if (!issue || isRejectedRequest(issue)) return false;
+    return isRequestRecord(issue) || !isApprovedWorkOrder(issue);
+  };
+  const isReactiveRequest = (issue) => {
+    if (!issue || isPreventiveIssue(issue)) return false;
+    return isRequestIssue(issue);
+  };
+  const isReactiveWorkOrder = (issue) => {
+    if (!issue || isPreventiveIssue(issue)) return false;
+    return isApprovedWorkOrder(issue) && !isRequestIssue(issue);
+  };
+  const isReactiveIssue = (issue) => isReactiveRequest(issue) || isReactiveWorkOrder(issue);
+  const toCostNumber = (value) => {
+    if (value === null || value === undefined || value === '') return 0;
+    const normalized = Number(String(value).replace(/[^0-9.-]/g, ''));
+    return Number.isFinite(normalized) ? normalized : 0;
+  };
+  const extractIssueCostSummary = (issue) => {
+    const laborEntries = Array.isArray(issue?.labor) ? issue.labor : Array.isArray(issue?.laborEntries) ? issue.laborEntries : [];
+    const partEntries = Array.isArray(issue?.parts) ? issue.parts : Array.isArray(issue?.materials) ? issue.materials : Array.isArray(issue?.lineItems) ? issue.lineItems : [];
+    const extraCostEntries = Array.isArray(issue?.costs) ? issue.costs : Array.isArray(issue?.additionalCosts) ? issue.additionalCosts : [];
+
+    const laborFromEntries = laborEntries.reduce((sum, entry) => {
+      if (entry?.cost !== undefined) return sum + toCostNumber(entry.cost);
+      const rate = toCostNumber(entry?.rate ?? entry?.hourlyRate);
+      const hours = toCostNumber(entry?.hours ?? entry?.time);
+      const minutes = toCostNumber(entry?.minutes);
+      const seconds = toCostNumber(entry?.seconds);
+      return sum + (rate * (hours + (minutes / 60) + (seconds / 3600)));
+    }, 0);
+    const laborCost = laborFromEntries || toCostNumber(issue?.laborCost ?? issue?.laborTotal ?? issue?.labor?.total ?? issue?.labor?.cost);
+
+    const partsFromEntries = partEntries.reduce((sum, entry) => {
+      const cost = toCostNumber(entry?.unitCost ?? entry?.cost ?? entry?.price);
+      const quantity = toCostNumber(entry?.quantity ?? entry?.qty ?? 1) || 1;
+      return sum + (cost * quantity);
+    }, 0);
+    const partsCost = partsFromEntries || toCostNumber(issue?.partsCost ?? issue?.materialsCost ?? issue?.totalPartsCost ?? issue?.parts?.total ?? issue?.itemsCost);
+
+    const otherFromEntries = extraCostEntries.reduce((sum, entry) => sum + toCostNumber(entry?.cost ?? entry?.amount ?? entry?.value), 0);
+    const otherCost = otherFromEntries || toCostNumber(issue?.otherCost ?? issue?.miscCost ?? issue?.additionalCost);
+
+    const explicitTotal = toCostNumber(issue?.totalCost ?? issue?.cost);
+    const totalCost = explicitTotal || (laborCost + partsCost + otherCost);
+
+    return {
+      laborCost,
+      partsCost,
+      otherCost,
+      totalCost,
+    };
+  };
+  const getScheduleDueDate = (schedule) => normalizeDate(
+    schedule?.nextDate ||
+    schedule?.date ||
+    schedule?.scheduledFor ||
+    schedule?.startDate
+  );
 
   const statusCounts = React.useMemo(() => {
     const source = inRangeIssues.length ? inRangeIssues : allIssues;
@@ -21673,30 +28499,80 @@ const ClientAnalyticsTab = ({ allIssues = [], technicians = [], assets = [], mai
   }, [allIssues, inRangeIssues]);
 
   const createdMap = React.useMemo(() => {
-    const map = {};
-    labels.forEach((label) => { map[label] = 0; });
+    const map = labels.reduce((accumulator, label) => ({ ...accumulator, [label]: 0 }), {});
     inRangeIssues.forEach((issue) => {
-      const key = normalizeDate(issue.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-      if (map[key] !== undefined) map[key] += 1;
+      const bucketIndex = bucketIndexForDate(getIssueAnalyticsDate(issue));
+      if (bucketIndex < 0) return;
+      const key = labels[bucketIndex];
+      map[key] += 1;
     });
     return map;
-  }, [inRangeIssues, labels]);
+  }, [inRangeIssues, labels, rangeStart, rangeEnd, stepDays]);
 
   const completedMap = React.useMemo(() => {
-    const map = {};
-    labels.forEach((label) => { map[label] = 0; });
+    const map = labels.reduce((accumulator, label) => ({ ...accumulator, [label]: 0 }), {});
     inRangeIssues.forEach((issue) => {
       if (!isCompleted(issue.status)) return;
-      const key = normalizeDate(issue.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-      if (map[key] !== undefined) map[key] += 1;
+      const bucketIndex = bucketIndexForDate(issue.updatedAt || issue.createdAt);
+      if (bucketIndex < 0) return;
+      const key = labels[bucketIndex];
+      map[key] += 1;
     });
     return map;
-  }, [inRangeIssues, labels]);
+  }, [inRangeIssues, labels, rangeStart, rangeEnd, stepDays]);
 
   const createdSeries = labels.map((label) => createdMap[label] || 0);
   const completedSeries = labels.map((label) => completedMap[label] || 0);
-  const reactiveSeries = labels.map((_, index) => Math.max(0, createdSeries[index] - completedSeries[index]));
-  const preventiveSeries = labels.map((_, index) => Math.round((completedSeries[index] * 0.7) + 1));
+  const getIssueKey = (issue) => String(
+    issue?._id ||
+    issue?.id ||
+    issue?.workOrderId ||
+    issue?.requestId ||
+    `${issue?.title || issue?.name || 'item'}-${getIssueAnalyticsDate(issue)?.toISOString() || 'undated'}`
+  );
+  const inRangeRequestIssues = React.useMemo(() => {
+    return (requestItems || []).filter((issue) => {
+      if (isPreventiveIssue(issue)) return false;
+      const dt = getIssueAnalyticsDate(issue);
+      return dt && dt >= rangeStart && dt <= rangeEnd;
+    });
+  }, [requestItems, rangeStart, rangeEnd]);
+  const inRangeWorkOrderIssues = React.useMemo(() => {
+    return (workOrderItems || []).filter((issue) => {
+      const dt = getIssueAnalyticsDate(issue);
+      return dt && dt >= rangeStart && dt <= rangeEnd;
+    });
+  }, [workOrderItems, rangeStart, rangeEnd]);
+  const uniqueReactiveItems = React.useMemo(() => {
+    const merged = [...inRangeRequestIssues, ...inRangeWorkOrderIssues.filter((issue) => !isPreventiveIssue(issue))];
+    const seen = new Set();
+    return merged.filter((issue) => {
+      const key = getIssueKey(issue);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [inRangeRequestIssues, inRangeWorkOrderIssues]);
+  const issueTypeSeries = React.useMemo(() => {
+    const preventiveBuckets = labels.map(() => 0);
+    const reactiveBuckets = labels.map(() => 0);
+    inRangeWorkOrderIssues.forEach((issue) => {
+      const bucketIndex = bucketIndexForDate(issue.updatedAt || getIssueAnalyticsDate(issue));
+      if (bucketIndex < 0) return;
+      if (isPreventiveIssue(issue)) preventiveBuckets[bucketIndex] += 1;
+    });
+    uniqueReactiveItems.forEach((issue) => {
+      const bucketIndex = bucketIndexForDate(issue.updatedAt || getIssueAnalyticsDate(issue));
+      if (bucketIndex < 0) return;
+      reactiveBuckets[bucketIndex] += 1;
+    });
+    return {
+      preventive: preventiveBuckets,
+      reactive: reactiveBuckets,
+    };
+  }, [inRangeWorkOrderIssues, labels, rangeStart, rangeEnd, stepDays, uniqueReactiveItems]);
+  const preventiveSeries = issueTypeSeries.preventive;
+  const reactiveSeries = issueTypeSeries.reactive;
 
   const maxLineValue = Math.max(1, ...createdSeries, ...completedSeries);
   const lineChartWidth = 700;
@@ -21710,6 +28586,187 @@ const ClientAnalyticsTab = ({ allIssues = [], technicians = [], assets = [], mai
     const y = linePadding + linePlotHeight - ((value / maxLineValue) * linePlotHeight);
     return `${index === 0 ? 'M' : 'L'}${x},${y}`;
   }).join(' ');
+  const totalPreventive = preventiveSeries.reduce((sum, value) => sum + value, 0);
+  const totalReactive = reactiveSeries.reduce((sum, value) => sum + value, 0);
+  const completionRate = statusCounts.total ? Math.round((statusCounts.completed / statusCounts.total) * 100) : 0;
+  const preventiveShare = totalPreventive + totalReactive ? Math.round((totalPreventive / (totalPreventive + totalReactive)) * 100) : 0;
+  const upcomingPreventive = React.useMemo(() => {
+    return (maintenanceSchedules || [])
+      .filter((schedule) => {
+        const dueDate = getScheduleDueDate(schedule);
+        return dueDate && dueDate >= now;
+      })
+      .sort((a, b) => getScheduleDueDate(a) - getScheduleDueDate(b))
+      .slice(0, 6);
+  }, [maintenanceSchedules, now]);
+
+  const responseStats = React.useMemo(() => {
+    const values = [];
+    const series = labels.map(() => []);
+    (allIssues || []).forEach((issue) => {
+      if (!issue?.createdAt || !issue?.updatedAt) return;
+      const hours = (normalizeDate(issue.updatedAt) - normalizeDate(issue.createdAt)) / 3600000;
+      if (!Number.isFinite(hours) || hours < 0) return;
+      values.push(hours);
+      const bucketIndex = bucketIndexForDate(issue.updatedAt || issue.createdAt);
+      if (bucketIndex >= 0) series[bucketIndex].push(hours);
+    });
+    const averages = series.map((bucket) => bucket.length ? Number((bucket.reduce((sum, value) => sum + value, 0) / bucket.length).toFixed(1)) : 0);
+    return {
+      min: values.length ? Number(Math.min(...values).toFixed(1)) : 0,
+      avg: values.length ? Number((values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(1)) : 0,
+      max: values.length ? Number(Math.max(...values).toFixed(1)) : 0,
+      series: averages,
+    };
+  }, [allIssues, labels, rangeStart, rangeEnd, stepDays]);
+
+  const cycleStats = React.useMemo(() => {
+    const values = [];
+    const series = labels.map(() => []);
+    (allIssues || []).forEach((issue) => {
+      if (!isCompleted(issue.status) || !issue?.createdAt || !issue?.updatedAt) return;
+      const hours = (normalizeDate(issue.updatedAt) - normalizeDate(issue.createdAt)) / 3600000;
+      if (!Number.isFinite(hours) || hours < 0) return;
+      values.push(hours);
+      const bucketIndex = bucketIndexForDate(issue.updatedAt || issue.createdAt);
+      if (bucketIndex >= 0) series[bucketIndex].push(hours);
+    });
+    const averages = series.map((bucket) => bucket.length ? Number((bucket.reduce((sum, value) => sum + value, 0) / bucket.length).toFixed(1)) : 0);
+    return {
+      min: values.length ? Number(Math.min(...values).toFixed(1)) : 0,
+      avg: values.length ? Number((values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(1)) : 0,
+      max: values.length ? Number(Math.max(...values).toFixed(1)) : 0,
+      series: averages,
+    };
+  }, [allIssues, labels, rangeStart, rangeEnd, stepDays]);
+
+  const backlogByPriority = React.useMemo(() => {
+    const counts = { High: 0, Medium: 0, Low: 0, None: 0 };
+    (allIssues || []).forEach((issue) => {
+      if (isCompleted(issue.status)) return;
+      const rawPriority = String(issue.priority || '').trim().toLowerCase();
+      const normalized = rawPriority === 'high'
+        ? 'High'
+        : rawPriority === 'medium'
+          ? 'Medium'
+          : rawPriority === 'low'
+            ? 'Low'
+            : 'None';
+      counts[normalized] += 1;
+    });
+    return priorityOrder.map((label, index) => ({
+      label,
+      value: counts[label] || 0,
+      color: palette[index],
+    }));
+  }, [allIssues]);
+
+  const topCompletedLocations = React.useMemo(() => {
+    const counts = {};
+    (allIssues || []).forEach((issue) => {
+      if (!isCompleted(issue.status)) return;
+      const location = issue.location || issue.address || issue.propertyName || 'Unknown';
+      counts[location] = (counts[location] || 0) + 1;
+    });
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([label, value], index) => ({ label, value, color: palette[index % palette.length] }));
+  }, [allIssues]);
+
+  const upcomingPreventiveSeries = React.useMemo(() => {
+    const values = labels.map(() => 0);
+    upcomingPreventive.forEach((schedule) => {
+      const bucketIndex = bucketIndexForDate(getScheduleDueDate(schedule));
+      if (bucketIndex >= 0) values[bucketIndex] += 1;
+    });
+    return values;
+  }, [labels, upcomingPreventive, rangeStart, rangeEnd, stepDays]);
+
+  const maxMetricChartValue = (series) => Math.max(1, ...series);
+  const buildMetricPath = (series) => {
+    const maxValue = maxMetricChartValue(series);
+    return series.map((value, index) => {
+      const x = linePadding + index * xStep;
+      const y = linePadding + linePlotHeight - ((value / maxValue) * linePlotHeight);
+      return `${index === 0 ? 'M' : 'L'}${x},${y}`;
+    }).join(' ');
+  };
+  const getMetricPointY = (series, value) => {
+    const maxValue = maxMetricChartValue(series);
+    return linePadding + linePlotHeight - ((value / maxValue) * linePlotHeight);
+  };
+  const donutStyle = (primary, secondary, percentage) => ({
+    background: `conic-gradient(${primary} 0deg ${percentage * 3.6}deg, ${secondary} ${percentage * 3.6}deg 360deg)`,
+  });
+  const maxLeaderboardValue = (entries) => Math.max(1, ...entries.map((entry) => entry.value || entry.count || 0));
+  const backlogTotal = backlogByPriority.reduce((sum, item) => sum + item.value, 0);
+  const priorityDonutStyle = {
+    background: `conic-gradient(${backlogByPriority[0].color} 0deg ${((backlogByPriority[0].value / Math.max(1, backlogTotal)) * 360)}deg, ${backlogByPriority[1].color} ${((backlogByPriority[0].value / Math.max(1, backlogTotal)) * 360)}deg ${(((backlogByPriority[0].value + backlogByPriority[1].value) / Math.max(1, backlogTotal)) * 360)}deg, ${backlogByPriority[2].color} ${(((backlogByPriority[0].value + backlogByPriority[1].value) / Math.max(1, backlogTotal)) * 360)}deg ${(((backlogByPriority[0].value + backlogByPriority[1].value + backlogByPriority[2].value) / Math.max(1, backlogTotal)) * 360)}deg, ${backlogByPriority[3].color} ${(((backlogByPriority[0].value + backlogByPriority[1].value + backlogByPriority[2].value) / Math.max(1, backlogTotal)) * 360)}deg 360deg)`,
+  };
+  const upcomingLabelStep = Math.max(1, Math.ceil(labels.length / 8));
+  const costCurrency = React.useMemo(() => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }), []);
+  const formatCost = (value) => costCurrency.format(Number.isFinite(value) ? value : 0);
+  const inRangeCostWorkOrders = React.useMemo(
+    () => inRangeWorkOrderIssues.filter((issue) => extractIssueCostSummary(issue).totalCost > 0),
+    [inRangeWorkOrderIssues]
+  );
+  const costSummary = React.useMemo(() => {
+    const weeklyTotals = labels.map(() => ({ preventive: 0, reactive: 0, all: 0 }));
+    const assetMap = {};
+    const categoryMap = {};
+    const locationMap = {};
+    let labor = 0;
+    let parts = 0;
+    let other = 0;
+    let preventive = 0;
+    let reactive = 0;
+    let total = 0;
+
+    inRangeCostWorkOrders.forEach((issue) => {
+      const { laborCost, partsCost, otherCost, totalCost } = extractIssueCostSummary(issue);
+      const bucketIndex = bucketIndexForDate(issue.updatedAt || getIssueAnalyticsDate(issue));
+      const costType = isPreventiveIssue(issue) ? 'preventive' : 'reactive';
+      labor += laborCost;
+      parts += partsCost;
+      other += otherCost;
+      total += totalCost;
+      if (costType === 'preventive') preventive += totalCost;
+      else reactive += totalCost;
+
+      if (bucketIndex >= 0) {
+        weeklyTotals[bucketIndex].all += totalCost;
+        weeklyTotals[bucketIndex][costType] += totalCost;
+      }
+
+      const assetLabel = issue.assetName || issue.asset?.name || issue.asset || 'Unassigned Asset';
+      const categoryLabel = issue.category || issue.issueType || issue.type || 'General';
+      const locationLabel = issue.location || issue.property?.name || issue.propertyName || issue.assetLocation || 'Unknown';
+      assetMap[assetLabel] = (assetMap[assetLabel] || 0) + totalCost;
+      categoryMap[categoryLabel] = (categoryMap[categoryLabel] || 0) + totalCost;
+      locationMap[locationLabel] = (locationMap[locationLabel] || 0) + totalCost;
+    });
+
+    const toEntries = (source) => Object.entries(source)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([label, value], index) => ({ label, value, color: palette[index % palette.length] }));
+
+    return {
+      labor,
+      parts,
+      other,
+      preventive,
+      reactive,
+      total,
+      average: inRangeCostWorkOrders.length ? total / inRangeCostWorkOrders.length : 0,
+      workOrderCount: inRangeCostWorkOrders.length,
+      weeklyTotals,
+      byAsset: toEntries(assetMap),
+      byCategory: toEntries(categoryMap),
+      byLocation: toEntries(locationMap),
+    };
+  }, [inRangeCostWorkOrders, labels, rangeStart, rangeEnd, stepDays]);
 
   const locationEntries = React.useMemo(() => {
     const counts = {};
@@ -21778,39 +28835,268 @@ const ClientAnalyticsTab = ({ allIssues = [], technicians = [], assets = [], mai
     };
   }, [assets]);
 
-  const assetUtilization = React.useMemo(() => {
-    const openAssetIds = new Set((allIssues || [])
-      .filter((issue) => !isCompleted(issue.status))
-      .map((issue) => String(issue.assetId || ''))
-      .filter(Boolean));
+  const assetAnalytics = React.useMemo(() => {
+    const safeRangeHours = Math.max(24, (rangeEnd.getTime() - rangeStart.getTime()) / 3600000);
+    const rows = new Map();
+    const locationAgg = {};
+    const categoryAgg = {};
+    const utilizationSeries = labels.map(() => 100);
+    const downtimeEventSeries = labels.map(() => 0);
 
-    const grouped = {};
+    const getAssetKey = (item = {}) => String(
+      item?._id ||
+      item?.id ||
+      item?.assetId ||
+      item?.asset?._id ||
+      item?.asset?.id ||
+      item?.serialNumber ||
+      item?.name ||
+      item?.assetName ||
+      ''
+    ).trim();
+
+    const getAssetLabel = (item = {}) => String(
+      item?.name ||
+      item?.assetName ||
+      item?.title ||
+      item?.asset?.name ||
+      item?.serialNumber ||
+      'Unnamed Asset'
+    ).trim();
+
+    const getLocationLabel = (item = {}) => String(
+      item?.locationName ||
+      item?.location ||
+      item?.propertyName ||
+      item?.property?.name ||
+      item?.assetLocation ||
+      item?.address ||
+      'Unknown'
+    ).trim();
+
+    const getCategoryLabel = (item = {}) => String(
+      item?.category ||
+      item?.type ||
+      item?.assetType ||
+      item?.issueType ||
+      'Uncategorized'
+    ).trim();
+
+    const ensureRow = (item = {}) => {
+      const key = getAssetKey(item) || getAssetLabel(item);
+      if (!key) return null;
+      if (!rows.has(key)) {
+        rows.set(key, {
+          id: key,
+          name: getAssetLabel(item),
+          location: getLocationLabel(item),
+          category: getCategoryLabel(item),
+          downtimeHours: 0,
+          downtimeEvents: 0,
+          operational: true,
+        });
+      }
+      const existing = rows.get(key);
+      if (existing) {
+        existing.name = existing.name || getAssetLabel(item);
+        existing.location = existing.location === 'Unknown' ? getLocationLabel(item) : existing.location;
+        existing.category = existing.category === 'Uncategorized' ? getCategoryLabel(item) : existing.category;
+      }
+      return existing;
+    };
+
+    const parseDowntimeHours = (issue) => {
+      const numericFields = [
+        issue?.downtimeHours,
+        issue?.downtime,
+        issue?.fixDurationHours,
+        issue?.resolutionHours,
+        issue?.durationHours,
+        issue?.fixTime,
+      ];
+      for (const value of numericFields) {
+        const parsed = Number(value);
+        if (Number.isFinite(parsed) && parsed > 0) return parsed;
+      }
+      const startedAt = normalizeDate(issue?.startedAt || issue?.createdAt);
+      const endedAt = normalizeDate(issue?.completedAt || issue?.resolvedAt || issue?.updatedAt);
+      if (startedAt && endedAt && endedAt >= startedAt) {
+        return (endedAt.getTime() - startedAt.getTime()) / 3600000;
+      }
+      return 0;
+    };
+
     (assets || []).forEach((asset) => {
-      const key = asset.type || 'Unknown';
-      grouped[key] = grouped[key] || { total: 0, available: 0 };
-      grouped[key].total += 1;
-      if (!openAssetIds.has(String(asset.id || asset._id))) grouped[key].available += 1;
+      ensureRow(asset);
     });
 
-    return Object.entries(grouped).slice(0, 5).map(([key, value]) => ({
-      label: key,
-      utilization: value.total ? Math.round((value.available / value.total) * 100) : 0,
-      downtime: value.total ? Math.round(((value.total - value.available) / value.total) * 100) : 0,
-    }));
-  }, [allIssues, assets]);
+    (allIssues || []).forEach((issue) => {
+      const assetId = issue?.assetId || issue?.asset?._id || issue?.asset?.id;
+      const assetName = issue?.assetName || issue?.asset?.name;
+      if (!assetId && !assetName) return;
+      const issueDate = getIssueAnalyticsDate(issue);
+      if (!issueDate || issueDate < rangeStart || issueDate > rangeEnd) return;
 
-  const upcomingPreventive = React.useMemo(() => {
-    return (maintenanceSchedules || [])
-      .filter((schedule) => schedule?.nextDate && normalizeDate(schedule.nextDate) >= now)
-      .sort((a, b) => normalizeDate(a.nextDate) - normalizeDate(b.nextDate))
+      const row = ensureRow({
+        assetId,
+        assetName,
+        location: issue?.location || issue?.propertyName || issue?.property?.name || issue?.assetLocation,
+        category: issue?.assetCategory || issue?.category || issue?.issueType || issue?.asset?.type,
+      });
+      if (!row) return;
+
+      const downtimeHours = parseDowntimeHours(issue);
+      row.downtimeHours += downtimeHours;
+      row.downtimeEvents += 1;
+      if (!isCompleted(issue?.status)) row.operational = false;
+
+      const bucketIndex = bucketIndexForDate(issue?.updatedAt || issueDate);
+      if (bucketIndex >= 0) {
+        downtimeEventSeries[bucketIndex] += 1;
+        utilizationSeries[bucketIndex] = Math.max(
+          0,
+          Math.min(
+            100,
+            utilizationSeries[bucketIndex] - ((downtimeHours / Math.max(24, stepDays * 24)) * 100) / Math.max(1, rows.size || (assets || []).length || 1)
+          )
+        );
+      }
+    });
+
+    const tableRows = Array.from(rows.values()).map((row) => {
+      const utilization = Math.max(0, Math.min(100, Number((100 - ((row.downtimeHours / safeRangeHours) * 100)).toFixed(1))));
+      return {
+        ...row,
+        utilization,
+        statusLabel: row.operational ? 'Operational' : 'Not Operational',
+      };
+    });
+
+    tableRows.forEach((row) => {
+      const locationKey = row.location || 'Unknown';
+      const categoryKey = row.category || 'Uncategorized';
+      locationAgg[locationKey] = locationAgg[locationKey] || { total: 0, utilization: 0 };
+      categoryAgg[categoryKey] = categoryAgg[categoryKey] || { total: 0, utilization: 0 };
+      locationAgg[locationKey].total += 1;
+      locationAgg[locationKey].utilization += row.utilization;
+      categoryAgg[categoryKey].total += 1;
+      categoryAgg[categoryKey].utilization += row.utilization;
+    });
+
+    const toGroupedEntries = (grouped, color) => Object.entries(grouped)
+      .map(([label, value]) => ({
+        label,
+        utilization: value.total ? Number((value.utilization / value.total).toFixed(1)) : 0,
+        total: value.total,
+        color,
+      }))
+      .sort((a, b) => b.utilization - a.utilization)
       .slice(0, 6);
-  }, [maintenanceSchedules, now]);
+
+    const operationalCount = tableRows.filter((row) => row.operational).length;
+    const totalAssets = tableRows.length;
+    const overallUtilization = totalAssets
+      ? Number((tableRows.reduce((sum, row) => sum + row.utilization, 0) / totalAssets).toFixed(1))
+      : 0;
+
+    return {
+      summary: {
+        totalAssets,
+        operationalCount,
+        notOperationalCount: Math.max(0, totalAssets - operationalCount),
+        utilization: overallUtilization,
+      },
+      tableRows: tableRows
+        .sort((a, b) => {
+          if (b.downtimeHours !== a.downtimeHours) return b.downtimeHours - a.downtimeHours;
+          return b.downtimeEvents - a.downtimeEvents;
+        })
+        .slice(0, 8),
+      utilizationByLocation: toGroupedEntries(locationAgg, '#14b8a6'),
+      utilizationByCategory: toGroupedEntries(categoryAgg, '#1d4ed8'),
+      utilizationSeries: utilizationSeries.map((value) => Number(value.toFixed(1))),
+      downtimeEventSeries,
+    };
+  }, [allIssues, assets, bucketIndexForDate, getIssueAnalyticsDate, labels, rangeEnd, rangeStart, stepDays]);
 
   const subTabs = [
     { id: 'team-performance', label: 'Team Performance' },
     { id: 'cost-of-maintenance', label: 'Cost of Maintenance' },
     { id: 'asset-downtime', label: 'Asset Downtime & Utilization' },
   ];
+  const recommendedDashboards = subTabs.map((tab) => ({
+    id: tab.id,
+    label: tab.label,
+    category: 'Recommended',
+    recommended: true,
+    basedOn: tab.id,
+  }));
+  const otherDashboardCatalog = [
+    { id: 'adoption-metrics', label: 'Fixnest Adoption Metrics', category: 'General' },
+    { id: 'maintenance-compliance', label: 'Maintenance Compliance', category: 'Work Orders' },
+    { id: 'status-report', label: 'Status Report', category: 'Work Orders' },
+    { id: 'time-cost', label: 'Time & Cost', category: 'Work Orders' },
+    { id: 'work-order-aging', label: 'Work Order Aging', category: 'Work Orders' },
+    { id: 'work-order-analysis', label: 'Work Order Analysis', category: 'Work Orders' },
+    { id: 'reliability-dashboard', label: 'Reliability Dashboard', category: 'Assets' },
+    { id: 'total-maintenance-cost', label: 'Total Maintenance Cost', category: 'Assets' },
+    { id: 'useful-life', label: 'Useful Life', category: 'Assets' },
+    { id: 'meters-dashboard', label: 'Meters', category: 'Meters' },
+    { id: 'parts-consumption', label: 'Parts Consumption', category: 'Parts' },
+    { id: 'parts-in-inventory', label: 'Parts in Inventory', category: 'Parts' },
+    { id: 'requests-dashboard', label: 'Requests', category: 'Requests' },
+    { id: 'itemized-time-report', label: 'Itemized Time Report', category: 'Users' },
+    { id: 'user-login', label: 'User Login', category: 'Users' },
+    { id: 'asset-audit-trail', label: 'Asset Audit Trail', category: 'Audit Trail' },
+  ];
+  const customDashboardCatalog = customDashboards.map((dashboard) => ({
+    id: dashboard.id,
+    label: dashboard.name,
+    category: 'Custom',
+    basedOn: dashboard.basedOn || 'team-performance',
+  }));
+  const dashboardCatalog = [...recommendedDashboards, ...customDashboardCatalog, ...otherDashboardCatalog];
+  const pinnedCatalog = dashboardCatalog.filter((dashboard) => pinnedDashboardIds.includes(dashboard.id));
+  const displayedTabs = subTabs.filter((tab) => pinnedDashboardIds.includes(tab.id));
+  const dropdownCategoryLinks = ['Work Orders', 'Assets', 'Meters', 'Parts', 'Requests', 'Users', 'Purchase Orders', 'Audit Trail'];
+  const customDashboardWidgetOptions = ['Visualization', 'Text', 'Markdown', 'Button', 'Tabs'];
+  const defaultCustomDashboardSettings = {
+    timezoneMode: 'tile',
+    runOnLoad: true,
+    allowFullscreen: true,
+    defaultFiltersView: 'expanded',
+    filtersLocation: 'top',
+  };
+  const supportedTimeZones = React.useMemo(() => {
+    if (typeof Intl !== 'undefined' && typeof Intl.supportedValuesOf === 'function') {
+      try {
+        return Intl.supportedValuesOf('timeZone');
+      } catch {
+        // Fall through to static list.
+      }
+    }
+    return [
+      'Africa/Abidjan', 'Africa/Accra', 'Africa/Addis_Ababa', 'Africa/Algiers', 'Africa/Cairo', 'Africa/Casablanca',
+      'Africa/Johannesburg', 'Africa/Kampala', 'Africa/Kigali', 'Africa/Lagos', 'Africa/Nairobi', 'Africa/Tripoli',
+      'America/Anchorage', 'America/Argentina/Buenos_Aires', 'America/Bogota', 'America/Chicago', 'America/Denver',
+      'America/Halifax', 'America/Los_Angeles', 'America/Mexico_City', 'America/New_York', 'America/Phoenix',
+      'America/Sao_Paulo', 'America/St_Johns', 'Asia/Bangkok', 'Asia/Dhaka', 'Asia/Dubai', 'Asia/Hong_Kong',
+      'Asia/Jakarta', 'Asia/Jerusalem', 'Asia/Karachi', 'Asia/Kathmandu', 'Asia/Kolkata', 'Asia/Kuala_Lumpur',
+      'Asia/Manila', 'Asia/Seoul', 'Asia/Shanghai', 'Asia/Singapore', 'Asia/Tokyo', 'Australia/Adelaide',
+      'Australia/Brisbane', 'Australia/Melbourne', 'Australia/Perth', 'Australia/Sydney', 'Europe/Amsterdam',
+      'Europe/Athens', 'Europe/Berlin', 'Europe/Brussels', 'Europe/Bucharest', 'Europe/Budapest', 'Europe/Copenhagen',
+      'Europe/Dublin', 'Europe/Helsinki', 'Europe/Istanbul', 'Europe/Kiev', 'Europe/Lisbon', 'Europe/London',
+      'Europe/Madrid', 'Europe/Moscow', 'Europe/Oslo', 'Europe/Paris', 'Europe/Prague', 'Europe/Rome',
+      'Europe/Stockholm', 'Europe/Vienna', 'Europe/Warsaw', 'Pacific/Auckland', 'Pacific/Fiji', 'Pacific/Honolulu'
+    ];
+  }, []);
+  const activeDashboardLabel = selectedDashboardView === 'default'
+    ? subTabs.find((tab) => tab.id === subTab)?.label
+    : customDashboards.find((dashboard) => dashboard.id === selectedDashboardView)?.name || 'Custom Dashboard';
+  const selectedCustomDashboard = selectedDashboardView === 'default'
+    ? null
+    : customDashboards.find((dashboard) => dashboard.id === selectedDashboardView) || null;
+  const isCustomDashboardView = Boolean(selectedCustomDashboard);
   const dateRanges = ['Last 7 Days', 'Last 30 Days', 'Last 90 Days', 'Last 12 Months', 'All Time', 'Custom Range'];
 
   const metricCards = [
@@ -21820,56 +29106,638 @@ const ClientAnalyticsTab = ({ allIssues = [], technicians = [], assets = [], mai
     { label: 'Overdue', value: statusCounts.overdue, tone: 'border-rose-200 bg-rose-50 text-rose-700' },
   ];
 
+  const loadAnalyticsPreferences = React.useCallback(async () => {
+    try {
+      const { data } = await api.get('/analytics-preferences', { params: { scope: 'client-dashboard' } });
+      const nextPinned = Array.isArray(data?.pinnedDashboardIds) && data.pinnedDashboardIds.length
+        ? data.pinnedDashboardIds.slice(0, 3)
+        : ['team-performance', 'cost-of-maintenance', 'asset-downtime'];
+      setPinnedDashboardIds(nextPinned);
+      setCustomDashboards(Array.isArray(data?.customDashboards) ? data.customDashboards : []);
+    } catch {
+      // Keep sensible defaults if preferences fail to load.
+    } finally {
+      setPreferencesLoaded(true);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    loadAnalyticsPreferences();
+  }, [loadAnalyticsPreferences]);
+
+  const persistAnalyticsPreferences = React.useCallback(async (nextPinnedIds, nextCustomDashboards) => {
+    const { data } = await api.put('/analytics-preferences', {
+      scope: 'client-dashboard',
+      pinnedDashboardIds: nextPinnedIds,
+      customDashboards: nextCustomDashboards,
+    });
+    setPinnedDashboardIds(Array.isArray(data?.pinnedDashboardIds) && data.pinnedDashboardIds.length
+      ? data.pinnedDashboardIds.slice(0, 3)
+      : ['team-performance', 'cost-of-maintenance', 'asset-downtime']);
+    setCustomDashboards(Array.isArray(data?.customDashboards) ? data.customDashboards : []);
+    return data;
+  }, []);
+
+  const openCreateDashboardModal = () => {
+    setCustomDashboardName('');
+    setShowCreateDashboardModal(true);
+  };
+
+  const handleCreateCustomDashboard = () => {
+    const trimmedName = customDashboardName.trim();
+    if (!trimmedName) return;
+    const nextDashboard = {
+      id: `custom-${Date.now()}`,
+      name: trimmedName,
+      basedOn: subTab,
+      widgets: [],
+      settings: defaultCustomDashboardSettings,
+      createdAt: new Date().toISOString(),
+    };
+    const nextCustomDashboards = [nextDashboard, ...customDashboards];
+    setCustomDashboards(nextCustomDashboards);
+    setSelectedDashboardView(nextDashboard.id);
+    setSubTab(nextDashboard.basedOn);
+    setIsEditingCustomDashboard(false);
+    setCustomDashboardDraft(null);
+    setShowCreateDashboardModal(false);
+    setCustomDashboardName('');
+    persistAnalyticsPreferences(pinnedDashboardIds, nextCustomDashboards).catch(() => {
+      // Keep the local view responsive even if persistence fails.
+    });
+  };
+
+  const togglePinnedDashboard = (dashboardId) => {
+    setPinnedDashboardIds((prev) => {
+      const exists = prev.includes(dashboardId);
+      if (exists) return prev.filter((id) => id !== dashboardId);
+      if (prev.length >= 3) return prev;
+      return [...prev, dashboardId];
+    });
+  };
+
+  const handleSavePins = async () => {
+    setSavingPins(true);
+    try {
+      await persistAnalyticsPreferences(pinnedDashboardIds, customDashboards);
+      if (!pinnedDashboardIds.includes(subTab) && pinnedDashboardIds.length) {
+        const nextTab = subTabs.find((tab) => pinnedDashboardIds.includes(tab.id));
+        if (nextTab) setSubTab(nextTab.id);
+      }
+      setShowManagePinsModal(false);
+    } finally {
+      setSavingPins(false);
+    }
+  };
+
+  const headerAgeLabel = React.useMemo(() => {
+    const diffMinutes = Math.max(0, Math.round((now.getTime() - lastRefreshedAt.getTime()) / 60000));
+    if (diffMinutes < 1) return 'just now';
+    if (diffMinutes < 60) return `${diffMinutes}m ago`;
+    const diffHours = Math.round(diffMinutes / 60);
+    return `${diffHours}h ago`;
+  }, [lastRefreshedAt, now]);
+
+  const handleRefreshAnalytics = async () => {
+    setLastRefreshedAt(new Date());
+    try {
+      await loadAnalyticsPreferences();
+    } catch {
+      // Keep refresh lightweight if preferences reload fails.
+    }
+    setShowMoreActionsMenu(false);
+  };
+
+  const handleResetAnalyticsFilters = () => {
+    setDateRange('Last 90 Days');
+    setCustomRange({ start: '', end: '' });
+    setShowCustomRange(false);
+    setShowDateDropdown(false);
+    setShowMoreActionsMenu(false);
+    setShowFilters(true);
+  };
+
+  const handleDownloadAnalytics = () => {
+    window.print();
+    setShowMoreActionsMenu(false);
+  };
+
+  React.useEffect(() => {
+    try {
+      window.localStorage.setItem('client-analytics-viewer-timezone', viewerTimeZone);
+    } catch {
+      // Ignore local persistence issues.
+    }
+  }, [viewerTimeZone]);
+
+  const formatTimeZoneLabel = (value) => String(value || '').replaceAll('_', ' ').replaceAll('/', ' - ');
+
+  const openTimeZoneModal = () => {
+    setDraftTimeZone(viewerTimeZone);
+    setShowTimeZoneModal(true);
+    setShowMoreActionsMenu(false);
+  };
+
+  const handleUpdateTimeZone = () => {
+    setViewerTimeZone(draftTimeZone || 'Africa/Kigali');
+    setShowTimeZoneModal(false);
+  };
+
+  React.useEffect(() => {
+    if (!isCustomDashboardView) {
+      setIsEditingCustomDashboard(false);
+      setCustomDashboardDraft(null);
+      setShowAddWidgetMenu(false);
+      setShowCustomDashboardSettings(false);
+      setCustomDashboardSettingsDraft(null);
+    }
+  }, [isCustomDashboardView, selectedDashboardView]);
+
+  const openCustomDashboardEditor = () => {
+    if (!selectedCustomDashboard) return;
+    setCustomDashboardDraft({
+      ...selectedCustomDashboard,
+      widgets: Array.isArray(selectedCustomDashboard.widgets) ? [...selectedCustomDashboard.widgets] : [],
+      settings: {
+        ...defaultCustomDashboardSettings,
+        ...(selectedCustomDashboard.settings || {}),
+      },
+    });
+    setIsEditingCustomDashboard(true);
+    setShowAddWidgetMenu(false);
+  };
+
+  const cancelCustomDashboardEditor = () => {
+    setIsEditingCustomDashboard(false);
+    setCustomDashboardDraft(null);
+    setShowAddWidgetMenu(false);
+  };
+
+  const saveCustomDashboardEditor = async () => {
+    if (!selectedCustomDashboard || !customDashboardDraft) return;
+    const nextCustomDashboards = customDashboards.map((dashboard) => (
+      dashboard.id === selectedCustomDashboard.id ? { ...dashboard, ...customDashboardDraft } : dashboard
+    ));
+    setCustomDashboards(nextCustomDashboards);
+    await persistAnalyticsPreferences(pinnedDashboardIds, nextCustomDashboards);
+    setIsEditingCustomDashboard(false);
+    setCustomDashboardDraft(null);
+    setShowAddWidgetMenu(false);
+  };
+
+  const addWidgetToCustomDashboard = (widgetType) => {
+    setCustomDashboardDraft((prev) => ({
+      ...(prev || selectedCustomDashboard || {}),
+      widgets: [...(prev?.widgets || selectedCustomDashboard?.widgets || []), widgetType],
+      settings: {
+        ...defaultCustomDashboardSettings,
+        ...(prev?.settings || selectedCustomDashboard?.settings || {}),
+      },
+    }));
+    setShowAddWidgetMenu(false);
+  };
+
+  const openCustomDashboardSettings = () => {
+    if (!customDashboardDraft && selectedCustomDashboard) {
+      setCustomDashboardDraft({
+        ...selectedCustomDashboard,
+        widgets: Array.isArray(selectedCustomDashboard.widgets) ? [...selectedCustomDashboard.widgets] : [],
+        settings: {
+          ...defaultCustomDashboardSettings,
+          ...(selectedCustomDashboard.settings || {}),
+        },
+      });
+    }
+    setCustomDashboardSettingsTab('general');
+    setCustomDashboardSettingsDraft({
+      ...defaultCustomDashboardSettings,
+      ...(customDashboardDraft?.settings || selectedCustomDashboard?.settings || {}),
+    });
+    setShowCustomDashboardSettings(true);
+  };
+
+  const openCustomDashboardFiltersSettings = () => {
+    if (!customDashboardDraft && selectedCustomDashboard) {
+      setCustomDashboardDraft({
+        ...selectedCustomDashboard,
+        widgets: Array.isArray(selectedCustomDashboard.widgets) ? [...selectedCustomDashboard.widgets] : [],
+        settings: {
+          ...defaultCustomDashboardSettings,
+          ...(selectedCustomDashboard.settings || {}),
+        },
+      });
+    }
+    setCustomDashboardSettingsTab('filters');
+    setCustomDashboardSettingsDraft({
+      ...defaultCustomDashboardSettings,
+      ...(customDashboardDraft?.settings || selectedCustomDashboard?.settings || {}),
+    });
+    setShowCustomDashboardSettings(true);
+  };
+
+  const closeCustomDashboardSettings = () => {
+    setShowCustomDashboardSettings(false);
+    setCustomDashboardSettingsDraft(null);
+  };
+
+  const saveCustomDashboardSettings = () => {
+    if (!customDashboardSettingsDraft) {
+      closeCustomDashboardSettings();
+      return;
+    }
+    setCustomDashboardDraft((prev) => ({
+      ...(prev || selectedCustomDashboard || {}),
+      settings: {
+        ...defaultCustomDashboardSettings,
+        ...(prev?.settings || selectedCustomDashboard?.settings || {}),
+        ...customDashboardSettingsDraft,
+      },
+    }));
+    closeCustomDashboardSettings();
+  };
+
   return (
     <div className="flex flex-col gap-0 bg-transparent min-h-screen -m-6 glass-theme-blue">
-      <div className="flex items-center justify-between px-6 pt-4 border-b border-gray-100 bg-white sticky top-0 z-10">
-        <div className="flex gap-0">
-          {subTabs.map((tab) => (
+      <div className="sticky top-0 z-10 bg-white border-b border-gray-100">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <h1 className="text-[2rem] font-black tracking-tight text-gray-900">Fixnest Analytics</h1>
+          <div className="flex items-center gap-3">
+            {isCustomDashboardView ? (
+              <button
+                type="button"
+                className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-5 py-3 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+              >
+                Share
+              </button>
+            ) : null}
             <button
-              key={tab.id}
-              onClick={() => setSubTab(tab.id)}
-              className={`px-4 pb-3 pt-1 text-sm font-bold border-b-2 transition-colors ${subTab === tab.id ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+              type="button"
+              onClick={openCreateDashboardModal}
+              className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-5 py-3 text-sm font-bold text-white shadow-sm transition-colors hover:bg-blue-700"
             >
-              {tab.label}
+              Create Custom Dashboard
             </button>
-          ))}
+          </div>
         </div>
-        <div className="relative pb-3">
-          <button
-            onClick={() => setShowDateDropdown((prev) => !prev)}
-            className="flex items-center gap-2 text-xs font-bold text-gray-600 px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            <Calendar className="w-3.5 h-3.5" />
-            {dateRange}
-            <ChevronDown className="w-3.5 h-3.5" />
-          </button>
-          {showDateDropdown && (
-            <>
-              <div className="fixed inset-0 z-40" onClick={() => setShowDateDropdown(false)} />
-              <div className="absolute top-full right-0 mt-1 z-50 w-44 bg-white rounded-xl shadow-2xl border border-gray-100 py-1">
-                {dateRanges.map((range) => (
-                  <button
-                    key={range}
-                    onClick={() => {
-                      setDateRange(range);
-                      setShowDateDropdown(false);
-                      setShowCustomRange(range === 'Custom Range');
-                    }}
-                    className={`w-full text-left px-3 py-2 text-xs font-bold transition-colors ${range === dateRange ? 'text-blue-600 bg-blue-50' : 'text-gray-600 hover:bg-gray-50'}`}
-                  >
-                    {range}
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
+        <div className="flex items-center justify-between px-6 pt-4">
+          <div className="flex gap-0">
+            {(displayedTabs.length ? displayedTabs : subTabs).map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => {
+                  setSubTab(tab.id);
+                  setSelectedDashboardView('default');
+                }}
+                className={`px-4 pb-5 pt-1 text-sm font-bold border-b-2 transition-colors ${subTab === tab.id ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center pb-4">
+            <button
+              type="button"
+              onClick={() => setShowManagePinsModal(true)}
+              className="px-5 text-sm font-semibold text-gray-700 hover:text-gray-900"
+            >
+              Manage Pins
+            </button>
+            <div className="mx-6 h-8 w-px bg-gray-200" />
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowViewDropdown((prev) => !prev)}
+                className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+              >
+                <span className="text-gray-500">View:</span>
+                <span>{activeDashboardLabel}</span>
+                <ChevronDown className="h-4 w-4" />
+              </button>
+              {showViewDropdown && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowViewDropdown(false)} />
+                  <div className="absolute right-0 top-full z-50 mt-2 w-80 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-2xl">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedDashboardView('default');
+                        setShowViewDropdown(false);
+                      }}
+                      className={`w-full px-4 py-3 text-left text-sm font-semibold transition-colors ${selectedDashboardView === 'default' ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'}`}
+                    >
+                      {subTabs.find((tab) => tab.id === subTab)?.label}
+                    </button>
+                    {recommendedDashboards
+                      .filter((dashboard) => dashboard.id !== subTab)
+                      .map((dashboard) => (
+                        <button
+                          key={dashboard.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedDashboardView('default');
+                            setSubTab(dashboard.id);
+                            setShowViewDropdown(false);
+                          }}
+                          className={`w-full px-4 py-3 text-left text-sm font-semibold transition-colors ${selectedDashboardView === 'default' && subTab === dashboard.id ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'}`}
+                        >
+                          {dashboard.label}
+                        </button>
+                      ))}
+                    {customDashboards.length ? (
+                      <>
+                        {customDashboards.map((dashboard) => (
+                          <button
+                            key={dashboard.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedDashboardView(dashboard.id);
+                              setSubTab(dashboard.basedOn || 'team-performance');
+                              setShowViewDropdown(false);
+                            }}
+                            className={`w-full px-4 py-3 text-left text-sm font-semibold transition-colors ${selectedDashboardView === dashboard.id ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'}`}
+                          >
+                            {dashboard.name}
+                          </button>
+                        ))}
+                      </>
+                    ) : null}
+                    <div className="border-t border-gray-200" />
+                    <div className="py-2">
+                      {dropdownCategoryLinks.map((category) => (
+                        <div
+                          key={category}
+                          className="px-4 py-3 text-sm font-medium text-gray-700"
+                        >
+                          {category}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
       <div className="p-6 flex flex-col gap-6">
+        {isCustomDashboardView ? (
+          <>
+            {isEditingCustomDashboard ? (
+              <div className="-mx-6 -mt-6 flex items-center justify-between bg-blue-700 px-6 py-5 text-white">
+                <div className="flex items-center gap-6 text-sm font-semibold">
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setShowAddWidgetMenu((prev) => !prev)}
+                      className="inline-flex items-center gap-2 rounded-md px-2 py-1 hover:bg-white/10"
+                    >
+                      <Plus className="h-5 w-5" />
+                      <span>Add</span>
+                    </button>
+                    {showAddWidgetMenu && (
+                      <>
+                        <div className="fixed inset-0 z-40" onClick={() => setShowAddWidgetMenu(false)} />
+                        <div className="absolute left-0 top-full z-50 mt-3 w-64 overflow-hidden rounded-xl border border-gray-200 bg-white text-gray-800 shadow-2xl">
+                          {customDashboardWidgetOptions.map((item, index) => (
+                            <button
+                              key={item}
+                              type="button"
+                              onClick={() => addWidgetToCustomDashboard(item)}
+                              className={`flex w-full items-center gap-4 px-6 py-4 text-left text-lg font-medium transition-colors hover:bg-gray-50 ${index === 0 || index === 3 ? 'border-t border-gray-200 first:border-t-0' : ''}`}
+                            >
+                              <span className="text-gray-500">{item === 'Visualization' ? 'I' : item === 'Text' ? 'D' : item === 'Markdown' ? 'T' : item === 'Button' ? 'L' : '≡'}</span>
+                              <span>{item}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  <button type="button" onClick={openCustomDashboardFiltersSettings} className="opacity-60">Filters</button>
+                  <button type="button" onClick={openCustomDashboardSettings} className="font-bold">Settings</button>
+                  <button type="button" className="opacity-40">Quick layout</button>
+                </div>
+                <div className="flex items-center gap-6 text-sm font-semibold">
+                  <button
+                    type="button"
+                    onClick={cancelCustomDashboardEditor}
+                    className="hover:text-white/80"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={saveCustomDashboardEditor}
+                    className="rounded-lg bg-blue-500 px-6 py-2 text-white transition-colors hover:bg-blue-400"
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className={`text-[3rem] leading-none text-gray-900 ${isEditingCustomDashboard ? 'inline-block border-b border-dashed border-gray-300 pb-1' : ''}`}>
+                  {activeDashboardLabel}
+                </h2>
+              </div>
+              <div className="flex items-center gap-5 text-gray-500">
+                <RotateCcw className="h-6 w-6" />
+                <MoreHorizontal className="h-6 w-6" />
+              </div>
+            </div>
+
+            {customDashboardDraft?.widgets?.length ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {customDashboardDraft.widgets.map((widget, index) => (
+                  <div key={`${widget}-${index}`} className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-gray-400">Widget</p>
+                    <p className="mt-3 text-xl font-bold text-gray-900">{widget}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex min-h-[58vh] flex-col items-center justify-center text-center">
+                <p className="text-5xl font-medium text-gray-900">This dashboard is empty.</p>
+                {isEditingCustomDashboard ? (
+                  <div className="relative mt-10">
+                    <button
+                      type="button"
+                      onClick={() => setShowAddWidgetMenu((prev) => !prev)}
+                      className="rounded-lg bg-blue-600 px-10 py-4 text-2xl font-semibold text-white transition-colors hover:bg-blue-700"
+                    >
+                      Add
+                    </button>
+                    {showAddWidgetMenu && (
+                      <>
+                        <div className="fixed inset-0 z-40" onClick={() => setShowAddWidgetMenu(false)} />
+                        <div className="absolute left-1/2 top-full z-50 mt-3 max-h-80 w-64 -translate-x-1/2 overflow-y-auto rounded-xl border border-gray-200 bg-white text-gray-800 shadow-2xl">
+                          {customDashboardWidgetOptions.map((item, index) => (
+                            <button
+                              key={`empty-${item}`}
+                              type="button"
+                              onClick={() => addWidgetToCustomDashboard(item)}
+                              className={`flex w-full items-center gap-4 px-6 py-4 text-left text-lg font-medium transition-colors hover:bg-gray-50 ${index === 0 || index === 3 ? 'border-t border-gray-200 first:border-t-0' : ''}`}
+                            >
+                              <span className="text-gray-500">{item === 'Visualization' ? 'I' : item === 'Text' ? 'D' : item === 'Markdown' ? 'T' : item === 'Button' ? 'L' : '≡'}</span>
+                              <span>{item}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={openCustomDashboardEditor}
+                    className="mt-10 rounded-lg bg-blue-600 px-10 py-4 text-2xl font-semibold text-white transition-colors hover:bg-blue-700"
+                  >
+                    Edit Dashboard
+                  </button>
+                )}
+              </div>
+            )}
+          </>
+        ) : (
+          <>
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">{subTabs.find((tab) => tab.id === subTab)?.label}</h2>
+          <h2 className="text-2xl font-bold text-gray-900">{activeDashboardLabel}</h2>
           <p className="text-sm text-gray-500 mt-1">Company-scoped analytics for your maintenance operations.</p>
+        </div>
+
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          {showFilters ? (
+            <div>
+              <p className="text-sm font-semibold text-gray-700 mb-2">
+                {subTab === 'cost-of-maintenance' ? 'Completed Date' : 'Date'}
+              </p>
+              <div className="relative">
+                <button
+                  onClick={() => setShowDateDropdown((prev) => !prev)}
+                  className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-bold text-gray-700 transition-colors hover:bg-blue-100"
+                >
+                  {dateRange}
+                  <ChevronDown className="w-4 h-4" />
+                </button>
+                {showDateDropdown && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setShowDateDropdown(false)} />
+                    <div className="absolute left-0 top-full z-50 mt-2 w-44 rounded-xl border border-gray-100 bg-white py-1 shadow-2xl">
+                      {dateRanges.map((range) => (
+                        <button
+                          key={range}
+                          onClick={() => {
+                            setDateRange(range);
+                            setShowDateDropdown(false);
+                            setShowCustomRange(range === 'Custom Range');
+                          }}
+                          className={`w-full px-3 py-2 text-left text-xs font-bold transition-colors ${range === dateRange ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50'}`}
+                        >
+                          {range}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="text-sm font-semibold text-gray-400">Filters hidden</div>
+          )}
+          <div className="relative flex items-center gap-5 text-sm text-gray-400">
+            <span>{headerAgeLabel}</span>
+            <button
+              type="button"
+              onClick={handleRefreshAnalytics}
+              className="rounded-full p-1 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
+              aria-label="Refresh analytics"
+            >
+              <RotateCcw className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setShowFilters((prev) => !prev);
+                setShowDateDropdown(false);
+              }}
+              className="rounded-full p-1 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
+              aria-label={showFilters ? 'Hide filters' : 'Show filters'}
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowMoreActionsMenu((prev) => !prev)}
+              className="rounded-full p-1 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
+              aria-label="More analytics actions"
+            >
+              <MoreHorizontal className="h-4 w-4" />
+            </button>
+            {showMoreActionsMenu && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowMoreActionsMenu(false)} />
+                <div className="absolute right-0 top-full z-50 mt-3 w-96 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl">
+                  <button
+                    type="button"
+                    onClick={handleRefreshAnalytics}
+                    className="flex w-full items-center justify-between gap-4 border-b border-gray-100 px-6 py-5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50"
+                  >
+                    <span className="flex items-center gap-4">
+                      <RotateCcw className="h-5 w-5 text-gray-500" />
+                      <span className="text-[1.05rem] font-medium">Clear cache and refresh</span>
+                    </span>
+                    <span className="text-sm text-gray-400">ctrl+r</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDownloadAnalytics}
+                    className="flex w-full items-center justify-between gap-4 px-6 py-5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50"
+                  >
+                    <span className="flex items-center gap-4">
+                      <Download className="h-5 w-5 text-gray-500" />
+                      <span className="text-[1.05rem] font-medium">Download</span>
+                    </span>
+                    <span className="text-sm text-gray-400">alt+d</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowMoreActionsMenu(false)}
+                    className="flex w-full items-center justify-between gap-4 border-b border-gray-100 px-6 pb-5 pt-0 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50"
+                  >
+                    <span className="flex items-center gap-4 pl-9">
+                      <span className="text-[1.05rem] font-medium">Schedule delivery</span>
+                    </span>
+                    <span className="text-sm text-gray-400">alt+s</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleResetAnalyticsFilters}
+                    className="flex w-full items-center justify-between gap-4 border-b border-gray-100 px-6 py-5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50"
+                  >
+                    <span className="flex items-center gap-4">
+                      <SlidersHorizontal className="h-5 w-5 text-gray-500" />
+                      <span className="text-[1.05rem] font-medium">Reset filters</span>
+                    </span>
+                    <span className="text-sm text-gray-400">ctrl+alt+r</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={openTimeZoneModal}
+                    className="flex w-full items-start gap-4 px-6 py-5 text-left text-gray-700 transition-colors hover:bg-gray-50"
+                  >
+                    <Globe className="mt-1 h-5 w-5 text-gray-500" />
+                    <div>
+                      <div className="text-[1.05rem] font-medium">Viewer time zone</div>
+                      <div className="mt-1 text-sm text-gray-400">{formatTimeZoneLabel(viewerTimeZone)}</div>
+                    </div>
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
 
         {showCustomRange && (
@@ -21905,61 +29773,284 @@ const ClientAnalyticsTab = ({ allIssues = [], technicians = [], assets = [], mai
         </div>
 
         {subTab === 'team-performance' && (
-          <div className="grid grid-cols-1 xl:grid-cols-[1.5fr_0.9fr] gap-6">
-            <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
-              <div className="flex items-center justify-between mb-4">
-                <p className="text-sm font-bold text-gray-700">Issues Over Time</p>
-                <div className="flex items-center gap-4 text-xs font-medium text-gray-500">
+          <div className="flex flex-col gap-6">
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+              <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-sm font-bold text-gray-700">Work Order Completion Rate</p>
+                  <span className="text-xs font-semibold text-gray-400">{completionRate}% complete</span>
+                </div>
+                <div className="grid grid-cols-2 gap-3 mb-5">
+                  <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 text-center">
+                    <p className="text-4xl font-black text-blue-600">{statusCounts.total}</p>
+                    <p className="mt-1 text-sm font-semibold text-blue-700">Created</p>
+                  </div>
+                  <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4 text-center">
+                    <p className="text-4xl font-black text-emerald-600">{statusCounts.completed}</p>
+                    <p className="mt-1 text-sm font-semibold text-emerald-700">Completed</p>
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <svg viewBox={`0 0 ${lineChartWidth} ${lineChartHeight}`} className="w-full min-w-[620px] h-[230px]">
+                    {[0, 1, 2, 3, 4].map((step) => {
+                      const y = linePadding + (linePlotHeight / 4) * step;
+                      return <line key={step} x1={linePadding} y1={y} x2={lineChartWidth - linePadding} y2={y} stroke="#e5e7eb" strokeDasharray="4 4" />;
+                    })}
+                    <path d={toLinePath(createdSeries)} fill="none" stroke="#3b82f6" strokeWidth="3" strokeLinecap="round" />
+                    <path d={toLinePath(completedSeries)} fill="none" stroke="#10b981" strokeWidth="3" strokeLinecap="round" />
+                    {labels.map((label, index) => (
+                      <text key={label} x={linePadding + index * xStep} y={lineChartHeight - 6} textAnchor="middle" className="fill-gray-400 text-[10px]">
+                        {label}
+                      </text>
+                    ))}
+                  </svg>
+                </div>
+                <div className="mt-4 flex items-center gap-4 text-xs font-medium text-gray-500">
                   <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-blue-500 inline-block rounded" />Created</span>
                   <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-emerald-500 inline-block rounded" />Completed</span>
                 </div>
               </div>
-              <div className="overflow-x-auto">
-                <svg viewBox={`0 0 ${lineChartWidth} ${lineChartHeight}`} className="w-full min-w-[620px] h-[230px]">
-                  {[0, 1, 2, 3, 4].map((step) => {
-                    const y = linePadding + (linePlotHeight / 4) * step;
-                    return <line key={step} x1={linePadding} y1={y} x2={lineChartWidth - linePadding} y2={y} stroke="#e5e7eb" strokeDasharray="4 4" />;
-                  })}
-                  <path d={toLinePath(createdSeries)} fill="none" stroke="#3b82f6" strokeWidth="3" strokeLinecap="round" />
-                  <path d={toLinePath(completedSeries)} fill="none" stroke="#10b981" strokeWidth="3" strokeLinecap="round" />
-                  {labels.map((label, index) => (
-                    <text key={label} x={linePadding + index * xStep} y={lineChartHeight - 6} textAnchor="middle" className="fill-gray-400 text-[10px]">
-                      {label}
-                    </text>
-                  ))}
-                </svg>
+
+              <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-sm font-bold text-gray-700">Preventive vs Reactive Mix</p>
+                  <span className="text-xs font-semibold text-gray-400">{totalPreventive + totalReactive} requests + work orders</span>
+                </div>
+                <div className="grid grid-cols-[1.1fr_0.9fr] gap-5 items-center">
+                  <div className="flex items-center justify-center">
+                    <div className="relative flex h-48 w-48 items-center justify-center rounded-full" style={donutStyle('#1d4ed8', '#93c5fd', preventiveShare || 0)}>
+                      <div className="flex h-28 w-28 items-center justify-center rounded-full bg-white shadow-inner">
+                        <div className="text-center">
+                          <p className="text-3xl font-black text-gray-900">{preventiveShare}%</p>
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-400">Preventive</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
+                      <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600">Preventive</p>
+                      <p className="mt-2 text-3xl font-black text-blue-700">{totalPreventive}</p>
+                    </div>
+                    <div className="rounded-xl border border-sky-100 bg-sky-50 p-4">
+                      <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-sky-500">Reactive</p>
+                      <p className="mt-2 text-3xl font-black text-sky-600">{totalReactive}</p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
-            <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm space-y-5">
-              <div>
-                <p className="text-sm font-bold text-gray-700">Operational Highlights</p>
-                <div className="mt-4 grid grid-cols-2 gap-3">
-                  <div className="rounded-xl bg-blue-50 border border-blue-100 p-4">
-                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600">Avg Response</p>
-                    <p className="mt-2 text-2xl font-black text-gray-900">{avgResponseHours}h</p>
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+              <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-sm font-bold text-gray-700">Completed Work Orders - Top Technicians</p>
+                  <span className="text-xs font-semibold text-gray-400">Top 5</span>
+                </div>
+                <div className="space-y-4">
+                  {technicianLeaderboard.length ? technicianLeaderboard.map((entry, index) => {
+                    const percentage = Math.round(((entry.count || 0) / maxLeaderboardValue(technicianLeaderboard.map((item) => ({ value: item.count })))) * 100);
+                    return (
+                      <div key={entry.id}>
+                        <div className="flex items-center justify-between text-sm mb-1.5">
+                          <span className="font-semibold text-gray-700">{index + 1}. {entry.name}</span>
+                          <span className="font-black text-blue-600">{entry.count}</span>
+                        </div>
+                        <div className="h-3 rounded-full bg-gray-100 overflow-hidden">
+                          <div className="h-full rounded-full bg-blue-500" style={{ width: `${percentage}%` }} />
+                        </div>
+                      </div>
+                    );
+                  }) : (
+                    <div className="rounded-xl border border-dashed border-gray-200 px-4 py-12 text-center text-sm text-gray-500">
+                      No completed technician activity yet.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-sm font-bold text-gray-700">Completed Work Orders - Top Locations</p>
+                  <span className="text-xs font-semibold text-gray-400">Top 5</span>
+                </div>
+                <div className="space-y-4">
+                  {topCompletedLocations.length ? topCompletedLocations.map((entry) => {
+                    const percentage = Math.round(((entry.value || 0) / maxLeaderboardValue(topCompletedLocations)) * 100);
+                    return (
+                      <div key={entry.label}>
+                        <div className="flex items-center justify-between text-sm mb-1.5">
+                          <span className="font-semibold text-gray-700">{entry.label}</span>
+                          <span className="font-black text-sky-600">{entry.value}</span>
+                        </div>
+                        <div className="h-3 rounded-full bg-gray-100 overflow-hidden">
+                          <div className="h-full rounded-full bg-sky-400" style={{ width: `${percentage}%` }} />
+                        </div>
+                      </div>
+                    );
+                  }) : (
+                    <div className="rounded-xl border border-dashed border-gray-200 px-4 py-12 text-center text-sm text-gray-500">
+                      No completed location data yet.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+              <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-sm font-bold text-gray-700">Work Order Request Response Time (hours)</p>
+                  <span className="text-xs font-semibold text-gray-400">Avg {responseStats.avg}h</span>
+                </div>
+                <div className="grid grid-cols-3 gap-3 mb-5">
+                  {[
+                    { label: 'Max', value: responseStats.max, tone: 'text-blue-700 border-blue-100 bg-blue-50' },
+                    { label: 'Average', value: responseStats.avg, tone: 'text-blue-700 border-blue-100 bg-blue-50' },
+                    { label: 'Min', value: responseStats.min, tone: 'text-blue-700 border-blue-100 bg-blue-50' },
+                  ].map((stat) => (
+                    <div key={stat.label} className={`rounded-xl border p-4 text-center ${stat.tone}`}>
+                      <p className="text-3xl font-black">{stat.value}</p>
+                      <p className="mt-1 text-sm font-semibold">{stat.label}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="overflow-x-auto">
+                  <svg viewBox={`0 0 ${lineChartWidth} ${lineChartHeight}`} className="w-full min-w-[620px] h-[230px]">
+                    {[0, 1, 2, 3, 4].map((step) => {
+                      const y = linePadding + (linePlotHeight / 4) * step;
+                      return <line key={step} x1={linePadding} y1={y} x2={lineChartWidth - linePadding} y2={y} stroke="#e5e7eb" strokeDasharray="4 4" />;
+                    })}
+                    <path d={buildMetricPath(responseStats.series)} fill="none" stroke="#2563eb" strokeWidth="3" strokeLinecap="round" />
+                    {labels.map((label, index) => (
+                      <text key={label} x={linePadding + index * xStep} y={lineChartHeight - 6} textAnchor="middle" className="fill-gray-400 text-[10px]">
+                        {label}
+                      </text>
+                    ))}
+                  </svg>
+                </div>
+              </div>
+
+              <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-sm font-bold text-gray-700">Work Order Cycle Time (hours)</p>
+                  <span className="text-xs font-semibold text-gray-400">Avg {cycleStats.avg}h</span>
+                </div>
+                <div className="grid grid-cols-3 gap-3 mb-5">
+                  {[
+                    { label: 'Max', value: cycleStats.max, tone: 'text-emerald-700 border-emerald-100 bg-emerald-50' },
+                    { label: 'Average', value: cycleStats.avg, tone: 'text-emerald-700 border-emerald-100 bg-emerald-50' },
+                    { label: 'Min', value: cycleStats.min, tone: 'text-emerald-700 border-emerald-100 bg-emerald-50' },
+                  ].map((stat) => (
+                    <div key={stat.label} className={`rounded-xl border p-4 text-center ${stat.tone}`}>
+                      <p className="text-3xl font-black">{stat.value}</p>
+                      <p className="mt-1 text-sm font-semibold">{stat.label}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="overflow-x-auto">
+                  <svg viewBox={`0 0 ${lineChartWidth} ${lineChartHeight}`} className="w-full min-w-[620px] h-[230px]">
+                    {[0, 1, 2, 3, 4].map((step) => {
+                      const y = linePadding + (linePlotHeight / 4) * step;
+                      return <line key={step} x1={linePadding} y1={y} x2={lineChartWidth - linePadding} y2={y} stroke="#e5e7eb" strokeDasharray="4 4" />;
+                    })}
+                    <path d={buildMetricPath(cycleStats.series)} fill="none" stroke="#10b981" strokeWidth="3" strokeLinecap="round" />
+                    {labels.map((label, index) => (
+                      <text key={label} x={linePadding + index * xStep} y={lineChartHeight - 6} textAnchor="middle" className="fill-gray-400 text-[10px]">
+                        {label}
+                      </text>
+                    ))}
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 2xl:grid-cols-2 gap-6">
+              <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-sm font-bold text-gray-700">Backlog</p>
+                  <span className="text-xs font-semibold text-gray-400">{statusCounts.pending + statusCounts.inProgress} open work orders</span>
+                </div>
+                <div className="grid grid-cols-1 gap-4 items-start">
+                  <div className="grid grid-cols-2 gap-3 2xl:grid-cols-1">
+                    {backlogByPriority.map((entry) => (
+                      <div key={entry.label} className="rounded-xl border border-gray-100 p-3 text-center">
+                        <p className="text-3xl font-black" style={{ color: entry.color }}>{entry.value}</p>
+                        <p className="mt-1 text-sm font-semibold text-gray-600">{entry.label}</p>
+                      </div>
+                    ))}
                   </div>
-                  <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-4">
-                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-600">Avg Cycle</p>
-                    <p className="mt-2 text-2xl font-black text-gray-900">{avgResolutionHours}h</p>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div className="rounded-2xl border border-gray-100 p-4">
+                      <p className="text-sm font-bold text-gray-700 mb-4">Priority</p>
+                      <div className="flex items-center justify-center">
+                        <div
+                          className="h-36 w-36 rounded-full sm:h-40 sm:w-40 lg:h-44 lg:w-44"
+                          style={priorityDonutStyle}
+                        >
+                          <div className="m-5 flex h-[104px] w-[104px] items-center justify-center rounded-full bg-white text-center sm:m-6 sm:h-[112px] sm:w-[112px] lg:m-7 lg:h-[120px] lg:w-[120px]">
+                            <div>
+                              <p className="text-2xl font-black text-gray-900 sm:text-3xl">{backlogTotal}</p>
+                              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-400">Backlog</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="rounded-2xl border border-gray-100 p-4">
+                      <p className="text-sm font-bold text-gray-700 mb-4">Preventive vs Reactive</p>
+                      <div className="flex items-center justify-center">
+                        <div className="h-36 w-36 rounded-full sm:h-40 sm:w-40 lg:h-44 lg:w-44" style={donutStyle('#1d4ed8', '#93c5fd', preventiveShare || 0)}>
+                          <div className="m-5 flex h-[104px] w-[104px] items-center justify-center rounded-full bg-white text-center sm:m-6 sm:h-[112px] sm:w-[112px] lg:m-7 lg:h-[120px] lg:w-[120px]">
+                            <div>
+                              <p className="text-2xl font-black text-gray-900 sm:text-3xl">{preventiveShare}%</p>
+                              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-400">Preventive</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              <div>
-                <p className="text-sm font-bold text-gray-700">Top Technicians</p>
-                <div className="mt-3 space-y-3">
-                  {technicianLeaderboard.length ? technicianLeaderboard.map((entry, index) => (
-                    <div key={entry.id} className="flex items-center justify-between rounded-xl border border-gray-100 px-4 py-3">
+              <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-sm font-bold text-gray-700">Upcoming Preventive Work Orders</p>
+                  <span className="text-xs font-semibold text-gray-400">{upcomingPreventive.length} scheduled</span>
+                </div>
+                <div className="w-full">
+                  <div className="flex w-full items-end gap-2 h-[220px] sm:gap-3">
+                    {labels.map((label, index) => {
+                      const maxBar = Math.max(1, ...upcomingPreventiveSeries);
+                      const barHeight = `${Math.max(upcomingPreventiveSeries[index] ? 12 : 0, (upcomingPreventiveSeries[index] / maxBar) * 100)}%`;
+                      return (
+                        <div key={label} className="flex-1 flex flex-col items-center gap-2 h-full">
+                          <div className="flex items-end justify-center h-full w-full">
+                            <div className="w-full max-w-[52px] rounded-t bg-blue-500/95" style={{ height: barHeight }} />
+                          </div>
+                          <span className="max-w-full truncate text-center text-[9px] text-gray-400 sm:text-[10px]">
+                            {index % upcomingLabelStep === 0 ? label : ''}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div className="mt-4 space-y-3">
+                  {upcomingPreventive.length ? upcomingPreventive.map((schedule) => (
+                    <div key={schedule._id || schedule.id} className="flex items-center justify-between rounded-xl border border-gray-100 px-4 py-3">
                       <div>
-                        <p className="text-sm font-bold text-gray-900">{index + 1}. {entry.name}</p>
-                        <p className="text-xs text-gray-500">Completed work orders</p>
+                        <p className="text-sm font-bold text-gray-900">{schedule.name || schedule.title || 'Preventive Task'}</p>
+                        <p className="text-xs text-gray-500 mt-1">{schedule.assetName || schedule.location || 'Scheduled work order'}</p>
                       </div>
-                      <span className="text-lg font-black text-blue-600">{entry.count}</span>
+                      <span className="text-xs font-semibold text-gray-500">
+                        {getScheduleDueDate(schedule) ? getScheduleDueDate(schedule).toLocaleDateString() : 'Soon'}
+                      </span>
                     </div>
                   )) : (
-                    <div className="rounded-xl border border-dashed border-gray-200 px-4 py-8 text-center text-sm text-gray-500">
-                      No completed technician activity yet.
+                    <div className="rounded-xl border border-dashed border-gray-200 px-4 py-12 text-center text-sm text-gray-500">
+                      No upcoming preventive maintenance tasks found.
                     </div>
                   )}
                 </div>
@@ -21969,61 +30060,125 @@ const ClientAnalyticsTab = ({ allIssues = [], technicians = [], assets = [], mai
         )}
 
         {subTab === 'cost-of-maintenance' && (
-          <div className="grid grid-cols-1 xl:grid-cols-[1.2fr_1fr] gap-6">
-            <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
-              <p className="text-sm font-bold text-gray-700">Issue Category Weight</p>
-              <div className="mt-5 space-y-4">
-                {categoryEntries.length ? categoryEntries.map(([label, count], index) => {
-                  const percentage = statusCounts.total ? Math.round((count / statusCounts.total) * 100) : 0;
-                  const barColor = ['bg-blue-500', 'bg-emerald-500', 'bg-amber-500', 'bg-violet-500', 'bg-rose-500'][index % 5];
-                  return (
-                    <div key={label}>
-                      <div className="flex items-center justify-between text-sm mb-1.5">
-                        <span className="font-semibold text-gray-700">{label}</span>
-                        <span className="font-bold text-gray-900">{count}</span>
-                      </div>
-                      <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
-                        <div className={`h-full rounded-full ${barColor}`} style={{ width: `${percentage}%` }} />
-                      </div>
-                    </div>
-                  );
-                }) : (
-                  <div className="rounded-xl border border-dashed border-gray-200 px-4 py-8 text-center text-sm text-gray-500">
-                    No category data available yet.
+          <div className="flex flex-col gap-6">
+            <div className="grid grid-cols-1 xl:grid-cols-[1.35fr_0.8fr] gap-6">
+              <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-sm font-bold text-gray-700">Maintenance Spend Trend</p>
+                  <span className="text-xs font-semibold text-gray-400">{costSummary.workOrderCount} costed work orders</span>
+                </div>
+                <div className="overflow-x-auto">
+                  <svg viewBox={`0 0 ${lineChartWidth} ${lineChartHeight}`} className="w-full min-w-[620px] h-[230px]">
+                    {[0, 1, 2, 3, 4].map((step) => {
+                      const y = linePadding + (linePlotHeight / 4) * step;
+                      return <line key={step} x1={linePadding} y1={y} x2={lineChartWidth - linePadding} y2={y} stroke="#e5e7eb" strokeDasharray="4 4" />;
+                    })}
+                    <path d={buildMetricPath(costSummary.weeklyTotals.map((entry) => entry.all))} fill="none" stroke="#111827" strokeWidth="3" strokeLinecap="round" />
+                    <path d={buildMetricPath(costSummary.weeklyTotals.map((entry) => entry.preventive))} fill="none" stroke="#2563eb" strokeWidth="3" strokeLinecap="round" />
+                    <path d={buildMetricPath(costSummary.weeklyTotals.map((entry) => entry.reactive))} fill="none" stroke="#0f766e" strokeWidth="3" strokeLinecap="round" />
+                    {labels.map((label, index) => (
+                      <text key={label} x={linePadding + index * xStep} y={lineChartHeight - 6} textAnchor="middle" className="fill-gray-400 text-[10px]">
+                        {label}
+                      </text>
+                    ))}
+                  </svg>
+                </div>
+                <div className="mt-4 flex flex-wrap items-center gap-4 text-xs font-medium text-gray-500">
+                  <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-gray-900 inline-block rounded" />All</span>
+                  <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-blue-600 inline-block rounded" />Preventive</span>
+                  <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-teal-600 inline-block rounded" />Reactive</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                {[
+                  { label: 'Labor', value: costSummary.labor, tone: 'text-emerald-700 border-emerald-100 bg-emerald-50' },
+                  { label: 'Parts', value: costSummary.parts, tone: 'text-cyan-700 border-cyan-100 bg-cyan-50' },
+                  { label: 'Other', value: costSummary.other, tone: 'text-amber-700 border-amber-100 bg-amber-50' },
+                  { label: 'Total', value: costSummary.total, tone: 'text-gray-900 border-gray-200 bg-gray-50' },
+                  { label: 'Reactive', value: costSummary.reactive, tone: 'text-teal-700 border-teal-100 bg-teal-50' },
+                  { label: 'Preventive', value: costSummary.preventive, tone: 'text-blue-700 border-blue-100 bg-blue-50' },
+                ].map((card) => (
+                  <div key={card.label} className={`rounded-2xl border p-5 shadow-sm ${card.tone}`}>
+                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] opacity-80">{card.label}</p>
+                    <p className="mt-4 text-4xl font-black">{formatCost(card.value)}</p>
                   </div>
-                )}
+                ))}
               </div>
             </div>
 
-            <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm space-y-4">
-              <div className="rounded-2xl bg-slate-900 text-white p-5">
-                <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-300">Asset Portfolio Cost</p>
-                <p className="mt-3 text-3xl font-black">{assetSpend.total.toLocaleString()}</p>
-                <p className="mt-2 text-sm text-slate-300">Total tracked asset purchase value inside your company.</p>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
-                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-gray-500">Avg Asset Cost</p>
-                  <p className="mt-2 text-2xl font-black text-gray-900">{Math.round(assetSpend.average).toLocaleString()}</p>
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+              {[
+                ['Asset', costSummary.byAsset],
+                ['Work Order Category', costSummary.byCategory],
+                ['Location', costSummary.byLocation],
+              ].map(([title, entries]) => (
+                <div key={title} className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+                  <p className="text-sm font-bold text-gray-700">{title}</p>
+                  <div className="mt-5 space-y-4">
+                    {entries.length ? entries.map((entry) => {
+                      const percentage = Math.round(((entry.value || 0) / Math.max(1, costSummary.total)) * 100);
+                      return (
+                        <div key={entry.label}>
+                          <div className="flex items-center justify-between text-sm mb-1.5">
+                            <span className="font-semibold text-gray-700">{entry.label}</span>
+                            <span className="font-bold text-gray-900">{formatCost(entry.value)}</span>
+                          </div>
+                          <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+                            <div className="h-full rounded-full" style={{ width: `${percentage}%`, backgroundColor: entry.color }} />
+                          </div>
+                        </div>
+                      );
+                    }) : (
+                      <div className="rounded-xl border border-dashed border-gray-200 px-4 py-12 text-center text-sm text-gray-500">
+                        No cost data available yet.
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
-                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-gray-500">Upcoming PM</p>
-                  <p className="mt-2 text-2xl font-black text-gray-900">{upcomingPreventive.length}</p>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-1 xl:grid-cols-[1fr_0.85fr] gap-6">
+              <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+                <p className="text-sm font-bold text-gray-700">Average Cost</p>
+                <div className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {[
+                    { label: 'Per Costed Work Order', value: formatCost(costSummary.average), tone: 'text-gray-900' },
+                    { label: 'Total Maintenance Spend', value: formatCost(costSummary.total), tone: 'text-gray-900' },
+                    { label: 'Asset Portfolio Value', value: formatCost(assetSpend.total), tone: 'text-gray-900' },
+                  ].map((item) => (
+                    <div key={item.label} className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                      <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-gray-500">{item.label}</p>
+                      <p className={`mt-3 text-3xl font-black ${item.tone}`}>{item.value}</p>
+                    </div>
+                  ))}
                 </div>
               </div>
-              <div>
-                <p className="text-sm font-bold text-gray-700">Top Locations by Issue Volume</p>
-                <div className="mt-3 space-y-3">
-                  {locationEntries.length ? locationEntries.map(([label, count]) => (
-                    <div key={label} className="flex items-center justify-between rounded-xl border border-gray-100 px-4 py-3">
-                      <span className="text-sm font-semibold text-gray-700">{label}</span>
-                      <span className="text-lg font-black text-amber-600">{count}</span>
-                    </div>
-                  )) : (
-                    <div className="rounded-xl border border-dashed border-gray-200 px-4 py-8 text-center text-sm text-gray-500">
-                      No location trend data yet.
-                    </div>
-                  )}
+
+              <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+                <p className="text-sm font-bold text-gray-700">Cost Mix</p>
+                <div className="mt-5 grid grid-cols-2 gap-4">
+                  <div className="rounded-xl border border-gray-100 p-4">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-gray-500">Reactive Share</p>
+                    <p className="mt-3 text-3xl font-black text-teal-700">
+                      {costSummary.total ? Math.round((costSummary.reactive / costSummary.total) * 100) : 0}%
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-gray-100 p-4">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-gray-500">Preventive Share</p>
+                    <p className="mt-3 text-3xl font-black text-blue-700">
+                      {costSummary.total ? Math.round((costSummary.preventive / costSummary.total) * 100) : 0}%
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-gray-100 p-4">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-gray-500">Avg Asset Cost</p>
+                    <p className="mt-3 text-3xl font-black text-gray-900">{formatCost(assetSpend.average)}</p>
+                  </div>
+                  <div className="rounded-xl border border-gray-100 p-4">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-gray-500">Upcoming PM</p>
+                    <p className="mt-3 text-3xl font-black text-gray-900">{upcomingPreventive.length}</p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -22031,168 +30186,2210 @@ const ClientAnalyticsTab = ({ allIssues = [], technicians = [], assets = [], mai
         )}
 
         {subTab === 'asset-downtime' && (
-          <div className="grid grid-cols-1 xl:grid-cols-[1.25fr_1fr] gap-6">
-            <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
-              <p className="text-sm font-bold text-gray-700">Preventive vs Reactive Pattern</p>
-              <div className="mt-5 overflow-x-auto">
-                <div className="min-w-[620px] flex items-end gap-3 h-[240px]">
-                  {labels.map((label, index) => {
-                    const maxBar = Math.max(1, ...preventiveSeries, ...reactiveSeries);
-                    const preventiveHeight = `${Math.max(8, (preventiveSeries[index] / maxBar) * 100)}%`;
-                    const reactiveHeight = `${Math.max(8, (reactiveSeries[index] / maxBar) * 100)}%`;
-                    return (
-                      <div key={label} className="flex-1 flex flex-col items-center gap-2 h-full">
-                        <div className="flex items-end justify-center gap-1 h-full w-full">
-                          <div className="w-4 rounded-t bg-blue-500/85" style={{ height: preventiveHeight }} />
-                          <div className="w-4 rounded-t bg-amber-400/90" style={{ height: reactiveHeight }} />
-                        </div>
-                        <span className="text-[10px] text-gray-400">{label}</span>
-                      </div>
-                    );
-                  })}
-                </div>
+          <div className="flex flex-col gap-6">
+            <div className="grid grid-cols-1 xl:grid-cols-[1.2fr_0.8fr_0.8fr_0.8fr] gap-4">
+              <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+                <p className="text-sm font-bold text-gray-700">Current Status</p>
+                <p className="mt-3 text-3xl font-black text-gray-900">{assetAnalytics.summary.totalAssets}</p>
+                <p className="mt-1 text-sm text-gray-500">Tracked assets in the selected range</p>
               </div>
-              <div className="mt-4 flex items-center gap-4 text-xs font-medium text-gray-500">
-                <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-blue-500 inline-block" />Preventive</span>
-                <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-amber-400 inline-block" />Reactive</span>
+              <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm text-center">
+                <p className="text-5xl font-black text-gray-900">{assetAnalytics.summary.utilization.toFixed(1)}%</p>
+                <p className="mt-2 text-sm font-semibold text-gray-600">Utilization</p>
+              </div>
+              <div className="bg-white border border-emerald-100 rounded-2xl p-5 shadow-sm text-center bg-emerald-50/70">
+                <p className="text-5xl font-black text-emerald-600">{assetAnalytics.summary.operationalCount}</p>
+                <p className="mt-2 text-sm font-semibold text-emerald-700">Operational</p>
+              </div>
+              <div className="bg-white border border-rose-100 rounded-2xl p-5 shadow-sm text-center bg-rose-50/70">
+                <p className="text-5xl font-black text-rose-500">{assetAnalytics.summary.notOperationalCount}</p>
+                <p className="mt-2 text-sm font-semibold text-rose-600">Not Operational</p>
               </div>
             </div>
 
-            <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm space-y-5">
-              <div>
-                <p className="text-sm font-bold text-gray-700">Asset Utilization by Type</p>
-                <div className="mt-4 space-y-4">
-                  {assetUtilization.length ? assetUtilization.map((entry) => (
-                    <div key={entry.label}>
-                      <div className="flex items-center justify-between text-sm mb-1.5">
-                        <span className="font-semibold text-gray-700">{entry.label}</span>
-                        <span className="font-bold text-gray-900">{entry.utilization}%</span>
+            <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+              <div className="flex items-center justify-between mb-4 gap-3">
+                <p className="text-sm font-bold text-gray-700">Assets With Most Downtime</p>
+                <span className="text-xs font-semibold text-gray-400">{assetAnalytics.tableRows.length} assets ranked</span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-100 text-left text-gray-500">
+                      <th className="py-3 pr-4 font-bold">Asset Name</th>
+                      <th className="py-3 pr-4 font-bold">Location Name</th>
+                      <th className="py-3 pr-4 font-bold">Operational Status</th>
+                      <th className="py-3 pr-4 font-bold">Downtime (Hours)</th>
+                      <th className="py-3 pr-4 font-bold">Downtime Events</th>
+                      <th className="py-3 font-bold">% Utilization</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {assetAnalytics.tableRows.length ? assetAnalytics.tableRows.map((row) => (
+                      <tr key={row.id} className="border-b border-gray-50 last:border-b-0">
+                        <td className="py-3 pr-4 font-semibold text-gray-800">{row.name}</td>
+                        <td className="py-3 pr-4 text-gray-600">{row.location || 'Unknown'}</td>
+                        <td className="py-3 pr-4">
+                          <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${row.operational ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-rose-50 text-rose-600 border border-rose-100'}`}>
+                            {row.statusLabel}
+                          </span>
+                        </td>
+                        <td className="py-3 pr-4 font-semibold text-gray-800">{row.downtimeHours.toFixed(2)}</td>
+                        <td className="py-3 pr-4 text-gray-700">{row.downtimeEvents}</td>
+                        <td className="py-3">
+                          <div className="flex items-center gap-3">
+                            <div className="h-2 w-28 rounded-full bg-gray-100 overflow-hidden">
+                              <div className="h-full rounded-full bg-blue-500" style={{ width: `${row.utilization}%` }} />
+                            </div>
+                            <span className="font-semibold text-gray-800">{row.utilization.toFixed(1)}%</span>
+                          </div>
+                        </td>
+                      </tr>
+                    )) : (
+                      <tr>
+                        <td colSpan="6" className="py-16 text-center text-gray-500">No asset downtime data available yet.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+              {[
+                {
+                  title: 'Utilization % By Location',
+                  entries: assetAnalytics.utilizationByLocation,
+                  accent: 'text-teal-600',
+                  tone: 'bg-teal-50 border-teal-100',
+                  bar: 'bg-teal-500',
+                },
+                {
+                  title: 'Utilization % By Category',
+                  entries: assetAnalytics.utilizationByCategory,
+                  accent: 'text-blue-600',
+                  tone: 'bg-blue-50 border-blue-100',
+                  bar: 'bg-blue-500',
+                },
+              ].map((section) => {
+                const values = section.entries.map((entry) => entry.utilization);
+                const min = values.length ? Math.min(...values) : 0;
+                const max = values.length ? Math.max(...values) : 0;
+                return (
+                  <div key={section.title} className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+                    <p className="text-sm font-bold text-gray-700">{section.title}</p>
+                    <div className="mt-4 grid grid-cols-2 gap-4">
+                      <div className={`rounded-2xl border p-5 text-center ${section.tone}`}>
+                        <p className={`text-5xl font-black ${section.accent}`}>{min.toFixed(1)}%</p>
+                        <p className="mt-2 text-sm font-semibold text-gray-600">Min</p>
                       </div>
-                      <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
-                        <div className="h-full rounded-full bg-emerald-500" style={{ width: `${entry.utilization}%` }} />
+                      <div className={`rounded-2xl border p-5 text-center ${section.tone}`}>
+                        <p className={`text-5xl font-black ${section.accent}`}>{max.toFixed(1)}%</p>
+                        <p className="mt-2 text-sm font-semibold text-gray-600">Max</p>
                       </div>
-                      <p className="mt-1 text-[11px] text-gray-500">Downtime pressure: {entry.downtime}%</p>
                     </div>
-                  )) : (
-                    <div className="rounded-xl border border-dashed border-gray-200 px-4 py-8 text-center text-sm text-gray-500">
-                      No asset utilization data yet.
+                    <div className="mt-4 space-y-4">
+                      {section.entries.length ? section.entries.map((entry) => (
+                        <div key={entry.label}>
+                          <div className="mb-1.5 flex items-center justify-between gap-3 text-sm">
+                            <span className="font-semibold text-gray-700">{entry.label}</span>
+                            <span className="font-bold text-gray-900">{entry.utilization.toFixed(1)}%</span>
+                          </div>
+                          <div className="h-3 rounded-full bg-gray-100 overflow-hidden">
+                            <div className={`h-full rounded-full ${section.bar}`} style={{ width: `${entry.utilization}%` }} />
+                          </div>
+                        </div>
+                      )) : (
+                        <div className="rounded-xl border border-dashed border-gray-200 px-4 py-12 text-center text-sm text-gray-500">
+                          No utilization data available yet.
+                        </div>
+                      )}
                     </div>
-                  )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+              <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-sm font-bold text-gray-700">Utilization Over Time</p>
+                  <span className="text-xs font-semibold text-gray-400">{dateRange}</span>
+                </div>
+                <div className="overflow-x-auto">
+                  <svg viewBox={`0 0 ${lineChartWidth} ${lineChartHeight}`} className="w-full min-w-[620px] h-[230px]">
+                    {[0, 1, 2, 3, 4].map((step) => {
+                      const y = linePadding + (linePlotHeight / 4) * step;
+                      return <line key={step} x1={linePadding} y1={y} x2={lineChartWidth - linePadding} y2={y} stroke="#e5e7eb" strokeDasharray="4 4" />;
+                    })}
+                    <path d={buildMetricPath(assetAnalytics.utilizationSeries)} fill="none" stroke="#1d4ed8" strokeWidth="3" strokeLinecap="round" />
+                    {assetAnalytics.utilizationSeries.map((value, index) => (
+                      <circle key={`${labels[index]}-${value}`} cx={linePadding + index * xStep} cy={getMetricPointY(assetAnalytics.utilizationSeries, value)} r="4.5" fill="#3b82f6" />
+                    ))}
+                    {labels.map((label, index) => (
+                      <text key={label} x={linePadding + index * xStep} y={lineChartHeight - 6} textAnchor="middle" className="fill-gray-400 text-[10px]">
+                        {label}
+                      </text>
+                    ))}
+                  </svg>
                 </div>
               </div>
 
-              <div>
-                <p className="text-sm font-bold text-gray-700">Upcoming Preventive Maintenance</p>
-                <div className="mt-3 space-y-3">
-                  {upcomingPreventive.length ? upcomingPreventive.map((schedule) => (
-                    <div key={schedule._id || schedule.id} className="rounded-xl border border-gray-100 px-4 py-3">
-                      <p className="text-sm font-bold text-gray-900">{schedule.name || schedule.title || 'Preventive Task'}</p>
-                      <p className="mt-1 text-xs text-gray-500">
-                        Due {schedule.nextDate ? normalizeDate(schedule.nextDate).toLocaleDateString() : 'soon'}
-                      </p>
-                    </div>
-                  )) : (
-                    <div className="rounded-xl border border-dashed border-gray-200 px-4 py-8 text-center text-sm text-gray-500">
-                      No upcoming preventive maintenance tasks found.
-                    </div>
-                  )}
+              <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-sm font-bold text-gray-700">Downtime Event History</p>
+                  <span className="text-xs font-semibold text-gray-400">{assetAnalytics.downtimeEventSeries.reduce((sum, value) => sum + value, 0)} events</span>
+                </div>
+                <div className="overflow-x-auto">
+                  <svg viewBox={`0 0 ${lineChartWidth} ${lineChartHeight}`} className="w-full min-w-[620px] h-[230px]">
+                    {[0, 1, 2, 3, 4].map((step) => {
+                      const y = linePadding + (linePlotHeight / 4) * step;
+                      return <line key={step} x1={linePadding} y1={y} x2={lineChartWidth - linePadding} y2={y} stroke="#e5e7eb" strokeDasharray="4 4" />;
+                    })}
+                    <path d={buildMetricPath(assetAnalytics.downtimeEventSeries)} fill="none" stroke="#0f766e" strokeWidth="3" strokeLinecap="round" />
+                    {assetAnalytics.downtimeEventSeries.map((value, index) => (
+                      <circle key={`${labels[index]}-${value}`} cx={linePadding + index * xStep} cy={getMetricPointY(assetAnalytics.downtimeEventSeries, value)} r="4.5" fill="#14b8a6" />
+                    ))}
+                    {labels.map((label, index) => (
+                      <text key={label} x={linePadding + index * xStep} y={lineChartHeight - 6} textAnchor="middle" className="fill-gray-400 text-[10px]">
+                        {label}
+                      </text>
+                    ))}
+                  </svg>
                 </div>
               </div>
             </div>
           </div>
         )}
+          </>
+        )}
       </div>
+
+      {showCreateDashboardModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/35"
+            onClick={() => setShowCreateDashboardModal(false)}
+          />
+          <div className="relative w-full max-w-2xl rounded-2xl bg-white p-8 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <h3 className="text-[2.1rem] font-black tracking-tight text-gray-900">Add Custom Dashboard</h3>
+              <button
+                type="button"
+                onClick={() => setShowCreateDashboardModal(false)}
+                className="rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
+              >
+                <X className="h-7 w-7" />
+              </button>
+            </div>
+
+            <div className="mt-8">
+              <label className="mb-3 block text-[1.35rem] font-medium text-gray-800">
+                Dashboard Name
+              </label>
+              <input
+                autoFocus
+                type="text"
+                value={customDashboardName}
+                onChange={(e) => setCustomDashboardName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleCreateCustomDashboard();
+                  }
+                }}
+                className="w-full rounded-lg border border-gray-300 px-4 py-4 text-lg text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              />
+            </div>
+
+            <div className="mt-20 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowCreateDashboardModal(false)}
+                className="rounded-lg border border-gray-300 px-6 py-3 text-lg font-medium text-gray-700 transition-colors hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleCreateCustomDashboard}
+                disabled={!customDashboardName.trim()}
+                className="rounded-lg bg-blue-600 px-6 py-3 text-lg font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500"
+              >
+                Add
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showManagePinsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/35"
+            onClick={() => setShowManagePinsModal(false)}
+          />
+          <div className="relative flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-gray-200 px-7 py-6">
+              <div>
+                <h3 className="text-[2rem] font-black tracking-tight text-gray-900">Edit Pinned Items</h3>
+                <p className="mt-3 text-lg text-gray-600">Choose up to three dashboard views to pin for quick access on your tab list.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowManagePinsModal(false)}
+                className="rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
+              >
+                <X className="h-8 w-8" />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto px-7 py-6">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  value={pinSearch}
+                  onChange={(e) => setPinSearch(e.target.value)}
+                  placeholder="Search"
+                  className="w-full rounded-lg border border-blue-500 px-12 py-3 text-lg text-gray-900 outline-none ring-2 ring-blue-100"
+                />
+              </div>
+
+              <div className="mt-8 border-t border-gray-200 pt-7">
+                <div className="flex items-center gap-5 text-[1.05rem]">
+                  <h4 className="font-black text-gray-900">Pinned</h4>
+                  <div className="h-10 w-px bg-gray-200" />
+                  <span className="text-gray-500">{Math.max(0, 3 - pinnedDashboardIds.length)} remaining</span>
+                </div>
+                <div className="mt-6 space-y-4">
+                  {pinnedCatalog.length ? pinnedCatalog.map((dashboard) => (
+                    <label key={dashboard.id} className="flex cursor-pointer items-center justify-between gap-4 text-lg">
+                      <div className="flex items-center gap-4">
+                        <input
+                          type="checkbox"
+                          checked
+                          onChange={() => togglePinnedDashboard(dashboard.id)}
+                          className="h-6 w-6 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span className="text-gray-900">{dashboard.label}</span>
+                      </div>
+                      <span className="text-gray-400">{dashboard.recommended ? 'Recommended' : dashboard.category}</span>
+                    </label>
+                  )) : (
+                    <p className="text-base text-gray-500">No dashboards pinned yet.</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="mt-8 border-t border-gray-200 pt-7">
+                <div className="flex items-center gap-5 text-[1.05rem]">
+                  <h4 className="font-black text-gray-900">Recommended Dashboards</h4>
+                  <div className="h-10 w-px bg-gray-200" />
+                  <span className="text-gray-500">{recommendedDashboards.filter((dashboard) => !pinnedDashboardIds.includes(dashboard.id)).length} available</span>
+                </div>
+                <div className="mt-6 space-y-4">
+                  {recommendedDashboards
+                    .filter((dashboard) => !pinnedDashboardIds.includes(dashboard.id))
+                    .filter((dashboard) => dashboard.label.toLowerCase().includes(pinSearch.toLowerCase()))
+                    .length ? recommendedDashboards
+                    .filter((dashboard) => !pinnedDashboardIds.includes(dashboard.id))
+                    .filter((dashboard) => dashboard.label.toLowerCase().includes(pinSearch.toLowerCase()))
+                    .map((dashboard) => (
+                      <label key={dashboard.id} className="flex cursor-pointer items-center justify-between gap-4 text-lg">
+                        <div className="flex items-center gap-4">
+                          <input
+                            type="checkbox"
+                            checked={pinnedDashboardIds.includes(dashboard.id)}
+                            onChange={() => togglePinnedDashboard(dashboard.id)}
+                            disabled={!pinnedDashboardIds.includes(dashboard.id) && pinnedDashboardIds.length >= 3}
+                            className="h-6 w-6 rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:opacity-40"
+                          />
+                          <span className="text-gray-900">{dashboard.label}</span>
+                        </div>
+                        <span className="text-gray-400">Recommended</span>
+                      </label>
+                    )) : (
+                    <p className="text-base text-gray-500">All recommended dashboards are pinned.</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="mt-8 border-t border-gray-200 pt-7">
+                <div className="flex items-center gap-5 text-[1.05rem]">
+                  <h4 className="font-black text-gray-900">Other Dashboards</h4>
+                  <div className="h-10 w-px bg-gray-200" />
+                  <span className="text-gray-500">
+                    {dashboardCatalog.filter((dashboard) => !dashboard.recommended && !pinnedDashboardIds.includes(dashboard.id) && dashboard.label.toLowerCase().includes(pinSearch.toLowerCase())).length} available
+                  </span>
+                </div>
+                <div className="mt-6 space-y-4">
+                  {dashboardCatalog
+                    .filter((dashboard) => !dashboard.recommended && !pinnedDashboardIds.includes(dashboard.id))
+                    .filter((dashboard) => dashboard.label.toLowerCase().includes(pinSearch.toLowerCase()))
+                    .map((dashboard) => (
+                      <label key={dashboard.id} className="flex cursor-pointer items-center justify-between gap-4 text-lg">
+                        <div className="flex items-center gap-4">
+                          <input
+                            type="checkbox"
+                            checked={pinnedDashboardIds.includes(dashboard.id)}
+                            onChange={() => togglePinnedDashboard(dashboard.id)}
+                            disabled={!pinnedDashboardIds.includes(dashboard.id) && pinnedDashboardIds.length >= 3}
+                            className="h-6 w-6 rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:opacity-40"
+                          />
+                          <span className="text-gray-900">{dashboard.label}</span>
+                        </div>
+                        <span className="text-gray-400">{dashboard.category}</span>
+                      </label>
+                    ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 border-t border-gray-200 px-7 py-6">
+              <button
+                type="button"
+                onClick={() => setShowManagePinsModal(false)}
+                className="rounded-lg border border-gray-300 px-6 py-3 text-lg font-medium text-gray-700 transition-colors hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSavePins}
+                disabled={savingPins || !preferencesLoaded}
+                className="rounded-lg bg-blue-600 px-6 py-3 text-lg font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
+              >
+                {savingPins ? 'Saving...' : 'Save pins'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showTimeZoneModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/35"
+            onClick={() => setShowTimeZoneModal(false)}
+          />
+          <div className="relative w-full max-w-2xl rounded-2xl bg-white p-10 shadow-2xl">
+            <h3 className="text-[2rem] font-black tracking-tight text-gray-900">Dashboard time zone</h3>
+            <div className="mt-10">
+              <label className="mb-3 block text-sm font-semibold text-gray-700">Viewer time zone</label>
+              <select
+                value={draftTimeZone}
+                onChange={(e) => setDraftTimeZone(e.target.value)}
+                className="w-full rounded-lg border border-blue-500 px-4 py-4 text-lg text-gray-900 outline-none ring-2 ring-blue-100"
+                size={1}
+              >
+                {supportedTimeZones.map((timeZone) => (
+                  <option key={timeZone} value={timeZone}>
+                    {formatTimeZoneLabel(timeZone)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="mt-16 flex items-center justify-end gap-4">
+              <button
+                type="button"
+                onClick={() => setShowTimeZoneModal(false)}
+                className="rounded-lg px-6 py-3 text-lg font-medium text-gray-600 transition-colors hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleUpdateTimeZone}
+                className="rounded-lg bg-blue-600 px-8 py-3 text-lg font-medium text-white transition-colors hover:bg-blue-700"
+              >
+                Update
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCustomDashboardSettings && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/35"
+            onClick={() => setShowCustomDashboardSettings(false)}
+          />
+          <div className="relative w-full max-w-5xl rounded-2xl bg-white p-10 shadow-2xl">
+            <h3 className="text-[2rem] font-black tracking-tight text-gray-900">Settings</h3>
+
+            <div className="mt-10 flex items-end gap-2 border-b border-gray-200">
+              {[
+                ['general', 'General'],
+                ['filters', 'Filters'],
+              ].map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setCustomDashboardSettingsTab(id)}
+                  className={`rounded-t-lg px-6 py-4 text-[1.05rem] font-semibold transition-colors ${customDashboardSettingsTab === id ? 'bg-blue-50 text-blue-600 border-b-4 border-blue-600' : 'text-gray-700 hover:bg-gray-50'}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {customDashboardSettingsTab === 'general' ? (
+              <div className="space-y-8 py-8">
+                <div>
+                  <label className="mb-3 block text-lg font-semibold text-gray-700">Timezone</label>
+                  <select
+                    value={customDashboardSettingsDraft?.timezoneMode || defaultCustomDashboardSettings.timezoneMode}
+                    onChange={(e) => setCustomDashboardSettingsDraft((prev) => ({
+                      ...defaultCustomDashboardSettings,
+                      ...(prev || {}),
+                      timezoneMode: e.target.value,
+                    }))}
+                    className="w-full rounded-lg border border-gray-300 px-4 py-4 text-xl text-gray-900"
+                  >
+                    <option value="tile">Each tile&apos;s time zone</option>
+                    <option value="viewer">Viewer time zone</option>
+                    <option value="dashboard">Dashboard time zone</option>
+                  </select>
+                </div>
+
+                {[
+                  ['runOnLoad', 'Run on load'],
+                  ['allowFullscreen', 'Allow full screen mode for visualizations'],
+                ].map(([key, label]) => (
+                  <div key={key} className="flex items-center gap-4">
+                    <button
+                      type="button"
+                      onClick={() => setCustomDashboardSettingsDraft((prev) => ({
+                        ...defaultCustomDashboardSettings,
+                        ...(prev || {}),
+                        [key]: !(prev?.[key] ?? defaultCustomDashboardSettings[key]),
+                      }))}
+                      className={`relative h-7 w-14 rounded-full px-1 transition ${
+                        (customDashboardSettingsDraft?.[key] ?? defaultCustomDashboardSettings[key])
+                          ? 'bg-blue-600'
+                          : 'bg-gray-300'
+                      }`}
+                    >
+                      <span className={`block h-5 w-5 rounded-full bg-white shadow-sm transition ${
+                        (customDashboardSettingsDraft?.[key] ?? defaultCustomDashboardSettings[key])
+                          ? 'translate-x-7'
+                          : ''
+                      }`} />
+                    </button>
+                    <span className="text-[1.1rem] text-gray-800">{label}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-8 py-8">
+                <div>
+                  <label className="mb-3 block text-lg font-semibold text-gray-700">Default filters view</label>
+                  <select
+                    value={customDashboardSettingsDraft?.defaultFiltersView || defaultCustomDashboardSettings.defaultFiltersView}
+                    onChange={(e) => setCustomDashboardSettingsDraft((prev) => ({
+                      ...defaultCustomDashboardSettings,
+                      ...(prev || {}),
+                      defaultFiltersView: e.target.value,
+                    }))}
+                    className="w-full rounded-lg border border-gray-300 px-4 py-4 text-xl text-gray-900"
+                  >
+                    <option value="expanded">Expanded</option>
+                    <option value="collapsed">Collapsed</option>
+                    <option value="hidden">Hidden</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-3 block text-lg font-semibold text-gray-700">Filters location</label>
+                  <select
+                    value={customDashboardSettingsDraft?.filtersLocation || defaultCustomDashboardSettings.filtersLocation}
+                    onChange={(e) => setCustomDashboardSettingsDraft((prev) => ({
+                      ...defaultCustomDashboardSettings,
+                      ...(prev || {}),
+                      filtersLocation: e.target.value,
+                    }))}
+                    className="w-full rounded-lg border border-gray-300 px-4 py-4 text-xl text-gray-900"
+                  >
+                    <option value="top">Top</option>
+                    <option value="left">Left</option>
+                    <option value="right">Right</option>
+                  </select>
+                </div>
+              </div>
+            )}
+
+            <div className="mt-10 flex items-center justify-end gap-4">
+              <button
+                type="button"
+                onClick={closeCustomDashboardSettings}
+                className="rounded-lg px-6 py-3 text-lg font-medium text-gray-600 transition-colors hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={saveCustomDashboardSettings}
+                className="rounded-lg bg-blue-600 px-8 py-3 text-lg font-semibold text-white transition-colors hover:bg-blue-700"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
 
-const ClientMetersTab = () => {
+const ClientMetersTab = ({
+  people: peopleProp = [],
+  teams: teamsProp = [],
+  assets: assetsProp = [],
+  properties: propertiesProp = [],
+  internalTechnicians: internalTechniciansProp = [],
+  currentUser = null,
+}) => {
+  const meterCategoryOptions = ['Electricity', 'Water', 'Electrical Generator', 'Generator', 'Fuel', 'Gas', 'Solar', 'Utility', 'Submeter'];
   const [meters, setMeters] = React.useState([]);
   const [search, setSearch] = React.useState('');
-  const [filter, setFilter] = React.useState('All');
   const [showAdd, setShowAdd] = React.useState(false);
-  const [newMeter, setNewMeter] = React.useState({ name: '', type: 'Electricity', reading: 0, unit: 'kWh', status: 'Normal', location: '' });
-  const types = ['All', 'Electricity', 'Water', 'Gas'];
+  const [selectedMeterId, setSelectedMeterId] = React.useState('');
+  const [selectedMeter, setSelectedMeter] = React.useState(null);
+  const [selectedMeterTab, setSelectedMeterTab] = React.useState('details');
+  const [showAddReading, setShowAddReading] = React.useState(false);
+  const [showEditMeter, setShowEditMeter] = React.useState(false);
+  const [showCreateTrigger, setShowCreateTrigger] = React.useState(false);
+  const [showMeterActionsMenu, setShowMeterActionsMenu] = React.useState(false);
+  const [readingValue, setReadingValue] = React.useState('0');
+  const [readingRecordedAt, setReadingRecordedAt] = React.useState(() => new Date().toISOString().slice(0, 10));
+  const [readingNote, setReadingNote] = React.useState('');
+  const [dailySummarySettings, setDailySummarySettings] = React.useState({
+    adminDailySummary: true,
+    technicianDailySummary: true,
+    sendTime: '07:00',
+  });
+  const [locationFilter, setLocationFilter] = React.useState('');
+  const [assetFilter, setAssetFilter] = React.useState('');
+  const [categoryFilter, setCategoryFilter] = React.useState('');
+  const createEmptyMeter = () => ({
+    name: '',
+    type: 'Electricity',
+    reading: 0,
+    unit: 'kWh',
+    frequency: '',
+    status: 'Normal',
+    location: '',
+    worker: '',
+    asset: '',
+    category: '',
+    image: '',
+    imageName: '',
+    reminderDay: 1,
+    notifyAdmins: true,
+    notifyCategoryTechnicians: true,
+    customEmails: '',
+    technicianCategory: '',
+    monthlyTarget: '',
+  });
+  const [newMeter, setNewMeter] = React.useState(createEmptyMeter);
+  const [editMeter, setEditMeter] = React.useState(createEmptyMeter);
+  const meterImportInputRef = React.useRef(null);
+  const createEmptyTrigger = React.useCallback(() => ({
+    mode: 'every',
+    condition: 'Greater than',
+    value: 0,
+    dueAmount: 0,
+    dueUnit: 'Hours',
+    title: '',
+    description: '',
+    priority: '',
+    category: '',
+    location: '',
+    asset: '',
+    primaryAssignee: '',
+    additionalWorker: '',
+    team: '',
+    purchaseOrder: '',
+    requiresSignature: false,
+    images: [],
+    files: [],
+    tasks: [],
+    checklists: [],
+  }), []);
+  const [triggerForm, setTriggerForm] = React.useState(createEmptyTrigger);
+  const meterCategories = React.useMemo(() => {
+    const dynamic = Array.from(new Set((meters || []).map((meter) => String(meter.category || '').trim()).filter(Boolean)));
+    return [...meterCategoryOptions, ...dynamic.filter((item) => !meterCategoryOptions.includes(item))];
+  }, [meters]);
   React.useEffect(() => { api.get('/api/meters').then(r => setMeters(r.data || [])).catch(() => setMeters([])); }, []);
-  const filtered = meters.filter(m => (filter === 'All' || m.type === filter) && ((m.name || '').toLowerCase().includes(search.toLowerCase()) || (m.location || '').toLowerCase().includes(search.toLowerCase())));
-  const sc = s => ({ Normal: { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' }, Warning: { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' }, Alert: { bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200' } }[s] || { bg: 'bg-gray-50', text: 'text-gray-700', border: 'border-gray-200' });
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const saved = JSON.parse(window.localStorage.getItem('mms-daily-email-summary-settings') || '{}');
+      if (saved && typeof saved === 'object') {
+        setDailySummarySettings((prev) => ({ ...prev, ...saved }));
+      }
+    } catch {}
+  }, []);
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem('mms-daily-email-summary-settings', JSON.stringify(dailySummarySettings));
+    } catch {}
+  }, [dailySummarySettings]);
+  React.useEffect(() => {
+    if (!selectedMeterId) {
+      setSelectedMeter(null);
+      return;
+    }
+    const localMatch = (meters || []).find((meter) => String(meter.id || meter._id) === String(selectedMeterId));
+    if (localMatch) setSelectedMeter(localMatch);
+    api.get(`/api/meters/${selectedMeterId}`)
+      .then((response) => setSelectedMeter(response.data || null))
+      .catch(() => {
+        if (!localMatch) setSelectedMeter(null);
+      });
+  }, [meters, selectedMeterId]);
+  const allPeopleOptions = React.useMemo(() => (
+    [...(peopleProp || []), ...(internalTechniciansProp || [])]
+  ), [internalTechniciansProp, peopleProp]);
+  const adminRecipients = React.useMemo(() => {
+    const peopleAdmins = allPeopleOptions.filter((person) => {
+      const roleText = `${person?.role || ''} ${person?.accountType || ''} ${person?.type || ''}`.toLowerCase();
+      return roleText.includes('admin');
+    });
+    const mapped = peopleAdmins
+      .map((person) => ({
+        email: person?.email || '',
+        name: person?.name || person?.fullName || person?.email || 'Administrator',
+        source: 'Administrator',
+      }))
+      .filter((entry) => entry.email);
+    if (currentUser?.email && /admin/i.test(String(currentUser?.role || currentUser?.accountType || ''))) {
+      mapped.unshift({
+        email: currentUser.email,
+        name: currentUser.name || currentUser.fullName || currentUser.email,
+        source: 'Current user',
+      });
+    }
+    return mapped.filter((entry, index, array) => array.findIndex((item) => item.email === entry.email) === index);
+  }, [allPeopleOptions, currentUser]);
+  const getCategoryTechnicians = React.useCallback((category) => {
+    const normalized = String(category || '').trim().toLowerCase();
+    if (!normalized) return [];
+    return allPeopleOptions.filter((person) => {
+      const haystack = [
+        person?.role,
+        person?.jobTitle,
+        person?.department,
+        ...(Array.isArray(person?.categories) ? person.categories : [person?.categories]),
+      ].filter(Boolean).join(' ').toLowerCase();
+      return haystack.includes(normalized);
+    }).map((person) => ({
+      email: person?.email || '',
+      name: person?.name || person?.fullName || person?.email || 'Technician',
+      source: 'Category technician',
+    })).filter((entry) => entry.email);
+  }, [allPeopleOptions]);
+  const technicianSummaryRecipients = React.useMemo(() => {
+    return allPeopleOptions.filter((person) => {
+      const haystack = [
+        person?.role,
+        person?.jobTitle,
+        person?.type,
+        person?.kind,
+        person?.department,
+      ].filter(Boolean).join(' ').toLowerCase();
+      return ['technician', 'worker', 'mechanic', 'electrician', 'plumber', 'hvac', 'operator'].some((term) => haystack.includes(term));
+    }).map((person) => ({
+      email: person?.email || '',
+      name: person?.name || person?.fullName || person?.email || 'Technician',
+      source: 'Technician',
+    })).filter((entry) => entry.email)
+      .filter((entry, index, array) => array.findIndex((item) => item.email === entry.email) === index);
+  }, [allPeopleOptions]);
+  const workerOptions = React.useMemo(() => {
+    const personOptions = (peopleProp || []).map((person) => ({
+      value: person.id || person._id || person.userId || person.email || person.phone || '',
+      label: person.name || person.fullName || person.email || person.phone || 'Person',
+      kind: 'Person',
+    }));
+    const teamOptions = (teamsProp || []).map((team) => ({
+      value: team.id || team._id || team.name || team.title || '',
+      label: team.name || team.title || 'Team',
+      kind: 'Team',
+    }));
+    return [...personOptions, ...teamOptions].filter((option) => option.value);
+  }, [peopleProp, teamsProp]);
+  const filtered = React.useMemo(() => {
+    return (meters || [])
+      .filter((meter) => {
+        const matchesSearch = `${meter.name || ''} ${meter.location || ''} ${meter.asset || ''} ${meter.category || ''}`.toLowerCase().includes(search.toLowerCase());
+        const matchesLocation = !locationFilter || String(meter.location || '') === String(locationFilter);
+        const matchesAsset = !assetFilter || String(meter.asset || '') === String(assetFilter);
+        const matchesCategory = !categoryFilter || String(meter.category || meter.type || '') === String(categoryFilter);
+        return matchesSearch && matchesLocation && matchesAsset && matchesCategory;
+      })
+      .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+  }, [assetFilter, categoryFilter, locationFilter, meters, search]);
+  const locationOptions = React.useMemo(() => Array.from(new Set((propertiesProp || []).map((property) => property.name || property.title || property.location || '').filter(Boolean))), [propertiesProp]);
+  const assetOptions = React.useMemo(() => Array.from(new Set((assetsProp || []).map((asset) => asset.name || asset.title || asset.assetName || '').filter(Boolean))), [assetsProp]);
+  const formatCreatedAt = React.useCallback((value) => {
+    if (!value) return '—';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '—';
+    return date.toLocaleString('en-US', {
+      month: '2-digit',
+      day: '2-digit',
+      year: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+  }, []);
+  const formatDateOnly = React.useCallback((value) => {
+    if (!value) return '—';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '—';
+    return date.toLocaleDateString('en-US', {
+      month: '2-digit',
+      day: '2-digit',
+      year: '2-digit',
+    });
+  }, []);
+  const resolveAssignedName = React.useCallback((worker) => {
+    if (!worker) return '—';
+    return worker;
+  }, []);
+  const deriveReadings = React.useCallback((meter) => {
+    const history = Array.isArray(meter?.readings) ? meter.readings : [];
+    if (history.length > 0) {
+      return history
+        .map((entry, index) => ({
+          id: entry.id || entry._id || `reading-${index}`,
+          value: Number(entry.value ?? entry.reading ?? 0) || 0,
+          createdAt: entry.createdAt || entry.date || entry.recordedAt || meter?.updatedAt || meter?.createdAt,
+          note: entry.note || '',
+        }))
+        .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    }
+    if (meter && (meter.reading !== undefined || meter.createdAt)) {
+      return [{
+        id: 'initial-reading',
+        value: Number(meter.reading || 0),
+        createdAt: meter.lastReadingAt || meter.updatedAt || meter.createdAt,
+        note: 'Initial reading',
+      }];
+    }
+    return [];
+  }, []);
+  const selectedMeterReadings = React.useMemo(() => deriveReadings(selectedMeter), [deriveReadings, selectedMeter]);
+  const selectedMeterMonthlyRecords = React.useMemo(() => {
+    const bucket = new Map();
+    selectedMeterReadings.forEach((entry) => {
+      const date = new Date(entry.createdAt || 0);
+      if (Number.isNaN(date.getTime())) return;
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      if (!bucket.has(key)) bucket.set(key, []);
+      bucket.get(key).push(entry);
+    });
+    return Array.from(bucket.entries())
+      .map(([monthKey, entries]) => {
+        const sorted = [...entries].sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
+        const first = sorted[0];
+        const last = sorted[sorted.length - 1];
+        return {
+          monthKey,
+          label: new Date(`${monthKey}-01T00:00:00`).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+          opening: Number(first?.value || 0),
+          closing: Number(last?.value || 0),
+          consumption: Number(last?.value || 0) - Number(first?.value || 0),
+          records: sorted.length,
+        };
+      })
+      .sort((a, b) => b.monthKey.localeCompare(a.monthKey));
+  }, [selectedMeterReadings]);
+  const selectedMeterRecipients = React.useMemo(() => {
+    if (!selectedMeter) return [];
+    const recipients = [];
+    const customEmails = String(selectedMeter.customEmails || '')
+      .split(',')
+      .map((email) => email.trim())
+      .filter(Boolean)
+      .map((email) => ({ email, name: email, source: 'Custom email' }));
+    if (selectedMeter.notifyAdmins !== false) recipients.push(...adminRecipients);
+    if (selectedMeter.notifyCategoryTechnicians !== false) {
+      recipients.push(...getCategoryTechnicians(selectedMeter.technicianCategory || selectedMeter.category || selectedMeter.type));
+    }
+    recipients.push(...customEmails);
+    return recipients.filter((entry, index, array) => array.findIndex((item) => item.email === entry.email) === index);
+  }, [adminRecipients, getCategoryTechnicians, selectedMeter]);
+  const selectedMonthInsight = React.useMemo(() => {
+    const currentMonth = selectedMeterMonthlyRecords[0];
+    const previousMonth = selectedMeterMonthlyRecords[1];
+    if (!currentMonth) return null;
+    return {
+      ...currentMonth,
+      variance: previousMonth ? currentMonth.consumption - previousMonth.consumption : null,
+    };
+  }, [selectedMeterMonthlyRecords]);
+  const selectedMeterTriggers = React.useMemo(() => Array.isArray(selectedMeter?.triggers) ? selectedMeter.triggers : [], [selectedMeter]);
+  const canCreateTrigger = React.useMemo(() => {
+    return Boolean(
+      String(triggerForm.title || '').trim() &&
+      String(triggerForm.condition || '').trim() &&
+      String(triggerForm.dueUnit || '').trim()
+    );
+  }, [triggerForm.condition, triggerForm.dueUnit, triggerForm.title]);
+  const updateLocalMeter = React.useCallback((updatedMeter) => {
+    if (!updatedMeter) return;
+    setMeters((prev) => prev.map((meter) => (
+      String(meter.id || meter._id) === String(updatedMeter.id || updatedMeter._id) ? updatedMeter : meter
+    )));
+    setSelectedMeter(updatedMeter);
+  }, []);
+  const openMeterDetails = React.useCallback((meter) => {
+    const meterId = meter?.id || meter?._id;
+    if (!meterId) return;
+    setSelectedMeterId(String(meterId));
+    setSelectedMeterTab('details');
+  }, []);
+  const closeMeterDetails = React.useCallback(() => {
+    setSelectedMeterId('');
+    setSelectedMeter(null);
+    setSelectedMeterTab('details');
+    setShowAddReading(false);
+    setShowEditMeter(false);
+    setShowCreateTrigger(false);
+    setReadingRecordedAt(new Date().toISOString().slice(0, 10));
+    setReadingNote('');
+  }, []);
+  const handleMeterImageUpload = (file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      setNewMeter((prev) => ({
+        ...prev,
+        image: String(reader.result || ''),
+        imageName: file.name,
+      }));
+    };
+    reader.readAsDataURL(file);
+  };
+  const selectedMeterFrequencyLabel = React.useMemo(() => {
+    const freq = Number(selectedMeter?.frequency || 0);
+    if (!freq) return '—';
+    return `Every ${freq} day${freq === 1 ? '' : 's'}`;
+  }, [selectedMeter]);
+  const selectedMeterNextReadingLabel = React.useMemo(() => {
+    const freq = Number(selectedMeter?.frequency || 0);
+    if (!freq) return '—';
+    return `Due in ${freq} day${freq === 1 ? '' : 's'}`;
+  }, [selectedMeter]);
+  const selectedMeterLastReadingLabel = React.useMemo(() => {
+    const lastReading = selectedMeterReadings[0];
+    if (!lastReading) return '—';
+    const valueText = `${Number(lastReading.value || 0).toLocaleString()} ${selectedMeter?.unit || ''}`.trim();
+    return `${valueText} (${formatDateOnly(lastReading.createdAt)})`;
+  }, [formatDateOnly, selectedMeter, selectedMeterReadings]);
+  const openEditMeter = React.useCallback(() => {
+    if (!selectedMeter) return;
+    setEditMeter({
+      name: selectedMeter.name || '',
+      type: selectedMeter.type || 'Electricity',
+      reading: Number(selectedMeter.reading || 0),
+      unit: selectedMeter.unit || '',
+      frequency: selectedMeter.frequency || '',
+      status: selectedMeter.status || 'Normal',
+      location: selectedMeter.location || '',
+      worker: selectedMeter.worker || '',
+      asset: selectedMeter.asset || '',
+      category: selectedMeter.category || '',
+      image: selectedMeter.image || '',
+      imageName: selectedMeter.imageName || '',
+      reminderDay: selectedMeter.reminderDay || 1,
+      notifyAdmins: selectedMeter.notifyAdmins !== false,
+      notifyCategoryTechnicians: selectedMeter.notifyCategoryTechnicians !== false,
+      customEmails: selectedMeter.customEmails || '',
+      technicianCategory: selectedMeter.technicianCategory || selectedMeter.category || '',
+      monthlyTarget: selectedMeter.monthlyTarget || '',
+    });
+    setShowEditMeter(true);
+  }, [selectedMeter]);
+  const openCreateTrigger = React.useCallback(() => {
+    if (!selectedMeter) return;
+    setTriggerForm({
+      ...createEmptyTrigger(),
+      title: `${selectedMeter.name || 'Meter'} Trigger`,
+      category: selectedMeter.category || selectedMeter.type || '',
+      location: selectedMeter.location || '',
+      asset: selectedMeter.asset || '',
+      primaryAssignee: selectedMeter.worker || '',
+    });
+    setShowCreateTrigger(true);
+  }, [createEmptyTrigger, selectedMeter]);
+  const saveEditedMeter = React.useCallback(async () => {
+    if (!selectedMeter) return;
+    try {
+      const payload = {
+        ...selectedMeter,
+        ...editMeter,
+        reading: Number(editMeter.reading || 0),
+        frequency: Number(editMeter.frequency || 0),
+        reminderDay: Number(editMeter.reminderDay || 1),
+        monthlyTarget: editMeter.monthlyTarget === '' ? '' : Number(editMeter.monthlyTarget || 0),
+      };
+      const response = await api.put(`/api/meters/${selectedMeter.id || selectedMeter._id}`, payload);
+      updateLocalMeter(response.data || payload);
+      setShowEditMeter(false);
+    } catch {
+      alert('Failed to update meter');
+    }
+  }, [editMeter, selectedMeter, updateLocalMeter]);
+  const handleDeleteMeter = React.useCallback(async () => {
+    if (!selectedMeter) return;
+    const confirmed = window.confirm(`Delete ${selectedMeter.name || 'this meter'}?`);
+    if (!confirmed) return;
+    try {
+      await api.delete(`/api/meters/${selectedMeter.id || selectedMeter._id}`);
+      setMeters((prev) => prev.filter((meter) => String(meter.id || meter._id) !== String(selectedMeter.id || selectedMeter._id)));
+      closeMeterDetails();
+    } catch {
+      alert('Failed to delete meter');
+    }
+  }, [closeMeterDetails, selectedMeter]);
+  const handleAddReading = React.useCallback(async () => {
+    if (!selectedMeter) return;
+    const numericValue = Number(readingValue);
+    if (Number.isNaN(numericValue)) {
+      alert('Enter a valid reading value');
+      return;
+    }
+    const now = new Date().toISOString();
+    const recordedAt = readingRecordedAt ? new Date(`${readingRecordedAt}T12:00:00`).toISOString() : now;
+    const nextReadings = [
+      {
+        id: `reading-${Date.now()}`,
+        value: numericValue,
+        createdAt: recordedAt,
+        note: String(readingNote || '').trim(),
+      },
+      ...selectedMeterReadings,
+    ];
+    const payload = {
+      ...selectedMeter,
+      reading: numericValue,
+      lastReadingAt: recordedAt,
+      readings: nextReadings,
+    };
+    try {
+      const response = await api.put(`/api/meters/${selectedMeter.id || selectedMeter._id}`, payload);
+      updateLocalMeter(response.data || payload);
+      setReadingValue('0');
+      setReadingRecordedAt(new Date().toISOString().slice(0, 10));
+      setReadingNote('');
+      setShowAddReading(false);
+      setSelectedMeterTab('history');
+    } catch {
+      alert('Failed to add meter reading');
+    }
+  }, [readingNote, readingRecordedAt, readingValue, selectedMeter, selectedMeterReadings, updateLocalMeter]);
+  const handleCreateTrigger = React.useCallback(async () => {
+    if (!selectedMeter) return;
+    if (!triggerForm.title.trim()) {
+      alert('Work order title is required');
+      return;
+    }
+    const triggerValueText = `${triggerForm.condition} ${triggerForm.value} ${selectedMeter.unit || ''}`.trim();
+    const now = new Date().toISOString();
+    const nextTrigger = {
+      id: `trigger-${Date.now()}`,
+      title: triggerForm.title.trim(),
+      type: triggerForm.mode,
+      when: triggerForm.condition,
+      value: Number(triggerForm.value || 0),
+      triggerValue: triggerValueText,
+      due: {
+        amount: Number(triggerForm.dueAmount || 0),
+        unit: triggerForm.dueUnit,
+      },
+      description: triggerForm.description,
+      priority: triggerForm.priority,
+      category: triggerForm.category,
+      location: triggerForm.location,
+      asset: triggerForm.asset,
+      primaryAssignee: triggerForm.primaryAssignee,
+      additionalWorker: triggerForm.additionalWorker,
+      team: triggerForm.team,
+      purchaseOrder: triggerForm.purchaseOrder,
+      requiresSignature: !!triggerForm.requiresSignature,
+      images: triggerForm.images,
+      files: triggerForm.files,
+      tasks: triggerForm.tasks,
+      checklists: triggerForm.checklists,
+      lastWorkOrderCreatedAt: selectedMeterLastReadingLabel === '—' ? '—' : selectedMeterLastReadingLabel,
+      createdAt: now,
+    };
+    const payload = {
+      ...selectedMeter,
+      triggers: [nextTrigger, ...selectedMeterTriggers],
+    };
+    try {
+      const response = await api.put(`/api/meters/${selectedMeter.id || selectedMeter._id}`, payload);
+      updateLocalMeter(response.data || payload);
+      setShowCreateTrigger(false);
+      setTriggerForm(createEmptyTrigger());
+    } catch {
+      alert('Failed to create trigger');
+    }
+  }, [createEmptyTrigger, selectedMeter, selectedMeterLastReadingLabel, selectedMeterTriggers, triggerForm, updateLocalMeter]);
+  const exportMeterReadings = React.useCallback(() => {
+    if (!selectedMeter) return;
+    const rows = selectedMeterReadings.map((entry) => ({
+      value: entry.value,
+      unit: selectedMeter.unit || '',
+      createdAt: entry.createdAt || '',
+      note: entry.note || '',
+    }));
+    const csv = [
+      ['value', 'unit', 'createdAt', 'note'].join(','),
+      ...rows.map((row) => [
+        row.value,
+        `"${String(row.unit).replace(/"/g, '""')}"`,
+        row.createdAt,
+        `"${String(row.note).replace(/"/g, '""')}"`,
+      ].join(',')),
+    ].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `${String(selectedMeter.name || 'meter-readings').replace(/\s+/g, '-').toLowerCase()}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
+    setShowMeterActionsMenu(false);
+  }, [selectedMeter, selectedMeterReadings]);
+  const importMeterReadings = React.useCallback(async (file) => {
+    if (!selectedMeter || !file) return;
+    const text = await file.text();
+    let importedReadings = [];
+    try {
+      if (file.name.toLowerCase().endsWith('.json')) {
+        const parsed = JSON.parse(text);
+        importedReadings = (Array.isArray(parsed) ? parsed : []).map((entry, index) => ({
+          id: entry.id || `imported-${Date.now()}-${index}`,
+          value: Number(entry.value ?? entry.reading ?? 0) || 0,
+          createdAt: entry.createdAt || entry.date || new Date().toISOString(),
+          note: entry.note || 'Imported reading',
+        }));
+      } else {
+        const [headerLine, ...lines] = text.split(/\r?\n/).filter(Boolean);
+        const headers = headerLine.split(',').map((item) => item.trim().toLowerCase());
+        importedReadings = lines.map((line, index) => {
+          const cells = line.split(',').map((cell) => cell.replace(/^"|"$/g, '').trim());
+          const row = Object.fromEntries(headers.map((header, cellIndex) => [header, cells[cellIndex] || '']));
+          return {
+            id: `imported-${Date.now()}-${index}`,
+            value: Number(row.value ?? row.reading ?? 0) || 0,
+            createdAt: row.createdat || row.date || new Date().toISOString(),
+            note: row.note || 'Imported reading',
+          };
+        });
+      }
+    } catch {
+      alert('Failed to parse reading file');
+      return;
+    }
+    if (!importedReadings.length) {
+      alert('No readings found in file');
+      return;
+    }
+    const nextReadings = [...importedReadings, ...selectedMeterReadings]
+      .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    const latest = nextReadings[0];
+    const payload = {
+      ...selectedMeter,
+      readings: nextReadings,
+      reading: Number(latest?.value || 0),
+      lastReadingAt: latest?.createdAt || new Date().toISOString(),
+    };
+    try {
+      const response = await api.put(`/api/meters/${selectedMeter.id || selectedMeter._id}`, payload);
+      updateLocalMeter(response.data || payload);
+      setSelectedMeterTab('history');
+      setShowMeterActionsMenu(false);
+    } catch {
+      alert('Failed to import readings');
+    } finally {
+      if (meterImportInputRef.current) meterImportInputRef.current.value = '';
+    }
+  }, [selectedMeter, selectedMeterReadings, updateLocalMeter]);
+  if (selectedMeter) {
+    return (
+      <div className="-m-6 min-h-screen bg-[#f8fafc]">
+        <div className="border-b border-gray-200 bg-white">
+          <div className="flex items-center justify-between px-8 py-4">
+            <div className="flex items-center gap-5">
+              <button type="button" onClick={closeMeterDetails} className="rounded-lg p-2 text-gray-600 hover:bg-gray-100">
+                <ArrowLeft className="h-6 w-6" />
+              </button>
+              <div className="h-10 w-px bg-gray-200" />
+              <h2 className="text-[2rem] font-black text-gray-900">{selectedMeter.name || 'Meter Details'}</h2>
+            </div>
+            <div className="flex items-center gap-4">
+              <button type="button" onClick={openEditMeter} className="rounded-lg border border-gray-300 bg-white px-6 py-3 text-lg font-medium text-gray-900 hover:bg-gray-50">
+                Edit
+              </button>
+              <button type="button" onClick={handleDeleteMeter} className="rounded-lg bg-rose-600 px-6 py-3 text-lg font-semibold text-white hover:bg-rose-700">
+                Delete
+              </button>
+              <button type="button" onClick={() => setShowAddReading(true)} className="rounded-lg bg-blue-600 px-6 py-3 text-lg font-semibold text-white hover:bg-blue-700">
+                Add Reading
+              </button>
+              <div className="relative">
+                <input
+                  ref={meterImportInputRef}
+                  type="file"
+                  accept=".csv,.json,text/csv,application/json"
+                  className="hidden"
+                  onChange={(e) => importMeterReadings(e.target.files?.[0])}
+                />
+                <button type="button" onClick={() => setShowMeterActionsMenu((prev) => !prev)} className="rounded-lg p-2 text-gray-500 hover:bg-gray-100">
+                  <MoreHorizontal className="h-6 w-6" />
+                </button>
+                {showMeterActionsMenu && (
+                  <div className="absolute right-0 top-14 z-20 w-80 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl">
+                    <button
+                      type="button"
+                      onClick={() => meterImportInputRef.current?.click()}
+                      className="flex w-full items-center gap-4 px-6 py-5 text-left text-[1rem] text-gray-800 hover:bg-gray-50"
+                    >
+                      <ArrowUpDown className="h-6 w-6 text-gray-600" />
+                      <span>Import Meter Readings</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={exportMeterReadings}
+                      className="flex w-full items-center gap-4 border-t border-gray-100 px-6 py-5 text-left text-[1rem] text-gray-800 hover:bg-gray-50"
+                    >
+                      <Download className="h-6 w-6 text-gray-600" />
+                      <span>Export Meter Readings</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-8 px-8">
+            {[
+              ['details', 'Details'],
+              ['history', 'History'],
+            ].map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setSelectedMeterTab(key)}
+                className={`border-b-2 px-0 py-5 text-[1.05rem] font-semibold ${selectedMeterTab === key ? 'border-blue-500 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="grid min-h-[calc(100vh-120px)] grid-cols-1 xl:grid-cols-[1fr_360px]">
+          <div className="border-r border-gray-200 px-8 py-8">
+            {selectedMeterTab === 'details' ? (
+              <div className="space-y-8">
+                <section className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
+                  <h3 className="mb-8 text-[1.65rem] font-bold text-gray-900">Details</h3>
+                  <div className="divide-y divide-gray-200">
+                    {[
+                      ['Update Frequency', selectedMeterFrequencyLabel],
+                      ['Units', selectedMeter.unit || '—'],
+                      ['Last Reading', selectedMeterLastReadingLabel],
+                      ['Next Reading', selectedMeterNextReadingLabel],
+                      ['Category', selectedMeter.category || selectedMeter.type || '—'],
+                      ['Date Created', formatDateOnly(selectedMeter.createdAt)],
+                    ].map(([label, value]) => (
+                      <div key={label} className="grid grid-cols-[220px_1fr] gap-6 py-5">
+                        <div className="text-[1rem] text-gray-500">{label}</div>
+                        <div className="text-[1rem] text-gray-900">{value}</div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+                <section className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
+                  <div className="mb-6 flex items-start justify-between gap-6">
+                    <div>
+                      <h3 className="text-[1.65rem] font-bold text-gray-900">Monthly Consumption</h3>
+                      <p className="mt-2 text-[0.98rem] text-gray-500">Track month-by-month usage so the company can compare trends and make spending decisions.</p>
+                    </div>
+                    {selectedMonthInsight && (
+                      <div className="rounded-2xl bg-blue-50 px-5 py-4 text-right">
+                        <div className="text-[0.82rem] font-semibold uppercase tracking-[0.12em] text-blue-700">Current Month</div>
+                        <div className="mt-1 text-[1.45rem] font-bold text-gray-900">{selectedMonthInsight.consumption.toLocaleString()} {selectedMeter.unit || ''}</div>
+                        <div className="mt-1 text-[0.92rem] text-gray-600">{selectedMonthInsight.label}</div>
+                        {selectedMonthInsight.variance !== null && (
+                          <div className={`mt-2 text-[0.92rem] font-semibold ${selectedMonthInsight.variance > 0 ? 'text-rose-600' : selectedMonthInsight.variance < 0 ? 'text-emerald-600' : 'text-gray-500'}`}>
+                            {selectedMonthInsight.variance > 0 ? '+' : ''}{selectedMonthInsight.variance.toLocaleString()} vs previous month
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <div className="overflow-hidden rounded-2xl border border-gray-200">
+                    <table className="min-w-full border-collapse text-left">
+                      <thead className="bg-white">
+                        <tr className="border-b border-gray-200">
+                          {['Month', 'Opening', 'Closing', 'Consumption', 'Records'].map((heading) => (
+                            <th key={heading} className="px-6 py-4 text-[0.95rem] font-bold text-gray-900">{heading}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedMeterMonthlyRecords.length > 0 ? selectedMeterMonthlyRecords.map((row) => (
+                          <tr key={row.monthKey} className="border-b border-gray-100 last:border-b-0">
+                            <td className="px-6 py-5 text-[0.95rem] text-gray-900">{row.label}</td>
+                            <td className="px-6 py-5 text-[0.95rem] text-gray-700">{row.opening.toLocaleString()}</td>
+                            <td className="px-6 py-5 text-[0.95rem] text-gray-700">{row.closing.toLocaleString()}</td>
+                            <td className="px-6 py-5 text-[0.95rem] font-semibold text-gray-900">{row.consumption.toLocaleString()} {selectedMeter.unit || ''}</td>
+                            <td className="px-6 py-5 text-[0.95rem] text-gray-700">{row.records}</td>
+                          </tr>
+                        )) : (
+                          <tr>
+                            <td colSpan="5" className="px-6 py-12 text-center text-[0.95rem] text-gray-500">Add monthly readings to see consumption trends.</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+                <section className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
+                  <div className="mb-8 flex items-center justify-between">
+                    <h3 className="text-[1.65rem] font-bold text-gray-900">Work Order Triggers</h3>
+                    <button type="button" onClick={openCreateTrigger} className="rounded-lg bg-blue-600 px-6 py-3 text-lg font-semibold text-white hover:bg-blue-700">
+                      Create Trigger
+                    </button>
+                  </div>
+                  <div className="overflow-hidden rounded-2xl border border-gray-200">
+                    <table className="min-w-full border-collapse text-left">
+                      <thead className="bg-white">
+                        <tr className="border-b border-gray-200">
+                          {['Title', 'Trigger Value', 'Last Work Order Created At', 'Date Created', ''].map((heading) => (
+                            <th key={heading} className="px-6 py-4 text-[0.95rem] font-bold text-gray-900">{heading}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedMeterTriggers.length > 0 ? selectedMeterTriggers.map((trigger, index) => (
+                          <tr key={trigger.id || trigger._id || `trigger-${index}`} className="border-b border-gray-100 last:border-b-0">
+                            <td className="px-6 py-5 text-[0.95rem] text-gray-900">{trigger.title || 'Untitled Trigger'}</td>
+                            <td className="px-6 py-5 text-[0.95rem] text-gray-700">{trigger.triggerValue || trigger.value || '—'}</td>
+                            <td className="px-6 py-5 text-[0.95rem] text-gray-700">{trigger.lastWorkOrderCreatedAt || trigger.lastWorkOrder || '—'}</td>
+                            <td className="px-6 py-5 text-[0.95rem] text-gray-700">{formatDateOnly(trigger.createdAt)}</td>
+                            <td className="px-6 py-5 text-right text-gray-500"><MoreVertical className="ml-auto h-5 w-5" /></td>
+                          </tr>
+                        )) : (
+                          <tr>
+                            <td colSpan="5" className="px-6 py-12 text-center text-[0.95rem] text-gray-500">No triggers yet</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              </div>
+            ) : (
+              <section className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
+                <h3 className="mb-8 text-[1.65rem] font-bold text-gray-900">Reading History</h3>
+                <div className="overflow-hidden rounded-2xl border border-gray-200">
+                  <table className="min-w-full border-collapse text-left">
+                    <thead className="bg-white">
+                      <tr className="border-b border-gray-200">
+                        {['Reading', 'Units', 'Recorded At', 'Note'].map((heading) => (
+                          <th key={heading} className="px-6 py-4 text-[0.95rem] font-bold text-gray-900">{heading}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedMeterReadings.map((entry) => (
+                        <tr key={entry.id} className="border-b border-gray-100 last:border-b-0">
+                          <td className="px-6 py-5 text-[0.95rem] text-gray-900">{Number(entry.value || 0).toLocaleString()}</td>
+                          <td className="px-6 py-5 text-[0.95rem] text-gray-700">{selectedMeter.unit || '—'}</td>
+                          <td className="px-6 py-5 text-[0.95rem] text-gray-700">{formatCreatedAt(entry.createdAt)}</td>
+                          <td className="px-6 py-5 text-[0.95rem] text-gray-700">{entry.note || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            )}
+          </div>
+          <aside className="bg-white">
+            {[
+              ['Asset', selectedMeter.asset || '—'],
+              ['Location', selectedMeter.location || '—'],
+              ['Assigned To', resolveAssignedName(selectedMeter.worker)],
+            ].map(([label, value], index) => (
+              <div key={label} className={`px-8 py-10 ${index < 2 ? 'border-b border-gray-200' : ''}`}>
+                <h4 className="mb-8 text-[1.3rem] font-bold text-gray-900">{label}</h4>
+                {label === 'Assigned To' && value !== '—' ? (
+                  <div className="flex items-center gap-4">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-full bg-purple-700 text-lg font-semibold text-white">
+                      {String(value).charAt(0).toUpperCase()}
+                    </div>
+                    <div className="text-[1rem] text-gray-900">{value}</div>
+                  </div>
+                ) : (
+                  <div className="text-[1rem] text-gray-900">{value}</div>
+                )}
+              </div>
+            ))}
+            <div className="border-t border-gray-200 px-8 py-10">
+              <h4 className="mb-4 text-[1.3rem] font-bold text-gray-900">Email Notifications</h4>
+              <div className="space-y-3">
+                <div className="rounded-xl bg-gray-50 px-4 py-3 text-[0.95rem] text-gray-700">
+                  Reminder day each month: <span className="font-semibold text-gray-900">{selectedMeter.reminderDay || 1}</span>
+                </div>
+                <div className="rounded-xl bg-gray-50 px-4 py-3 text-[0.95rem] text-gray-700">
+                  Technician category: <span className="font-semibold text-gray-900">{selectedMeter.technicianCategory || selectedMeter.category || selectedMeter.type || '—'}</span>
+                </div>
+                <div className="rounded-xl border border-gray-200">
+                  <div className="border-b border-gray-200 px-4 py-3 text-[0.95rem] font-semibold text-gray-900">Recipients</div>
+                  <div className="divide-y divide-gray-100">
+                    {selectedMeterRecipients.length > 0 ? selectedMeterRecipients.map((recipient) => (
+                      <div key={`${recipient.email}-${recipient.source}`} className="px-4 py-3">
+                        <div className="text-[0.95rem] font-medium text-gray-900">{recipient.name}</div>
+                        <div className="mt-1 text-[0.88rem] text-gray-500">{recipient.email} • {recipient.source}</div>
+                      </div>
+                    )) : (
+                      <div className="px-4 py-4 text-[0.92rem] text-gray-500">No recipients configured yet.</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </aside>
+        </div>
+
+        {showAddReading && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/40" onClick={() => setShowAddReading(false)} />
+            <div className="relative z-10 w-full max-w-xl rounded-2xl bg-white p-8 shadow-2xl">
+              <div className="mb-8 flex items-start justify-between">
+                <h3 className="text-[2rem] font-bold text-gray-900">Add Meter Reading</h3>
+                <button type="button" onClick={() => setShowAddReading(false)} className="rounded-lg p-2 text-gray-500 hover:bg-gray-100">
+                  <X className="h-8 w-8" />
+                </button>
+              </div>
+              <label className="mb-3 block text-[1rem] text-gray-900">New meter reading ({selectedMeter.unit || 'Units'})</label>
+              <div className="space-y-4">
+                <input
+                  type="number"
+                  value={readingValue}
+                  onChange={(e) => setReadingValue(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-5 py-3 text-[1.5rem] text-gray-900 outline-none focus:border-blue-500"
+                />
+                <div>
+                  <label className="mb-2 block text-[0.95rem] text-gray-700">Recorded month / date</label>
+                  <input
+                    type="date"
+                    value={readingRecordedAt}
+                    onChange={(e) => setReadingRecordedAt(e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 px-4 py-3 text-[1rem] text-gray-900 outline-none focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="mb-2 block text-[0.95rem] text-gray-700">Note</label>
+                  <textarea
+                    rows={3}
+                    value={readingNote}
+                    onChange={(e) => setReadingNote(e.target.value)}
+                    placeholder="Optional monthly note"
+                    className="w-full rounded-lg border border-gray-300 px-4 py-3 text-[1rem] text-gray-900 outline-none focus:border-blue-500"
+                  />
+                </div>
+              </div>
+              <div className="mt-10 flex justify-end gap-3">
+                <button type="button" onClick={() => setShowAddReading(false)} className="rounded-lg border border-gray-300 bg-white px-6 py-3 text-lg font-medium text-gray-900 hover:bg-gray-50">
+                  Cancel
+                </button>
+                <button type="button" onClick={handleAddReading} className="rounded-lg bg-blue-600 px-6 py-3 text-lg font-semibold text-white hover:bg-blue-700">
+                  Add Reading
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showEditMeter && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/40" onClick={() => setShowEditMeter(false)} />
+            <div className="relative glass-surface-strong z-10 w-full max-w-2xl rounded-xl p-6">
+              <h3 className="mb-5 text-xl font-bold">Edit Meter</h3>
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-sm font-semibold text-gray-700">Name *</label>
+                    <input value={editMeter.name} onChange={(e) => setEditMeter({ ...editMeter, name: e.target.value })} className="w-full rounded-lg border p-3" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-semibold text-gray-700">Unit of Measurement *</label>
+                    <input value={editMeter.unit} onChange={(e) => setEditMeter({ ...editMeter, unit: e.target.value })} className="w-full rounded-lg border p-3" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-semibold text-gray-700">Frequency *</label>
+                    <input type="number" min="0" value={editMeter.frequency} onChange={(e) => setEditMeter({ ...editMeter, frequency: e.target.value })} className="w-full rounded-lg border p-3" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-semibold text-gray-700">Type</label>
+                    <select value={editMeter.type} onChange={(e) => setEditMeter({ ...editMeter, type: e.target.value })} className="w-full rounded-lg border p-3">
+                      {meterCategoryOptions.map((option) => <option key={option}>{option}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-semibold text-gray-700">Worker</label>
+                    <select value={editMeter.worker} onChange={(e) => setEditMeter({ ...editMeter, worker: e.target.value })} className="w-full rounded-lg border p-3">
+                      <option value="">Select worker</option>
+                      {workerOptions.map((worker) => (
+                        <option key={`${worker.kind}-${worker.value}`} value={worker.label}>{worker.label} ({worker.kind})</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-semibold text-gray-700">Location</label>
+                    <select value={editMeter.location} onChange={(e) => setEditMeter({ ...editMeter, location: e.target.value })} className="w-full rounded-lg border p-3">
+                      <option value="">Select location</option>
+                      {(propertiesProp || []).map((property) => (
+                        <option key={property.id || property._id} value={property.name || property.title || property.location || ''}>{property.name || property.title || property.location || 'Location'}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-semibold text-gray-700">Asset</label>
+                    <select value={editMeter.asset} onChange={(e) => setEditMeter({ ...editMeter, asset: e.target.value })} className="w-full rounded-lg border p-3">
+                      <option value="">Select asset</option>
+                      {(assetsProp || []).map((asset) => (
+                        <option key={asset.id || asset._id} value={asset.name || asset.title || ''}>{asset.name || asset.title || asset.assetName || 'Asset'}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-semibold text-gray-700">Category</label>
+                    <select value={editMeter.category} onChange={(e) => setEditMeter({ ...editMeter, category: e.target.value })} className="w-full rounded-lg border p-3">
+                      <option value="">Select category</option>
+                      {meterCategories.map((category) => (
+                        <option key={category} value={category}>{category}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-semibold text-gray-700">Monthly target</label>
+                    <input type="number" min="0" value={editMeter.monthlyTarget} onChange={(e) => setEditMeter({ ...editMeter, monthlyTarget: e.target.value })} className="w-full rounded-lg border p-3" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-semibold text-gray-700">Reminder day</label>
+                    <input type="number" min="1" max="31" value={editMeter.reminderDay} onChange={(e) => setEditMeter({ ...editMeter, reminderDay: e.target.value })} className="w-full rounded-lg border p-3" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-semibold text-gray-700">Technician category</label>
+                    <select value={editMeter.technicianCategory} onChange={(e) => setEditMeter({ ...editMeter, technicianCategory: e.target.value })} className="w-full rounded-lg border p-3">
+                      <option value="">Use meter category</option>
+                      {meterCategories.map((category) => (
+                        <option key={`tech-${category}`} value={category}>{category}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="mb-1 block text-sm font-semibold text-gray-700">Additional email recipients</label>
+                    <input value={editMeter.customEmails} onChange={(e) => setEditMeter({ ...editMeter, customEmails: e.target.value })} placeholder="ops@company.com, utilities@company.com" className="w-full rounded-lg border p-3" />
+                  </div>
+                  <div className="md:col-span-2 grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <label className="flex items-center gap-3 rounded-lg border p-3 text-sm text-gray-700">
+                      <input type="checkbox" checked={!!editMeter.notifyAdmins} onChange={(e) => setEditMeter({ ...editMeter, notifyAdmins: e.target.checked })} className="h-4 w-4" />
+                      Notify administrators
+                    </label>
+                    <label className="flex items-center gap-3 rounded-lg border p-3 text-sm text-gray-700">
+                      <input type="checkbox" checked={!!editMeter.notifyCategoryTechnicians} onChange={(e) => setEditMeter({ ...editMeter, notifyCategoryTechnicians: e.target.checked })} className="h-4 w-4" />
+                      Notify category technicians
+                    </label>
+                  </div>
+                </div>
+                <div className="mt-4 flex justify-end gap-2">
+                  <button type="button" onClick={() => setShowEditMeter(false)} className="rounded bg-white px-3 py-2 text-gray-700 shadow">
+                    Cancel
+                  </button>
+                  <button type="button" onClick={saveEditedMeter} className="rounded bg-blue-600 px-4 py-2 text-white">
+                    Save
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showCreateTrigger && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4">
+            <div className="absolute inset-0" onClick={() => setShowCreateTrigger(false)} />
+            <div className="relative z-10 flex h-[92vh] w-full max-w-[1420px] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+              <div className="flex items-center justify-between border-b border-gray-200 px-6 py-5">
+                <div className="flex items-center gap-5">
+                  <button type="button" onClick={() => setShowCreateTrigger(false)} className="rounded-lg p-2 text-gray-600 hover:bg-gray-100">
+                    <X className="h-7 w-7" />
+                  </button>
+                  <div className="h-10 w-px bg-gray-200" />
+                  <h3 className="text-[2.1rem] font-bold text-gray-900">Create Work Order Trigger</h3>
+                </div>
+                <div className="flex items-center gap-4">
+                  <button type="button" onClick={() => setShowCreateTrigger(false)} className="rounded-lg border border-gray-300 bg-white px-6 py-3 text-lg font-medium text-gray-900 hover:bg-gray-50">
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCreateTrigger}
+                    disabled={!canCreateTrigger}
+                    className={`rounded-lg px-6 py-3 text-lg font-semibold transition ${
+                      canCreateTrigger
+                        ? 'bg-blue-600 text-white hover:bg-blue-700'
+                        : 'cursor-not-allowed bg-gray-100 text-gray-500'
+                    }`}
+                  >
+                    Create Trigger
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid flex-1 grid-cols-1 overflow-hidden xl:grid-cols-[1fr_420px]">
+                <div className="overflow-y-auto border-r border-gray-200 px-6 py-8">
+                  <div className="space-y-10 pr-4">
+                    <section>
+                      <h4 className="mb-8 text-[1.75rem] font-bold text-gray-900">Trigger Details</h4>
+                      <div className="mb-8 space-y-5">
+                        {[
+                          ['every', 'Trigger every time'],
+                          ['once', 'One-time trigger'],
+                        ].map(([value, label]) => (
+                          <label key={value} className="flex items-center gap-4 text-[1rem] text-gray-700">
+                            <input
+                              type="radio"
+                              name="trigger-mode"
+                              checked={triggerForm.mode === value}
+                              onChange={() => setTriggerForm((prev) => ({ ...prev, mode: value }))}
+                              className="h-6 w-6 accent-blue-600"
+                            />
+                            <span>{label}</span>
+                          </label>
+                        ))}
+                      </div>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div>
+                          <label className="mb-2 block text-[1rem] text-gray-700">When meter reading *</label>
+                          <select
+                            value={triggerForm.condition}
+                            onChange={(e) => setTriggerForm((prev) => ({ ...prev, condition: e.target.value }))}
+                            className="w-full rounded-lg border border-gray-300 px-4 py-3 text-[1rem] text-gray-900"
+                          >
+                            <option>Greater than</option>
+                            <option>Greater than or equal to</option>
+                            <option>Less than</option>
+                            <option>Less than or equal to</option>
+                            <option>Equal to</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="mb-2 block text-[1rem] text-gray-700">Value ({selectedMeter.unit || 'Units'}) *</label>
+                          <input
+                            type="number"
+                            value={triggerForm.value}
+                            onChange={(e) => setTriggerForm((prev) => ({ ...prev, value: e.target.value }))}
+                            className="w-full rounded-lg border border-gray-300 px-4 py-3 text-[1rem] text-gray-900"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-2 block text-[1rem] text-gray-700">Due *</label>
+                          <input
+                            type="number"
+                            value={triggerForm.dueAmount}
+                            onChange={(e) => setTriggerForm((prev) => ({ ...prev, dueAmount: e.target.value }))}
+                            className="w-full rounded-lg border border-gray-300 px-4 py-3 text-[1rem] text-gray-900"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-2 block text-[1rem] text-gray-700">Select Frequency *</label>
+                          <div className="flex items-center gap-3">
+                            <select
+                              value={triggerForm.dueUnit}
+                              onChange={(e) => setTriggerForm((prev) => ({ ...prev, dueUnit: e.target.value }))}
+                              className="w-full rounded-lg border border-gray-300 px-4 py-3 text-[1rem] text-gray-900"
+                            >
+                              <option>Hours</option>
+                              <option>Days</option>
+                              <option>Weeks</option>
+                            </select>
+                            <span className="whitespace-nowrap text-[1rem] text-gray-700">after trigger</span>
+                          </div>
+                        </div>
+                      </div>
+                    </section>
+
+                    <section>
+                      <h4 className="mb-8 text-[1.75rem] font-bold text-gray-900">Work Order Details</h4>
+                      <div className="space-y-5">
+                        <div>
+                          <label className="mb-2 block text-[1rem] text-gray-700">Work Order Title *</label>
+                          <input
+                            value={triggerForm.title}
+                            onChange={(e) => setTriggerForm((prev) => ({ ...prev, title: e.target.value }))}
+                            className="w-full rounded-lg border border-gray-300 px-4 py-3 text-[1rem] text-gray-900"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-2 block text-[1rem] text-gray-700">Description</label>
+                          <textarea
+                            rows={4}
+                            value={triggerForm.description}
+                            onChange={(e) => setTriggerForm((prev) => ({ ...prev, description: e.target.value }))}
+                            className="w-full rounded-lg border border-gray-300 px-4 py-3 text-[1rem] text-gray-900"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-2 block text-[1rem] text-gray-700">Images</label>
+                          <div className="rounded-lg border border-dashed border-gray-300 px-6 py-8 text-center">
+                            <button type="button" className="rounded-lg border border-gray-300 bg-white px-6 py-3 text-lg font-medium text-gray-900">Upload</button>
+                            <span className="ml-5 text-[1rem] text-gray-500">or Drop Images</span>
+                          </div>
+                        </div>
+                        <div>
+                          <label className="mb-2 block text-[1rem] text-gray-700">Priority</label>
+                          <select
+                            value={triggerForm.priority}
+                            onChange={(e) => setTriggerForm((prev) => ({ ...prev, priority: e.target.value }))}
+                            className="w-full rounded-lg border border-gray-300 px-4 py-3 text-[1rem] text-gray-900"
+                          >
+                            <option value="">Select priority</option>
+                            <option>HIGH</option>
+                            <option>MEDIUM</option>
+                            <option>LOW</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="mb-2 block text-[1rem] text-gray-700">Category</label>
+                          <select
+                            value={triggerForm.category}
+                            onChange={(e) => setTriggerForm((prev) => ({ ...prev, category: e.target.value }))}
+                            className="w-full rounded-lg border border-gray-300 px-4 py-3 text-[1rem] text-gray-900"
+                          >
+                            <option value="">Select category</option>
+                            {meterCategories.map((category) => (
+                              <option key={category} value={category}>{category}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    </section>
+
+                    <section>
+                      <h4 className="mb-8 text-[1.75rem] font-bold text-gray-900">Location & Asset</h4>
+                      <div className="space-y-5">
+                        <div>
+                          <label className="mb-2 block text-[1rem] text-gray-700">Location</label>
+                          <select
+                            value={triggerForm.location}
+                            onChange={(e) => setTriggerForm((prev) => ({ ...prev, location: e.target.value }))}
+                            className="w-full rounded-lg border border-gray-300 px-4 py-3 text-[1rem] text-gray-900"
+                          >
+                            <option value="">Select location</option>
+                            {locationOptions.map((location) => (
+                              <option key={location} value={location}>{location}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="mb-2 block text-[1rem] text-gray-700">Asset</label>
+                          <select
+                            value={triggerForm.asset}
+                            onChange={(e) => setTriggerForm((prev) => ({ ...prev, asset: e.target.value }))}
+                            className="w-full rounded-lg border border-gray-300 px-4 py-3 text-[1rem] text-gray-900"
+                          >
+                            <option value="">Select asset</option>
+                            {assetOptions.map((asset) => (
+                              <option key={asset} value={asset}>{asset}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    </section>
+
+                    <section>
+                      <h4 className="mb-4 text-[1.75rem] font-bold text-gray-900">Files</h4>
+                      <p className="mb-8 text-[1rem] text-gray-500">Add files to this work order by dropping them here or selecting from your computer.</p>
+                      <div className="rounded-lg border border-dashed border-gray-300 px-6 py-10 text-center">
+                        <button type="button" className="rounded-lg border border-gray-300 bg-white px-6 py-3 text-lg font-medium text-gray-900">Upload</button>
+                        <span className="ml-5 text-[1rem] text-gray-500">or Drop Files</span>
+                      </div>
+                      <button type="button" className="mt-8 text-[1rem] font-medium text-blue-600 hover:underline">Add from Saved Files</button>
+                    </section>
+
+                    <section>
+                      <h4 className="mb-8 text-[1.75rem] font-bold text-gray-900">Tasks</h4>
+                      <div className="flex flex-wrap gap-4">
+                        <button type="button" className="inline-flex items-center gap-3 rounded-lg border border-blue-500 bg-white px-6 py-3 text-lg font-medium text-blue-600">
+                          <Plus className="h-6 w-6" /> Add Tasks
+                        </button>
+                        <button type="button" className="inline-flex items-center gap-3 rounded-lg border border-blue-500 bg-white px-6 py-3 text-lg font-medium text-blue-600">
+                          <Plus className="h-6 w-6" /> Add Checklist
+                        </button>
+                      </div>
+                    </section>
+                  </div>
+                </div>
+
+                <aside className="overflow-y-auto bg-white px-6 py-8">
+                  <div className="space-y-10 pr-2">
+                    <section>
+                      <h4 className="mb-8 text-[1.75rem] font-bold text-gray-900">Structure & Settings</h4>
+                      <div className="border-t border-gray-200 pt-10">
+                        <input
+                          value={triggerForm.dueUnit}
+                          onChange={(e) => setTriggerForm((prev) => ({ ...prev, dueUnit: e.target.value }))}
+                          placeholder="Hours"
+                          className="w-full rounded-lg border border-gray-300 px-4 py-3 text-[1rem] text-gray-900"
+                        />
+                      </div>
+                    </section>
+
+                    <section className="border-t border-gray-200 pt-10">
+                      <h4 className="mb-3 text-[1.5rem] font-bold text-gray-900">Workers & Teams</h4>
+                      <p className="mb-8 text-[1rem] text-gray-500">Assign workers and teams to this work order</p>
+                      <div className="space-y-6">
+                        <div>
+                          <label className="mb-2 block text-[1rem] text-gray-700">Primary Assignee</label>
+                          <select
+                            value={triggerForm.primaryAssignee}
+                            onChange={(e) => setTriggerForm((prev) => ({ ...prev, primaryAssignee: e.target.value }))}
+                            className="w-full rounded-lg border border-gray-300 px-4 py-3 text-[1rem] text-gray-900"
+                          >
+                            <option value="">Select assignee</option>
+                            {workerOptions.map((worker) => (
+                              <option key={`${worker.kind}-${worker.value}`} value={worker.label}>{worker.label}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="mb-2 block text-[1rem] text-gray-700">Additional Workers</label>
+                          <select
+                            value={triggerForm.additionalWorker}
+                            onChange={(e) => setTriggerForm((prev) => ({ ...prev, additionalWorker: e.target.value }))}
+                            className="w-full rounded-lg border border-gray-300 px-4 py-3 text-[1rem] text-gray-900"
+                          >
+                            <option value="">Select additional worker</option>
+                            {workerOptions.map((worker) => (
+                              <option key={`additional-${worker.kind}-${worker.value}`} value={worker.label}>{worker.label}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="mb-2 block text-[1rem] text-gray-700">Team</label>
+                          <select
+                            value={triggerForm.team}
+                            onChange={(e) => setTriggerForm((prev) => ({ ...prev, team: e.target.value }))}
+                            className="w-full rounded-lg border border-gray-300 px-4 py-3 text-[1rem] text-gray-900"
+                          >
+                            <option value="">Select team</option>
+                            {(teamsProp || []).map((team) => (
+                              <option key={team.id || team._id || team.name} value={team.name || team.title || ''}>{team.name || team.title || 'Team'}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    </section>
+
+                    <section className="border-t border-gray-200 pt-10">
+                      <h4 className="mb-8 text-[1.5rem] font-bold text-gray-900">Assign Purchase Orders</h4>
+                      <div>
+                        <label className="mb-2 block text-[1rem] text-gray-700">Purchase Order</label>
+                        <select
+                          value={triggerForm.purchaseOrder}
+                          onChange={(e) => setTriggerForm((prev) => ({ ...prev, purchaseOrder: e.target.value }))}
+                          className="w-full rounded-lg border border-gray-300 px-4 py-3 text-[1rem] text-gray-900"
+                        >
+                          <option value="">Select purchase order</option>
+                        </select>
+                      </div>
+                    </section>
+
+                    <section className="border-t border-gray-200 pt-10">
+                      <h4 className="mb-3 text-[1.5rem] font-bold text-gray-900">Signature Required</h4>
+                      <p className="mb-8 text-[1rem] text-gray-500">Require technicians to upload a signature image in order to complete this work order.</p>
+                      <label className="flex items-center gap-4">
+                        <button
+                          type="button"
+                          onClick={() => setTriggerForm((prev) => ({ ...prev, requiresSignature: !prev.requiresSignature }))}
+                          className={`relative h-8 w-14 rounded-full transition ${triggerForm.requiresSignature ? 'bg-blue-600' : 'bg-gray-300'}`}
+                        >
+                          <span className={`absolute top-1 h-6 w-6 rounded-full bg-white transition ${triggerForm.requiresSignature ? 'left-7' : 'left-1'}`} />
+                        </button>
+                        <div>
+                          <div className="text-[1rem] font-medium text-gray-900">Requires Signature</div>
+                          <div className="text-[0.95rem] text-gray-500">Work order will require a signature</div>
+                        </div>
+                      </label>
+                    </section>
+                  </div>
+                </aside>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <div><h2 className="text-xl font-bold text-gray-900">Meters</h2><p className="text-sm text-gray-500 mt-0.5">Live readings from all property meters</p></div>
-        <button onClick={() => setShowAdd(true)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 shadow-sm">
-          <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg> Add Meter
-        </button>
+    <div className="-m-6 flex flex-col bg-[#f8fafc] min-h-screen">
+      <div className="border-b border-gray-200 bg-white">
+        <div className="flex items-center justify-between px-8 py-4">
+          <h2 className="text-[2.1rem] font-black text-gray-900">Meters</h2>
+          <div className="flex items-center gap-4">
+            <button onClick={() => setShowAdd(true)} className="rounded-lg bg-blue-600 px-6 py-3 text-lg font-semibold text-white hover:bg-blue-700">
+              Create Meter
+            </button>
+            <button type="button" className="rounded-lg p-2 text-gray-500 hover:bg-gray-100">
+              <MoreHorizontal className="h-6 w-6" />
+            </button>
+          </div>
+        </div>
+        <div className="flex items-center justify-between border-t border-gray-100 px-8 py-3">
+          <div className="flex items-center gap-8 text-[0.95rem] font-semibold text-gray-700">
+            <span className="flex items-center gap-3"><ArrowUpDown className="h-5 w-5 text-gray-500" /> Sort: Date Created</span>
+            <span className="flex items-center gap-3"><LayoutDashboard className="h-5 w-5 text-gray-500" /> Columns</span>
+          </div>
+          <div className="relative w-full max-w-sm">
+            <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search" className="w-full rounded-lg border border-blue-500 bg-white py-2.5 pl-12 pr-4 text-base text-gray-900 shadow-sm outline-none ring-2 ring-blue-100" />
+          </div>
+        </div>
+        <div className="flex items-center justify-between border-t border-gray-100 px-8 py-4">
+          <div className="flex items-center gap-3">
+            <button type="button" className="inline-flex items-center gap-3 rounded-2xl border border-gray-300 bg-white px-5 py-2.5 text-[0.95rem] font-semibold text-gray-700 shadow-sm">
+              <SlidersHorizontal className="h-5 w-5 text-gray-500" /> Filters
+            </button>
+            <select value={locationFilter} onChange={(e) => setLocationFilter(e.target.value)} className="rounded-2xl border border-gray-300 bg-white px-5 py-2.5 text-[0.95rem] font-semibold text-gray-700 shadow-sm">
+              <option value="">Location</option>
+              {locationOptions.map((location) => <option key={location} value={location}>{location}</option>)}
+            </select>
+            <select value={assetFilter} onChange={(e) => setAssetFilter(e.target.value)} className="rounded-2xl border border-gray-300 bg-white px-5 py-2.5 text-[0.95rem] font-semibold text-gray-700 shadow-sm">
+              <option value="">Asset</option>
+              {assetOptions.map((asset) => <option key={asset} value={asset}>{asset}</option>)}
+            </select>
+            <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className="rounded-2xl border border-gray-300 bg-white px-5 py-2.5 text-[0.95rem] font-semibold text-gray-700 shadow-sm">
+              <option value="">Category</option>
+              {meterCategories.map((category) => <option key={`filter-${category}`} value={category}>{category}</option>)}
+            </select>
+            <button
+              type="button"
+              onClick={() => {
+                setLocationFilter('');
+                setAssetFilter('');
+                setCategoryFilter('');
+                setSearch('');
+              }}
+              className="px-4 py-2 text-[0.95rem] font-medium text-blue-600"
+            >
+              Reset Filters
+            </button>
+          </div>
+          <button type="button" className="text-[0.95rem] font-medium text-gray-700">Save View</button>
+        </div>
       </div>
       {showAdd && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={() => setShowAdd(false)} />
-          <div className="relative glass-surface-strong rounded-xl p-6 w-full max-w-md z-10">
-            <h3 className="text-lg font-bold mb-3">Add Meter</h3>
-            <div className="flex flex-col gap-2">
-              <input value={newMeter.name} onChange={e => setNewMeter({ ...newMeter, name: e.target.value })} placeholder="Name" className="p-2 border rounded" />
-              <select value={newMeter.type} onChange={e => setNewMeter({ ...newMeter, type: e.target.value, unit: e.target.value === 'Water' ? 'mÂ³' : 'kWh' })} className="p-2 border rounded">
-                <option>Electricity</option><option>Water</option><option>Gas</option>
-              </select>
-              <input value={newMeter.location} onChange={e => setNewMeter({ ...newMeter, location: e.target.value })} placeholder="Location" className="p-2 border rounded" />
-              <div className="flex gap-2">
-                <input type="number" value={newMeter.reading} onChange={e => setNewMeter({ ...newMeter, reading: Number(e.target.value) })} className="p-2 border rounded flex-1" />
-                <input value={newMeter.unit} onChange={e => setNewMeter({ ...newMeter, unit: e.target.value })} className="p-2 border rounded w-24" />
+          <div className="relative glass-surface-strong rounded-xl p-6 w-full max-w-2xl z-10">
+            <h3 className="text-xl font-bold mb-5">Add Meter</h3>
+            <div className="space-y-4">
+              <div className="text-sm font-semibold text-gray-700">Details</div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Name *</label>
+                  <input value={newMeter.name} onChange={e => setNewMeter({ ...newMeter, name: e.target.value })} placeholder="Name" className="w-full p-3 border rounded-lg" />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Unit of Measurement *</label>
+                  <input value={newMeter.unit} onChange={e => setNewMeter({ ...newMeter, unit: e.target.value })} placeholder="kWh" className="w-full p-3 border rounded-lg" />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Frequency *</label>
+                  <input type="number" min="0" value={newMeter.frequency} onChange={e => setNewMeter({ ...newMeter, frequency: e.target.value })} placeholder="0" className="w-full p-3 border rounded-lg" />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Type</label>
+                  <select value={newMeter.type} onChange={e => setNewMeter({ ...newMeter, type: e.target.value })} className="w-full p-3 border rounded-lg">
+                    {meterCategoryOptions.map((option) => <option key={option}>{option}</option>)}
+                  </select>
+                </div>
               </div>
-              <div className="flex justify-end gap-2 mt-3">
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Image</label>
+                <label
+                  className="flex min-h-[110px] cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-6 text-center"
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    handleMeterImageUpload(e.dataTransfer.files?.[0]);
+                  }}
+                  onDragOver={(e) => e.preventDefault()}
+                >
+                  <input type="file" accept="image/*" className="hidden" onChange={(e) => handleMeterImageUpload(e.target.files?.[0])} />
+                  <span className="text-sm font-medium text-gray-700">{newMeter.imageName || 'No file chosen'}</span>
+                  <span className="mt-2 text-sm text-blue-600">Upload</span>
+                  <span className="text-xs text-gray-400">or Drop Image</span>
+                </label>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Worker</label>
+                  <select value={newMeter.worker} onChange={e => setNewMeter({ ...newMeter, worker: e.target.value })} className="w-full p-3 border rounded-lg">
+                    <option value="">Select worker</option>
+                    {workerOptions.map((worker) => (
+                      <option key={`${worker.kind}-${worker.value}`} value={worker.label}>
+                        {worker.label} ({worker.kind})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Location</label>
+                  <select value={newMeter.location} onChange={e => setNewMeter({ ...newMeter, location: e.target.value })} className="w-full p-3 border rounded-lg">
+                    <option value="">Select location</option>
+                    {(propertiesProp || []).map((property) => (
+                      <option key={property.id || property._id} value={property.name || property.title || property.location || ''}>{property.name || property.title || property.location || 'Location'}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Asset</label>
+                  <select value={newMeter.asset} onChange={e => setNewMeter({ ...newMeter, asset: e.target.value })} className="w-full p-3 border rounded-lg">
+                    <option value="">Select asset</option>
+                    {(assetsProp || []).map((asset) => (
+                      <option key={asset.id || asset._id} value={asset.name || asset.title || ''}>{asset.name || asset.title || asset.assetName || 'Asset'}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Category</label>
+                  <select value={newMeter.category} onChange={e => setNewMeter({ ...newMeter, category: e.target.value })} className="w-full p-3 border rounded-lg">
+                    <option value="">Select category</option>
+                    {meterCategories.map((category) => (
+                      <option key={category} value={category}>{category}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Monthly target</label>
+                  <input type="number" min="0" value={newMeter.monthlyTarget} onChange={e => setNewMeter({ ...newMeter, monthlyTarget: e.target.value })} placeholder="Optional target" className="w-full p-3 border rounded-lg" />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Reminder day each month</label>
+                  <input type="number" min="1" max="31" value={newMeter.reminderDay} onChange={e => setNewMeter({ ...newMeter, reminderDay: e.target.value })} className="w-full p-3 border rounded-lg" />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Technician category</label>
+                  <select value={newMeter.technicianCategory} onChange={e => setNewMeter({ ...newMeter, technicianCategory: e.target.value })} className="w-full p-3 border rounded-lg">
+                    <option value="">Use meter category</option>
+                    {meterCategories.map((category) => (
+                      <option key={`new-tech-${category}`} value={category}>{category}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Additional email recipients</label>
+                  <input value={newMeter.customEmails} onChange={e => setNewMeter({ ...newMeter, customEmails: e.target.value })} placeholder="admin@company.com, utilities@company.com" className="w-full p-3 border rounded-lg" />
+                </div>
+                <div className="md:col-span-2 grid grid-cols-1 gap-3 md:grid-cols-2">
+                  <label className="flex items-center gap-3 rounded-lg border p-3 text-sm text-gray-700">
+                    <input type="checkbox" checked={!!newMeter.notifyAdmins} onChange={e => setNewMeter({ ...newMeter, notifyAdmins: e.target.checked })} className="h-4 w-4" />
+                    Notify administrators
+                  </label>
+                  <label className="flex items-center gap-3 rounded-lg border p-3 text-sm text-gray-700">
+                    <input type="checkbox" checked={!!newMeter.notifyCategoryTechnicians} onChange={e => setNewMeter({ ...newMeter, notifyCategoryTechnicians: e.target.checked })} className="h-4 w-4" />
+                    Notify technicians in this category
+                  </label>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-4 text-sm text-gray-700">
+                <div className="font-semibold text-gray-900">Who gets notified</div>
+                <div className="mt-2">
+                  {(newMeter.notifyAdmins ? adminRecipients : [])
+                    .concat(newMeter.notifyCategoryTechnicians ? getCategoryTechnicians(newMeter.technicianCategory || newMeter.category || newMeter.type) : [])
+                    .concat(
+                      String(newMeter.customEmails || '').split(',').map((email) => email.trim()).filter(Boolean).map((email) => ({ email, name: email, source: 'Custom email' }))
+                    )
+                    .filter((entry, index, array) => array.findIndex((item) => item.email === entry.email) === index)
+                    .slice(0, 6)
+                    .map((recipient) => (
+                      <div key={`${recipient.email}-${recipient.source}`} className="mt-1">{recipient.name} • {recipient.email}</div>
+                    ))}
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 mt-4">
                 <button onClick={() => setShowAdd(false)} className="px-3 py-2 glass-ghost rounded">Cancel</button>
-                <button onClick={async () => { try { const res = await api.post('/api/meters', newMeter); setMeters(p => [res.data, ...p]); setShowAdd(false); setNewMeter({ name: '', type: 'Electricity', reading: 0, unit: 'kWh', status: 'Normal', location: '' }); } catch { alert('Failed to add meter'); } }} className="px-3 py-2 bg-blue-600 text-white rounded">Create</button>
+                <button
+                  onClick={async () => {
+                    try {
+                      const payload = {
+                        ...newMeter,
+                        reading: Number(newMeter.reading) || 0,
+                        frequency: Number(newMeter.frequency) || 0,
+                        reminderDay: Number(newMeter.reminderDay || 1),
+                        monthlyTarget: newMeter.monthlyTarget === '' ? '' : Number(newMeter.monthlyTarget || 0),
+                      };
+                      const res = await api.post('/api/meters', payload);
+                      setMeters(p => [res.data, ...p]);
+                      setShowAdd(false);
+                      setNewMeter(createEmptyMeter());
+                    } catch {
+                      alert('Failed to add meter');
+                    }
+                  }}
+                  disabled={!newMeter.name.trim() || !newMeter.unit.trim() || newMeter.frequency === ''}
+                  className="px-4 py-2 bg-blue-600 text-white rounded disabled:opacity-50"
+                >
+                  Create
+                </button>
               </div>
             </div>
           </div>
         </div>
       )}
-      <div className="grid grid-cols-3 gap-4">
-        {[
-          { label: 'Total Electricity', value: `${(meters.filter(m => m.type === 'Electricity').reduce((s, m) => s + (Number(m.reading) || 0), 0) / 1000).toFixed(1)} MWh`, icon: 'âš¡', color: 'from-amber-50 to-yellow-50 border-amber-100' },
-          { label: 'Total Water', value: `${meters.filter(m => m.type === 'Water').reduce((s, m) => s + (Number(m.reading) || 0), 0).toLocaleString()} mÂ³`, icon: 'ðŸ’§', color: 'from-blue-50 to-cyan-50 border-blue-100' },
-          { label: 'Active Alerts', value: meters.filter(m => m.status !== 'Normal').length, icon: 'ðŸš¨', color: 'from-rose-50 to-pink-50 border-rose-100' },
-        ].map(c => (
-          <div key={c.label} className={`bg-gradient-to-br ${c.color} border rounded-xl p-4 flex items-center gap-4`}>
-            <span className="text-3xl">{c.icon}</span>
-            <div><p className="text-xs font-bold text-gray-500 uppercase tracking-wider">{c.label}</p><p className="text-xl font-black text-gray-900 mt-0.5">{c.value}</p></div>
-          </div>
-        ))}
-      </div>
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-xs">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" /></svg>
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search meters..." className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+      <div className="px-8 py-6">
+        <div className="mb-6 grid gap-6 xl:grid-cols-[1.2fr_1fr]">
+          <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+            <div className="flex items-start justify-between gap-6">
+              <div>
+                <h3 className="text-[1.25rem] font-bold text-gray-900">Daily Email Summaries</h3>
+                <p className="mt-2 text-[0.95rem] text-gray-500">Administrators receive the company summary each day, and technicians receive their own daily work summary by email.</p>
+              </div>
+              <div className="min-w-[150px]">
+                <label className="mb-2 block text-sm font-semibold text-gray-700">Send time</label>
+                <input
+                  type="time"
+                  value={dailySummarySettings.sendTime}
+                  onChange={(e) => setDailySummarySettings((prev) => ({ ...prev, sendTime: e.target.value }))}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900"
+                />
+              </div>
+            </div>
+            <div className="mt-5 grid gap-3 md:grid-cols-2">
+              <label className="flex items-center gap-3 rounded-xl border border-gray-200 p-4 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={!!dailySummarySettings.adminDailySummary}
+                  onChange={(e) => setDailySummarySettings((prev) => ({ ...prev, adminDailySummary: e.target.checked }))}
+                  className="h-4 w-4"
+                />
+                Send daily company summary to administrators
+              </label>
+              <label className="flex items-center gap-3 rounded-xl border border-gray-200 p-4 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={!!dailySummarySettings.technicianDailySummary}
+                  onChange={(e) => setDailySummarySettings((prev) => ({ ...prev, technicianDailySummary: e.target.checked }))}
+                  className="h-4 w-4"
+                />
+                Send daily assigned-work summary to technicians
+              </label>
+            </div>
+            <div className="mt-5 rounded-xl bg-blue-50 px-4 py-4 text-sm text-gray-700">
+              <div className="font-semibold text-gray-900">Summary content</div>
+              <div className="mt-2">Admin email: overall meter status, current-month consumption, overdue utility readings, and company-wide activity.</div>
+              <div className="mt-1">Technician email: assigned work orders, meter categories they own, and the readings or follow-ups due that day.</div>
+            </div>
+          </section>
+          <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+            <h3 className="text-[1.25rem] font-bold text-gray-900">Recipients Preview</h3>
+            <div className="mt-5 grid gap-5 md:grid-cols-2 xl:grid-cols-1">
+              <div>
+                <div className="mb-3 text-sm font-semibold text-gray-900">Administrators</div>
+                <div className="space-y-2">
+                  {dailySummarySettings.adminDailySummary && adminRecipients.length > 0 ? adminRecipients.map((recipient) => (
+                    <div key={`admin-summary-${recipient.email}`} className="rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-700">
+                      <div className="font-medium text-gray-900">{recipient.name}</div>
+                      <div className="text-gray-500">{recipient.email}</div>
+                    </div>
+                  )) : (
+                    <div className="rounded-lg bg-gray-50 px-3 py-3 text-sm text-gray-500">No administrator daily summary recipients enabled.</div>
+                  )}
+                </div>
+              </div>
+              <div>
+                <div className="mb-3 text-sm font-semibold text-gray-900">Technicians</div>
+                <div className="space-y-2">
+                  {dailySummarySettings.technicianDailySummary && technicianSummaryRecipients.length > 0 ? technicianSummaryRecipients.slice(0, 8).map((recipient) => (
+                    <div key={`tech-summary-${recipient.email}`} className="rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-700">
+                      <div className="font-medium text-gray-900">{recipient.name}</div>
+                      <div className="text-gray-500">{recipient.email}</div>
+                    </div>
+                  )) : (
+                    <div className="rounded-lg bg-gray-50 px-3 py-3 text-sm text-gray-500">No technician daily summary recipients enabled.</div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </section>
         </div>
-        <div className="flex bg-gray-100 rounded-xl p-1">
-          {types.map(t => <button key={t} onClick={() => setFilter(t)} className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors ${filter === t ? 'bg-white/70 shadow-sm text-gray-900 backdrop-blur' : 'text-gray-500 hover:text-gray-700'}`}>{t}</button>)}
-        </div>
-      </div>
-      <div className="glass-surface rounded-lg overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead className="bg-[#fcfcfd] border-b border-gray-100">
-              <tr>{['Meter', 'Type', 'Reading', 'Trend', 'Status', 'Location', 'Last Read', 'Actions'].map(h => <th key={h} className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">{h}</th>)}</tr>
-            </thead>
-            <tbody>
-              {filtered.map((m, idx) => {
-                const badge = sc(m.status); return (
-                  <tr key={m.id || m._id || `m-${idx}`} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
-                    <td className="py-4 px-4"><div className="flex items-center gap-3"><div className="w-10 h-10 bg-gray-50 border border-gray-100 rounded-xl flex items-center justify-center text-xl">{m.icon || 'ðŸ“Š'}</div><div><p className="text-sm font-bold text-gray-900">{m.name}</p><p className="text-[10px] text-gray-400 mt-0.5">{m.type}</p></div></div></td>
-                    <td className="py-4 px-4 text-sm text-gray-600">{m.type}</td>
-                    <td className="py-4 px-4 text-sm font-black text-gray-900">{(m.reading || 0).toLocaleString()} <span className="text-xs text-gray-400 font-medium">{m.unit}</span></td>
-                    <td className="py-4 px-4"><span className={`text-sm font-bold ${(m.trend || 0) > 0 ? 'text-rose-500' : (m.trend || 0) < 0 ? 'text-emerald-500' : 'text-gray-400'}`}>{(m.trend || 0) > 0 ? '+' : ''}{m.trend || 0}%</span></td>
-                    <td className="py-4 px-4"><span className={`px-2 py-0.5 border text-[10px] font-bold rounded-full ${badge.bg} ${badge.text} ${badge.border}`}>{m.status || 'Normal'}</span></td>
-                    <td className="py-4 px-4 text-sm text-gray-600">{m.location || 'â€”'}</td>
-                    <td className="py-4 px-4 text-sm text-gray-500">{m.lastRead || 'â€”'}</td>
-                    <td className="py-4 px-4 text-right"><button className="p-1.5 hover:bg-gray-100 rounded-lg" onClick={() => alert(JSON.stringify(m, null, 2))}><svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg></button></td>
+        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="min-w-full border-collapse text-left">
+              <thead className="border-b border-gray-200 bg-white">
+                <tr>
+                  <th className="w-12 px-6 py-4"><input type="checkbox" className="h-6 w-6 rounded border-gray-300" /></th>
+                  {['Meter Name', 'Frequency', 'Category', 'Latest Reading', 'This Month', 'Location', 'Date Created'].map((h) => (
+                    <th key={h} className="px-6 py-4 text-[0.92rem] font-bold text-gray-900">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((m, idx) => (
+                  (() => {
+                    const readingRows = deriveReadings(m);
+                    const latestReading = readingRows[0];
+                    const currentMonthKey = new Date().toISOString().slice(0, 7);
+                    const monthlyRows = readingRows.filter((entry) => String(entry.createdAt || '').slice(0, 7) === currentMonthKey);
+                    const thisMonthUsage = monthlyRows.length > 1 ? Number(monthlyRows[0]?.value || 0) - Number(monthlyRows[monthlyRows.length - 1]?.value || 0) : 0;
+                    return (
+                  <tr
+                    key={m.id || m._id || `m-${idx}`}
+                    onClick={() => openMeterDetails(m)}
+                    className="cursor-pointer border-b border-gray-100 last:border-b-0 hover:bg-gray-50/40"
+                  >
+                    <td className="px-6 py-5" onClick={(e) => e.stopPropagation()}><input type="checkbox" className="h-6 w-6 rounded border-gray-300" /></td>
+                    <td className="px-6 py-5 text-[0.95rem] text-gray-900">{m.name || 'Untitled meter'}</td>
+                    <td className="px-6 py-5 text-[0.95rem] text-gray-700">{m.frequency || '—'}</td>
+                    <td className="px-6 py-5 text-[0.95rem] text-gray-700">{m.category || m.type || '—'}</td>
+                    <td className="px-6 py-5 text-[0.95rem] text-gray-700">{latestReading ? `${Number(latestReading.value || 0).toLocaleString()} ${m.unit || ''}` : '—'}</td>
+                    <td className="px-6 py-5 text-[0.95rem] text-gray-700">{thisMonthUsage ? `${thisMonthUsage.toLocaleString()} ${m.unit || ''}` : '—'}</td>
+                    <td className="px-6 py-5 text-[0.95rem] text-gray-700">{m.location || '—'}</td>
+                    <td className="px-6 py-5 text-[0.95rem] text-gray-700">{formatCreatedAt(m.createdAt)}</td>
                   </tr>
-                );
-              })}
-              {filtered.length === 0 && <tr><td colSpan="8" className="py-16 text-center text-gray-500">No meters found</td></tr>}
-            </tbody>
-          </table>
+                    );
+                  })()
+                ))}
+                {filtered.length === 0 && (
+                  <tr>
+                    <td colSpan="8" className="px-6 py-16 text-center text-base text-gray-500">No meters found</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
