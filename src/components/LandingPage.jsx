@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import AuthHeader from './auth/AuthHeader';
 import subscriptionAPI from '../api/subscription';
 import api from '../api/axios';
@@ -23,28 +24,40 @@ const products = [
       'Custom app platform that lets anyone on your team build exactly the tools they need or install from 30+ ready-made apps, all running on your existing data, permissions, and security. No code. No IT. No limits.'
   },
   {
-    name: 'EHS',
-    label: 'Environment, Health, & Safety Software',
+    name: 'Safety',
+    label: 'Safety',
     description:
-      'Capture safety events in seconds with voice-to-text reporting that works in any language. Automated OSHA logs, AI-powered CAPAs, and instant audit trails help you reduce incidents and stay compliant.'
+      'Environment, Health, & Safety Software. Capture safety events in seconds with voice-to-text reporting that works in any language. Automated OSHA logs, AI-powered CAPAs, and instant audit trails help you reduce incidents and stay compliant.'
   },
   {
-    name: 'FixNestEdge',
-    label: 'Edge',
+    name: 'Providers',
+    label: 'Providers',
+    description:
+      'Vendor and contractor management integrated with your maintenance workflow. Track contracts, performance, and communications all in one place to streamline external partnerships.'
+  },
+  {
+    name: 'Edge Sensors',
+    label: 'Edge Sensors',
     description:
       'Wireless IoT sensors that monitor your assets 24/7 and automatically create work orders when conditions change. Install in hours, not months, and avoid hardwiring or data science overhead.'
   },
   {
-    name: 'FixNestFleet',
+    name: 'Lattice',
+    label: 'Lattice',
+    description:
+      'Data integration and connectivity layer that unifies maintenance, safety, and asset information across all platforms. One data foundation for your entire operation.'
+  },
+  {
+    name: 'Fleet',
     label: 'Fleet',
     description:
       'Vehicle maintenance management that connects telematics data to work orders through real-time integrations and automated PM scheduling. Instant VIN lookup, digital inspections, and complete vehicle history in one system.'
   },
   {
-    name: 'FixNestLMS',
-    label: 'Learning Management Software',
+    name: 'Learn',
+    label: 'Learn',
     description:
-      'Enable your frontline team to access job-relevant training, track certifications, and prove compliance. No more spreadsheets, delays, or one-size-fits-all courses.'
+      'Learning Management Software. Enable your frontline team to access job-relevant training, track certifications, and prove compliance. No more spreadsheets, delays, or one-size-fits-all courses.'
   }
 ];
 
@@ -53,7 +66,7 @@ const planMetadata = {
   basic: {
     displayName: 'Essential',
     description: 'Small teams or single-site operations getting off spreadsheets and paper for the first time.',
-    features: ['Unlimited work orders', 'Unlimited locations', 'Nova AI'],
+    features: ['Unlimited work orders', 'Unlimited locations', 'Over AI'],
     cta: 'Try for free'
   },
   premium: {
@@ -99,6 +112,7 @@ const planMetadata = {
 };
 
 const LandingPage = () => {
+  const navigate = useNavigate();
   const [pricing, setPricing] = useState(null);
   const [currency, setCurrency] = useState('USD');
   const [changingCurrency, setChangingCurrency] = useState(false);
@@ -106,6 +120,26 @@ const LandingPage = () => {
   const currencySymbols = {
     'USD': '$',
     'RWF': 'FRw'
+  };
+
+  // Product navigation mapping
+  const productRoutes = {
+    'CMMS': () => navigate('/product/cmms'),
+    'FixNest Intelligence': () => navigate('/product/intelligence'),
+    'Studio': () => navigate('/product/studio'),
+    'Safety': () => navigate('/product/safety'),
+    'Providers': () => navigate('/product/providers'),
+    'Edge Sensors': () => navigate('/product/edge-sensors'),
+    'Lattice': () => navigate('/product/lattice'),
+    'Fleet': () => navigate('/product/fleet'),
+    'Learn': () => navigate('/product/learn')
+  };
+
+  const handleProductClick = (productName) => {
+    const handler = productRoutes[productName];
+    if (handler) {
+      handler();
+    }
   };
 
   const fetchPricingData = async () => {
@@ -222,7 +256,14 @@ const LandingPage = () => {
               <div className="product-label">{product.label}</div>
               <h3 className="product-title">{product.name}</h3>
               <p className="product-description">{product.description}</p>
-              <button className="product-link" type="button">Learn More</button>
+              <button 
+                className="product-link" 
+                type="button"
+                onClick={() => handleProductClick(product.name)}
+                style={{ cursor: 'pointer' }}
+              >
+                Learn More
+              </button>
             </article>
           ))}
         </div>
@@ -308,6 +349,43 @@ const LandingPage = () => {
         </section>
       )}
 
+      <section className="landing-section landing-features">
+        <div className="landing-section-header">
+          <div className="landing-section-title">Core Features</div>
+          <p style={{ marginTop: '8px', fontSize: '16px', color: '#666' }}>Everything you need for complete maintenance management</p>
+        </div>
+        <div className="features-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px', marginTop: '40px' }}>
+          <div className="feature-card" style={{ padding: '24px', border: '1px solid #e0e0e0', borderRadius: '8px', backgroundColor: '#fafafa' }}>
+            <h3 style={{ marginBottom: '12px', fontSize: '18px', fontWeight: '600' }}>Work Orders</h3>
+            <p style={{ color: '#666', lineHeight: '1.6' }}>Manage requests and work orders in real-time. Create, assign, and track maintenance tasks from any device with complete visibility.</p>
+          </div>
+          <div className="feature-card" style={{ padding: '24px', border: '1px solid #e0e0e0', borderRadius: '8px', backgroundColor: '#fafafa' }}>
+            <h3 style={{ marginBottom: '12px', fontSize: '18px', fontWeight: '600' }}>Asset Management</h3>
+            <p style={{ color: '#666', lineHeight: '1.6' }}>Maximize asset uptime and reliability. Track asset lifecycle, maintenance history, and performance metrics in one centralized location.</p>
+          </div>
+          <div className="feature-card" style={{ padding: '24px', border: '1px solid #e0e0e0', borderRadius: '8px', backgroundColor: '#fafafa' }}>
+            <h3 style={{ marginBottom: '12px', fontSize: '18px', fontWeight: '600' }}>Safety & Compliance</h3>
+            <p style={{ color: '#666', lineHeight: '1.6' }}>Audit trails and regulatory compliance. Automated documentation and reporting to help you maintain standards and reduce risk.</p>
+          </div>
+          <div className="feature-card" style={{ padding: '24px', border: '1px solid #e0e0e0', borderRadius: '8px', backgroundColor: '#fafafa' }}>
+            <h3 style={{ marginBottom: '12px', fontSize: '18px', fontWeight: '600' }}>Preventive Maintenance</h3>
+            <p style={{ color: '#666', lineHeight: '1.6' }}>Reduce downtime with proactive service. AI-powered scheduling automatically creates preventive maintenance tasks based on usage and best practices.</p>
+          </div>
+          <div className="feature-card" style={{ padding: '24px', border: '1px solid #e0e0e0', borderRadius: '8px', backgroundColor: '#fafafa' }}>
+            <h3 style={{ marginBottom: '12px', fontSize: '18px', fontWeight: '600' }}>Parts & Inventory</h3>
+            <p style={{ color: '#666', lineHeight: '1.6' }}>Streamline parts tracking and purchasing. Manage stock levels, automate reorders, and reduce supply chain delays.</p>
+          </div>
+          <div className="feature-card" style={{ padding: '24px', border: '1px solid #e0e0e0', borderRadius: '8px', backgroundColor: '#fafafa' }}>
+            <h3 style={{ marginBottom: '12px', fontSize: '18px', fontWeight: '600' }}>Analytics & Reporting</h3>
+            <p style={{ color: '#666', lineHeight: '1.6' }}>Customizable reports and dashboards with deep insights. Track KPIs, identify trends, and make data-driven maintenance decisions.</p>
+          </div>
+          <div className="feature-card" style={{ padding: '24px', border: '1px solid #e0e0e0', borderRadius: '8px', backgroundColor: '#fafafa' }}>
+            <h3 style={{ marginBottom: '12px', fontSize: '18px', fontWeight: '600' }}>Integrations</h3>
+            <p style={{ color: '#666', lineHeight: '1.6' }}>Unified maintenance operations. Connect with ERPs, sensors, IoT devices, and other systems for seamless data flow.</p>
+          </div>
+        </div>
+      </section>
+
       <section className="landing-section landing-integrations">
         <div className="integration-card">
           <div className="integration-text">
@@ -321,10 +399,11 @@ const LandingPage = () => {
           <div className="integration-visual">
             <div className="integration-node">CMMS</div>
             <div className="integration-node">Fleet</div>
-            <div className="integration-node">Edge</div>
-            <div className="integration-node">EHS</div>
-            <div className="integration-node">LMS</div>
-            <div className="integration-core">Nova Agent</div>
+            <div className="integration-node">Edge Sensors</div>
+            <div className="integration-node">Safety</div>
+            <div className="integration-node">Learn</div>
+            <div className="integration-node">Lattice</div>
+            <div className="integration-core">Over Agent</div>
           </div>
         </div>
       </section>
@@ -334,7 +413,7 @@ const LandingPage = () => {
           <div className="ai-text">
             <h2>Automate the tedious. Accelerate the complex.</h2>
             <p>
-              Give your team AI that does real work. Nova handles routine tasks and surfaces insights
+              Give your team AI that does real work. Over handles routine tasks and surfaces insights
               that used to take hours.
             </p>
             <div className="ai-cta-row">

@@ -415,7 +415,9 @@
   }
 
   .mega-menu--resources {
-    width: min(1020px, 94vw);
+    width: min(900px, 92vw);
+    max-height: 80vh;
+    overflow-y: auto;
   }
 
   .mega-section {
@@ -454,12 +456,19 @@
   }
 
   .mega-list-grid--compact {
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   }
 
   .mega-item {
     color: #2a3b52;
     font-weight: 600;
+    padding: 8px;
+    border-radius: 6px;
+    transition: background-color 0.2s ease;
+  }
+
+  .mega-item:hover {
+    background-color: #f0f3f9;
   }
 
   .mega-item-title {

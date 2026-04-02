@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import backgroundVideo from "../assets/136906-765457769_small.mp4";
 import { createPortal } from "react-dom";
 import api from "../api/axios";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 import { WorkOrderForm } from './WorkOrder';
 import SubscriptionPlan from './SubscriptionPlan';
 import SubscriptionManagement from './SubscriptionManagement';
@@ -6928,7 +6928,17 @@ function ClientDashboard() {
   }, [backendBase]);
 
   // â”€â”€ State â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState('dashboard');
+
+  // Handle query parameter to set active tab
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tabParam = params.get('tab');
+    if (tabParam) {
+      setActiveTab(tabParam);
+    }
+  }, [location.search]);
   const [properties, setProperties] = useState([]);
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [propertyUseNamedBlocks, setPropertyUseNamedBlocks] = useState(false);
@@ -24559,6 +24569,48 @@ function ClientDashboard() {
           {/* â”€â”€ Edge â”€â”€ */}
           {activeTab === 'edge' && (
             <ClientEdgeTab />
+          )}
+
+          {/* Integrations (Lattice) */}
+          {activeTab === 'integrations' && (
+            <div style={{ padding: '40px', textAlign: 'center', minHeight: '500px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
+              <div style={{ fontSize: '48px', marginBottom: '20px' }}>🔗</div>
+              <h2 style={{ fontSize: '28px', fontWeight: 'bold', color: '#1f2937', marginBottom: '12px' }}>Integrations & Data Connectivity</h2>
+              <p style={{ fontSize: '16px', color: '#6b7280', maxWidth: '600px', marginBottom: '30px' }}>
+                Connect your maintenance systems with external platforms, APIs, and data sources. Unified data foundation across all operations.
+              </p>
+              <button type="button" style={{ padding: '12px 24px', backgroundColor: '#2563EB', color: 'white', border: 'none', borderRadius: '8px', fontSize: '16px', fontWeight: '600', cursor: 'pointer' }}>
+                + Add Integration
+              </button>
+            </div>
+          )}
+
+          {/* Fleet Management */}
+          {activeTab === 'fleet' && (
+            <div style={{ padding: '40px', textAlign: 'center', minHeight: '500px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
+              <div style={{ fontSize: '48px', marginBottom: '20px' }}>🚗</div>
+              <h2 style={{ fontSize: '28px', fontWeight: 'bold', color: '#1f2937', marginBottom: '12px' }}>Fleet Management</h2>
+              <p style={{ fontSize: '16px', color: '#6b7280', maxWidth: '600px', marginBottom: '30px' }}>
+                Manage vehicle maintenance, telematics integration, and fleet operations. Track VINs, inspections, and complete vehicle histories.
+              </p>
+              <button type="button" style={{ padding: '12px 24px', backgroundColor: '#2563EB', color: 'white', border: 'none', borderRadius: '8px', fontSize: '16px', fontWeight: '600', cursor: 'pointer' }}>
+                + Add Vehicle
+              </button>
+            </div>
+          )}
+
+          {/* Learning Management */}
+          {activeTab === 'learn' && (
+            <div style={{ padding: '40px', textAlign: 'center', minHeight: '500px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
+              <div style={{ fontSize: '48px', marginBottom: '20px' }}>📚</div>
+              <h2 style={{ fontSize: '28px', fontWeight: 'bold', color: '#1f2937', marginBottom: '12px' }}>Learning Management</h2>
+              <p style={{ fontSize: '16px', color: '#6b7280', maxWidth: '600px', marginBottom: '30px' }}>
+                Manage training content, track certifications, and ensure compliance. Enable your frontline team with job-relevant training.
+              </p>
+              <button type="button" style={{ padding: '12px 24px', backgroundColor: '#2563EB', color: 'white', border: 'none', borderRadius: '8px', fontSize: '16px', fontWeight: '600', cursor: 'pointer' }}>
+                + Create Course
+              </button>
+            </div>
           )}
 
           {activeTab === 'imports' && <ImportExportPanel />}
