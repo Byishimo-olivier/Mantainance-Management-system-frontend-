@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import backgroundVideo from '../../assets/136906-765457769_small.mp4';
 import AuthHeader from './AuthHeader';
+import subscriptionAPI from '../../api/subscription';
 
 const initialForm = {
   firstName: '',
@@ -284,7 +285,25 @@ export default function Register() {
   const [form, setForm] = useState(initialForm);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  
+  // Pre-fill form from Subscribe page parameters
+  useEffect(() => {
+    const companyName = searchParams.get('companyName');
+    const email = searchParams.get('email');
+    const phone = searchParams.get('phone');
+    
+    if (companyName || email || phone) {
+      setForm(prev => ({
+        ...prev,
+        companyName: companyName || prev.companyName,
+        email: email || prev.email,
+        phone: phone || prev.phone
+      }));
+    }
+  }, [searchParams]);
+  
   const isBranch = form.companyType === 'branch';
   const isSubmitDisabled = isSubmitting
     || !form.firstName
@@ -376,6 +395,43 @@ export default function Register() {
       });
       const data = await res.json();
       if (res.ok) {
+        // Handle subscription creation if coming from Subscribe page
+        const plan = searchParams.get('plan');
+        const currency = searchParams.get('currency');
+        const cycle = searchParams.get('cycle');
+        const phone = searchParams.get('phone');
+        
+        if (plan) {
+          try {
+            // Create company-based subscription
+            const subscriptionResponse = await subscriptionAPI.createSubscription({
+              plan: plan,
+              currency: currency || 'RWF',
+              billingCycle: cycle || 'monthly',
+              clientId: form.companyName,
+              companyName: form.companyName,
+              managerEmail: form.email,
+              companyPhone: phoneValue
+            });
+
+            // Check if payment details were stored for mobile money
+            const pendingPayment = sessionStorage.getItem('pendingPayment');
+            if (pendingPayment && subscriptionResponse.data?.id) {
+              const paymentData = JSON.parse(pendingPayment);
+              
+              // If mobile money was selected, redirect to payment selection
+              if (paymentData.paymentMethod === 'mobile_money') {
+                setForm(initialForm);
+                navigate(`/payment-selection?plan=${plan}&cycle=${cycle}&currency=${currency}&companyName=${encodeURIComponent(form.companyName)}&email=${encodeURIComponent(form.email)}&phone=${encodeURIComponent(phoneValue)}&subscriptionId=${subscriptionResponse.data.id}&amount=${paymentData.amount}`, { replace: true });
+                return;
+              }
+            }
+          } catch (subError) {
+            console.error('Subscription creation failed:', subError);
+            // Continue with login even if subscription creation fails
+          }
+        }
+        
         setForm(initialForm);
         navigate('/login', { replace: true });
       } else {
@@ -705,8 +761,9 @@ export default function Register() {
             By clicking above, you agree to the <span className="auth-link">Fixnest Terms of Use</span>.
           </div>
 
-          <div className="auth-footer">
-            Already have an account? <Link to="/login" className="auth-link">Log in</Link>
+          <div className="auth-footer" style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
+            <div>Already have an account? <Link to="/login" className="auth-link">Log in</Link></div>
+            <div style={{ fontSize: '0.85em', opacity: 0.8 }}>Explore our <Link to="/pricing" className="auth-link">Pricing Plans</Link></div>
           </div>
         </form>
 

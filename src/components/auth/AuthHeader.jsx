@@ -1,8 +1,19 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 
 export default function AuthHeader() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const location = useLocation();
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('user');
+      if (raw) setUser(JSON.parse(raw));
+    } catch (e) {
+      console.error('Failed to parse user from localStorage', e);
+    }
+  }, []);
 
   useEffect(() => {
     if (!isSearchOpen) return undefined;
@@ -191,6 +202,9 @@ export default function AuthHeader() {
             <span className="nav-search-icon" aria-hidden="true" />
             <span className="nav-search-label">Search</span>
           </button>
+          {user && location.pathname !== '/subscription' && (
+            <Link to="/subscription" className="nav-link nav-link--upgrade" style={{ color: '#0F172A', fontWeight: 600 }}>Upgrade</Link>
+          )}
           <Link to="/login" className="nav-link">Log in</Link>
           <Link to="/register" className="auth-cta">Start a Free Trial</Link>
         </div>

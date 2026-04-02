@@ -161,9 +161,16 @@ const SubscriptionManagement = () => {
 
     setLoading(true);
     try {
-      const resp = await subscriptionAPI.initiatePayPackPayment(subscription.id, amount, subscription.paymentMethod || 'mobile_money', null, subscription.email);
-      // api helper returns response.data – it should contain redirect_url
-      const redirectUrl = resp.redirect_url || resp.authorization_url || resp.redirectUrl || (resp.data && (resp.data.redirect_url || resp.data.authorization_url));
+      const resp = await subscriptionAPI.initiatePesaPalPayment(
+        subscription.id, 
+        amount, 
+        null, // phoneNumber
+        subscription.email
+      );
+      
+      const redirectUrl = resp.redirectUrl || resp.redirect_url || resp.authorization_url || 
+                         (resp.data && (resp.data.redirectUrl || resp.data.redirect_url || resp.data.authorization_url));
+      
       if (redirectUrl) {
         window.open(redirectUrl, '_blank');
         showSuccess('Payment initiated; please complete payment in the opened tab.');

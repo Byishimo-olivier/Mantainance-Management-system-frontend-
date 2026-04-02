@@ -105,8 +105,9 @@ export default function Login({ onLogin }) {
 
         <Link to="/sso-login" className="auth-ghost-btn auth-ghost-link">Continue with SSO</Link>
 
-        <div className="auth-footer">
-          New to Fixnest? <Link to="/register" className="auth-link">Sign up</Link>
+        <div className="auth-footer" style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
+          <div>New to Fixnest? <Link to="/register" className="auth-link">Sign up</Link></div>
+          <div style={{ fontSize: '0.85em', opacity: 0.8 }}>Interested in our plans? <Link to="/pricing" className="auth-link">See Pricing</Link></div>
         </div>
       </form>
     </div>

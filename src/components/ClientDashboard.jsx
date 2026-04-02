@@ -1,14 +1,16 @@
-﻿import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import backgroundVideo from "../assets/136906-765457769_small.mp4";
 import { createPortal } from "react-dom";
 import api from "../api/axios";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { WorkOrderForm } from './WorkOrder';
-import SubscriptionWidget from './SubscriptionWidget';
+import SubscriptionPlan from './SubscriptionPlan';
 import SubscriptionManagement from './SubscriptionManagement';
+import CompanySubscriptionDashboard from './CompanySubscriptionDashboard';
+import { useSubscription } from '../hooks/useSubscription';
 import { getImageUrl } from '../utils/imageUrl';
 import { useLanguage, useTranslation } from "../i18n/LanguageContext";
-import { Clock, Calendar, CheckCircle, ClipboardCheck, X, Bell, Download, Package, ShoppingCart, Gauge, Plus, Search, Eye, MapPin, AlertCircle, Repeat, Edit, ChevronLeft, ChevronRight, ChevronDown, SlidersHorizontal, Flag, MoreHorizontal, MoreVertical, Trash2, Image as ImageIcon, Tag, Paperclip, MessageSquare, Send, Navigation, DollarSign, Bookmark, Link2, FileText, Copy, Archive, ArrowUpDown, ArrowRight, ArrowLeft, LayoutDashboard, Settings, Users, RotateCcw, Zap, Globe, Activity, QrCode, GripVertical } from 'lucide-react';
+import { Clock, Calendar, CheckCircle, ClipboardCheck, X, Bell, Download, Package, ShoppingCart, Gauge, Plus, Search, Eye, MapPin, AlertCircle, Repeat, Edit, ChevronLeft, ChevronRight, ChevronDown, SlidersHorizontal, Flag, MoreHorizontal, MoreVertical, Trash2, Image as ImageIcon, Tag, Paperclip, MessageSquare, Send, Navigation, DollarSign, Bookmark, Link2, FileText, Copy, Archive, ArrowUpDown, ArrowRight, ArrowLeft, LayoutDashboard, Settings, Users, RotateCcw, Zap, Globe, Activity, QrCode, GripVertical, Info } from 'lucide-react';
 
 const ASSISTANT_ACTION_STORAGE_KEY = 'mms_assistant_action';
 const REQUEST_FORM_SETTINGS_STORAGE_KEY = 'mms_request_form_settings';
@@ -6908,6 +6910,8 @@ function AssetEditorModal({
 // â”€â”€ Main Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function ClientDashboard() {
   const navigate = useNavigate();
+  const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const { isActive } = useSubscription(storedUser?.id || storedUser?._id);
   const { language, setLanguage } = useLanguage();
   const { t } = useTranslation();
   const backendBase = (import.meta.env.VITE_API_URL || '') + '';
@@ -7557,23 +7561,23 @@ function ClientDashboard() {
     setPmTasks(
       taskSource.length
         ? taskSource.map((task, idx) => ({
-            id: task?.id || task?._id || `${Date.now()}-${idx}`,
+            id: task?.id || task?._id || `task-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 5)}`,
             title: task?.title || task?.text || task?.name || '',
             status: task?.status || (task?.completed ? 'Done' : 'Open'),
           }))
-        : [{ id: Date.now(), title: '', status: 'Open' }]
+        : [{ id: `task-${Date.now()}`, title: '', status: 'Open' }]
     );
 
     setPmChecklist(
       checklistSource.length
         ? checklistSource.map((item, idx) => ({
-            id: item?.id || item?._id || `${Date.now()}-${idx}`,
+            id: item?.id || item?._id || `check-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 5)}`,
             text: item?.text || item?.title || item?.label || '',
             type: item?.type || 'Status',
             meter: item?.meter || '',
             required: !!item?.required,
           }))
-        : [{ id: Date.now() + 1, text: '', type: 'Status', meter: '' }]
+        : [{ id: `check-${Date.now()}`, text: '', type: 'Status', meter: '' }]
     );
 
     setModalData({ open: false, type: '', item: null });
@@ -17565,6 +17569,33 @@ function ClientDashboard() {
           ))}
         </nav>
 
+        {!isActive && (
+          <div style={{ padding: '0 12px 12px' }}>
+            <button
+              onClick={() => setActiveTab('subscription')}
+              style={{
+                width: '100%',
+                padding: '10px',
+                borderRadius: '10px',
+                background: 'linear-gradient(135deg, #d3ac2a 0%, #b89624 100%)',
+                color: 'white',
+                fontWeight: '700',
+                fontSize: '13px',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                boxShadow: '0 4px 12px rgba(211, 172, 42, 0.2)'
+              }}
+            >
+              <Zap className="h-4 w-4" />
+              Upgrade Plan
+            </button>
+          </div>
+        )}
+
         {/* Bottom actions */}
         <div style={{ padding: '14px 12px', borderTop: '1px solid #E5E7EB', background: 'rgba(255,255,255,0.72)', backdropFilter: 'blur(12px)' }}>
           <input type="file" ref={importFileRef} accept=".csv" onChange={(e) => {
@@ -20611,11 +20642,16 @@ function ClientDashboard() {
 
           {/* â”€â”€ Subscription â”€â”€ */}
           {activeTab === 'subscription' && (
-            <div style={{ padding: '24px' }}>
-              {(currentUser?.role === 'admin' || currentUser?.role === 'manager') ? (
+            <div style={{ padding: '0' }}>
+              {(currentUser?.role === 'superadmin' || currentUser?.role === 'super-admin') ? (
+                // System admin sees all subscriptions management
                 <SubscriptionManagement />
+              ) : (currentUser?.role === 'admin' || currentUser?.role === 'manager') ? (
+                // Company admin sees their company subscription dashboard
+                <CompanySubscriptionDashboard />
               ) : (
-                <SubscriptionWidget userId={currentUser?._id || currentUser?.id} />
+                // Regular users see their personal subscription
+                <SubscriptionPlan userId={currentUser?._id || currentUser?.id} />
               )}
             </div>
           )}
@@ -24507,7 +24543,7 @@ function ClientDashboard() {
           {activeTab === 'analytics' && (
             <ClientAnalyticsTab
               allIssues={allIssues}
-              technicians={technicians}
+              technicians={[...(allWorkers || []), ...(internalTechnicians || []), ...(people || []), ...(technicians || [])]}
               assets={assets}
               maintenanceSchedules={maintenanceSchedules}
               requestItems={filteredRequests}
@@ -25318,8 +25354,19 @@ const sanitizeOpsFilterTerm = (value, blockedTerms = []) => {
 
 const buildOpsDatasets = ({ assets = [], issues = [], technicians = [], properties = [], people = [] }) => {
   const assetRows = (assets || []).map((asset, index) => {
-    const propertyName = asset?.property?.name || asset?.propertyName || asset?.location || asset?.site || '';
-    const assignedTo = asset?.assignedToName || asset?.assignedTo?.name || asset?.owner?.name || asset?.technician?.name || '';
+    let propertyName = asset?.property?.name || asset?.propertyName || asset?.location || asset?.site || '';
+    if (!propertyName && (asset?.property || asset?.propertyId)) {
+      const propId = typeof asset.property === 'object' ? (asset.property._id || asset.property.id) : (asset.property || asset.propertyId);
+      const p = properties.find(prop => String(prop._id) === String(propId) || String(prop.id) === String(propId));
+      if (p) propertyName = p.name || propertyName;
+    }
+    let assignedTo = asset?.assignedToName || asset?.assignedTo?.name || asset?.owner?.name || asset?.technician?.name || '';
+    if (!assignedTo && asset?.assignedTo) {
+      const techId = typeof asset.assignedTo === 'object' ? (asset.assignedTo._id || asset.assignedTo.id) : asset.assignedTo;
+      const t = technicians.find((t) => String(t._id) === String(techId) || String(t.id) === String(techId));
+      if (t) assignedTo = t.name || t.fullName || t.email || assignedTo;
+      else if (typeof techId === 'string' && techId.length > 5) assignedTo = techId;
+    }
     const status = asset?.status || asset?.condition || 'Active';
     const category = asset?.category || asset?.type || asset?.assetType || '';
     const createdAt = asset?.createdAt || asset?.updatedAt || null;
@@ -25357,8 +25404,19 @@ const buildOpsDatasets = ({ assets = [], issues = [], technicians = [], properti
   });
 
   const issueRows = (issues || []).map((issue, index) => {
-    const assignedTo = issue?.assignedTechnicianName || issue?.assignedToName || issue?.assignedTo?.name || issue?.technician?.name || '';
-    const where = issue?.property?.name || issue?.propertyName || issue?.location || issue?.asset?.name || '';
+    let assignedTo = issue?.assignedTechnicianName || issue?.assignedToName || issue?.assignedTo?.name || issue?.technician?.name || '';
+    if (!assignedTo && issue?.assignedTo) {
+      const techId = typeof issue.assignedTo === 'object' ? (issue.assignedTo._id || issue.assignedTo.id) : issue.assignedTo;
+      const t = technicians.find((t) => String(t._id) === String(techId) || String(t.id) === String(techId));
+      if (t) assignedTo = t.name || t.fullName || t.email || assignedTo;
+      else if (typeof techId === 'string' && techId.length > 5) assignedTo = techId;
+    }
+    let where = issue?.property?.name || issue?.propertyName || issue?.location || issue?.asset?.name || '';
+    if (!where && (issue?.property || issue?.propertyId)) {
+       const propId = typeof issue.property === 'object' ? (issue.property._id || issue.property.id) : (issue.property || issue.propertyId);
+       const p = properties.find(prop => String(prop._id) === String(propId) || String(prop.id) === String(propId));
+       if (p) where = p.name || where;
+    }
     const status = getOpsIssueStatus(issue);
     const priority = issue?.priority || issue?.severity || '';
     const category = issue?.category || issue?.issueType || '';
@@ -28242,6 +28300,8 @@ const ClientAnalyticsTab = ({
   const [showDateDropdown, setShowDateDropdown] = useState(false);
   const [customRange, setCustomRange] = useState({ start: '', end: '' });
   const [showCustomRange, setShowCustomRange] = useState(false);
+  const [costTypeFilter, setCostTypeFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
   const [showFilters, setShowFilters] = useState(true);
   const [showMoreActionsMenu, setShowMoreActionsMenu] = useState(false);
   const [showTimeZoneModal, setShowTimeZoneModal] = useState(false);
@@ -28705,7 +28765,7 @@ const ClientAnalyticsTab = ({
     background: `conic-gradient(${backlogByPriority[0].color} 0deg ${((backlogByPriority[0].value / Math.max(1, backlogTotal)) * 360)}deg, ${backlogByPriority[1].color} ${((backlogByPriority[0].value / Math.max(1, backlogTotal)) * 360)}deg ${(((backlogByPriority[0].value + backlogByPriority[1].value) / Math.max(1, backlogTotal)) * 360)}deg, ${backlogByPriority[2].color} ${(((backlogByPriority[0].value + backlogByPriority[1].value) / Math.max(1, backlogTotal)) * 360)}deg ${(((backlogByPriority[0].value + backlogByPriority[1].value + backlogByPriority[2].value) / Math.max(1, backlogTotal)) * 360)}deg, ${backlogByPriority[3].color} ${(((backlogByPriority[0].value + backlogByPriority[1].value + backlogByPriority[2].value) / Math.max(1, backlogTotal)) * 360)}deg 360deg)`,
   };
   const upcomingLabelStep = Math.max(1, Math.ceil(labels.length / 8));
-  const costCurrency = React.useMemo(() => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }), []);
+  const costCurrency = React.useMemo(() => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'RWF', maximumFractionDigits: 0 }), []);
   const formatCost = (value) => costCurrency.format(Number.isFinite(value) ? value : 0);
   const inRangeCostWorkOrders = React.useMemo(
     () => inRangeWorkOrderIssues.filter((issue) => extractIssueCostSummary(issue).totalCost > 0),
@@ -28834,6 +28894,322 @@ const ClientAnalyticsTab = ({
       average: values.length ? total / values.length : 0,
     };
   }, [assets]);
+
+  const maintenanceComplianceData = React.useMemo(() => {
+    const completedIssues = (allIssues || []).filter((issue) => isCompleted(issue.status));
+    const compliantIssues = completedIssues.filter((issue) => !issue.overdue);
+    const nonCompliantIssues = completedIssues.filter((issue) => issue.overdue);
+    const byPriority = { High: { compliant: 0, nonCompliant: 0 }, Medium: { compliant: 0, nonCompliant: 0 }, Low: { compliant: 0, nonCompliant: 0 }, None: { compliant: 0, nonCompliant: 0 } };
+    const monthlyData = {};
+    let totalEstimatedHours = 0;
+    let totalActualHours = 0;
+    let scheduleCompliantCount = 0;
+    let preventiveCompleteCount = 0;
+
+    completedIssues.forEach((issue) => {
+      const priority = issue.priority || 'None';
+      const normalized = String(priority || '').trim().toLowerCase() === 'high' ? 'High' : String(priority || '').trim().toLowerCase() === 'medium' ? 'Medium' : String(priority || '').trim().toLowerCase() === 'low' ? 'Low' : 'None';
+      if (byPriority[normalized]) {
+        if (issue.overdue) {
+          byPriority[normalized].nonCompliant += 1;
+        } else {
+          byPriority[normalized].compliant += 1;
+        }
+      }
+
+      // Monthly compliance data
+      const issueDate = normalizeDate(issue.updatedAt || issue.createdAt);
+      if (issueDate) {
+        const month = issueDate.toLocaleString('en-US', { month: 'short', year: '2-digit' });
+        if (!monthlyData[month]) {
+          monthlyData[month] = { compliant: 0, total: 0, compliancePercent: 0 };
+        }
+        monthlyData[month].total += 1;
+        if (!issue.overdue) {
+          monthlyData[month].compliant += 1;
+        }
+      }
+
+      // Schedule compliance (preventive maintenance on time)
+      if (isPreventiveIssue(issue)) {
+        preventiveCompleteCount += 1;
+        if (!issue.overdue) {
+          scheduleCompliantCount += 1;
+        }
+      }
+
+      // Hours planning
+      totalEstimatedHours += Number(issue.estimatedDuration || 0);
+      const actualHours = (normalizeDate(issue.updatedAt) - normalizeDate(issue.createdAt)) / 3600000;
+      totalActualHours += actualHours > 0 ? actualHours : 0;
+    });
+
+    Object.keys(monthlyData).forEach((month) => {
+      monthlyData[month].compliancePercent = monthlyData[month].total
+        ? ((monthlyData[month].compliant / monthlyData[month].total) * 100).toFixed(1)
+        : 0;
+    });
+
+    const byPriorityEntries = Object.entries(byPriority)
+      .filter(([, data]) => data.compliant + data.nonCompliant > 0)
+      .map(([priority, data]) => ({
+        label: priority,
+        compliant: data.compliant,
+        nonCompliant: data.nonCompliant,
+        total: data.compliant + data.nonCompliant,
+        complianceRate: ((data.compliant / (data.compliant + data.nonCompliant)) * 100).toFixed(1),
+        color: palette[priorityOrder.indexOf(priority)],
+      }));
+
+    const complianceRate = completedIssues.length ? ((compliantIssues.length / completedIssues.length) * 100).toFixed(1) : 0;
+    const scheduleComplianceRate = preventiveCompleteCount ? ((scheduleCompliantCount / preventiveCompleteCount) * 100).toFixed(1) : 0;
+    const monthlyTrend = Object.entries(monthlyData)
+      .sort((a, b) => new Date(a[0]) - new Date(b[0]))
+      .map(([month, data]) => ({
+        label: month,
+        compliance: Number(data.compliancePercent),
+      }));
+
+    return {
+      totalCompleted: completedIssues.length,
+      totalCompliant: compliantIssues.length,
+      totalNonCompliant: nonCompliantIssues.length,
+      complianceRate: Number(complianceRate),
+      scheduleComplianceRate: Number(scheduleComplianceRate),
+      byPriority: byPriorityEntries,
+      monthlyTrend,
+      estimatedHours: Number(totalEstimatedHours.toFixed(1)),
+      actualHours: Number(totalActualHours.toFixed(1)),
+    };
+  }, [allIssues]);
+
+  const workOrderAgingData = React.useMemo(() => {
+    const incompleteIssues = (allIssues || []).filter((issue) => !isCompleted(issue.status));
+    const workerAging = {};
+    const assetAging = {};
+    let totalAgingHours = 0;
+
+    incompleteIssues.forEach((issue) => {
+      const createdDate = normalizeDate(issue.createdAt);
+      const agingHours = createdDate ? (now.getTime() - createdDate.getTime()) / 3600000 : 0;
+      totalAgingHours += agingHours;
+
+      let assignedWorker = 'Unassigned';
+      const workerId = issue.assignedTo || issue.primaryWorker?._id || issue.primaryWorker?.id;
+      if (workerId) {
+        const worker = (technicians || []).find((t) => String(t._id || t.id) === String(workerId));
+        if (worker) {
+          assignedWorker = worker.name || worker.fullName || String(workerId);
+        } else {
+          // Fallback: use the workerId if it looks like a name
+          assignedWorker = typeof workerId === 'string' && !workerId.match(/^[a-f0-9]{24}$|^[a-f0-9-]{36}$/) ? workerId : String(workerId);
+        }
+      } else if (issue.primaryWorker?.name) {
+        assignedWorker = issue.primaryWorker.name;
+      } else if (issue.assignedWorker?.name) {
+        assignedWorker = issue.assignedWorker.name;
+      }
+
+      if (!workerAging[assignedWorker]) {
+        workerAging[assignedWorker] = { count: 0, totalHours: 0 };
+      }
+      workerAging[assignedWorker].count += 1;
+      workerAging[assignedWorker].totalHours += agingHours;
+
+      const assetName = issue.assetName || issue.asset?.name || 'Unassigned Asset';
+      if (!assetAging[assetName]) {
+        assetAging[assetName] = { count: 0, totalHours: 0 };
+      }
+      assetAging[assetName].count += 1;
+      assetAging[assetName].totalHours += agingHours;
+    });
+
+    const workerAgingEntries = Object.entries(workerAging)
+      .map(([worker, data]) => ({
+        label: worker,
+        count: data.count,
+        averageAgeDays: Number((data.totalHours / 24 / data.count).toFixed(1)),
+        color: palette[Object.keys(workerAging).indexOf(worker) % palette.length],
+      }))
+      .sort((a, b) => b.averageAgeDays - a.averageAgeDays)
+      .slice(0, 10);
+
+    const assetAgingEntries = Object.entries(assetAging)
+      .map(([asset, data]) => ({
+        label: asset,
+        count: data.count,
+        averageAgeDays: Number((data.totalHours / 24 / data.count).toFixed(1)),
+        color: palette[Object.keys(assetAging).indexOf(asset) % palette.length],
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
+    const avgAgingDays = incompleteIssues.length ? (totalAgingHours / 24 / incompleteIssues.length).toFixed(1) : 0;
+
+    return {
+      incompleteCount: incompleteIssues.length,
+      averageAgingDays: Number(avgAgingDays),
+      workerAging: workerAgingEntries,
+      assetAging: assetAgingEntries,
+    };
+  }, [allIssues, technicians, now]);
+
+  const timeCostData = React.useMemo(() => {
+    const inRangeCompleted = inRangeWorkOrderIssues.filter((issue) => isCompleted(issue.status));
+    const workerTimeData = {};
+    const costTrendsData = {};
+    let totalHours = 0;
+    let totalPartCost = 0;
+    let totalLaborCost = 0;
+    let totalOtherCost = 0;
+
+    inRangeCompleted.forEach((issue) => {
+      const { laborCost, partsCost, otherCost } = extractIssueCostSummary(issue);
+      const hours = (normalizeDate(issue.updatedAt) - normalizeDate(issue.createdAt)) / 3600000;
+      totalHours += hours > 0 ? hours : 0;
+      totalPartCost += partsCost;
+      totalLaborCost += laborCost;
+      totalOtherCost += otherCost;
+
+      const workerId = issue.assignedTo || issue.primaryWorker?._id || issue.primaryWorker?.id;
+      let worker = 'Unassigned';
+      if (workerId) {
+        const workerObj = (technicians || []).find((t) => String(t._id || t.id) === String(workerId));
+        if (workerObj) {
+          worker = workerObj.name || workerObj.fullName || String(workerId);
+        } else {
+          worker = typeof workerId === 'string' && !workerId.match(/^[a-f0-9]{24}$|^[a-f0-9-]{36}$/) ? workerId : String(workerId);
+        }
+      } else if (issue.primaryWorker?.name) {
+        worker = issue.primaryWorker.name;
+      } else if (issue.assignedWorker?.name) {
+        worker = issue.assignedWorker.name;
+      }
+      
+      if (!workerTimeData[worker]) {
+        workerTimeData[worker] = { workOrders: 0, hours: 0, laborCost: 0 };
+      }
+      workerTimeData[worker].workOrders += 1;
+      workerTimeData[worker].hours += hours > 0 ? hours : 0;
+      workerTimeData[worker].laborCost += laborCost;
+
+      const month = normalizeDate(issue.updatedAt).toLocaleString('en-US', { month: 'short' });
+      if (!costTrendsData[month]) {
+        costTrendsData[month] = { parts: 0, labor: 0, other: 0 };
+      }
+      costTrendsData[month].parts += partsCost;
+      costTrendsData[month].labor += laborCost;
+      costTrendsData[month].other += otherCost;
+    });
+
+    const workerTimeEntries = Object.entries(workerTimeData)
+      .map(([worker, data]) => ({
+        label: worker,
+        workOrders: data.workOrders,
+        hours: Number(data.hours.toFixed(1)),
+        laborCost: data.laborCost,
+      }))
+      .sort((a, b) => b.hours - a.hours)
+      .slice(0, 10);
+
+    const costTrendsEntries = Object.entries(costTrendsData)
+      .sort((a, b) => new Date(a[0]) - new Date(b[0]))
+      .map(([month, data]) => ({
+        label: month,
+        parts: data.parts,
+        labor: data.labor,
+        other: data.other,
+      }));
+
+    return {
+      totalHours: Number(totalHours.toFixed(1)),
+      totalPartCost,
+      totalLaborCost,
+      totalOtherCost,
+      totalCost: totalPartCost + totalLaborCost + totalOtherCost,
+      workerTime: workerTimeEntries,
+      costTrends: costTrendsEntries,
+    };
+  }, [inRangeWorkOrderIssues, technicians]);
+
+  const workOrderAnalysisData = React.useMemo(() => {
+    const groupedByAssigned = {};
+    const groupedByCompletedBy = {};
+    const groupedByPriority = {};
+    const groupedByCategory = {};
+    const completionTrendData = labels.map(() => ({ complete: 0, compliant: 0, reactive: 0, recurring: 0 }));
+    const laborHourTrendData = labels.map(() => ({ reactive: 0, recurring: 0 }));
+    const costByAssigned = {};
+    const costByPriority = {};
+    const costByCategory = {};
+
+    (allIssues || []).forEach((issue) => {
+      const issueDate = getIssueAnalyticsDate(issue);
+      if (!issueDate || issueDate < rangeStart || issueDate > rangeEnd) return;
+
+      const bucketIndex = bucketIndexForDate(issueDate);
+      const isIssueCompleted = isCompleted(issue.status);
+      const isIssuePreventive = isPreventiveIssue(issue);
+      
+      let assignedTo = 'Unassigned';
+      const workerId = issue.assignedTo || issue.primaryWorker?._id || issue.primaryWorker?.id;
+      if (workerId) {
+        const workerObj = (technicians || []).find((t) => String(t._id || t.id) === String(workerId));
+        if (workerObj) {
+          assignedTo = workerObj.name || workerObj.fullName || String(workerId);
+        } else {
+          assignedTo = typeof workerId === 'string' && !workerId.match(/^[a-f0-9]{24}$|^[a-f0-9-]{36}$/) ? workerId : String(workerId);
+        }
+      } else if (issue.primaryWorker?.name) {
+        assignedTo = issue.primaryWorker.name;
+      } else if (issue.assignedWorker?.name) {
+        assignedTo = issue.assignedWorker.name;
+      }
+      
+      const completedBy = issue.completedBy || 'Not completed';
+      const priority = issue.priority || 'None';
+      const category = issue.category || issue.issueType || 'General';
+      const isCompliant = !issue.overdue;
+      const { totalCost } = extractIssueCostSummary(issue);
+
+      groupedByAssigned[assignedTo] = (groupedByAssigned[assignedTo] || 0) + 1;
+      if (isIssueCompleted) groupedByCompletedBy[completedBy] = (groupedByCompletedBy[completedBy] || 0) + 1;
+      groupedByPriority[priority] = (groupedByPriority[priority] || 0) + 1;
+      groupedByCategory[category] = (groupedByCategory[category] || 0) + 1;
+      
+      costByAssigned[assignedTo] = (costByAssigned[assignedTo] || 0) + totalCost;
+      costByPriority[priority] = (costByPriority[priority] || 0) + totalCost;
+      costByCategory[category] = (costByCategory[category] || 0) + totalCost;
+
+      if (bucketIndex >= 0) {
+        completionTrendData[bucketIndex].complete += isIssueCompleted ? 1 : 0;
+        completionTrendData[bucketIndex].compliant += isCompliant ? 1 : 0;
+        completionTrendData[bucketIndex].reactive += !isIssuePreventive ? 1 : 0;
+        completionTrendData[bucketIndex].recurring += isIssuePreventive ? 1 : 0;
+        laborHourTrendData[bucketIndex].reactive += !isIssuePreventive ? (issue.laborHours || 1) : 0;
+        laborHourTrendData[bucketIndex].recurring += isIssuePreventive ? (issue.laborHours || 1) : 0;
+      }
+    });
+
+    const toGroupedEntries = (grouped, costMap) => Object.entries(grouped)
+      .map(([label, value]) => ({ 
+        label, 
+        value, 
+        cost: costMap[label] || 0,
+        color: palette[Object.keys(grouped).indexOf(label) % palette.length] 
+      }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10);
+
+    return {
+      groupedByAssigned: toGroupedEntries(groupedByAssigned, costByAssigned),
+      groupedByCompletedBy: toGroupedEntries(groupedByCompletedBy, {}),
+      groupedByPriority: toGroupedEntries(groupedByPriority, costByPriority),
+      groupedByCategory: toGroupedEntries(groupedByCategory, costByCategory),
+      completionTrend: completionTrendData,
+      laborHourTrends: laborHourTrendData,
+    };
+  }, [allIssues, technicians, labels, rangeStart, rangeEnd, bucketIndexForDate, getIssueAnalyticsDate, palette]);
 
   const assetAnalytics = React.useMemo(() => {
     const safeRangeHours = Math.max(24, (rangeEnd.getTime() - rangeStart.getTime()) / 3600000);
@@ -29038,16 +29414,24 @@ const ClientAnalyticsTab = ({
     { id: 'time-cost', label: 'Time & Cost', category: 'Work Orders' },
     { id: 'work-order-aging', label: 'Work Order Aging', category: 'Work Orders' },
     { id: 'work-order-analysis', label: 'Work Order Analysis', category: 'Work Orders' },
+    { id: 'explore-work-order', label: 'Explore Work Order', category: 'Work Orders' },
+    { id: 'explore-checklist-tasks', label: 'Explore Checklist Tasks', category: 'Work Orders' },
+    { id: 'explore-preventive-maintenance', label: 'Explore Preventive Maintenance', category: 'Work Orders' },
     { id: 'reliability-dashboard', label: 'Reliability Dashboard', category: 'Assets' },
     { id: 'total-maintenance-cost', label: 'Total Maintenance Cost', category: 'Assets' },
     { id: 'useful-life', label: 'Useful Life', category: 'Assets' },
+    { id: 'explore-assets', label: 'Explore Assets', category: 'Assets' },
     { id: 'meters-dashboard', label: 'Meters', category: 'Meters' },
+    { id: 'explore-meters', label: 'Explore Meters', category: 'Meters' },
     { id: 'parts-consumption', label: 'Parts Consumption', category: 'Parts' },
     { id: 'parts-in-inventory', label: 'Parts in Inventory', category: 'Parts' },
+    { id: 'explore-parts-inventory', label: 'Explore Parts Inventory', category: 'Parts' },
+    { id: 'explore-parts-events', label: 'Explore Parts Events', category: 'Parts' },
     { id: 'requests-dashboard', label: 'Requests', category: 'Requests' },
     { id: 'itemized-time-report', label: 'Itemized Time Report', category: 'Users' },
     { id: 'user-login', label: 'User Login', category: 'Users' },
     { id: 'asset-audit-trail', label: 'Asset Audit Trail', category: 'Audit Trail' },
+    { id: 'explore-audit-trail', label: 'Explore Audit Trail', category: 'Audit Trail' },
   ];
   const customDashboardCatalog = customDashboards.map((dashboard) => ({
     id: dashboard.id,
@@ -29416,7 +29800,7 @@ const ClientAnalyticsTab = ({
               {showViewDropdown && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setShowViewDropdown(false)} />
-                  <div className="absolute right-0 top-full z-50 mt-2 w-80 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-2xl">
+                  <div className="absolute right-0 top-full z-50 mt-2 w-80 rounded-xl border border-gray-100 bg-white shadow-2xl py-1">
                     <button
                       type="button"
                       onClick={() => {
@@ -29463,14 +29847,36 @@ const ClientAnalyticsTab = ({
                     ) : null}
                     <div className="border-t border-gray-200" />
                     <div className="py-2">
-                      {dropdownCategoryLinks.map((category) => (
-                        <div
-                          key={category}
-                          className="px-4 py-3 text-sm font-medium text-gray-700"
-                        >
-                          {category}
-                        </div>
-                      ))}
+                      {dropdownCategoryLinks.map((category) => {
+                        const categoryItems = otherDashboardCatalog.filter((d) => d.category === category);
+                        return (
+                          <div
+                            key={category}
+                            className="group relative px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 cursor-pointer flex items-center justify-between"
+                          >
+                            <span>{category}</span>
+                            {categoryItems.length > 0 && (
+                              <div className="absolute right-full top-0 mr-1 hidden w-64 rounded-xl border border-gray-100 bg-white py-2 shadow-xl group-hover:block z-50">
+                                {categoryItems.map((item) => (
+                                  <button
+                                    key={item.id}
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedDashboardView('default');
+                                      setSubTab(item.id);
+                                      setShowViewDropdown(false);
+                                    }}
+                                    className="w-full px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 hover:text-blue-700 block"
+                                  >
+                                    {item.label}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 </>
@@ -30061,7 +30467,13 @@ const ClientAnalyticsTab = ({
 
         {subTab === 'cost-of-maintenance' && (
           <div className="flex flex-col gap-6">
-            <div className="grid grid-cols-1 xl:grid-cols-[1.35fr_0.8fr] gap-6">
+            <div>
+              <h2 className="text-2xl font-bold">Cost of Maintenance</h2>
+              <p className="text-gray-500 mt-1">View your maintenance costs breakdown and trends.</p>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6">
+              <div className="flex flex-col gap-6">
               <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
                 <div className="flex items-center justify-between mb-4">
                   <p className="text-sm font-bold text-gray-700">Maintenance Spend Trend</p>
@@ -30101,9 +30513,48 @@ const ClientAnalyticsTab = ({
                 ].map((card) => (
                   <div key={card.label} className={`rounded-2xl border p-5 shadow-sm ${card.tone}`}>
                     <p className="text-[11px] font-bold uppercase tracking-[0.18em] opacity-80">{card.label}</p>
-                    <p className="mt-4 text-4xl font-black">{formatCost(card.value)}</p>
+                    <p className="mt-4 text-2xl font-black">{formatCost(card.value)}</p>
                   </div>
                 ))}
+              </div>
+              </div>
+
+              <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden h-fit">
+                <div className="py-2">
+                  <div className="px-4 py-3 text-sm font-medium text-gray-700">
+                    Cost Type
+                  </div>
+                  {['all', 'reactive', 'preventive'].map((type) => (
+                    <button
+                      key={type}
+                      onClick={() => setCostTypeFilter(type)}
+                      className={`w-full text-left px-4 py-3 text-sm font-medium transition-colors ${
+                        costTypeFilter === type
+                          ? 'bg-blue-50 text-blue-700'
+                          : 'text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      {type === 'all' ? 'All Cost Types' : type === 'reactive' ? 'Reactive Only' : 'Preventive Only'}
+                    </button>
+                  ))}
+                  <div className="border-t border-gray-200" />
+                  <div className="px-4 py-3 text-sm font-medium text-gray-700">
+                    Category
+                  </div>
+                  {['all', 'labor', 'parts', 'other'].map((cat) => (
+                    <button
+                      key={cat}
+                      onClick={() => setCategoryFilter(cat)}
+                      className={`w-full text-left px-4 py-3 text-sm font-medium transition-colors ${
+                        categoryFilter === cat
+                          ? 'bg-blue-50 text-blue-700'
+                          : 'text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      {cat === 'all' ? 'All Categories' : cat.charAt(0).toUpperCase() + cat.slice(1)}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
@@ -30150,7 +30601,7 @@ const ClientAnalyticsTab = ({
                   ].map((item) => (
                     <div key={item.label} className="rounded-xl border border-gray-100 bg-gray-50 p-4">
                       <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-gray-500">{item.label}</p>
-                      <p className={`mt-3 text-3xl font-black ${item.tone}`}>{item.value}</p>
+                      <p className={`mt-3 text-2xl font-black ${item.tone}`}>{item.value}</p>
                     </div>
                   ))}
                 </div>
@@ -30161,23 +30612,23 @@ const ClientAnalyticsTab = ({
                 <div className="mt-5 grid grid-cols-2 gap-4">
                   <div className="rounded-xl border border-gray-100 p-4">
                     <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-gray-500">Reactive Share</p>
-                    <p className="mt-3 text-3xl font-black text-teal-700">
+                    <p className="mt-3 text-2xl font-black text-teal-700">
                       {costSummary.total ? Math.round((costSummary.reactive / costSummary.total) * 100) : 0}%
                     </p>
                   </div>
                   <div className="rounded-xl border border-gray-100 p-4">
                     <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-gray-500">Preventive Share</p>
-                    <p className="mt-3 text-3xl font-black text-blue-700">
+                    <p className="mt-3 text-2xl font-black text-blue-700">
                       {costSummary.total ? Math.round((costSummary.preventive / costSummary.total) * 100) : 0}%
                     </p>
                   </div>
                   <div className="rounded-xl border border-gray-100 p-4">
                     <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-gray-500">Avg Asset Cost</p>
-                    <p className="mt-3 text-3xl font-black text-gray-900">{formatCost(assetSpend.average)}</p>
+                    <p className="mt-3 text-2xl font-black text-gray-900">{formatCost(assetSpend.average)}</p>
                   </div>
                   <div className="rounded-xl border border-gray-100 p-4">
                     <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-gray-500">Upcoming PM</p>
-                    <p className="mt-3 text-3xl font-black text-gray-900">{upcomingPreventive.length}</p>
+                    <p className="mt-3 text-2xl font-black text-gray-900">{upcomingPreventive.length}</p>
                   </div>
                 </div>
               </div>
@@ -30357,6 +30808,760 @@ const ClientAnalyticsTab = ({
                     ))}
                   </svg>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {subTab === 'work-order-analysis' && (
+          <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-1000 pb-12">
+            {/* Filter Bar */}
+            <div className="bg-white border text-[#495b6c] border-[#e4e7ec] rounded-2xl p-6 shadow-sm flex flex-wrap items-center gap-4 text-[11px] font-semibold">
+               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Date Completed Date</span><button className="px-3 py-1.5 bg-[#eef4ff] text-[#2563eb] border border-[#c7d7fe] rounded transition-colors whitespace-nowrap">Last 30 Days</button></div>
+               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Type</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap flex items-center gap-6 min-w-[140px]">any value <ChevronDown className="w-3.5 h-3.5 text-gray-400 ml-auto" /></button></div>
+               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Work Order Category</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap text-gray-700">is any value</button></div>
+               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Location Name</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap text-gray-700">is any value</button></div>
+               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Asset Name</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap text-gray-700">is any value</button></div>
+               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Asset Category</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap text-gray-700">is any value</button></div>
+               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Worker Assigned</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap text-gray-700">is any value</button></div>
+               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Team Assigned</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap text-gray-700">is any value</button></div>
+               <div className="flex flex-col gap-1.5 w-full md:w-auto"><span className="text-[10px]">Priority</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap text-gray-700">is any value</button></div>
+            </div>
+
+            <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden flex flex-col items-center justify-center py-10 px-6">
+               <div className="flex items-center gap-2 mb-10">
+                 <h3 className="text-base font-bold text-gray-800">Work Order Completion</h3>
+                 <Info className="w-4 h-4 text-gray-400" />
+               </div>
+               <div className="grid grid-cols-1 md:grid-cols-3 gap-12 w-full max-w-4xl">
+                  <div className="text-center">
+                    <p className="text-6xl font-black text-gray-900 tracking-tight">{inRangeIssues.length}</p>
+                    <p className="mt-4 text-sm font-semibold text-gray-500">Count</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-6xl font-black text-gray-900 tracking-tight">{inRangeIssues.filter(i => !Math.max(0, (normalizeDate(i.updatedAt) - normalizeDate(i.createdAt)) / 3600000) || i.overdue === false).length}</p>
+                    <p className="mt-4 text-sm font-semibold text-gray-500">Compliant Count</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="flex items-center justify-center gap-2">
+                       <p className="text-[10px] items-center uppercase font-bold text-gray-400 absolute -translate-y-12">Avg. Cycle Time</p>
+                       <p className="text-6xl font-black text-gray-900 tracking-tight leading-none">{cycleStats.avg > 0 ? (cycleStats.avg / 24).toFixed(0) : '∅'}</p>
+                    </div>
+                  </div>
+               </div>
+            </div>
+
+            {/* Grouped Charts row 1 */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {[ { title: 'Grouped by Assigned to', data: workOrderAnalysisData.groupedByAssigned }, { title: 'Grouped by Completed by', data: workOrderAnalysisData.groupedByCompletedBy } ].map((section) => (
+                <div key={section.title} className="bg-white border border-gray-100 rounded-2xl p-8 shadow-sm flex flex-col items-center justify-center min-h-[400px]">
+                   <div className="flex items-center gap-2 mb-10">
+                     <h3 className="text-base font-bold text-gray-800">{section.title}</h3>
+                     <Info className="w-4 h-4 text-gray-400" />
+                   </div>
+                   {section.data.length ? (
+                     <div className="w-full space-y-6">
+                       {section.data.map((item) => (
+                         <div key={item.label} className="w-full">
+                            <div className="flex justify-between items-center mb-1 text-xs font-bold text-gray-700">
+                               <span>{item.label}</span>
+                               <span>{item.value}</span>
+                            </div>
+                            <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                               <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${(item.value / Math.max(1, section.data[0].value)) * 100}%`, backgroundColor: item.color }} />
+                            </div>
+                         </div>
+                       ))}
+                     </div>
+                   ) : (
+                     <div className="flex flex-col items-center justify-center text-gray-400 py-20">
+                       <Info className="w-8 h-8 mb-3 opacity-20" />
+                       <p className="text-sm font-bold opacity-60">No results</p>
+                     </div>
+                   )}
+                </div>
+              ))}
+            </div>
+
+            {/* Grouped Charts row 2 */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {[ { title: 'Grouped by Priority', data: workOrderAnalysisData.groupedByPriority }, { title: 'Grouped by Category', data: workOrderAnalysisData.groupedByCategory } ].map((section) => (
+                <div key={section.title} className="bg-white border border-gray-100 rounded-2xl p-8 shadow-sm flex flex-col items-center justify-center min-h-[400px]">
+                   <div className="flex items-center gap-2 mb-10">
+                     <h3 className="text-base font-bold text-gray-800">{section.title}</h3>
+                     <Info className="w-4 h-4 text-gray-400" />
+                   </div>
+                   {section.data.length ? (
+                     <div className="w-full space-y-6">
+                       {section.data.map((item) => (
+                         <div key={item.label} className="w-full">
+                            <div className="flex justify-between items-center mb-1 text-xs font-bold text-gray-700">
+                               <span>{item.label}</span>
+                               <span>{item.value}</span>
+                            </div>
+                            <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                               <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${(item.value / Math.max(1, section.data[0].value)) * 100}%`, backgroundColor: item.color }} />
+                            </div>
+                         </div>
+                       ))}
+                     </div>
+                   ) : (
+                     <div className="flex flex-col items-center justify-center text-gray-400 py-20">
+                       <Info className="w-8 h-8 mb-3 opacity-20" />
+                       <p className="text-sm font-bold opacity-60">No results</p>
+                     </div>
+                   )}
+                </div>
+              ))}
+            </div>
+
+            {/* Completion Comparison & Labor Hour Trends */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+               <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm min-h-[500px]">
+                  <div className="flex items-center justify-center gap-2 mb-6">
+                     <h3 className="text-base font-bold text-gray-800">Completion Comparison</h3>
+                     <Info className="w-4 h-4 text-gray-400" />
+                  </div>
+                  <div className="h-72 w-full mt-10 relative px-4">
+                     <svg viewBox={`0 0 ${lineChartWidth} ${lineChartHeight}`} className="w-full h-full overflow-visible">
+                        {[0,1,2,3,4].map(s => {
+                           const y = linePadding + (linePlotHeight / 4) * s;
+                           return <line key={s} x1={linePadding} y1={y} x2={lineChartWidth - linePadding} y2={y} stroke="#f1f5f9" strokeWidth="1" />;
+                        })}
+                        <path d={buildMetricPath(workOrderAnalysisData.completionTrend.map(t => t.complete))} fill="none" stroke="#2dd4bf" strokeWidth="2.5" />
+                        <path d={buildMetricPath(workOrderAnalysisData.completionTrend.map(t => t.compliant))} fill="none" stroke="#f472b6" strokeWidth="2.5" />
+                        <path d={buildMetricPath(workOrderAnalysisData.completionTrend.map(t => t.reactive))} fill="none" stroke="#84cc16" strokeWidth="2.5" />
+                        <path d={buildMetricPath(workOrderAnalysisData.completionTrend.map(t => t.recurring))} fill="none" stroke="#6366f1" strokeWidth="2.5" />
+
+                        {labels.map((l, i) => i % Math.max(1, Math.floor(labels.length / 5)) === 0 && (
+                          <text key={l} x={linePadding + i * xStep} y={lineChartHeight - 5} textAnchor="middle" className="fill-gray-400 text-[10px] font-bold">{l}</text>
+                        ))}
+                     </svg>
+                     <div className="mt-8 flex flex-wrap justify-center gap-x-6 gap-y-2">
+                        {[
+                          { label: 'Complete Count', color: 'bg-[#2dd4bf]' },
+                          { label: 'Compliant Count', color: 'bg-[#f472b6]' },
+                          { label: 'Reactive Count', color: 'bg-[#84cc16]' },
+                          { label: 'Recurring Count', color: 'bg-[#6366f1]' }
+                        ].map(item => (
+                          <div key={item.label} className="flex items-center gap-1.5 text-[10px] font-bold text-gray-600">
+                             <div className={`w-3 h-0.5 ${item.color}`} /> {item.label}
+                          </div>
+                        ))}
+                     </div>
+                  </div>
+               </div>
+
+               <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm min-h-[500px]">
+                  <div className="flex items-center justify-center gap-2 mb-6">
+                     <h3 className="text-base font-bold text-gray-800">Labor Hour Trends</h3>
+                  </div>
+                  <div className="h-72 w-full mt-10 relative px-4">
+                     <svg viewBox={`0 0 ${lineChartWidth} ${lineChartHeight}`} className="w-full h-full overflow-visible">
+                        {[0,1,2,3,4].map(s => {
+                           const y = linePadding + (linePlotHeight / 4) * s;
+                           return <line key={s} x1={linePadding} y1={y} x2={lineChartWidth - linePadding} y2={y} stroke="#f1f5f9" strokeWidth="1" />;
+                        })}
+                        <path d={buildMetricPath(workOrderAnalysisData.laborHourTrends.map(t => t.reactive))} fill="none" stroke="#e11d48" strokeWidth="2.5" strokeDasharray="4 4" />
+                        <path d={buildMetricPath(workOrderAnalysisData.laborHourTrends.map(t => t.recurring))} fill="none" stroke="#2563eb" strokeWidth="2.5" strokeDasharray="4 4" />
+                        
+                        {labels.map((l, i) => i % Math.max(1, Math.floor(labels.length / 5)) === 0 && (
+                          <text key={l} x={linePadding + i * xStep} y={lineChartHeight - 5} textAnchor="middle" className="fill-gray-400 text-[10px] font-bold">{l}</text>
+                        ))}
+                     </svg>
+                     <div className="mt-8 flex flex-wrap justify-center gap-x-6 gap-y-2">
+                        {[
+                          { label: 'Reactive', color: 'bg-[#e11d48]' },
+                          { label: 'Recurring', color: 'bg-[#2563eb]' }
+                        ].map(item => (
+                          <div key={item.label} className="flex items-center gap-1.5 text-[10px] font-bold text-gray-600">
+                             <div className={`w-3 h-0.5 border-b border-dashed border-gray-400 ${item.color.replace('bg-', 'border-')}`} /> {item.label}
+                          </div>
+                        ))}
+                     </div>
+                  </div>
+               </div>
+            </div>
+
+            {/* Costs Section */}
+            <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden flex flex-col">
+               <div className="flex items-center justify-center gap-2 py-4 border-b border-gray-100">
+                  <h3 className="text-base font-bold text-gray-800">Costs</h3>
+                  <Info className="w-4 h-4 text-gray-400" />
+               </div>
+               <div className="grid grid-cols-2 divide-x divide-gray-100">
+                  <div className="px-10 py-12 flex flex-col items-start">
+                     <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-8">Total Cost</p>
+                     <span className="text-6xl font-black text-gray-900">{formatCost(inRangeIssues.reduce((sum, i) => sum + toCostNumber(extractIssueCostSummary(i).totalCost), 0))}</span>
+                  </div>
+                  <div className="px-10 py-12 flex flex-col items-start translate-x-2">
+                     <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-8">Avg. Cost</p>
+                     <div className="flex items-end gap-2">
+                        <span className="text-6xl font-black text-gray-900 font-sans tracking-tight leading-none">{inRangeIssues.length ? formatCost(inRangeIssues.reduce((sum, i) => sum + toCostNumber(extractIssueCostSummary(i).totalCost), 0) / inRangeIssues.length) : '∅'}</span>
+                     </div>
+                  </div>
+               </div>
+            </div>
+          </div>
+        )}
+
+        {subTab === 'maintenance-compliance' && (
+          <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-1000 pb-12">
+            {/* Filter Bar */}
+            <div className="bg-white border text-[#495b6c] border-[#e4e7ec] rounded-2xl p-6 shadow-sm flex flex-wrap items-center gap-4 text-[11px] font-semibold">
+               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Date Completed</span><button className="px-3 py-1.5 bg-[#eef4ff] text-[#2563eb] border border-[#c7d7fe] rounded transition-colors whitespace-nowrap">Last 30 Days</button></div>
+               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Type</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap flex items-center gap-6 min-w-[140px]">any value <ChevronDown className="w-3.5 h-3.5 text-gray-400 ml-auto" /></button></div>
+               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Work Order Category</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap text-gray-700">is any value</button></div>
+               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Location</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap text-gray-700">is any value</button></div>
+               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Asset</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap text-gray-700">is any value</button></div>
+               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Asset Category</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap text-gray-700">is any value</button></div>
+               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Team Assigned</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap text-gray-700">is any value</button></div>
+            </div>
+
+            <div className="bg-white border border-gray-100 rounded-2xl p-8 shadow-sm">
+              <div className="text-center mb-12">
+                <h3 className="text-xl font-semibold text-gray-900">What does our compliance look like for completed work orders?</h3>
+              </div>
+
+              <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+                <div className="flex items-center justify-center gap-2 mb-10 p-8 bg-gray-50 border-b">
+                  <h3 className="text-base font-bold text-gray-800">Work Orders</h3>
+                  <Info className="w-4 h-4 text-gray-400" />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-12 w-full max-w-4xl px-8 py-12 mx-auto">
+                  <div className="text-center">
+                    <p className="text-6xl font-black text-gray-900 tracking-tight">{maintenanceComplianceData.totalCompleted}</p>
+                    <p className="mt-4 text-sm font-semibold text-gray-500">Count</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-6xl font-black text-gray-900 tracking-tight">{maintenanceComplianceData.totalCompliant}</p>
+                    <p className="mt-4 text-sm font-semibold text-gray-500">Compliant Count</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-6xl font-black text-gray-900 tracking-tight">{maintenanceComplianceData.totalNonCompliant}</p>
+                    <p className="mt-4 text-sm font-semibold text-gray-500">Non-Compliant Count</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* By Priority */}
+              <div className="bg-white border border-gray-100 rounded-2xl p-8 shadow-sm">
+                <div className="flex items-center justify-center gap-2 mb-10">
+                  <h3 className="text-base font-bold text-gray-800">By Priority</h3>
+                  <Info className="w-4 h-4 text-gray-400" />
+                </div>
+                {maintenanceComplianceData.byPriority.length ? (
+                  <div className="space-y-6">
+                    {maintenanceComplianceData.byPriority.map((item) => (
+                      <div key={item.label}>
+                        <div className="flex justify-between items-center mb-3">
+                          <span className="font-semibold text-gray-900">{item.label}</span>
+                          <span className="text-sm font-bold text-gray-700">{item.compliant} / {item.total}</span>
+                        </div>
+                        <div className="w-full bg-gray-100 rounded-full overflow-hidden h-3">
+                          <div
+                            className="h-full rounded-full transition-all duration-1000"
+                            style={{
+                              width: `${(item.compliant / item.total) * 100}%`,
+                              backgroundColor: item.color,
+                            }}
+                          />
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1">{item.complianceRate}% Compliant</div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center text-gray-400 py-20">
+                    <Info className="w-8 h-8 mb-3 opacity-20" />
+                    <p className="text-sm font-bold opacity-60">No completed work orders</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Compliance Rate Donut */}
+              <div className="bg-white border border-gray-100 rounded-2xl p-8 shadow-sm flex flex-col items-center justify-center">
+                <div className="flex items-center justify-center gap-2 mb-10">
+                  <h3 className="text-base font-bold text-gray-800">Compliance Rate</h3>
+                  <Info className="w-4 h-4 text-gray-400" />
+                </div>
+                {maintenanceComplianceData.totalCompleted > 0 ? (
+                  <div className="flex items-center justify-center">
+                    <div
+                      className="h-48 w-48 rounded-full flex items-center justify-center relative"
+                      style={{
+                        background: `conic-gradient(#10b981 0deg ${maintenanceComplianceData.complianceRate * 3.6}deg, #ef4444 ${maintenanceComplianceData.complianceRate * 3.6}deg 360deg)`,
+                      }}
+                    >
+                      <div className="w-32 h-32 bg-white rounded-full flex items-center justify-center">
+                        <span className="text-4xl font-black text-gray-900">{maintenanceComplianceData.complianceRate}%</span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center text-gray-400 py-20">
+                    <Info className="w-8 h-8 mb-3 opacity-20" />
+                    <p className="text-sm font-bold opacity-60">No data available</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Schedule Compliance */}
+              <div className="bg-white border border-gray-100 rounded-2xl p-8 shadow-sm flex flex-col items-center justify-center">
+                <div className="flex items-center justify-center gap-2 mb-10">
+                  <h3 className="text-base font-bold text-gray-800">Schedule Compliance</h3>
+                  <Info className="w-4 h-4 text-gray-400" />
+                </div>
+                {maintenanceComplianceData.scheduleComplianceRate !== undefined ? (
+                  <div className="flex items-center justify-center">
+                    <div
+                      className="h-48 w-48 rounded-full flex items-center justify-center relative"
+                      style={{
+                        background: `conic-gradient(#06b6d4 0deg ${maintenanceComplianceData.scheduleComplianceRate * 3.6}deg, #e5e7eb ${maintenanceComplianceData.scheduleComplianceRate * 3.6}deg 360deg)`,
+                      }}
+                    >
+                      <div className="w-32 h-32 bg-white rounded-full flex items-center justify-center">
+                        <span className="text-4xl font-black text-gray-900">{maintenanceComplianceData.scheduleComplianceRate}%</span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center text-gray-400 py-20">
+                    <Info className="w-8 h-8 mb-3 opacity-20" />
+                    <p className="text-sm font-bold opacity-60">No preventive maintenance data</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Actual Hours to Planning */}
+              <div className="bg-white border border-gray-100 rounded-2xl p-8 shadow-sm flex flex-col items-center justify-center">
+                <div className="flex items-center justify-center gap-2 mb-10">
+                  <h3 className="text-base font-bold text-gray-800">Actual Hours to Planning</h3>
+                  <Info className="w-4 h-4 text-gray-400" />
+                </div>
+                <div className="grid grid-cols-2 gap-12 w-full">
+                  <div className="text-center">
+                    <p className="text-5xl font-black text-gray-900">{maintenanceComplianceData.estimatedHours}</p>
+                    <p className="mt-4 text-sm font-semibold text-gray-500">Estimated Hours</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-5xl font-black text-gray-900">{maintenanceComplianceData.actualHours}</p>
+                    <p className="mt-4 text-sm font-semibold text-gray-500">Total Time Spent (hours)</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Monthly Compliance Trend */}
+            <div className="bg-white border border-gray-100 rounded-2xl p-8 shadow-sm">
+              <div className="flex items-center justify-center gap-2 mb-10">
+                <h3 className="text-base font-bold text-gray-800">Monthly Compliance</h3>
+                <Info className="w-4 h-4 text-gray-400" />
+              </div>
+              {maintenanceComplianceData.monthlyTrend.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <svg viewBox={`0 0 ${lineChartWidth} ${lineChartHeight}`} className="w-full min-w-[620px] h-[230px]">
+                    {[0, 1, 2, 3, 4].map((step) => {
+                      const y = linePadding + (linePlotHeight / 4) * step;
+                      return <line key={step} x1={linePadding} y1={y} x2={lineChartWidth - linePadding} y2={y} stroke="#e5e7eb" strokeDasharray="4 4" />;
+                    })}
+                    <path d={buildMetricPath(maintenanceComplianceData.monthlyTrend.map(t => t.compliance))} fill="none" stroke="#2563eb" strokeWidth="3" strokeLinecap="round" />
+                    {maintenanceComplianceData.monthlyTrend.map((item, index) => (
+                      <circle key={`${item.label}-${item.compliance}`} cx={linePadding + index * xStep} cy={getMetricPointY(maintenanceComplianceData.monthlyTrend.map(t => t.compliance), item.compliance)} r="4.5" fill="#3b82f6" />
+                    ))}
+                    {maintenanceComplianceData.monthlyTrend.map((item, index) => (
+                      <text key={item.label} x={linePadding + index * xStep} y={lineChartHeight - 6} textAnchor="middle" className="fill-gray-400 text-[10px]">
+                        {item.label}
+                      </text>
+                    ))}
+                  </svg>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center text-gray-400 py-20">
+                  <Info className="w-8 h-8 mb-3 opacity-20" />
+                  <p className="text-sm font-bold opacity-60">No monthly data available</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {subTab === 'work-order-aging' && (
+          <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-1000 pb-12">
+            {/* Filter Bar */}
+            <div className="bg-white border text-[#495b6c] border-[#e4e7ec] rounded-2xl p-6 shadow-sm flex flex-wrap items-center gap-4 text-[11px] font-semibold">
+               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Due Date Date</span><button className="px-3 py-1.5 bg-[#eef4ff] text-[#2563eb] border border-[#c7d7fe] rounded transition-colors whitespace-nowrap">Last 30 Days</button></div>
+               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Is Recurring (Yes / No)</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap flex items-center gap-6 min-w-[140px]">any value <ChevronDown className="w-3.5 h-3.5 text-gray-400 ml-auto" /></button></div>
+               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Category</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap text-gray-700">is any value</button></div>
+               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Location Name</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap text-gray-700">is any value</button></div>
+               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Asset Name</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap text-gray-700">is any value</button></div>
+               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Asset Category</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap text-gray-700">is any value</button></div>
+               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Priority</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap text-gray-700">is any value</button></div>
+               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Team Assigned</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap text-gray-700">is any value</button></div>
+            </div>
+
+            <div className="text-center mb-4">
+              <h3 className="text-xl font-semibold text-gray-900">How are our incomplete work orders aging?</h3>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Incomplete Work Orders */}
+              <div className="bg-white border border-gray-100 rounded-2xl p-8 shadow-sm">
+                <div className="flex items-center justify-center gap-2 mb-10">
+                  <h3 className="text-base font-bold text-gray-800">Incomplete Work Orders</h3>
+                  <Info className="w-4 h-4 text-gray-400" />
+                </div>
+                <div className="grid grid-cols-2 gap-12 w-full">
+                  <div className="text-center">
+                    <p className="text-6xl font-black text-gray-900">{workOrderAgingData.incompleteCount}</p>
+                    <p className="mt-4 text-sm font-semibold text-gray-500">Count</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-6xl font-black text-gray-900">{workOrderAgingData.averageAgingDays}</p>
+                    <p className="mt-4 text-sm font-semibold text-gray-500">Average Work Order Age</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Assigned Worker Table */}
+              <div className="bg-white border border-gray-100 rounded-2xl p-8 shadow-sm">
+                <div className="flex items-center justify-center gap-2 mb-10">
+                  <h3 className="text-base font-bold text-gray-800">Assigned Worker</h3>
+                  <Info className="w-4 h-4 text-gray-400" />
+                </div>
+                {workOrderAgingData.workerAging.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-gray-200">
+                          <th className="text-left py-3 px-4 font-bold text-gray-700">Assigned To</th>
+                          <th className="text-right py-3 px-4 font-bold text-gray-700">Incomplete Work Orders</th>
+                          <th className="text-right py-3 px-4 font-bold text-gray-700">Average Work Order Age</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {workOrderAgingData.workerAging.map((worker, idx) => (
+                          <tr key={idx} className="border-b border-gray-100 hover:bg-gray-50">
+                            <td className="py-3 px-4 text-gray-900 font-semibold">{worker.label}</td>
+                            <td className="py-3 px-4 text-right text-gray-700 font-semibold">{worker.count}</td>
+                            <td className="py-3 px-4 text-right text-gray-700 font-semibold">{worker.averageAgeDays}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="text-center text-gray-400 py-8">No incomplete work orders</div>
+                )}
+              </div>
+            </div>
+
+            {/* Assets Combo Chart */}
+            <div className="bg-white border border-gray-100 rounded-2xl p-8 shadow-sm">
+              <div className="flex items-center justify-center gap-2 mb-10">
+                <h3 className="text-base font-bold text-gray-800">Assets</h3>
+                <Info className="w-4 h-4 text-gray-400" />
+              </div>
+              {workOrderAgingData.assetAging.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <svg viewBox={`0 0 ${lineChartWidth} ${lineChartHeight}`} className="w-full min-w-[800px] h-[300px]">
+                    {[0, 1, 2, 3, 4].map((step) => {
+                      const y = linePadding + (linePlotHeight / 4) * step;
+                      return <line key={step} x1={linePadding} y1={y} x2={lineChartWidth - linePadding} y2={y} stroke="#e5e7eb" strokeDasharray="4 4" />;
+                    })}
+                    {workOrderAgingData.assetAging.map((item, index) => {
+                      const x = linePadding + (index * (lineChartWidth - 2 * linePadding)) / (workOrderAgingData.assetAging.length - 1 || 1);
+                      const barWidth = 30;
+                      const maxCount = Math.max(1, ...workOrderAgingData.assetAging.map(a => a.count));
+                      const barHeight = (item.count / maxCount) * linePlotHeight;
+                      const barY = linePadding + linePlotHeight - barHeight;
+                      return (
+                        <g key={item.label}>
+                          <rect x={x - barWidth / 2} y={barY} width={barWidth} height={barHeight} fill="#06b6d4" opacity="0.8" />
+                          <circle cx={x} cy={linePadding + linePlotHeight - (item.averageAgeDays / Math.max(5, ...workOrderAgingData.assetAging.map(a => a.averageAgeDays))) * linePlotHeight} r="5" fill="#ec4899" />
+                          <text x={x} y={lineChartHeight - 10} textAnchor="middle" className="fill-gray-500 text-[9px]">{item.label}</text>
+                        </g>
+                      );
+                    })}
+                  </svg>
+                  <div className="mt-4 flex items-center justify-center gap-8 text-xs">
+                    <span className="flex items-center gap-2"><span className="w-4 h-4 bg-cyan-400 rounded"></span>Incomplete Work Orders</span>
+                    <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-pink-500"></span>Average Age</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center text-gray-400 py-8">No asset data</div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {subTab === 'time-cost' && (
+          <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-1000 pb-12">
+            {/* Filter Bar */}
+            <div className="bg-white border text-[#495b6c] border-[#e4e7ec] rounded-2xl p-6 shadow-sm flex flex-wrap items-center gap-4 text-[11px] font-semibold">
+               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Date Completed Date</span><button className="px-3 py-1.5 bg-[#eef4ff] text-[#2563eb] border border-[#c7d7fe] rounded transition-colors whitespace-nowrap">Last 30 Days</button></div>
+               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Type</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap flex items-center gap-6 min-w-[140px]">any value <ChevronDown className="w-3.5 h-3.5 text-gray-400 ml-auto" /></button></div>
+               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Category</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap text-gray-700">is any value</button></div>
+               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Location</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap text-gray-700">is any value</button></div>
+               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Asset</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap text-gray-700">is any value</button></div>
+               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Team Assigned</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap text-gray-700">is any value</button></div>
+               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Worker Full Name</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap text-gray-700">is any value</button></div>
+            </div>
+
+            <div className="text-center mb-4">
+              <h3 className="text-xl font-semibold text-gray-900">How are we spending our time and money?</h3>
+            </div>
+
+            {/* Costs Table */}
+            <div className="bg-white border border-gray-100 rounded-2xl p-8 shadow-sm">
+              <h3 className="text-base font-bold text-gray-800 mb-6">Costs</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="py-3 px-4 text-left font-bold text-gray-700">Hours Worked</th>
+                      <th className="py-3 px-4 text-left font-bold text-gray-700">Part Cost</th>
+                      <th className="py-3 px-4 text-left font-bold text-gray-700">Labor Cost</th>
+                      <th className="py-3 px-4 text-left font-bold text-gray-700">Additional Cost</th>
+                      <th className="py-3 px-4 text-left font-bold text-gray-700">Total Cost</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr className="border-b border-gray-200">
+                      <td className="py-4 px-4 text-gray-900 font-semibold">{timeCostData.totalHours}</td>
+                      <td className="py-4 px-4 text-gray-900 font-semibold">{formatCost(timeCostData.totalPartCost)}</td>
+                      <td className="py-4 px-4 text-gray-900 font-semibold">{formatCost(timeCostData.totalLaborCost)}</td>
+                      <td className="py-4 px-4 text-gray-900 font-semibold">{formatCost(timeCostData.totalOtherCost)}</td>
+                      <td className="py-4 px-4 text-gray-900 font-bold">{formatCost(timeCostData.totalCost)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Worker Time Table */}
+              <div className="bg-white border border-gray-100 rounded-2xl p-8 shadow-sm">
+                <h3 className="text-base font-bold text-gray-800 mb-6">Worker Time</h3>
+                {timeCostData.workerTime.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-sm">
+                      <thead className="border-b border-gray-200">
+                        <tr>
+                          <th className="text-left py-3 px-4 font-bold text-gray-700">Worker Full Name</th>
+                          <th className="text-right py-3 px-4 font-bold text-gray-700">Work Orders</th>
+                          <th className="text-right py-3 px-4 font-bold text-gray-700">Total Time Logged (Hrs)</th>
+                          <th className="text-right py-3 px-4 font-bold text-gray-700">Total Labor Cost</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {timeCostData.workerTime.map((worker, idx) => (
+                          <tr key={idx} className="border-b border-gray-100 hover:bg-gray-50">
+                            <td className="py-3 px-4 text-gray-900 font-semibold">{worker.label}</td>
+                            <td className="py-3 px-4 text-right text-gray-700">{worker.workOrders}</td>
+                            <td className="py-3 px-4 text-right text-gray-700">{worker.hours}</td>
+                            <td className="py-3 px-4 text-right text-gray-700 font-semibold">{formatCost(worker.laborCost)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="text-center text-gray-400 py-8">No Results</div>
+                )}
+              </div>
+
+              {/* Cost Trends Chart */}
+              <div className="bg-white border border-gray-100 rounded-2xl p-8 shadow-sm">
+                <h3 className="text-base font-bold text-gray-800 mb-6">Cost Trends</h3>
+                {timeCostData.costTrends.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <svg viewBox={`0 0 ${lineChartWidth} ${lineChartHeight}`} className="w-full min-w-[500px] h-[250px]">
+                      {[0, 1, 2, 3, 4].map((step) => {
+                        const y = linePadding + (linePlotHeight / 4) * step;
+                        return <line key={step} x1={linePadding} y1={y} x2={lineChartWidth - linePadding} y2={y} stroke="#e5e7eb" strokeDasharray="4 4" />;
+                      })}
+                      {timeCostData.costTrends.map((item, index) => {
+                        const x = linePadding + (index * (lineChartWidth - 2 * linePadding)) / (timeCostData.costTrends.length - 1 || 1);
+                        const maxCost = Math.max(1, ...timeCostData.costTrends.map(t => t.parts + t.labor + t.other));
+                        const partsHeight = (item.parts / maxCost) * linePlotHeight * 0.33;
+                        const laborHeight = (item.labor / maxCost) * linePlotHeight * 0.33;
+                        const otherHeight = (item.other / maxCost) * linePlotHeight * 0.33;
+
+                        return (
+                          <g key={item.label}>
+                            <rect x={x - 10} y={linePadding + linePlotHeight - partsHeight} width="6" height={partsHeight} fill="#a78bfa" />
+                            <rect x={x - 2} y={linePadding + linePlotHeight - partsHeight - laborHeight} width="6" height={laborHeight} fill="#22c55e" />
+                            <rect x={x + 6} y={linePadding + linePlotHeight - partsHeight - laborHeight - otherHeight} width="6" height={otherHeight} fill="#fbbf24" />
+                            <text x={x} y={lineChartHeight - 10} textAnchor="middle" className="fill-gray-500 text-[9px]">{item.label}</text>
+                          </g>
+                        );
+                      })}
+                    </svg>
+                    <div className="mt-4 flex items-center justify-center gap-6 text-xs">
+                      <span className="flex items-center gap-2"><span className="w-3 h-3 bg-purple-300 rounded"></span>Parts Cost</span>
+                      <span className="flex items-center gap-2"><span className="w-3 h-3 bg-green-500 rounded"></span>Labor Cost</span>
+                      <span className="flex items-center gap-2"><span className="w-3 h-3 bg-amber-400 rounded"></span>Additional Cost</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center text-gray-400 py-8">No data available</div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {subTab === 'status-report' && (
+          <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
+            <div className="bg-white border text-[#495b6c] border-[#e4e7ec] rounded-2xl p-6 shadow-sm flex flex-wrap items-center gap-4 text-[11px] font-semibold">
+               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Due Date</span><button className="px-3 py-1.5 bg-[#eef4ff] text-[#2563eb] border border-[#c7d7fe] rounded transition-colors whitespace-nowrap">is in the last 30 days</button></div>
+               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Date Created</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap">is any time</button></div>
+               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Type</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap flex items-center gap-6 min-w-[140px]">any value <ChevronDown className="w-3.5 h-3.5 text-gray-400 ml-auto" /></button></div>
+               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Worker Assigned</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap">is any value</button></div>
+               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Work Order Category</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap">is any value</button></div>
+               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Location</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap">is any value</button></div>
+               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Asset</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap">is any value</button></div>
+               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Asset Category</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap">is any value</button></div>
+               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Team Assigned</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap">is any value</button></div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+               <div className="flex flex-col gap-6">
+                 <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-6 text-center">
+                   <div className="flex items-center justify-center gap-2 mb-8">
+                     <h3 className="text-sm font-semibold text-gray-700">By the numbers</h3>
+                     <Activity className="w-3.5 h-3.5 text-gray-400" />
+                   </div>
+                   <div className="grid grid-cols-4 gap-4">
+                     <div>
+                       <p className="text-3xl font-medium text-gray-800">{statusCounts.total}</p>
+                       <p className="text-[10px] text-gray-500 mt-2 font-medium">Count</p>
+                     </div>
+                     <div>
+                       <p className="text-3xl font-medium text-gray-800">{statusCounts.completed}</p>
+                       <p className="text-[10px] text-gray-500 mt-2 font-medium">Complete Count</p>
+                     </div>
+                     <div>
+                       <p className="text-3xl font-medium text-gray-800">{Math.max(0, statusCounts.completed - statusCounts.overdue)}</p>
+                       <p className="text-[10px] text-gray-500 mt-2 font-medium">Compliant Count</p>
+                     </div>
+                     <div>
+                       <p className="text-3xl font-medium text-gray-800 font-sans">{cycleStats.avg > 0 ? (cycleStats.avg / 24).toFixed(1) : '∅'}</p>
+                       <p className="text-[10px] text-gray-500 mt-2 font-medium leading-[1.2]">Average Cycle Time<br/>(days)</p>
+                     </div>
+                   </div>
+                 </div>
+
+                 <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-6 flex flex-col items-center justify-center min-h-[300px]">
+                   <h3 className="text-sm font-semibold text-gray-700 mb-8 w-full text-center">Work Order Status</h3>
+                   <div className="relative w-48 h-48 rounded-full flex items-center justify-center shadow-inner" style={{ background: `conic-gradient(#10b981 0deg ${(statusCounts.completed / Math.max(1, statusCounts.total)) * 360}deg, #3b82f6 ${(statusCounts.completed / Math.max(1, statusCounts.total)) * 360}deg ${((statusCounts.completed + statusCounts.inProgress) / Math.max(1, statusCounts.total)) * 360}deg, #f59e0b ${((statusCounts.completed + statusCounts.inProgress) / Math.max(1, statusCounts.total)) * 360}deg ${((statusCounts.completed + statusCounts.inProgress + statusCounts.pending) / Math.max(1, statusCounts.total)) * 360}deg, #e5e7eb ${((statusCounts.completed + statusCounts.inProgress + statusCounts.pending) / Math.max(1, statusCounts.total)) * 360}deg 360deg)` }}>
+                     <div className="w-32 h-32 bg-white rounded-full flex flex-col items-center justify-center absolute shadow-lg" />
+                   </div>
+                 </div>
+               </div>
+
+               <div className="flex flex-col gap-6">
+                 <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-6 flex-1 min-h-[350px]">
+                   <div className="flex items-center justify-center gap-2 mb-6">
+                     <h3 className="text-sm font-semibold text-gray-700">Work Remaining</h3>
+                     <Activity className="w-3.5 h-3.5 text-gray-400" />
+                   </div>
+                   <div className="h-64 flex flex-col relative w-full pr-8 py-2">
+                     <div className="flex justify-between h-full relative border-b border-gray-200 pb-2">
+                       <div className="absolute inset-0 flex flex-col justify-between z-0 translate-y-2">
+                         {[5,4,3,2,1,0].map(step => {
+                           const maxAxis = Math.max(10, Math.ceil((statusCounts.total - statusCounts.completed + 2) / 5) * 5);
+                           const y = Math.round((step / 5) * maxAxis);
+                           return (
+                             <div key={y} className="flex justify-between w-full relative h-[1px]">
+                               <div className="absolute -left-6 text-[10px] text-gray-500 -translate-y-[8px]">{y > 1 ? (y * 0.2).toFixed(1) : y}</div>
+                               <div className="w-full h-px border-t border-dashed border-gray-200" />
+                               <div className="absolute -right-6 text-[10px] text-gray-500 -translate-y-[8px]">{y}</div>
+                             </div>
+                           );
+                         })}
+                       </div>
+                       <div className="relative flex justify-center items-end w-full px-6 pt-4 h-full z-10 space-x-12">
+                          {(() => {
+                            const incompleteCount = statusCounts.total - statusCounts.completed;
+                            const maxAxis = Math.max(10, Math.ceil((incompleteCount + 2) / 5) * 5);
+                            const heightPercent = Math.min(100, Math.max(2, (incompleteCount / maxAxis) * 100));
+                            return (
+                              <div className="w-full max-w-[120px] bg-yellow-400 relative transition-all duration-1000" style={{ height: `${heightPercent}%` }}>
+                                <div className="absolute top-0 right-1/2 translate-x-1/2 -translate-y-1.5 border-t-2 border-b-2 border-transparent w-4 h-4 rounded-full bg-blue-500 z-20" />
+                                <div className="absolute top-0 right-[-50px] w-[100px] h-[3px] bg-blue-100 -translate-y-1 z-10" />
+                                <div className="absolute top-0 left-[-50px] w-[100px] h-[3px] bg-blue-100 -translate-y-1 z-10" />
+                              </div>
+                            );
+                          })()}
+                          <div className="absolute -left-8 top-1/2 -rotate-90 text-[10px] text-yellow-500 whitespace-nowrap transform -translate-y-1/2 origin-center font-medium">Work Order Incomplete Count</div>
+                          <div className="absolute -right-12 top-1/2 -rotate-270 text-[10px] text-blue-500 whitespace-nowrap transform -translate-y-1/2 rotate-90 origin-center font-medium">Estimated Hours</div>
+                       </div>
+                     </div>
+                     <div className="mt-2 text-center text-xs font-semibold text-gray-700">
+                        {technicians.length > 0 ? technicians[0].name : 'Unassigned'}
+                        <br/>
+                        <span className="text-[10px] font-normal text-gray-500">Assigned to</span>
+                     </div>
+                     <div className="flex justify-center gap-6 mt-4 opacity-80">
+                        <div className="flex items-center gap-2 text-[10px] font-medium text-gray-600">
+                           <div className="w-2.5 h-2.5 rounded-full bg-yellow-400"></div> 
+                           Medium - Work Order Incomplete Count
+                        </div>
+                        <div className="flex items-center gap-2 text-[10px] font-medium text-gray-600">
+                           <div className="w-3 h-0.5 bg-blue-500"></div> 
+                           Estimated Hours
+                        </div>
+                     </div>
+                   </div>
+                 </div>
+
+                 <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-6 text-center">
+                   <div className="flex items-center justify-center gap-2 mb-8">
+                     <h3 className="text-sm font-semibold text-gray-700">Hours Worked</h3>
+                     <Activity className="w-3.5 h-3.5 text-gray-400" />
+                   </div>
+                   <div className="flex justify-around">
+                     <div>
+                       <p className="text-3xl font-medium text-gray-800">{Number(allIssues.reduce((sum, issue) => sum + (Number(issue.estimatedDuration || issue.estimatedHours || issue.estimatedTime) || 0), 0)).toFixed(1)}</p>
+                       <p className="text-[10px] text-gray-500 mt-2 font-medium">Estimated Hours</p>
+                     </div>
+                     <div>
+                       <p className="text-3xl font-medium text-gray-800">{Number(allIssues.reduce((sum, issue) => sum + (Number(issue.timeSpent || issue.time || issue.totalTime) || 0), 0)).toFixed(1)}</p>
+                       <p className="text-[10px] text-gray-500 mt-2 font-medium">Total Time Spent (hours)</p>
+                     </div>
+                   </div>
+                 </div>
+               </div>
+            </div>
+          </div>
+        )}
+
+        {!['team-performance', 'cost-of-maintenance', 'asset-downtime', 'status-report', 'work-order-analysis', 'maintenance-compliance', 'work-order-aging', 'time-cost'].includes(subTab) && (
+          <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
+            <div className="bg-white border border-gray-100 rounded-2xl p-10 shadow-sm flex flex-col items-center justify-center text-center min-h-[450px]">
+              <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mb-5 shadow-sm border border-blue-100">
+                <Activity className="w-8 h-8" />
+              </div>
+              <h3 className="text-xl font-black text-gray-900 mb-3">
+                {otherDashboardCatalog.find((d) => d.id === subTab)?.label || 'Analytics Report'}
+              </h3>
+              <p className="max-w-md text-sm text-gray-500 leading-relaxed mb-10">
+                Detailed visualizations and filters for this report are currently being constructed. Stay tuned for real-time interactive insights.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-4xl mx-auto opacity-30 pointer-events-none select-none">
+                {[1, 2, 3].map((val) => (
+                  <div key={val} className="h-32 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200 flex flex-col gap-2 p-4">
+                     <div className="h-4 w-1/3 bg-gray-200 rounded-full" />
+                     <div className="h-3 w-1/4 bg-gray-100 rounded-full mt-auto" />
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -34537,7 +35742,7 @@ function WorkOrderDetailsModal({ open, onClose, onSave, mode = 'create', tasks =
     allRequired: false,
   });
 
-  const addTask = () => setTasks?.((t) => [...t, { id: Date.now(), title: '', status: 'Open' }]);
+  const addTask = () => setTasks?.((t) => [...t, { id: `task-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`, title: '', status: 'Open' }]);
   const updateTask = (id, key, value) => setTasks?.((t) => t.map(task => (task.id === id ? { ...task, [key]: value } : task)));
   const removeTask = (id) => setTasks?.((t) => (t.length === 1 ? t : t.filter(task => task.id !== id)));
   const imageFiles = Array.isArray(workOrderDetails?.imageFiles) ? workOrderDetails.imageFiles : [];
@@ -34571,13 +35776,13 @@ function WorkOrderDetailsModal({ open, onClose, onSave, mode = 'create', tasks =
     }));
   };
 
-  const addChecklistItem = () => setChecklist?.((c) => [...c, { id: Date.now(), text: '', type: 'Status', meter: '' }]);
+  const addChecklistItem = () => setChecklist?.((c) => [...c, { id: `check-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`, text: '', type: 'Status', meter: '' }]);
   const updateChecklistItem = (id, key, value) => setChecklist?.((c) => c.map(item => (item.id === id ? { ...item, [key]: value } : item)));
   const removeChecklistItem = (id) => setChecklist?.((c) => (c.length === 1 ? c : c.filter(item => item.id !== id)));
   const applyChecklistTemplate = (tpl) => {
     if (!tpl) return;
     const items = (tpl.items || []).map((item, idx) => ({
-      id: item.id || `${Date.now()}-${idx}`,
+      id: item.id || item._id || `check-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 5)}`,
       text: item.text || item.label || '',
       type: item.type || 'Status',
       meter: item.meter || '',

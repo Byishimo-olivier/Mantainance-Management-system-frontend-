@@ -203,6 +203,21 @@ const subscriptionAPI = {
     }
   },
 
+  // Initiate PesaPal payment
+  initiatePesaPalPayment: async (subscriptionId, amount, phoneNumber = null, email = null) => {
+    try {
+      const response = await api.post(`${BASE}/payments/initiate-pesapal`, {
+        subscriptionId,
+        amount,
+        phoneNumber,
+        email,
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
   // Get payment by ID
   getPaymentById: async (paymentId) => {
     try {
@@ -251,6 +266,48 @@ const subscriptionAPI = {
         finalConfig.params = { userId };
       }
       const response = await api.get('/api/properties', finalConfig);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  // Get invoices for a subscription
+  getSubscriptionInvoices: async (subscriptionId) => {
+    try {
+      const response = await api.get(`${BASE}/${subscriptionId}/invoices`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  // Get invoice by ID
+  getInvoiceById: async (invoiceId) => {
+    try {
+      const response = await api.get(`${BASE}/invoices/${invoiceId}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  // Download invoice PDF
+  downloadInvoice: async (invoiceId) => {
+    try {
+      const response = await api.get(`${BASE}/invoices/${invoiceId}/download`, {
+        responseType: 'blob',
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  // Get company subscription status for authenticated user
+  getCompanySubscriptionStatus: async () => {
+    try {
+      const response = await api.get(`${BASE}/status`);
       return response.data;
     } catch (error) {
       throw error.response?.data || error.message;

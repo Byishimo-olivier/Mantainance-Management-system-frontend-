@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import AuthHeader from './auth/AuthHeader';
+import subscriptionAPI from '../api/subscription';
+import api from '../api/axios';
 
 const products = [
   {
@@ -46,19 +48,16 @@ const products = [
   }
 ];
 
-const pricingPlans = [
-  {
-    name: 'Essential',
-    price: '$20',
-    period: '/user/mo',
+// Plan descriptions and features (static content)
+const planMetadata = {
+  basic: {
+    displayName: 'Essential',
     description: 'Small teams or single-site operations getting off spreadsheets and paper for the first time.',
     features: ['Unlimited work orders', 'Unlimited locations', 'Nova AI'],
     cta: 'Try for free'
   },
-  {
-    name: 'Premium',
-    price: '$55',
-    period: '/user/mo',
+  premium: {
+    displayName: 'Premium',
     description: 'Growing maintenance teams ready to move from reactive to preventive maintenance.',
     features: [
       'FixNestStudio',
@@ -70,9 +69,8 @@ const pricingPlans = [
     ],
     cta: 'Try for free'
   },
-  {
-    name: 'Professional',
-    price: 'Request a Quote',
+  professional: {
+    displayName: 'Professional',
     badge: 'Most Popular',
     description: 'Departments managing multiple asset types, needing field mobility and deeper analytics.',
     features: [
@@ -84,9 +82,8 @@ const pricingPlans = [
     ],
     cta: 'Schedule a Demo'
   },
-  {
-    name: 'Enterprise',
-    price: 'Request a Quote',
+  enterprise: {
+    displayName: 'Enterprise',
     description: 'Multi-site organizations needing automation, integrations, and governance controls.',
     features: [
       'Multi-site module support',
@@ -99,9 +96,76 @@ const pricingPlans = [
     ],
     cta: 'Schedule a Demo'
   }
-];
+};
 
 const LandingPage = () => {
+  const [pricing, setPricing] = useState(null);
+  const [currency, setCurrency] = useState('USD');
+  const [changingCurrency, setChangingCurrency] = useState(false);
+
+  const currencySymbols = {
+    'USD': '$',
+    'RWF': 'FRw'
+  };
+
+  const fetchPricingData = async () => {
+    try {
+      const response = await subscriptionAPI.getPricing();
+      setPricing(response.data?.pricing || response.pricing);
+      setCurrency(response.data?.currency || 'USD');
+    } catch (err) {
+      console.error('Error fetching pricing:', err);
+    }
+  };
+
+  const handleCurrencyChange = async (newCurrency) => {
+    if (changingCurrency) return;
+    
+    try {
+      setChangingCurrency(true);
+      const payload = {
+        platform: {
+          subscriptionCurrency: newCurrency
+        }
+      };
+      await api.put('/api/system-settings', payload);
+      setCurrency(newCurrency);
+      await fetchPricingData();
+    } catch (err) {
+      console.error('Error updating currency:', err);
+      alert('Failed to change currency: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setChangingCurrency(false);
+    }
+  };
+
+  const handleUpgrade = (planKey) => {
+    window.location.href = `/subscription?plan=${planKey}&currency=${currency}`;
+  };
+
+  useEffect(() => {
+    fetchPricingData();
+  }, []);
+
+  const pricingPlans = pricing 
+    ? Object.entries(pricing).map(([planKey, planPrices]) => {
+        const metadata = planMetadata[planKey] || {};
+        const monthlyPrice = planPrices.monthly;
+        const symbol = currencySymbols[currency] || '$';
+        
+        return {
+          key: planKey,
+          name: metadata.displayName || planKey,
+          price: monthlyPrice ? `${symbol}${monthlyPrice}` : 'Request a Quote',
+          period: monthlyPrice ? '/user/mo' : '',
+          badge: metadata.badge,
+          description: metadata.description,
+          features: metadata.features || [],
+          cta: metadata.cta
+        };
+      })
+    : [];
+
   return (
     <div className="landing-page">
       <AuthHeader />
@@ -164,40 +228,85 @@ const LandingPage = () => {
         </div>
       </section>
 
-      <section className="landing-section landing-pricing">
-        <div className="landing-section-header">
-          <div>
-            <div className="landing-kicker">FixNestPRICING</div>
-            <div className="landing-section-title">Plans for Every Team</div>
+      {pricingPlans.length > 0 && (
+        <section className="landing-section landing-pricing">
+          <div className="landing-section-header">
+            <div>
+              <div className="landing-kicker">FixNestPRICING</div>
+              <div className="landing-section-title">Plans for Every Team</div>
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button 
+                onClick={() => handleCurrencyChange('USD')}
+                disabled={changingCurrency}
+                style={{ 
+                  padding: '8px 16px', 
+                  borderRadius: '6px',
+                  border: currency === 'USD' ? '2px solid #0066cc' : '1px solid #ddd',
+                  backgroundColor: currency === 'USD' ? '#f0f8ff' : '#fff',
+                  color: currency === 'USD' ? '#0066cc' : '#333',
+                  fontWeight: currency === 'USD' ? '600' : '500',
+                  cursor: changingCurrency ? 'not-allowed' : 'pointer',
+                  opacity: changingCurrency ? 0.6 : 1,
+                  fontSize: '14px'
+                }}
+              >
+                USD ($)
+              </button>
+              <button 
+                onClick={() => handleCurrencyChange('RWF')}
+                disabled={changingCurrency}
+                style={{ 
+                  padding: '8px 16px', 
+                  borderRadius: '6px',
+                  border: currency === 'RWF' ? '2px solid #0066cc' : '1px solid #ddd',
+                  backgroundColor: currency === 'RWF' ? '#f0f8ff' : '#fff',
+                  color: currency === 'RWF' ? '#0066cc' : '#333',
+                  fontWeight: currency === 'RWF' ? '600' : '500',
+                  cursor: changingCurrency ? 'not-allowed' : 'pointer',
+                  opacity: changingCurrency ? 0.6 : 1,
+                  fontSize: '14px'
+                }}
+              >
+                RWF (FRw)
+              </button>
+            </div>
           </div>
-        </div>
-        <div className="pricing-grid">
-          {pricingPlans.map((plan) => (
-            <article
-              key={plan.name}
-              className={`pricing-card${plan.badge ? ' pricing-card--featured' : ''}`}
-            >
-              {plan.badge ? <div className="pricing-badge">{plan.badge}</div> : null}
-              <div className="pricing-name">{plan.name}</div>
-              <div className="pricing-price">
-                {plan.price}
-                {plan.period ? <span className="pricing-period">{plan.period}</span> : null}
-              </div>
-              <p className="pricing-description">{plan.description}</p>
-              <div className="pricing-feature-list">
-                {plan.features.map((feature) => (
-                  <div key={feature} className="pricing-feature">
-                    <span className="pricing-check" aria-hidden="true" />
-                    <span>{feature}</span>
-                  </div>
-                ))}
-              </div>
-              <button className="pricing-cta" type="button">{plan.cta}</button>
-              <div className="pricing-note">No Credit Card Required.</div>
-            </article>
-          ))}
-        </div>
-      </section>
+          <div className="pricing-grid">
+            {pricingPlans.map((plan) => (
+              <article
+                key={plan.key}
+                className={`pricing-card${plan.badge ? ' pricing-card--featured' : ''}`}
+              >
+                {plan.badge ? <div className="pricing-badge">{plan.badge}</div> : null}
+                <div className="pricing-name">{plan.name}</div>
+                <div className="pricing-price">
+                  {plan.price}
+                  {plan.period ? <span className="pricing-period">{plan.period}</span> : null}
+                </div>
+                <p className="pricing-description">{plan.description}</p>
+                <div className="pricing-feature-list">
+                  {plan.features.map((feature) => (
+                    <div key={feature} className="pricing-feature">
+                      <span className="pricing-check" aria-hidden="true" />
+                      <span>{feature}</span>
+                    </div>
+                  ))}
+                </div>
+                <button 
+                  className="pricing-cta" 
+                  type="button"
+                  onClick={() => handleUpgrade(plan.key)}
+                  style={{ cursor: 'pointer' }}
+                >
+                  {plan.cta}
+                </button>
+                <div className="pricing-note">No Credit Card Required.</div>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="landing-section landing-integrations">
         <div className="integration-card">

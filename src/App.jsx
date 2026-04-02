@@ -8,6 +8,10 @@ import ResetPassword from './components/auth/ResetPassword';
 import AcceptInvite from './components/auth/AcceptInvite';
 import Dashboard from './Dashboard';
 import Pricing from './components/Pricing';
+import Subscribe from './components/Subscribe';
+import PaymentSelection from './components/PaymentSelection';
+import PaymentConfirmation from './components/PaymentConfirmation';
+import SubscriptionPlan from './components/SubscriptionPlan';
 import LandingPage from './components/LandingPage';
 import AllIssues from './components/AllIssues';
 import NewIssue from './components/NewIssue';
@@ -67,7 +71,16 @@ function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/accept-invite" element={<AcceptInvite />} />
           <Route path="/pricing" element={<Pricing />} />
+          <Route path="/subscribe" element={<Subscribe />} />
+          <Route path="/payment-selection" element={<PaymentSelection />} />
+          <Route path="/payment-confirmation" element={<PaymentConfirmation />} />
+          <Route path="/subscription" element={auth ? (
+            <SubscriptionPlan userId={auth.user?.id} />
+          ) : <Subscribe />} />
           <Route path="/dashboard" element={auth ? (
+            <Dashboard user={auth.user} />
+          ) : <Login onLogin={handleLogin} />} />
+          <Route path="/dashboard/:view" element={auth ? (
             <Dashboard user={auth.user} />
           ) : <Login onLogin={handleLogin} />} />
           <Route path="/issues" element={auth ? <AllIssues /> : <Login onLogin={handleLogin} />} />

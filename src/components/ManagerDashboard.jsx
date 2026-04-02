@@ -9854,7 +9854,7 @@ const SystemSettingsTab = () => {
           </label>
           <label className="flex flex-col gap-1">
             <span className="text-xs font-semibold text-gray-500">Subscription Currency</span>
-            <input value={settings?.platform?.subscriptionCurrency ?? ''} onChange={(e) => updatePlatformValue('subscriptionCurrency', e.target.value)} placeholder="USD" className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+            <input value={settings?.platform?.subscriptionCurrency ?? ''} onChange={(e) => updatePlatformValue('subscriptionCurrency', e.target.value)} placeholder="RWF" className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
           </label>
           <label className="flex items-center justify-between rounded-xl border border-gray-100 px-4 py-3">
             <span className="text-sm font-semibold text-gray-700">Maintenance Mode Enabled</span>
