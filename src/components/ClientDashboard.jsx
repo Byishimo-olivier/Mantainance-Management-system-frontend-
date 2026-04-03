@@ -645,7 +645,7 @@ const DirectMessageModal = ({ open, recipientName, message, sending, messages = 
                 messages.map((entry, index) => {
                   const mine = entry.direction === 'outgoing';
                   return (
-                    <div key={entry.id || index} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
+                    <div key={entry._id || entry.id || `${entry.createdAt || entry.timestamp}-${index}`} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
                       <div className={`max-w-[85%] rounded-2xl px-4 py-3 shadow-sm ${mine ? 'bg-emerald-600 text-white' : 'border border-gray-200 bg-white text-gray-900'}`}>
                         <div className={`text-[11px] font-semibold ${mine ? 'text-emerald-50' : 'text-gray-500'}`}>
                           {entry.sender || (mine ? 'You' : recipientName || 'Contact')}
@@ -786,7 +786,7 @@ const CommentModal = ({ open, item, userName, people = [], onClose, onPosted }) 
             </div>
           ) : (
             messages.map((msg, idx) => (
-              <div key={idx} className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+              <div key={msg._id || msg.id || `${msg.createdAt || msg.timestamp}-${idx}`} className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
                 <div className="flex items-start gap-3">
                   <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xs font-bold ${String(msg.sender || msg.user || '').trim() === userName ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'}`}>
                     {String(msg.sender || msg.user || 'U').trim().split(' ').map(part => part?.[0] || '').join('').slice(0, 2).toUpperCase() || 'U'}
@@ -1240,19 +1240,19 @@ function StatCard({ label, value, sub, accent, icon, onClick }) {
   return (
     <div
       onClick={onClick}
-      className={`glass-surface rounded-2xl p-6 flex items-start gap-4 border-l-4 overflow-hidden relative group transition-all hover:scale-[1.02] ${onClick ? 'cursor-pointer hover:ring-2 hover:ring-blue-100' : ''}`}
+      className={`glass-surface rounded-xl p-4 xs:p-5 sm:p-6 flex items-start gap-3 sm:gap-4 border-l-4 overflow-hidden relative group transition-all hover:scale-[1.02] ${onClick ? 'cursor-pointer hover:ring-2 hover:ring-blue-100' : ''}`}
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : -1}
       onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } } : undefined}
     >
       <div className={`absolute inset-0 bg-gradient-to-br ${c} opacity-90`} />
-      <div className="relative z-10 w-12 h-12 rounded-xl glass-mirror flex items-center justify-center text-blue-700 shadow-lg bg-white/80 border border-blue-100">
+      <div className="relative z-10 w-10 h-10 sm:w-12 sm:h-12 rounded-xl glass-mirror flex items-center justify-center text-blue-700 shadow-lg bg-white/80 border border-blue-100 shrink-0">
         {icon}
       </div>
-      <div className="relative z-10">
-        <div className="text-3xl font-black text-gray-900 tracking-tight">{value}</div>
-        <div className="text-sm font-bold text-gray-700 uppercase tracking-wider mt-1">{label}</div>
-        {sub && <div className="text-xs text-gray-600 mt-1 font-medium">{sub}</div>}
+      <div className="relative z-10 min-w-0">
+        <div className="text-2xl xs:text-3xl font-black text-gray-900 tracking-tight truncate">{value}</div>
+        <div className="text-[10px] xs:text-xs sm:text-sm font-bold text-gray-700 uppercase tracking-wider mt-1 truncate">{label}</div>
+        {sub && <div className="hidden xs:block text-xs text-gray-600 mt-1 font-medium truncate">{sub}</div>}
       </div>
     </div>
   );
@@ -6930,6 +6930,7 @@ function ClientDashboard() {
   // â”€â”€ State â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const location = useLocation();
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Handle query parameter to set active tab
   useEffect(() => {
@@ -6937,6 +6938,7 @@ function ClientDashboard() {
     const tabParam = params.get('tab');
     if (tabParam) {
       setActiveTab(tabParam);
+      setIsMobileMenuOpen(false); // Close menu on tab change
     }
   }, [location.search]);
   const [properties, setProperties] = useState([]);
@@ -17511,21 +17513,35 @@ function ClientDashboard() {
         </video>
       </div>
       <div className="relative z-10 flex min-h-screen">
+        {/* Mobile Backdrop */}
+        {isMobileMenuOpen && (
+          <div 
+            className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden"
+            onClick={() => setIsMobileMenuOpen(false)}
+          />
+        )}
 
       {/* â”€â”€ Sidebar â”€â”€ */}
-      <aside className="glass-surface-strong border-r border-white/20 flex flex-col sticky top-0 h-screen overflow-y-auto shrink-0" style={{ width: 236 }}>
-        {/* Logo */}
-        <div style={{ padding: '24px 16px 20px', borderBottom: '1px solid rgba(255,255,255,0.12)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 32, height: 32, background: 'linear-gradient(135deg,#1D4ED8,#3B82F6)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <svg width="16" height="16" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-                <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" /><polyline points="9 22 9 12 15 12 15 22" />
-              </svg>
+      <aside className={`glass-surface-strong border-r border-white/20 flex flex-col fixed inset-y-0 left-0 z-50 h-screen overflow-y-auto shrink-0 transition-transform duration-300 md:sticky md:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`} style={{ width: 236 }}>
+        <div style={{ padding: '16px', borderBottom: '1px solid rgba(255,255,255,0.12)' }}>
+          <div className="flex items-center justify-between gap-4">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 32, height: 32, background: 'linear-gradient(135deg,#1D4ED8,#3B82F6)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <svg width="16" height="16" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                  <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" /><polyline points="9 22 9 12 15 12 15 22" />
+                </svg>
+              </div>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: 'white', lineHeight: 1.2 }}>FixNest ID</div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>Company operations hub</div>
+              </div>
             </div>
-            <div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: 'white', lineHeight: 1.2 }}>FixNest ID</div>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>Company operations hub</div>
-            </div>
+            <button 
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="md:hidden p-2 text-white/70 hover:text-white"
+            >
+              <X className="h-5 w-5" />
+            </button>
           </div>
         </div>
 
@@ -17654,9 +17670,15 @@ function ClientDashboard() {
       <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
 
         {/* Top bar */}
-        <header className="glass-surface border-b border-white/20 px-7 h-[60px] flex items-center justify-between sticky top-0 z-10">
-          <div>
-            <h1 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#111827' }}>
+        <header className="glass-surface border-b border-white/20 px-3 xs:px-4 sm:px-6 md:px-7 h-[60px] flex items-center justify-between sticky top-0 z-30">
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={() => setIsMobileMenuOpen(true)}
+              className="md:hidden p-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              {navItems.find(n => n.key === activeTab)?.icon || <LayoutDashboard className="h-6 w-6" />}
+            </button>
+            <h1 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#111827' }} className="truncate">
               {navItems.find(n => n.key === activeTab)?.label || t("manager.sidebar.dashboard")}
             </h1>
           </div>
@@ -17780,13 +17802,13 @@ function ClientDashboard() {
         )}
 
         {/* Content */}
-        <div style={{ flex: 1, padding: '28px', overflowY: 'auto' }}>
+        <div className="flex-1 responsive-padding overflow-y-auto">
 
           {/* â”€â”€ Dashboard â”€â”€ */}
           {activeTab === 'dashboard' && (
             <div>
               {/* Welcome */}
-              <div className="glass-surface rounded-2xl p-8 mb-6 text-gray-900 flex items-center justify-between overflow-hidden relative shadow-2xl border border-gray-200/70">
+              <div className="glass-surface responsive-card mb-6 text-gray-900 flex items-center justify-between overflow-hidden relative shadow-2xl border border-gray-200/70">
                 <div style={{ position: 'absolute', right: -30, top: -30, width: 180, height: 180, borderRadius: '50%', background: 'rgba(255,255,255,0.05)' }} />
                 <div style={{ position: 'absolute', right: 40, bottom: -50, width: 220, height: 220, borderRadius: '50%', background: 'rgba(255,255,255,0.05)' }} />
                 <div style={{ position: 'relative' }}>
@@ -17800,7 +17822,7 @@ function ClientDashboard() {
               </div>
 
               {/* Stats */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
+              <div className="responsive-grid-auto mb-6">
                 <StatCard label="Pending" value={combinedPending} sub="Awaiting action" accent="amber" onClick={() => openDashboardStatusView('PENDING')}
                   icon={<svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>} />
                 <StatCard label="In Progress" value={combinedInProgress} sub="Currently active" accent="blue" onClick={() => openDashboardStatusView('IN PROGRESS')}
@@ -17830,7 +17852,7 @@ function ClientDashboard() {
                 </div>
               )}
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16, marginBottom: 24 }}>
+              <div className="responsive-grid-2 mb-6">
                 <div className="glass-surface rounded-2xl border border-gray-200/70 p-6 shadow-xl">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
                     <div>
@@ -18027,9 +18049,9 @@ function ClientDashboard() {
               </div>
 
               {/* Charts + Quick Actions */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 240px', gap: 16, marginBottom: 28 }}>
+              <div className="flex flex-col lg:flex-row responsive-gap mb-8">
                 {/* Issues chart */}
-                <div className="glass-surface rounded-2xl border border-white/10 p-6 shadow-lg">
+                <div className="glass-surface rounded-2xl border border-white/10 p-6 shadow-lg flex-1">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
                     <div>
                       <div style={{ fontSize: 13, color: '#6B7280', fontWeight: 500 }}>Issues â€” Last 7 Days</div>

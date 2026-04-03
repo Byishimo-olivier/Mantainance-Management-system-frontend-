@@ -30,15 +30,15 @@ const AdminDashboard = () => {
           <source src={backgroundVideo} type="video/mp4" />
         </video>
       </div>
-      <div className="relative z-10 min-h-screen p-8 overflow-y-auto">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 mb-10">
-          <h1 className="text-4xl font-black tracking-tight">{t("admin.title")}</h1>
-          <div className="flex items-center gap-3 glass-surface px-4 py-2 rounded-full border border-white/20">
-            <span className="text-xs font-bold text-white/60 uppercase tracking-widest">{t("language.label")}</span>
+      <div className="relative z-10 min-h-screen p-2 xs:p-3 sm:p-4 md:p-6 lg:p-8 overflow-y-auto">
+        <div className="flex flex-col xs:flex-row xs:items-center xs:justify-between gap-3 xs:gap-4 sm:gap-6 mb-6 xs:mb-8 sm:mb-10">
+          <h1 className="responsive-heading-xl">{t("admin.title")}</h1>
+          <div className="flex items-center gap-2 xs:gap-3 glass-surface px-3 xs:px-4 py-1.5 xs:py-2 rounded-full border border-white/20">
+            <span className="responsive-text-label">{t("language.label")}</span>
             <select
               value={language}
               onChange={(e) => setLanguage(e.target.value)}
-              className="bg-transparent text-sm font-bold text-white focus:outline-none appearance-none cursor-pointer"
+              className="bg-transparent text-xs xs:text-sm font-bold text-white focus:outline-none appearance-none cursor-pointer"
             >
               <option value="en" className="text-slate-900">{t("language.english")}</option>
               <option value="fr" className="text-slate-900">{t("language.french")}</option>
@@ -46,50 +46,50 @@ const AdminDashboard = () => {
             </select>
           </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
-          <div className="glass-surface-strong rounded-3xl p-8 border border-white/20 shadow-2xl transition-all hover:scale-[1.02] group">
-            <h2 className="font-extrabold text-white/70 uppercase tracking-widest text-sm mb-3">{t("admin.activeJobs")}</h2>
-            <div className="text-6xl font-black text-white tracking-tighter mb-6">{jobs.length}</div>
-            <button className="flex items-center gap-2 text-blue-300 font-bold hover:text-blue-200 transition-colors uppercase text-xs tracking-widest" onClick={() => navigate("/manager-issues")}>
+        <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-3 gap-3 xs:gap-4 sm:gap-6 md:gap-8 mb-8 sm:mb-12">
+          <div className="glass-surface-strong rounded-xl xs:rounded-2xl sm:rounded-3xl responsive-card border border-white/20 shadow-2xl transition-all hover:scale-[1.02] group">
+            <h2 className="responsive-text-label mb-2 xs:mb-3 sm:mb-4">{t("admin.activeJobs")}</h2>
+            <div className="text-4xl xs:text-5xl sm:text-6xl font-black text-white tracking-tighter mb-4 xs:mb-6">{jobs.length}</div>
+            <button className="flex items-center gap-2 text-blue-300 font-bold hover:text-blue-200 transition-colors responsive-text-label" onClick={() => navigate("/manager-issues")}>
               {t("admin.viewAllJobs")} →
             </button>
           </div>
-          <div className="glass-surface-strong rounded-3xl p-8 border border-white/20 shadow-2xl transition-all hover:scale-[1.02] group">
-            <h2 className="font-extrabold text-white/70 uppercase tracking-widest text-sm mb-3">{t("admin.technicianPerformance")}</h2>
-            <div className="text-6xl font-black text-white tracking-tighter mb-6">{technicians.length}</div>
-            <button className="flex items-center gap-2 text-blue-300 font-bold hover:text-blue-200 transition-colors uppercase text-xs tracking-widest" onClick={() => navigate("/technician-management")}>
+          <div className="glass-surface-strong rounded-xl xs:rounded-2xl sm:rounded-3xl responsive-card border border-white/20 shadow-2xl transition-all hover:scale-[1.02] group">
+            <h2 className="responsive-text-label mb-2 xs:mb-3 sm:mb-4">{t("admin.technicianPerformance")}</h2>
+            <div className="text-4xl xs:text-5xl sm:text-6xl font-black text-white tracking-tighter mb-4 xs:mb-6">{technicians.length}</div>
+            <button className="flex items-center gap-2 text-blue-300 font-bold hover:text-blue-200 transition-colors responsive-text-label" onClick={() => navigate("/technician-management")}>
               {t("admin.viewTechnicians")} →
             </button>
           </div>
-          <div className="glass-surface-strong rounded-3xl p-8 border border-white/20 shadow-2xl transition-all hover:scale-[1.02] group">
-            <h2 className="font-extrabold text-white/70 uppercase tracking-widest text-sm mb-3">{t("admin.inventoryStatus")}</h2>
-            <div className="text-6xl font-black text-white tracking-tighter mb-6">{inventory.length}</div>
-            <button className="flex items-center gap-2 text-blue-300 font-bold hover:text-blue-200 transition-colors uppercase text-xs tracking-widest" onClick={() => navigate("/inventory")}>
+          <div className="glass-surface-strong rounded-xl xs:rounded-2xl sm:rounded-3xl responsive-card border border-white/20 shadow-2xl transition-all hover:scale-[1.02] group">
+            <h2 className="responsive-text-label mb-2 xs:mb-3 sm:mb-4">{t("admin.inventoryStatus")}</h2>
+            <div className="text-4xl xs:text-5xl sm:text-6xl font-black text-white tracking-tighter mb-4 xs:mb-6">{inventory.length}</div>
+            <button className="flex items-center gap-2 text-blue-300 font-bold hover:text-blue-200 transition-colors responsive-text-label" onClick={() => navigate("/inventory")}>
               {t("admin.viewInventory")} →
             </button>
           </div>
-          <div className="glass-surface-strong rounded-3xl p-8 border border-white/20 shadow-2xl transition-all hover:scale-[1.02] group">
-            <h2 className="font-extrabold text-white/70 uppercase tracking-widest text-sm mb-3">Financial Summary</h2>
-            <div className="space-y-3 mb-6">
-              <div className="flex justify-between items-center text-sm">
+          <div className="glass-surface-strong rounded-xl xs:rounded-2xl sm:rounded-3xl responsive-card border border-white/20 shadow-2xl transition-all hover:scale-[1.02] group">
+            <h2 className="responsive-text-label mb-2 xs:mb-3 sm:mb-4">Financial Summary</h2>
+            <div className="space-y-2 xs:space-y-3 mb-4 xs:mb-6">
+              <div className="flex justify-between items-center text-xs xs:text-sm">
                 <span className="text-white/60">Expenses</span>
                 <span className="font-black text-rose-300">{finances.expenses} RWF</span>
               </div>
-              <div className="flex justify-between items-center text-sm">
+              <div className="flex justify-between items-center text-xs xs:text-sm">
                 <span className="text-white/60">Income</span>
                 <span className="font-black text-emerald-300">{finances.income} RWF</span>
               </div>
-              <div className="pt-3 border-t border-white/10 flex justify-between items-center">
-                <span className="text-white font-bold">Profit</span>
-                <span className="text-2xl font-black text-blue-300">{finances.profit} RWF</span>
+              <div className="pt-2 xs:pt-3 border-t border-white/10 flex justify-between items-center">
+                <span className="text-white font-bold text-xs xs:text-sm">Profit</span>
+                <span className="text-lg xs:text-2xl font-black text-blue-300">{finances.profit} RWF</span>
               </div>
             </div>
-            <button className="flex items-center gap-2 text-blue-300 font-bold hover:text-blue-200 transition-colors uppercase text-xs tracking-widest" onClick={() => navigate("/finances")}>View Financials →</button>
+            <button className="flex items-center gap-2 text-blue-300 font-bold hover:text-blue-200 transition-colors responsive-text-label" onClick={() => navigate("/finances")}>View Financials →</button>
           </div>
-          <div className="glass-surface-strong rounded-3xl p-8 border border-white/20 shadow-2xl transition-all hover:scale-[1.02] group">
-            <h2 className="font-extrabold text-white/70 uppercase tracking-widest text-sm mb-3">Subscription Revenue</h2>
-            <div className="text-6xl font-black text-white tracking-tighter mb-6">{subscriptions.length}</div>
-            <button className="flex items-center gap-2 text-blue-300 font-bold hover:text-blue-200 transition-colors uppercase text-xs tracking-widest" onClick={() => navigate("/subscriptions")}>View Subscriptions →</button>
+          <div className="glass-surface-strong rounded-xl xs:rounded-2xl sm:rounded-3xl responsive-card border border-white/20 shadow-2xl transition-all hover:scale-[1.02] group">
+            <h2 className="responsive-text-label mb-2 xs:mb-3 sm:mb-4">Subscription Revenue</h2>
+            <div className="text-4xl xs:text-5xl sm:text-6xl font-black text-white tracking-tighter mb-4 xs:mb-6">{subscriptions.length}</div>
+            <button className="flex items-center gap-2 text-blue-300 font-bold hover:text-blue-200 transition-colors responsive-text-label" onClick={() => navigate("/subscriptions")}>View Subscriptions →</button>
           </div>
         </div>
       </div>
