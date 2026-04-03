@@ -33,6 +33,12 @@ const SubscriptionPlan = ({ userId }) => {
   const [upgrading, setUpgrading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  const [currency, setCurrency] = useState('USD');
+
+  const currencySymbols = {
+    'USD': '$',
+    'RWF': 'FRw'
+  };
 
   const plans = [
     {
@@ -90,6 +96,9 @@ const SubscriptionPlan = ({ userId }) => {
         const response = await subscriptionAPI.getPricing();
         const pricingData = response?.data?.pricing || response?.data || response;
         setPricing(pricingData);
+        // Fetch currency from system settings
+        const currencyValue = response?.data?.currency || response?.currency || 'USD';
+        setCurrency(currencyValue);
       } catch (err) {
         console.error('Failed to fetch pricing:', err);
       }
@@ -147,7 +156,7 @@ const SubscriptionPlan = ({ userId }) => {
       return;
     }
 
-    navigate(`/payment-selection?subscriptionId=${subscription.id || subscription._id}&plan=${subscription.plan}&cycle=${cycle}&amount=${amount}&currency=RWF&email=${subscription.email || ''}`);
+    navigate(`/payment-selection?subscriptionId=${subscription.id || subscription._id}&plan=${subscription.plan}&cycle=${cycle}&amount=${amount}&currency=${currency}&email=${subscription.email || ''}`);
   };
 
   const handleUpgrade = async (newPlanId) => {
@@ -198,7 +207,7 @@ const SubscriptionPlan = ({ userId }) => {
         if (amount) {
           setSuccess(`${isUpgrade ? 'Upgrade' : 'Subscription'} created successfully! Please complete the payment...`);
           setTimeout(() => {
-            navigate(`/payment-selection?subscriptionId=${subId}&plan=${newPlanId}&cycle=${billingCycle}&amount=${amount}&currency=RWF&email=${subData.email || ''}`);
+            navigate(`/payment-selection?subscriptionId=${subId}&plan=${newPlanId}&cycle=${billingCycle}&amount=${amount}&currency=${currency}&email=${subData.email || ''}`);
           }, 500);
         }
       }
@@ -292,7 +301,7 @@ const SubscriptionPlan = ({ userId }) => {
                     onClick={() => {
                       const cycle = subscription.billingCycle || billingCycle;
                       const amount = pricing?.[subscription.plan]?.[cycle];
-                      navigate(`/payment-selection?subscriptionId=${subscription.id || subscription._id}&plan=${subscription.plan}&cycle=${cycle}&amount=${amount}&currency=RWF&email=${subscription.email || ''}`);
+                      navigate(`/payment-selection?subscriptionId=${subscription.id || subscription._id}&plan=${subscription.plan}&cycle=${cycle}&amount=${amount}&currency=${currency}&email=${subscription.email || ''}`);
                     }}
                     className="text-sm bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-all"
                   >
@@ -397,8 +406,8 @@ const SubscriptionPlan = ({ userId }) => {
                       {price !== null ? (
                         <div className="mt-4 mb-6">
                           <div className="flex items-baseline gap-1">
-                            <span className="text-3xl font-bold text-gray-900">{price.toFixed(0)}</span>
-                            <span className="text-gray-600 text-sm">RWF /{billingCycle === 'monthly' ? 'month' : 'year'}</span>
+                            <span className="text-3xl font-bold text-gray-900">{currencySymbols[currency] || '$'}{price.toFixed(2)}</span>
+                            <span className="text-gray-600 text-sm">/{billingCycle === 'monthly' ? 'month' : 'year'}</span>
                           </div>
                           {billingCycle === 'yearly' && (
                             <p className="text-green-600 text-xs mt-1">Billed annually • {(price / 12).toFixed(0)} RWF/month</p>

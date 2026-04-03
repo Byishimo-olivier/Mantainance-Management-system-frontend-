@@ -277,16 +277,53 @@ const SubscriptionManagement = () => {
     setTimeout(() => setSuccessMessage(null), 3000);
   };
 
+  // Get unique companies - one subscription per company (the most recent/active one)
+  const getUniqueCompanySubscriptions = () => {
+    const companyMap = new Map();
+
+    // Group subscriptions by company name
+    subscriptions.forEach(subscription => {
+      const companyName = subscription.company?.name || subscription.email?.split('@')[0] || "Unlabeled";
+      
+      // Keep the subscription if:
+      // 1. This company hasn't been seen yet, OR
+      // 2. This subscription has 'active' status (prefer active), OR
+      // 3. This subscription is more recent than the stored one
+      if (!companyMap.has(companyName)) {
+        companyMap.set(companyName, subscription);
+      } else {
+        const existing = companyMap.get(companyName);
+        
+        // Prioritize active subscriptions
+        if (subscription.status === 'active' && existing.status !== 'active') {
+          companyMap.set(companyName, subscription);
+        }
+        // Otherwise keep the most recent
+        else if (subscription.status === existing.status) {
+          const newDate = new Date(subscription.createdAt || subscription.startDate);
+          const existingDate = new Date(existing.createdAt || existing.startDate);
+          if (newDate > existingDate) {
+            companyMap.set(companyName, subscription);
+          }
+        }
+      }
+    });
+
+    return Array.from(companyMap.values());
+  };
+
   const getPlanColor = (plan) => {
-    switch (plan) {
+    switch (plan?.toLowerCase()) {
       case 'basic':
-        return 'bg-blue-50 border-blue-200 text-blue-700';
+        return 'bg-blue-600 hover:bg-blue-700';
       case 'professional':
-        return 'bg-purple-50 border-purple-200 text-purple-700';
+        return 'bg-purple-600 hover:bg-purple-700';
       case 'enterprise':
-        return 'bg-red-50 border-red-200 text-red-700';
+        return 'bg-amber-600 hover:bg-amber-700';
+      case 'premium':
+        return 'bg-rose-600 hover:bg-rose-700';
       default:
-        return 'bg-gray-50 border-gray-200 text-gray-700';
+        return 'bg-gray-600 hover:bg-gray-700';
     }
   };
 
@@ -402,6 +439,65 @@ const SubscriptionManagement = () => {
         </div>
       )}
 
+      {/* Plan Distribution Summary */}
+      {subscriptions.length > 0 && (
+        <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-gray-200 p-6">
+          <h3 className="text-lg font-bold text-gray-800 mb-4">Companies by Plan Category</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {(() => {
+              const uniqueCompanies = getUniqueCompanySubscriptions();
+              return (
+                <>
+                  <div className="bg-white rounded-lg p-4 border-l-4 border-blue-600">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-gray-600 text-sm font-medium">Basic</p>
+                        <p className="text-2xl font-bold text-blue-600">
+                          {uniqueCompanies.filter(s => s.plan === 'basic').length}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-lg p-4 border-l-4 border-purple-600">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-gray-600 text-sm font-medium">Professional</p>
+                        <p className="text-2xl font-bold text-purple-600">
+                          {uniqueCompanies.filter(s => s.plan === 'professional').length}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-lg p-4 border-l-4 border-amber-600">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-gray-600 text-sm font-medium">Enterprise</p>
+                        <p className="text-2xl font-bold text-amber-600">
+                          {uniqueCompanies.filter(s => s.plan === 'enterprise').length}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-lg p-4 border-l-4 border-rose-600">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-gray-600 text-sm font-medium">Premium</p>
+                        <p className="text-2xl font-bold text-rose-600">
+                          {uniqueCompanies.filter(s => s.plan === 'premium').length}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
       {/* Filters */}
       <div className="flex gap-4">
         <select
@@ -416,6 +512,7 @@ const SubscriptionManagement = () => {
           <option value="basic">Basic</option>
           <option value="professional">Professional</option>
           <option value="enterprise">Enterprise</option>
+          <option value="premium">Premium</option>
         </select>
 
         <select
@@ -449,9 +546,9 @@ const SubscriptionManagement = () => {
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">User ID</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Email</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Plan</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Company Name</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Plan Category</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Billing Cycle</th>
                   <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Status</th>
                   <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Start Date</th>
                   <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Next Billing</th>
@@ -459,18 +556,23 @@ const SubscriptionManagement = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {subscriptions.map((subscription) => (
+                {getUniqueCompanySubscriptions().map((subscription) => (
                   <tr key={subscription.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 text-sm text-gray-800 font-mono">
-                      {subscription.userId
-                        ? `${subscription.userId.slice(0, 8)}...`
-                        : "—"}
+                    <td className="px-6 py-4 text-sm font-semibold text-gray-800">
+                      <div>
+                        {subscription.company?.name || subscription.email?.split('@')[0] || "Unlabeled"}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">
+                        {subscription.email}
+                      </div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-800">{subscription.email}</td>
                     <td className="px-6 py-4">
-                      <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${getPlanColor(subscription.plan)}`}>
+                      <span className={`px-4 py-2 rounded-lg text-sm font-bold text-white border-0 ${getPlanColor(subscription.plan)}`}>
                         {subscription.plan?.charAt(0).toUpperCase() + subscription.plan?.slice(1)}
                       </span>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-700 font-medium">
+                      {subscription.billingCycle?.charAt(0).toUpperCase() + subscription.billingCycle?.slice(1) || "—"}
                     </td>
                     <td className="px-6 py-4">
                       <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${getStatusColor(subscription.status)}`}>

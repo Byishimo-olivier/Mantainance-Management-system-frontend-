@@ -12,16 +12,33 @@ export default function PaymentSelection() {
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [systemCurrency, setSystemCurrency] = useState('USD');
 
   // Extract parameters from URL
   const plan = searchParams.get('plan') || 'basic';
   const cycle = searchParams.get('cycle') || 'monthly';
-  const currency = searchParams.get('currency') || 'RWF';
+  const currency = searchParams.get('currency') || systemCurrency;
   const companyName = searchParams.get('companyName') || '';
   const managerEmail = searchParams.get('email') || '';
   const companyPhone = searchParams.get('phone') || '';
   const subscriptionId = searchParams.get('subscriptionId');
   const amount = searchParams.get('amount') || '0';
+
+  // Fetch system currency on mount
+  useEffect(() => {
+    const fetchSystemCurrency = async () => {
+      try {
+        const response = await subscriptionAPI.getPricing();
+        const curr = response?.data?.currency || response?.currency || 'USD';
+        setSystemCurrency(curr);
+      } catch (err) {
+        console.error('Failed to fetch system currency:', err);
+        setSystemCurrency('USD');
+      }
+    };
+
+    fetchSystemCurrency();
+  }, []);
 
   const handleProcessPayment = async () => {
     try {

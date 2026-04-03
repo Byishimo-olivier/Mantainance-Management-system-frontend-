@@ -9568,32 +9568,70 @@ const SystemSettingsTab = () => {
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <div className="rounded-2xl border border-white/30 bg-white/80 p-6 shadow-sm">
-          <div className="flex items-center gap-3 mb-5">
-            <CreditCard className="w-5 h-5 text-blue-600" />
-            <div>
-              <h3 className="text-lg font-bold text-gray-900">Subscription Pricing</h3>
-              <p className="text-sm text-gray-500">Change plan pricing without editing backend code.</p>
+          <div className="flex items-center justify-between gap-3 mb-5">
+            <div className="flex items-center gap-3">
+              <CreditCard className="w-5 h-5 text-blue-600" />
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">Subscription Pricing</h3>
+                <p className="text-sm text-gray-500">Manage plan pricing and subscription currency for the entire platform.</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-50 border border-blue-200">
+              <span className="text-xs font-bold text-blue-700 uppercase tracking-wide">Currency:</span>
+              <select value={settings?.platform?.subscriptionCurrency ?? 'USD'} onChange={(e) => updatePlatformValue('subscriptionCurrency', e.target.value)} className="bg-white border border-blue-200 rounded-lg px-2 py-1 text-sm font-semibold text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-300">
+                <option value="USD">USD ($)</option>
+                <option value="RWF">RWF (FRw)</option>
+                <option value="EUR">EUR (€)</option>
+                <option value="GBP">GBP (£)</option>
+              </select>
             </div>
           </div>
           <div className="space-y-5">
-            {['basic', 'professional', 'enterprise'].map((plan) => (
-              <div key={plan} className="rounded-xl border border-gray-100 p-4">
-                <div className="text-sm font-bold uppercase tracking-wide text-gray-700 mb-3">{plan}</div>
-                <div className="grid grid-cols-3 gap-3">
-                  {['weekly', 'monthly', 'yearly'].map((cycle) => (
-                    <label key={cycle} className="flex flex-col gap-1">
-                      <span className="text-xs font-semibold text-gray-500 capitalize">{cycle}</span>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={settings?.pricing?.[plan]?.[cycle] ?? 0}
-                        onChange={(e) => updatePricingValue(plan, cycle, Number(e.target.value) || 0)}
-                        className="rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                      />
-                    </label>
-                  ))}
+            {['basic', 'professional', 'enterprise', 'premium'].map((plan) => (
+              <div key={plan} className={`rounded-xl border p-4 ${plan === 'premium' ? 'border-purple-200 bg-purple-50/50' : 'border-gray-100'}`}>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="text-sm font-bold uppercase tracking-wide text-gray-700">{plan}</div>
+                  {plan === 'premium' && (
+                    <span className="inline-flex rounded-full bg-purple-200 px-2.5 py-0.5 text-xs font-bold text-purple-700">Admin Quote</span>
+                  )}
                 </div>
+                {plan === 'premium' ? (
+                  <div className="rounded-lg bg-white border border-purple-200 p-4">
+                    <p className="text-sm text-gray-600 mb-3">
+                      Premium plans are custom-quoted by the system administrator based on specific business requirements.
+                    </p>
+                    <div className="space-y-2">
+                      <div className="text-xs font-semibold text-gray-500">Admin will quote on:</div>
+                      <ul className="text-xs text-gray-600 space-y-1 ml-3">
+                        <li>• Custom features and integrations</li>
+                        <li>• Volume and usage requirements</li>
+                        <li>• Support level and SLA</li>
+                        <li>• Billing cycle preference</li>
+                      </ul>
+                    </div>
+                    <div className="mt-4 p-3 rounded-lg bg-purple-100 border border-purple-200">
+                      <p className="text-xs text-purple-700 font-semibold">
+                        💡 Tip: Clients requesting Premium will trigger a quote request notification to you.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-3 gap-3">
+                    {['weekly', 'monthly', 'yearly'].map((cycle) => (
+                      <label key={cycle} className="flex flex-col gap-1">
+                        <span className="text-xs font-semibold text-gray-500 capitalize">{cycle}</span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={settings?.pricing?.[plan]?.[cycle] ?? 0}
+                          onChange={(e) => updatePricingValue(plan, cycle, Number(e.target.value) || 0)}
+                          className="rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                        />
+                      </label>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -9852,10 +9890,7 @@ const SystemSettingsTab = () => {
             <span className="text-xs font-semibold text-gray-500">Support Email</span>
             <input value={settings?.platform?.supportEmail || ''} onChange={(e) => updatePlatformValue('supportEmail', e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
           </label>
-          <label className="flex flex-col gap-1">
-            <span className="text-xs font-semibold text-gray-500">Subscription Currency</span>
-            <input value={settings?.platform?.subscriptionCurrency ?? ''} onChange={(e) => updatePlatformValue('subscriptionCurrency', e.target.value)} placeholder="RWF" className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
-          </label>
+
           <label className="flex items-center justify-between rounded-xl border border-gray-100 px-4 py-3">
             <span className="text-sm font-semibold text-gray-700">Maintenance Mode Enabled</span>
             <input type="checkbox" checked={Boolean(settings?.platform?.maintenanceMode)} onChange={(e) => updatePlatformValue('maintenanceMode', e.target.checked)} />
@@ -9894,6 +9929,8 @@ const SystemSettingsTab = () => {
           </div>
         </div>
       </div>
+
+      <SubscriptionManagementSection settings={settings} updatePlatformValue={updatePlatformValue} />
 
       <div id="superadmin-audit-trail" className="rounded-2xl border border-white/30 bg-white/80 p-6 shadow-sm">
         <div className="flex items-center justify-between gap-4 mb-5">
@@ -11264,6 +11301,244 @@ const AIInsights = ({ aiSentiment, loadingAI, aiError, aiRecommendations, aiSumm
           )}
         </GlassCard>
       </div>
+    </div>
+  );
+};
+
+const SubscriptionManagementSection = ({ settings, updatePlatformValue }) => {
+  const [subscriptions, setSubscriptions] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [formData, setFormData] = useState({
+    companyId: '',
+    email: '',
+    plan: 'basic',
+    billingCycle: 'monthly',
+    status: 'active'
+  });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    loadSubscriptions();
+  }, []);
+
+  const loadSubscriptions = async () => {
+    setLoading(true);
+    try {
+      const res = await api.get('/api/subscriptions', { params: { limit: 100 } });
+      setSubscriptions(Array.isArray(res.data?.data) ? res.data.data : []);
+    } catch (err) {
+      console.error('Failed to load subscriptions:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreateSubscription = async () => {
+    if (!formData.companyId || !formData.email) {
+      alert('Please fill in Company ID and Email');
+      return;
+    }
+
+    try {
+      setSaving(true);
+      await api.post('/api/subscriptions', {
+        companyId: formData.companyId,
+        userId: formData.companyId,
+        email: formData.email,
+        plan: formData.plan,
+        billingCycle: formData.billingCycle,
+        status: formData.status,
+        clientId: formData.companyId,
+        secretId: Math.random().toString(36).substring(2, 15),
+      });
+      alert('Subscription created successfully');
+      setFormData({ companyId: '', email: '', plan: 'basic', billingCycle: 'monthly', status: 'active' });
+      setShowCreateModal(false);
+      await loadSubscriptions();
+    } catch (err) {
+      console.error('Failed to create subscription:', err);
+      alert('Failed to create subscription: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteSubscription = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this subscription?')) return;
+
+    try {
+      await api.delete(`/api/subscriptions/${id}`);
+      alert('Subscription deleted');
+      await loadSubscriptions();
+    } catch (err) {
+      console.error('Failed to delete subscription:', err);
+      alert('Failed to delete: ' + (err.response?.data?.error || err.message));
+    }
+  };
+
+  const getCurrencySymbol = (currency) => {
+    const symbols = { 'USD': '$', 'RWF': 'FRw', 'EUR': '€', 'GBP': '£' };
+    return symbols[currency] || currency;
+  };
+
+  return (
+    <div className="rounded-2xl border border-white/30 bg-white/80 p-6 shadow-sm">
+      <div className="flex items-center justify-between gap-3 mb-5">
+        <div className="flex items-center gap-3">
+          <ShoppingCart className="w-5 h-5 text-indigo-600" />
+          <div>
+            <h3 className="text-lg font-bold text-gray-900">Active Subscriptions</h3>
+            <p className="text-sm text-gray-500">Manage company subscriptions across all clients. Changes affect pricing display.</p>
+          </div>
+        </div>
+        <button
+          onClick={() => setShowCreateModal(true)}
+          className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 disabled:opacity-60"
+        >
+          + Create Subscription
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-8">
+          <div className="w-6 h-6 border-2 border-indigo-100 border-t-indigo-600 rounded-full animate-spin"></div>
+        </div>
+      ) : subscriptions.length > 0 ? (
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead className="border-b border-gray-100">
+              <tr>
+                <th className="py-3 px-3 text-xs font-bold text-gray-500 uppercase">Company ID</th>
+                <th className="py-3 px-3 text-xs font-bold text-gray-500 uppercase">Email</th>
+                <th className="py-3 px-3 text-xs font-bold text-gray-500 uppercase">Plan</th>
+                <th className="py-3 px-3 text-xs font-bold text-gray-500 uppercase">Cycle</th>
+                <th className="py-3 px-3 text-xs font-bold text-gray-500 uppercase">Status</th>
+                <th className="py-3 px-3 text-xs font-bold text-gray-500 uppercase">Price</th>
+                <th className="py-3 px-3 text-xs font-bold text-gray-500 uppercase">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {subscriptions.map((sub, idx) => {
+                const pricing = settings?.pricing?.[sub.plan]?.[sub.billingCycle] || 0;
+                const currency = settings?.platform?.subscriptionCurrency || 'USD';
+                const symbol = getCurrencySymbol(currency);
+                return (
+                  <tr key={sub._id || idx} className="border-b border-gray-50 hover:bg-gray-50">
+                    <td className="py-3 px-3 text-sm text-gray-600 font-medium">{sub.companyId}</td>
+                    <td className="py-3 px-3 text-sm text-gray-600">{sub.email}</td>
+                    <td className="py-3 px-3 text-sm">
+                      <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-bold capitalize ${
+                        sub.plan === 'premium' 
+                          ? 'bg-purple-100 text-purple-700' 
+                          : 'bg-blue-100 text-blue-700'
+                      }`}>
+                        {sub.plan || 'N/A'}
+                        {sub.plan === 'premium' && ' 👑'}
+                      </span>
+                    </td>
+                    <td className="py-3 px-3 text-sm text-gray-600 capitalize">{sub.billingCycle || 'monthly'}</td>
+                    <td className="py-3 px-3 text-sm">
+                      <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-bold ${sub.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-700'}`}>
+                        {sub.status || 'unknown'}
+                      </span>
+                    </td>
+                    <td className="py-3 px-3 text-sm font-semibold text-gray-900">
+                      {sub.plan === 'premium' ? (
+                        <span className="text-purple-600 font-bold">Custom Quote</span>
+                      ) : (
+                        `${symbol}${pricing}`
+                      )}
+                    </td>
+                    <td className="py-3 px-3 text-sm">
+                      <button
+                        onClick={() => handleDeleteSubscription(sub._id || sub.id)}
+                        className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-100"
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-8 text-center text-sm text-gray-500">
+          No subscriptions found. Create one to get started.
+        </div>
+      )}
+
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="rounded-2xl bg-white p-6 shadow-xl max-w-md w-full">
+            <h3 className="text-lg font-bold text-gray-900 mb-4">Create New Subscription</h3>
+            <div className="space-y-4">
+              <label className="flex flex-col gap-2">
+                <span className="text-sm font-semibold text-gray-700">Company ID</span>
+                <input
+                  type="text"
+                  value={formData.companyId}
+                  onChange={(e) => setFormData({...formData, companyId: e.target.value})}
+                  placeholder="Enter company ID"
+                  className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                />
+              </label>
+              <label className="flex flex-col gap-2">
+                <span className="text-sm font-semibold text-gray-700">Email</span>
+                <input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({...formData, email: e.target.value})}
+                  placeholder="company@example.com"
+                  className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                />
+              </label>
+              <label className="flex flex-col gap-2">
+                <span className="text-sm font-semibold text-gray-700">Plan</span>
+                <select
+                  value={formData.plan}
+                  onChange={(e) => setFormData({...formData, plan: e.target.value})}
+                  className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                >
+                  <option value="basic">Basic</option>
+                  <option value="professional">Professional</option>
+                  <option value="enterprise">Enterprise</option>
+                  <option value="premium">Premium (Custom Quote)</option>
+                </select>
+              </label>
+              <label className="flex flex-col gap-2">
+                <span className="text-sm font-semibold text-gray-700">Billing Cycle</span>
+                <select
+                  value={formData.billingCycle}
+                  onChange={(e) => setFormData({...formData, billingCycle: e.target.value})}
+                  className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                >
+                  <option value="weekly">Weekly</option>
+                  <option value="monthly">Monthly</option>
+                  <option value="yearly">Yearly</option>
+                </select>
+              </label>
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => setShowCreateModal(false)}
+                  className="flex-1 px-4 py-2 border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCreateSubscription}
+                  disabled={saving}
+                  className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 disabled:opacity-60"
+                >
+                  {saving ? 'Creating...' : 'Create'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

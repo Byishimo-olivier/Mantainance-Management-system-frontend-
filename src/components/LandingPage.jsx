@@ -115,23 +115,25 @@ const industries = [
 // Plan descriptions and features (static content)
 const planMetadata = {
   basic: {
-    displayName: 'Essential',
+    displayName: 'Basic',
     description: 'Small teams or single-site operations getting off spreadsheets and paper for the first time.',
     features: ['Unlimited work orders', 'Unlimited locations', 'Over AI'],
     cta: 'Try for free'
   },
   premium: {
     displayName: 'Premium',
+    badge: 'Custom Quote',
     description: 'Growing maintenance teams ready to move from reactive to preventive maintenance.',
     features: [
-      'FixNestStudio',
+      'Daily Reporting & Insights',
       'PM scheduling',
       'Custom checklists',
       'Parts & inventory with costing',
       'Time & labor tracking',
       '30-day analytics history'
     ],
-    cta: 'Try for free'
+    cta: 'Request Quotation',
+    isPremium: true
   },
   professional: {
     displayName: 'Professional',
@@ -235,22 +237,25 @@ const LandingPage = () => {
   }, []);
 
   const pricingPlans = pricing 
-    ? Object.entries(pricing).map(([planKey, planPrices]) => {
-        const metadata = planMetadata[planKey] || {};
-        const monthlyPrice = planPrices.monthly;
-        const symbol = currencySymbols[currency] || '$';
-        
-        return {
-          key: planKey,
-          name: metadata.displayName || planKey,
-          price: monthlyPrice ? `${symbol}${monthlyPrice}` : 'Request a Quote',
-          period: monthlyPrice ? '/user/mo' : '',
-          badge: metadata.badge,
-          description: metadata.description,
-          features: metadata.features || [],
-          cta: metadata.cta
-        };
-      })
+    ? ['basic', 'professional', 'enterprise', 'premium']
+        .filter(planKey => pricing[planKey])
+        .map(planKey => {
+          const planPrices = pricing[planKey];
+          const metadata = planMetadata[planKey] || {};
+          const monthlyPrice = planPrices.monthly;
+          const symbol = currencySymbols[currency] || '$';
+          
+          return {
+            key: planKey,
+            name: metadata.displayName || planKey,
+            price: monthlyPrice ? `${symbol}${monthlyPrice}` : 'Request a Quote',
+            period: monthlyPrice ? '/user/mo' : '',
+            badge: metadata.badge,
+            description: metadata.description,
+            features: metadata.features || [],
+            cta: metadata.cta
+          };
+        })
     : [];
 
   return (
@@ -495,13 +500,28 @@ const LandingPage = () => {
             {pricingPlans.map((plan) => (
               <article
                 key={plan.key}
-                className={`pricing-card${plan.badge ? ' pricing-card--featured' : ''}`}
+                className={`pricing-card${plan.badge ? ' pricing-card--featured' : ''}${plan.key === 'premium' ? ' pricing-card--premium' : ''}`}
+                style={plan.key === 'premium' ? {
+                  borderColor: '#9333ea',
+                  backgroundColor: '#faf5ff',
+                  position: 'relative',
+                  transform: 'scale(1.02)'
+                } : {}}
               >
-                {plan.badge ? <div className="pricing-badge">{plan.badge}</div> : null}
-                <div className="pricing-name">{plan.name}</div>
+                {plan.badge ? <div className="pricing-badge" style={plan.key === 'premium' ? {
+                  backgroundColor: '#9333ea',
+                  color: '#fff'
+                } : {}}>{plan.badge}</div> : null}
+                <div className="pricing-name" style={plan.key === 'premium' ? { color: '#9333ea' } : {}}>{plan.name}</div>
                 <div className="pricing-price">
-                  {plan.price}
-                  {plan.period ? <span className="pricing-period">{plan.period}</span> : null}
+                  {plan.key === 'premium' ? (
+                    <span style={{ color: '#9333ea', fontSize: '24px', fontWeight: 'bold' }}>Custom Pricing</span>
+                  ) : (
+                    <>
+                      {plan.price}
+                      {plan.period ? <span className="pricing-period">{plan.period}</span> : null}
+                    </>
+                  )}
                 </div>
                 <p className="pricing-description">{plan.description}</p>
                 <div className="pricing-feature-list">
@@ -516,7 +536,11 @@ const LandingPage = () => {
                   className="pricing-cta" 
                   type="button"
                   onClick={() => handleUpgrade(plan.key)}
-                  style={{ cursor: 'pointer' }}
+                  style={plan.key === 'premium' ? {
+                    cursor: 'pointer',
+                    backgroundColor: '#9333ea',
+                    color: '#fff'
+                  } : { cursor: 'pointer' }}
                 >
                   {plan.cta}
                 </button>

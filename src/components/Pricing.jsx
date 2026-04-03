@@ -8,14 +8,9 @@ import useCompanySubscription from '../hooks/useCompanySubscription';
 // Plan descriptions and features (static content)
 const planMetadata = {
   basic: {
-    displayName: 'Essential',
+    displayName: 'Basic',
     description: 'Small teams or single-site operations getting off spreadsheets and paper for the first time.',
-    features: ['Unlimited work orders', 'Unlimited locations', 'Nova AI']
-  },
-  premium: {
-    displayName: 'Premium',
-    description: 'Growing maintenance teams ready to move from reactive to preventive maintenance.',
-    features: ['UpKeep Studio', 'PM scheduling', 'Custom checklists', 'Parts & inventory', 'Time & labor tracking', '30-day analytics history']
+    features: ['Unlimited work orders', 'Unlimited locations', 'Over AI']
   },
   professional: {
     displayName: 'Professional',
@@ -26,7 +21,22 @@ const planMetadata = {
   enterprise: {
     displayName: 'Enterprise',
     description: 'Multi-site organizations needing automation, integrations, and governance controls.',
-    features: ['Multi-site module support', 'Workflow automation', 'Reliability & downtime tracking', 'PO management', 'API & custom integrations', 'SSO & custom roles']
+    features: ['Multi-site module support', 'Workflow automation', 'Reliability & downtime tracking', 'PO management', 'API & custom integrations', 'SSO & custom roles', 'Custom dashboards']
+  },
+  premium: {
+    displayName: 'Premium',
+    badge: 'Custom Quote',
+    description: 'Growing maintenance teams ready to move from reactive to preventive maintenance.',
+    features: [
+      'FixNestStudio',
+      'PM scheduling',
+      'Custom checklists',
+      'Parts & inventory with costing',
+      'Time & labor tracking',
+      '30-day analytics history'
+    ],
+    cta: 'Request Quotation',
+    isPremium: true
   }
 };
 
@@ -90,8 +100,35 @@ export default function Pricing() {
   };
 
   const handleUpgrade = (planKey) => {
-    setSelectedPlan(planKey);
-    setShowPaymentModal(true);
+    if (planKey === 'premium') {
+      handlePremiumQuoteRequest();
+    } else {
+      setSelectedPlan(planKey);
+      setShowPaymentModal(true);
+    }
+  };
+
+  const handlePremiumQuoteRequest = async () => {
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const userEmail = user.email || '';
+    const companyName = user.companyName || user.company || 'Unknown Company';
+    
+    try {
+      // Send quote request to admin
+      await api.post('/api/quote-requests', {
+        requesterEmail: userEmail,
+        requesterName: user.name || 'Unknown',
+        companyName: companyName,
+        plan: 'premium',
+        message: `Quote request for Premium plan with custom requirements.`
+      });
+      
+      alert('Quote request sent! The system administrator will contact you shortly with a customized quote.');
+      window.location.href = '/';
+    } catch (error) {
+      console.error('Error sending quote request:', error);
+      alert('Failed to send quote request. Please contact the administrator directly.');
+    }
   };
 
   const handlePaymentMethodSelect = async (paymentMethod) => {
@@ -143,22 +180,25 @@ export default function Pricing() {
     );
   }
 
-  const pricingPlans = Object.entries(pricing).map(([planKey, planPrices]) => {
-    const metadata = planMetadata[planKey] || {};
-    const monthlyPrice = planPrices.monthly;
-    const symbol = currencySymbols[currency] || '$';
-    
-    return {
-      key: planKey,
-      name: metadata.displayName || planKey,
-      price: monthlyPrice ? `${symbol}${monthlyPrice}` : 'Request a Quote',
-      period: monthlyPrice ? '/user/mo' : '',
-      badge: metadata.badge,
-      description: metadata.description,
-      features: metadata.features || [],
-      billingCycles: planPrices
-    };
-  });
+  const pricingPlans = ['basic', 'professional', 'enterprise', 'premium']
+    .filter(planKey => pricing[planKey])
+    .map(planKey => {
+      const planPrices = pricing[planKey];
+      const metadata = planMetadata[planKey] || {};
+      const monthlyPrice = planPrices.monthly;
+      const symbol = currencySymbols[currency] || '$';
+      
+      return {
+        key: planKey,
+        name: metadata.displayName || planKey,
+        price: monthlyPrice ? `${symbol}${monthlyPrice}` : 'Request a Quote',
+        period: monthlyPrice ? '/user/mo' : '',
+        badge: metadata.badge,
+        description: metadata.description,
+        features: metadata.features || [],
+        billingCycles: planPrices
+      };
+    });
 
   return (
     <div className="pricing-page">
@@ -232,13 +272,28 @@ export default function Pricing() {
           return (
             <article
               key={plan.key}
-              className={`pricing-card${plan.badge ? ' pricing-card--featured' : ''}`}
+              className={`pricing-card${plan.badge ? ' pricing-card--featured' : ''}${plan.key === 'premium' ? ' pricing-card--premium' : ''}`}
+              style={plan.key === 'premium' ? {
+                borderColor: '#9333ea',
+                backgroundColor: '#faf5ff',
+                position: 'relative',
+                transform: 'scale(1.02)'
+              } : {}}
             >
-              {plan.badge ? <div className="pricing-badge">{plan.badge}</div> : null}
+              {plan.badge ? (
+                <div className="pricing-badge" style={plan.key === 'premium' ? {
+                  backgroundColor: '#9333ea',
+                  color: '#fff'
+                } : {}}>
+                  {plan.badge}
+                </div>
+              ) : null}
               <div className="pricing-name">{plan.name}</div>
               <div className="pricing-price">
-                {displayPrice}
-                {cyclePrice && <span className="pricing-period">/{billingCycle}</span>}
+                {plan.key === 'premium' ? (
+                  <span style={{ color: '#9333ea', fontSize: '24px', fontWeight: 'bold' }}>Custom Pricing</span>
+                ) : displayPrice}
+                {cyclePrice && plan.key !== 'premium' && <span className="pricing-period">/{billingCycle}</span>}
               </div>
               <p className="pricing-description">{plan.description}</p>
               <div className="pricing-feature-list">
@@ -271,10 +326,16 @@ export default function Pricing() {
                   className="pricing-cta" 
                   type="button"
                   onClick={() => handleUpgrade(plan.key)}
-                  style={{ cursor: 'pointer', marginTop: '20px' }}
+                  style={{ 
+                    cursor: 'pointer', 
+                    marginTop: '20px',
+                    backgroundColor: plan.key === 'premium' ? '#9333ea' : undefined,
+                    borderColor: plan.key === 'premium' ? '#9333ea' : undefined,
+                    color: plan.key === 'premium' ? '#fff' : undefined
+                  }}
                   disabled={subscriptionLoading}
                 >
-                  {subscriptionLoading ? 'Loading...' : (cyclePrice ? 'Start a Free Trial' : 'Request a Quote')}
+                  {subscriptionLoading ? 'Loading...' : (plan.key === 'premium' ? 'Request Quotation' : (cyclePrice ? 'Start a Free Trial' : 'Request a Quote'))}
                 </button>
               )}
             </article>

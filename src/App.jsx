@@ -6,6 +6,8 @@ import SsoLogin from './components/auth/SsoLogin';
 import ForgotPassword from './components/auth/ForgotPassword';
 import ResetPassword from './components/auth/ResetPassword';
 import AcceptInvite from './components/auth/AcceptInvite';
+import Activation from './components/Activation';
+import ActivationPending from './components/ActivationPending';
 import Dashboard from './Dashboard';
 import Pricing from './components/Pricing';
 import Subscribe from './components/Subscribe';
@@ -153,6 +155,8 @@ function App() {
           <Route path="/login" element={<Login onLogin={handleLogin} />} />
           <Route path="/sso-login" element={<SsoLogin />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/activate/:token" element={<Activation />} />
+          <Route path="/activation-pending" element={<ActivationPending />} />
           <Route path="/accept-invite" element={<AcceptInvite />} />
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/subscribe" element={<Subscribe />} />

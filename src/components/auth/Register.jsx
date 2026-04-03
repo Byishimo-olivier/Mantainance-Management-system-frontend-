@@ -395,45 +395,10 @@ export default function Register() {
       });
       const data = await res.json();
       if (res.ok) {
-        // Handle subscription creation if coming from Subscribe page
-        const plan = searchParams.get('plan');
-        const currency = searchParams.get('currency');
-        const cycle = searchParams.get('cycle');
-        const phone = searchParams.get('phone');
-        
-        if (plan) {
-          try {
-            // Create company-based subscription
-            const subscriptionResponse = await subscriptionAPI.createSubscription({
-              plan: plan,
-              currency: currency || 'RWF',
-              billingCycle: cycle || 'monthly',
-              clientId: form.companyName,
-              companyName: form.companyName,
-              managerEmail: form.email,
-              companyPhone: phoneValue
-            });
-
-            // Check if payment details were stored for mobile money
-            const pendingPayment = sessionStorage.getItem('pendingPayment');
-            if (pendingPayment && subscriptionResponse.data?.id) {
-              const paymentData = JSON.parse(pendingPayment);
-              
-              // If mobile money was selected, redirect to payment selection
-              if (paymentData.paymentMethod === 'mobile_money') {
-                setForm(initialForm);
-                navigate(`/payment-selection?plan=${plan}&cycle=${cycle}&currency=${currency}&companyName=${encodeURIComponent(form.companyName)}&email=${encodeURIComponent(form.email)}&phone=${encodeURIComponent(phoneValue)}&subscriptionId=${subscriptionResponse.data.id}&amount=${paymentData.amount}`, { replace: true });
-                return;
-              }
-            }
-          } catch (subError) {
-            console.error('Subscription creation failed:', subError);
-            // Continue with login even if subscription creation fails
-          }
-        }
-        
+        // User registered successfully with activation pending
         setForm(initialForm);
-        navigate('/login', { replace: true });
+        // Redirect to activation pending page with email
+        navigate(`/activation-pending?email=${encodeURIComponent(form.email)}&companyName=${encodeURIComponent(form.companyName)}`, { replace: true });
       } else {
         setError(data.error || 'Registration failed');
       }
