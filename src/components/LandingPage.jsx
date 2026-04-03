@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
+import { X, CheckCircle2, ArrowRight, Shield, Zap, Layout, Globe, Truck, GraduationCap, Building2, Factory, Utensils, Lightbulb } from 'lucide-react';
 import AuthHeader from './auth/AuthHeader';
 import subscriptionAPI from '../api/subscription';
 import api from '../api/axios';
@@ -8,56 +10,105 @@ const products = [
   {
     name: 'CMMS',
     label: 'CMMS',
-    description:
-      'Mobile-first maintenance management that turns reactive firefighting into proactive operations. Create work orders in seconds, automate PMs, and give your team real-time visibility from any device.'
+    image: 'https://images.unsplash.com/photo-1581092160562-40aa08e78837?w=800&q=80',
+    icon: <Layout className="w-5 h-5" />,
+    description: 'Mobile-first maintenance management that turns reactive firefighting into proactive operations.',
+    details: 'Create work orders in seconds, automate PMs, and give your team real-time visibility from any device. Includes inventory tracking, labor costing, and digital checklists.'
   },
   {
     name: 'FixNest Intelligence',
     label: 'Intelligence',
-    description:
-      'Embedded AI tools that eliminate busywork and surface insights your team would never find manually. From smart scheduling to predictive recommendations, Intelligence helps you work faster and smarter without extra setup.'
+    image: 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=800&q=80',
+    icon: <Zap className="w-5 h-5" />,
+    description: 'Embedded AI tools that eliminate busywork and surface insights your team would never find manually.',
+    details: 'From smart scheduling to predictive recommendations, Intelligence helps you work faster and smarter without extra setup. Features AI-powered triage and automated incident root cause analysis.'
   },
   {
     name: 'Studio',
     label: 'Studio',
-    description:
-      'Custom app platform that lets anyone on your team build exactly the tools they need or install from 30+ ready-made apps, all running on your existing data, permissions, and security. No code. No IT. No limits.'
+    image: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&q=80',
+    icon: <Building2 className="w-5 h-5" />,
+    description: 'Custom app platform that lets anyone on your team build exactly the tools they need.',
+    details: 'Install from 30+ ready-made apps or build your own with no code. All running on your existing data, permissions, and security. No IT intervention required.'
   },
   {
     name: 'Safety',
     label: 'Safety',
-    description:
-      'Environment, Health, & Safety Software. Capture safety events in seconds with voice-to-text reporting that works in any language. Automated OSHA logs, AI-powered CAPAs, and instant audit trails help you reduce incidents and stay compliant.'
+    image: 'https://images.unsplash.com/photo-1504328345606-18bbc8c9d7d1?w=800&q=80',
+    icon: <Shield className="w-5 h-5" />,
+    description: 'Environment, Health, & Safety Software. Capture safety events in seconds with voice-to-text.',
+    details: 'Automated OSHA logs, AI-powered CAPAs, and instant audit trails. Scan QR codes for instant safety reporting without requiring an account.'
   },
   {
     name: 'Providers',
     label: 'Providers',
-    description:
-      'Vendor and contractor management integrated with your maintenance workflow. Track contracts, performance, and communications all in one place to streamline external partnerships.'
+    image: 'https://images.unsplash.com/photo-1521791136064-7986c2959443?w=800&q=80',
+    icon: <Globe className="w-5 h-5" />,
+    description: 'Vendor and contractor management integrated with your maintenance workflow.',
+    details: 'Track contracts, performance, and communications all in one place. Streamline invoicing and external work order dispatching.'
   },
   {
     name: 'Edge Sensors',
     label: 'Edge Sensors',
-    description:
-      'Wireless IoT sensors that monitor your assets 24/7 and automatically create work orders when conditions change. Install in hours, not months, and avoid hardwiring or data science overhead.'
+    image: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&q=80',
+    icon: <Zap className="w-5 h-5" />,
+    description: 'Wireless IoT sensors that monitor your assets 24/7 and automatically create work orders.',
+    details: 'Monitor temperature, vibration, and energy usage. Install in hours and start receiving predictive alerts before failures occur.'
   },
   {
     name: 'Lattice',
     label: 'Lattice',
-    description:
-      'Data integration and connectivity layer that unifies maintenance, safety, and asset information across all platforms. One data foundation for your entire operation.'
+    image: 'https://images.unsplash.com/photo-1558494949-ef010cbdcc48?w=800&q=80',
+    icon: <Layout className="w-5 h-5" />,
+    description: 'Data integration layer that unifies maintenance, safety, and asset information.',
+    details: 'Connect your ERP, PLC, and third-party tools into one unified data foundation for your entire operation.'
   },
   {
     name: 'Fleet',
     label: 'Fleet',
-    description:
-      'Vehicle maintenance management that connects telematics data to work orders through real-time integrations and automated PM scheduling. Instant VIN lookup, digital inspections, and complete vehicle history in one system.'
+    image: 'https://images.unsplash.com/photo-1519003722824-194d4455a60c?w=800&q=80',
+    icon: <Truck className="w-5 h-5" />,
+    description: 'Vehicle maintenance management that connects telematics data to work orders.',
+    details: 'Instant VIN lookup, digital DOT inspections, and fuel tracking. Automate PM schedules based on real-time mileage and engine hours.'
   },
   {
     name: 'Learn',
     label: 'Learn',
-    description:
-      'Learning Management Software. Enable your frontline team to access job-relevant training, track certifications, and prove compliance. No more spreadsheets, delays, or one-size-fits-all courses.'
+    image: 'https://images.unsplash.com/photo-1524178232363-1fb2b075b655?w=800&q=80',
+    icon: <GraduationCap className="w-5 h-5" />,
+    description: 'Learning Management Software. Enable your frontline team to access job-relevant training.',
+    details: 'Track certifications, prove compliance, and deploy mobile micro-learning modules that technicians can complete in the field.'
+  }
+];
+
+const industries = [
+  {
+    name: 'Manufacturing & Plants',
+    image: 'https://images.unsplash.com/photo-1565373679107-344d3c173348?w=800&q=80',
+    icon: <Factory className="w-5 h-5" />,
+    description: 'Reduce unplanned downtime and optimize OEE with predictive maintenance.',
+    details: 'Connect shop-floor data to work orders. Monitor assembly lines 24/7 and manage spare parts inventory across multiple plants.'
+  },
+  {
+    name: 'Food & Beverage',
+    image: 'https://images.unsplash.com/photo-1556761175-5973bc0f22b8?w=800&q=80',
+    icon: <Utensils className="w-5 h-5" />,
+    description: 'Streamline food safety compliance and sanitation specialized workflows.',
+    details: 'Automated compliance logging, sanitation schedule tracking, and chilled storage monitoring to ensure regulatory standards are met every day.'
+  },
+  {
+    name: 'Energy & Utilities',
+    image: 'https://images.unsplash.com/photo-1473341304170-971dccb5ac1e?w=800&q=80',
+    icon: <Lightbulb className="w-5 h-5" />,
+    description: 'Maintain critical infrastructure with field-ready mobile tools and GIS.',
+    details: 'Remote asset monitoring, substation inspections, and grid reliability tracking. Empower field crews with offline-capable mobile access.'
+  },
+  {
+    name: 'Government & Public Works',
+    image: 'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?w=800&q=80',
+    icon: <Building2 className="w-5 h-5" />,
+    description: 'Public-facing request portals and infrastructure lifecycle management.',
+    details: 'Allow citizens to report issues via QR codes. Manage public assets, parks, and city buildings with transparent audit trails and budget oversight.'
   }
 ];
 
@@ -142,6 +193,8 @@ const LandingPage = () => {
     }
   };
 
+  const [selectedItem, setSelectedItem] = useState(null);
+
   const fetchPricingData = async () => {
     try {
       const response = await subscriptionAPI.getPricing();
@@ -218,7 +271,13 @@ const LandingPage = () => {
           </div>
         </div>
         <div className="landing-hero-media">
-          <div className="hero-photo">
+          <div className="hero-photo group">
+            <img 
+              src="https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=1200&q=80" 
+              alt="Industrial Maintenance" 
+              className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+            />
+            <div className="absolute inset-0 bg-gradient-to-tr from-slate-900/40 to-transparent" />
             <div className="hero-card hero-card--task">
               <div className="hero-card-title">Seasonal Electrical Connection Audit</div>
               <div className="hero-card-meta">Open · 1 hour</div>
@@ -252,22 +311,141 @@ const LandingPage = () => {
         </div>
         <div className="product-grid">
           {products.map((product) => (
-            <article key={product.name} className="product-card">
-              <div className="product-label">{product.label}</div>
+            <motion.article 
+              key={product.name} 
+              className="product-card group cursor-pointer"
+              whileHover={{ y: -8, transition: { duration: 0.2 } }}
+              onClick={() => setSelectedItem(product)}
+            >
+              <div className="product-image-container mb-4 overflow-hidden rounded-xl h-40">
+                <img 
+                  src={product.image} 
+                  alt={product.name} 
+                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                />
+              </div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-indigo-600">{product.icon}</span>
+                <div className="product-label">{product.label}</div>
+              </div>
               <h3 className="product-title">{product.name}</h3>
-              <p className="product-description">{product.description}</p>
+              <p className="product-description line-clamp-3">{product.description}</p>
               <button 
-                className="product-link" 
+                className="product-link mt-4 flex items-center gap-2 group-hover:gap-3 transition-all" 
                 type="button"
-                onClick={() => handleProductClick(product.name)}
                 style={{ cursor: 'pointer' }}
               >
-                Learn More
+                Expansion Details <ArrowRight className="w-4 h-4" />
               </button>
-            </article>
+            </motion.article>
           ))}
         </div>
       </section>
+
+      <section className="landing-section landing-industries">
+        <div className="landing-section-header">
+          <div className="landing-section-title">Industries We Serve</div>
+          <p className="text-gray-500 max-w-lg">Scalable solutions tailored for specialized operations across various sectors.</p>
+        </div>
+        <div className="industry-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {industries.map((industry) => (
+            <motion.div 
+              key={industry.name}
+              className="industry-card relative rounded-2xl overflow-hidden h-72 cursor-pointer group"
+              whileHover={{ scale: 1.02 }}
+              onClick={() => setSelectedItem(industry)}
+            >
+              <img 
+                src={industry.image} 
+                alt={industry.name} 
+                className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" 
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/40 to-transparent" />
+              <div className="absolute bottom-0 left-0 p-6 w-full">
+                <div className="flex items-center gap-2 text-indigo-400 mb-2">
+                  {industry.icon}
+                </div>
+                <h3 className="text-white font-bold text-xl mb-2">{industry.name}</h3>
+                <p className="text-slate-300 text-sm line-clamp-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                  {industry.description}
+                </p>
+                <div className="mt-3 flex items-center gap-2 text-white text-xs font-bold uppercase tracking-wider">
+                  View Expansion <ArrowRight className="w-3 h-3" />
+                </div>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      </section>
+
+      {/* Expansion Detail Modal/Overlay */}
+      <AnimatePresence>
+        {selectedItem && (
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 sm:p-6">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedItem(null)}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-md"
+            />
+            <motion.div 
+              layoutId={selectedItem.name}
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-4xl bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row"
+            >
+              <div className="w-full md:w-1/2 h-64 md:h-auto relative">
+                <img src={selectedItem.image} alt={selectedItem.name} className="w-full h-full object-cover" />
+                <div className="absolute top-4 left-4 p-2 bg-white/20 backdrop-blur-xl rounded-xl text-white">
+                  {selectedItem.icon}
+                </div>
+              </div>
+              <div className="w-full md:w-1/2 p-8 md:p-12 flex flex-col">
+                <button 
+                  onClick={() => setSelectedItem(null)}
+                  className="absolute top-6 right-6 p-2 hover:bg-slate-100 rounded-full transition-colors"
+                >
+                  <X className="w-6 h-6 text-slate-400" />
+                </button>
+                <div className="text-indigo-600 font-bold tracking-widest text-xs uppercase mb-2">
+                  {selectedItem.label || 'Industry Solution'}
+                </div>
+                <h2 className="text-3xl font-bold text-slate-900 mb-4">{selectedItem.name}</h2>
+                <p className="text-lg text-slate-600 font-medium mb-6 leading-relaxed">
+                  {selectedItem.description}
+                </p>
+                <div className="bg-slate-50 p-6 rounded-2xl mb-8">
+                  <h4 className="text-slate-900 font-bold mb-3 flex items-center gap-2">
+                    <CheckCircle2 className="w-5 h-5 text-green-500" /> Key Capabilities
+                  </h4>
+                  <p className="text-slate-600 leading-relaxed">
+                    {selectedItem.details}
+                  </p>
+                </div>
+                <div className="mt-auto pt-6 border-t border-slate-100 flex items-center gap-4">
+                  <button 
+                    onClick={() => {
+                      setSelectedItem(null);
+                      if (selectedItem.label) handleProductClick(selectedItem.name);
+                    }}
+                    className="px-6 py-3 bg-indigo-600 text-white rounded-full font-bold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200"
+                  >
+                    Learn More
+                  </button>
+                  <button 
+                    onClick={() => setSelectedItem(null)}
+                    className="px-6 py-3 border border-slate-200 text-slate-600 rounded-full font-bold hover:bg-slate-50 transition-colors"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {pricingPlans.length > 0 && (
         <section className="landing-section landing-pricing">
@@ -455,6 +633,29 @@ const LandingPage = () => {
               Report safety events from any device - just scan a QR code, no downloads or logins needed.
               AI turns incidents into preventive actions so small issues do not become big problems.
             </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="landing-section landing-cta-hero relative overflow-hidden rounded-[40px] h-[500px] mb-24">
+        <img 
+          src="https://images.unsplash.com/photo-1552664730-d307ca884978?w=1200&q=80" 
+          alt="Team Collaboration" 
+          className="absolute inset-0 w-full h-full object-cover"
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-slate-900/80 to-slate-900/40" />
+        <div className="relative z-10 h-full flex flex-col justify-center px-12 md:px-24 max-w-4xl">
+          <div className="landing-kicker text-indigo-400 mb-4">DRIVE EFFICIENCY TODAY</div>
+          <h2 className="text-4xl md:text-6xl font-bold text-white mb-6 leading-tight">
+            Stop reacting. <br />
+            Start predicting.
+          </h2>
+          <p className="text-xl text-slate-300 mb-8 max-w-xl">
+            Join 4,000+ businesses that have transformed their maintenance operations from reactive firefighting to intelligent asset management.
+          </p>
+          <div className="landing-cta-row">
+            <a className="landing-cta px-10 py-4 text-lg" href="/register">Start Your Free Trial</a>
+            <a className="landing-cta landing-cta--ghost px-10 py-4 text-lg border-white/20 text-white" href="/pricing">Schedule a Tour</a>
           </div>
         </div>
       </section>

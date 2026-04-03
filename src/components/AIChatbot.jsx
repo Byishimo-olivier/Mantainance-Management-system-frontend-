@@ -135,6 +135,9 @@ const AIChatbot = () => {
         if (!isOpen || summary || loadingSummary) return;
 
         const fetchSummary = async () => {
+            const token = localStorage.getItem('token');
+            if (!token) return;
+
             try {
                 setLoadingSummary(true);
                 const res = await api.get('/api/ai/maintenance-summary');
@@ -191,7 +194,7 @@ const AIChatbot = () => {
             setMessages(prev => [...prev, { role: 'model', content: res.data.response }]);
         } catch (error) {
             console.error("Chat error:", error);
-            const errorMessage = error.response?.data?.message || "Sorry, I encountered an error. Please check your connection or try again later.";
+            const errorMessage = error.response?.data?.message || error.response?.data?.error || "Sorry, I encountered an error. Please check your connection or try again later.";
             setMessages(prev => [...prev, { role: 'model', content: errorMessage }]);
         } finally {
             setIsTyping(false);

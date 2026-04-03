@@ -107,6 +107,9 @@ const getHomeRouteForRole = (role) => {
   return '/dashboard';
 };
 
+import Footer from './components/Footer';
+import { useLocation } from 'react-router-dom';
+
 function App() {
   const [auth, setAuth] = useState(() => {
     const token = localStorage.getItem('token');
@@ -115,6 +118,7 @@ function App() {
   });
   const [issues, setIssues] = useState([]); // State for issues, required by ManagementIssues
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleLogin = (token, user) => {
     localStorage.setItem('token', token);
@@ -122,6 +126,23 @@ function App() {
     setAuth({ token, user });
     navigate(getHomeRouteForRole(user?.role));
   };
+
+  // Hide footer on dashboard and private pages
+  const hideFooterRoutes = [
+    '/dashboard', 
+    '/manager-dashboard', 
+    '/technician-dashboard', 
+    '/admin-dashboard',
+    '/analytics',
+    '/manager-issues',
+    '/technicians',
+    '/feedback',
+    '/manager-feedback',
+    '/subscription',
+    '/payment-selection',
+    '/payment-confirmation'
+  ];
+  const shouldHideFooter = hideFooterRoutes.some(route => location.pathname.startsWith(route));
 
   return (
     <LanguageProvider>
@@ -233,6 +254,7 @@ function App() {
           <Route path="/resource/maintenance-calculator" element={<MaintenanceCalculatorResource />} />
           <Route path="/resource/qr-generator" element={<QRGeneratorResource />} />
         </Routes>
+        {!shouldHideFooter && <Footer />}
         <AIChatbot />
       </div>
     </LanguageProvider>
