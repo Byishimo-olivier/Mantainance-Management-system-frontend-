@@ -45,25 +45,83 @@ export default function PaymentSelection() {
       setError(null);
       setProcessing(true);
 
-      // Send to PesaPal - let PesaPal handle all payment method selection
+      // Get user info from localStorage
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const email = managerEmail || user.email || '';
+      const company = companyName || user.companyName || user.company || 'Unknown';
+      const userId = user.id || user._id;
+      const finalAmount = parseFloat(amount);
+
+      console.log('Payment details:', { plan, cycle, currency, finalAmount, amount });
+
+      if (!finalAmount || finalAmount <= 0 || isNaN(finalAmount)) {
+        setError('Invalid amount. Please go back and select a plan.');
+        setProcessing(false);
+        return;
+      }
+
+      if (!plan || !cycle) {
+        setError('Missing plan or billing cycle. Please go back and select a plan.');
+        setProcessing(false);
+        return;
+      }
+
+      // If no subscriptionId, create a subscription first
+      let subId = subscriptionId;
+      if (!subId) {
+        try {
+          const createSubResponse = await api.post('/api/subscriptions', {
+            plan,
+            billingCycle: cycle,
+            currency,
+            companyName: company,
+            email,
+            userId,
+          });
+          subId = createSubResponse.data?.subscription?._id || createSubResponse.data?._id;
+          console.log('Subscription created:', subId);
+          
+          if (!subId) {
+            setError('Failed to create subscription. Please try again.');
+            setProcessing(false);
+            return;
+          }
+        } catch (subErr) {
+          console.error('Subscription creation error:', subErr.response?.data || subErr.message);
+          setError('Failed to create subscription: ' + (subErr.response?.data?.error || subErr.message));
+          setProcessing(false);
+          return;
+        }
+      }
+
+      // Send to PesaPal with complete data
+      const paymentData = {
+        subscriptionId: subId,
+        amount: finalAmount,
+        currency,
+        email,
+        companyName: company,
+        phoneNumber: companyPhone,
+        plan,
+        cycle,
+      };
+
+      console.log('Sending payment request:', paymentData);
+
       const paymentResponse = await api.post(
         '/api/subscriptions/payments/initiate-pesapal',
-        {
-          subscriptionId,
-          amount: parseFloat(amount),
-          currency,
-          email: managerEmail,
-          phoneNumber: companyPhone,
-        }
+        paymentData
       );
 
       if (paymentResponse.data?.redirectUrl) {
-        // Redirect to PesaPal - they will show available payment methods
+        // Redirect to PesaPal
         window.location.href = paymentResponse.data.redirectUrl;
+      } else {
+        setError('Failed to get payment redirect. Please try again.');
       }
     } catch (err) {
       console.error('Payment processing error:', err);
-      setError(err.response?.data?.error || 'Failed to process payment. Please try again.');
+      setError(err.response?.data?.error || err.message || 'Failed to process payment. Please try again.');
     } finally {
       setProcessing(false);
     }
@@ -157,7 +215,7 @@ export default function PaymentSelection() {
         <div style={{ display: 'grid', gap: '12px' }}>
           <button
             onClick={handleProcessPayment}
-            disabled={processing || !subscriptionId}
+            disabled={processing || !amount}
             style={{
               padding: '14px 20px',
               fontSize: '16px',
@@ -166,15 +224,15 @@ export default function PaymentSelection() {
               color: '#fff',
               border: 'none',
               borderRadius: '8px',
-              cursor: processing || !subscriptionId ? 'not-allowed' : 'pointer',
-              opacity: processing || !subscriptionId ? 0.6 : 1,
+              cursor: processing || !amount ? 'not-allowed' : 'pointer',
+              opacity: processing || !amount ? 0.6 : 1,
               transition: 'background-color 0.3s',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               gap: '8px',
             }}
-            onMouseOver={(e) => !processing && !subscriptionId && (e.target.style.backgroundColor = '#0052a3')}
+            onMouseOver={(e) => !processing && !amount && (e.target.style.backgroundColor = '#0052a3')}
             onMouseOut={(e) => (e.target.style.backgroundColor = '#0066cc')}
           >
             {processing && <Loader size={18} className="animate-spin" />}

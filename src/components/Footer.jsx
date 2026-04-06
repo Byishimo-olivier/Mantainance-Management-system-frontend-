@@ -57,11 +57,12 @@ const Footer = () => {
             <div className="footer-links-column">
               <h4>Contact</h4>
               <div className="footer-contact-info">
-                <div className="footer-contact-item">1 (323) 880-0280</div>
-                <div className="footer-contact-item">1 (866) 994-4119</div>
+                <div className="footer-contact-item">+250 785 230 859</div>
+                <div className="footer-contact-item">+250 783 227 490</div>
                 <div className="footer-contact-item"><a href="#">Schedule a Tour</a></div>
                 <div className="footer-contact-item" style={{ marginTop: '12px', fontSize: '13px' }}>
-                  10880 Wilshire Blvd, Los Angeles, CA 90024
+                 Kigali, Rwanda<br />
+                 1234 Maintenance St.<br />
                 </div>
               </div>
             </div>

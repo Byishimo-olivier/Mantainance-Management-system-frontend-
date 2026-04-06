@@ -7,6 +7,7 @@ import { WorkOrderForm } from './WorkOrder';
 import SubscriptionPlan from './SubscriptionPlan';
 import SubscriptionManagement from './SubscriptionManagement';
 import CompanySubscriptionDashboard from './CompanySubscriptionDashboard';
+import ClientDashboardPricing from './ClientDashboardPricing';
 import { useSubscription } from '../hooks/useSubscription';
 import { getImageUrl } from '../utils/imageUrl';
 import { useLanguage, useTranslation } from "../i18n/LanguageContext";
@@ -17468,6 +17469,7 @@ function ClientDashboard() {
   const navItems = [
     { key: 'dashboard', label: t("manager.sidebar.dashboard"), icon: <Icon.Dashboard /> },
     { key: 'intelligence', label: t("manager.sidebar.intelligence"), icon: <Icon.Analytics /> },
+    { key: 'subscription', label: 'Subscription Plans', icon: <ShoppingCart />, group: 'billing' },
 
     { key: 'workOrders', label: t("manager.sidebar.workOrders"), icon: <Icon.Requests />, group: 'core' },
     { key: 'preventiveMaintenance', label: t("manager.sidebar.preventiveMaintenance"), icon: <Icon.Templates />, group: 'core' },
@@ -17499,6 +17501,7 @@ function ClientDashboard() {
   }, [activeTab, currentUser?.companyName, fetchBranches]);
 
   const navSections = [
+    { key: 'billing', label: 'Billing' },
     { key: 'core', label: t("manager.sidebar.core") },
     { key: 'data', label: t("manager.sidebar.dataAnalytics") },
     { key: 'resources', label: t("manager.sidebar.resources") },
@@ -18242,6 +18245,10 @@ function ClientDashboard() {
               onOpenMetersTab={() => handleAssistantAction('openMetersTab')}
               onOpenEdgeTab={() => handleAssistantAction('openEdgeTab')}
             />
+          )}
+
+          {activeTab === 'subscription' && (
+            <ClientDashboardPricing />
           )}
 
           {activeTab === 'maintenanceTemplates' && (

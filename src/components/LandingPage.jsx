@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, CheckCircle2, ArrowRight, Shield, Zap, Layout, Globe, Truck, GraduationCap, Building2, Factory, Utensils, Lightbulb } from 'lucide-react';
 import AuthHeader from './auth/AuthHeader';
 import subscriptionAPI from '../api/subscription';
 import api from '../api/axios';
+import ThierryImage from '../assets/Thierry.jpeg';
+import OlivierImage from '../assets/Byishimo.jpeg';
 
 const products = [
   {
@@ -166,6 +168,7 @@ const planMetadata = {
 
 const LandingPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [pricing, setPricing] = useState(null);
   const [currency, setCurrency] = useState('USD');
   const [changingCurrency, setChangingCurrency] = useState(false);
@@ -174,6 +177,18 @@ const LandingPage = () => {
     'USD': '$',
     'RWF': 'FRw'
   };
+
+  // Scroll to team section if navigation state indicates it
+  useEffect(() => {
+    if (location.state?.scrollToTeam) {
+      setTimeout(() => {
+        const teamSection = document.querySelector('[data-section="team"]');
+        if (teamSection) {
+          teamSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 300);
+    }
+  }, [location]);
 
   // Product navigation mapping
   const productRoutes = {
@@ -264,11 +279,13 @@ const LandingPage = () => {
 
       <section className="landing-hero">
         <div className="landing-hero-content">
-          <div className="landing-kicker">CONNECTED. INTELLIGENT. ADAPTABLE.</div>
-          <h1 className="landing-title">The modern platform for asset operations</h1>
+          <div className="landing-kicker">THE OPERATING SYSTEM FOR MAINTENANCE</div>
+          <h1 className="landing-title">Fixnest CMMS: The Intelligent Maintenance Platform</h1>
           <p className="landing-subtitle">
-            Fixnest brings maintenance, safety, and asset data into one platform. Your teams see what
-            matters. AI helps them act on it. Everything works together, and nothing falls through the cracks.
+            For every asset. Every property. Any scale.
+          </p>
+          <p style={{ fontSize: '18px', color: '#64748b', marginTop: '16px', maxWidth: '600px', lineHeight: '1.7' }}>
+            Maintenance today is fragmented — spread across emails, spreadsheets, WhatsApp, and disconnected tools. Fixnest centralizes it all, transforming reactive firefighting into intelligent, predictable operations.
           </p>
           <div className="landing-cta-row">
             <a className="landing-cta" href="/register">Start a Free Trial</a>
@@ -307,6 +324,271 @@ const LandingPage = () => {
           <div className="logo-pill">Yamaha</div>
           <div className="logo-pill">Stratasys</div>
         </div> */}
+      </section>
+
+      {/* The Problem Section */}
+      <section className="landing-section" style={{ backgroundColor: '#fff', padding: '80px 24px' }}>
+        <div className="max-w-6xl mx-auto">
+          <div style={{ textAlign: 'center', marginBottom: '60px' }}>
+            <h2 className="text-4xl font-bold text-slate-900 mb-4">The Problem With Maintenance Today</h2>
+            <p className="text-xl text-slate-600 max-w-2xl mx-auto">
+              Maintenance is not lacking effort — it is lacking structure. Here's what's holding you back:
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+            {[
+              { icon: '💬', title: 'Scattered Communication', desc: 'Lost service requests across emails, texts, and messages' },
+              { icon: '🗂️', title: 'No Single Source', desc: 'Asset and maintenance data trapped in spreadsheets' },
+              { icon: '🔥', title: 'Reactive Firefighting', desc: 'Always responding to emergencies, never preventing them' },
+              { icon: '👁️', title: 'Limited Visibility', desc: 'Leadership has no real-time insights into operations' },
+              { icon: '📈', title: 'Growing Inefficiency', desc: 'Problems multiply as you scale' }
+            ].map((item, idx) => (
+              <motion.div 
+                key={idx}
+                whileHover={{ y: -8 }}
+                className="p-6 bg-gradient-to-br from-red-50 to-orange-50 border border-red-200 rounded-2xl text-center hover:shadow-lg transition-shadow"
+              >
+                <div style={{ fontSize: '40px', marginBottom: '12px' }}>{item.icon}</div>
+                <h3 className="font-bold text-slate-900 mb-2 text-lg">{item.title}</h3>
+                <p className="text-sm text-slate-600">{item.desc}</p>
+              </motion.div>
+            ))}
+          </div>
+
+          <div style={{ marginTop: '40px', textAlign: 'center' }}>
+            <p style={{ fontSize: '18px', color: '#64748b', fontStyle: 'italic' }}>
+              The result? Poor visibility. Rising costs. Reactive operations. <span style={{ fontWeight: 'bold', color: '#dc2626' }}>But it doesn't have to be this way.</span>
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* The Opportunity Section */}
+      <section className="landing-section" style={{ 
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        padding: '80px 24px',
+        color: '#fff'
+      }}>
+        <div className="max-w-6xl mx-auto">
+          <div style={{ textAlign: 'center', marginBottom: '60px' }}>
+            <h2 className="text-4xl font-bold mb-4">The Transformation Happens Here</h2>
+            <p className="text-xl text-blue-100 max-w-3xl mx-auto">
+              When maintenance is managed through a centralized CMMS, everything changes:
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[
+              { number: '1️⃣', word: 'Predictable', desc: 'Scheduled, planned operations instead of surprises' },
+              { number: '2️⃣', word: 'Measurable', desc: 'Real-time metrics and clear performance indicators' },
+              { number: '3️⃣', word: 'Scalable', desc: 'Grow without losing control or visibility' },
+              { number: '4️⃣', word: 'Strategic', desc: 'Data-driven decisions that drive business value' }
+            ].map((item, idx) => (
+              <motion.div 
+                key={idx}
+                whileHover={{ scale: 1.05 }}
+                className="p-8 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 text-center hover:bg-white/20 transition-all"
+              >
+                <div style={{ fontSize: '48px', marginBottom: '12px' }}>{item.number}</div>
+                <h3 className="font-bold text-2xl mb-2">{item.word}</h3>
+                <p className="text-blue-100 text-sm">{item.desc}</p>
+              </motion.div>
+            ))}
+          </div>
+
+          <div style={{ 
+            marginTop: '60px', 
+            textAlign: 'center', 
+            padding: '40px 32px',
+            backgroundColor: 'rgba(255,255,255,0.1)',
+            borderRadius: '20px',
+            backdropFilter: 'blur(10px)',
+            border: '1px solid rgba(255,255,255,0.2)'
+          }}>
+            <p className="text-2xl font-bold">This is where Fixnest delivers real transformation</p>
+          </div>
+        </div>
+      </section>
+
+      {/* Fixnest Solution Section */}
+      <section className="landing-section" style={{ backgroundColor: '#fff', padding: '80px 24px' }}>
+        <div className="max-w-6xl mx-auto">
+          <div style={{ textAlign: 'center', marginBottom: '60px' }}>
+            <div className="landing-kicker">OUR SOLUTION</div>
+            <h2 className="text-4xl font-bold text-slate-900 mb-4">The Fixnest CMMS Platform</h2>
+            <p className="text-xl text-slate-600 max-w-3xl mx-auto">
+              A modern, intelligent system designed to centralize and optimize maintenance operations across any environment
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
+            <div>
+              <h3 className="text-2xl font-bold text-slate-900 mb-6">Built For Everyone</h3>
+              <div className="space-y-4">
+                {[
+                  { icon: '🏥', text: 'Hospitals' },
+                  { icon: '🎓', text: 'Universities' },
+                  { icon: '🏢', text: 'Commercial Buildings' },
+                  { icon: '🏘️', text: 'Residential Portfolios' },
+                  { icon: '🏭', text: 'Industrial Facilities' }
+                ].map((item, idx) => (
+                  <div key={idx} className="flex items-center gap-4 p-4 bg-gradient-to-r from-indigo-50 to-blue-50 rounded-xl border border-indigo-100">
+                    <span style={{ fontSize: '28px' }}>{item.icon}</span>
+                    <span className="font-semibold text-slate-900">{item.text}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <h3 className="text-2xl font-bold text-slate-900 mb-6">Why Choose Fixnest</h3>
+              <ul className="space-y-3">
+                {[
+                  '✅ Adapts to your specific operations',
+                  '✅ Scales with your growth',
+                  '✅ Mobile-first field execution',
+                  '✅ Real-time visibility and control',
+                  '✅ Integrated with your existing tools'
+                ].map((item, idx) => (
+                  <li key={idx} className="text-lg text-slate-700 flex items-center gap-3">
+                    <span className="text-green-600 text-xl">{item.split(' ')[0]}</span>
+                    {item.substring(3)}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Capabilities Section */}
+      <section className="landing-section" style={{ backgroundColor: '#f8fafc', padding: '80px 24px' }}>
+        <div className="max-w-6xl mx-auto">
+          <div style={{ textAlign: 'center', marginBottom: '60px' }}>
+            <h2 className="text-4xl font-bold text-slate-900 mb-4">What Fixnest CMMS Enables</h2>
+            <p className="text-xl text-slate-600">Everything you need for complete maintenance excellence</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[
+              { icon: '🏠', title: 'Universal Property Management', desc: 'Manage all your properties in one unified platform' },
+              { icon: '👀', title: 'Complete Asset Visibility', desc: 'Know the status of every asset in real-time' },
+              { icon: '📈', title: 'Scalable Operations', desc: 'Grow without losing control or efficiency' },
+              { icon: '📋', title: 'Centralized Work Orders', desc: 'Create, assign, and track all maintenance work' },
+              { icon: '🔄', title: 'Asset Lifecycle Tracking', desc: 'Monitor assets from purchase to replacement' },
+              { icon: '🛡️', title: 'Preventive & Predictive', desc: 'Prevent failures before they happen' },
+              { icon: '📊', title: 'Real-Time Dashboards', desc: 'Beautiful analytics and actionable insights' },
+              { icon: '📱', title: 'Mobile-First Execution', desc: 'Technicians work efficiently from anywhere' }
+            ].map((cap, idx) => (
+              <motion.div
+                key={idx}
+                whileHover={{ y: -12 }}
+                className="p-6 bg-white rounded-2xl shadow-md hover:shadow-2xl transition-shadow border border-slate-100"
+              >
+                <div style={{ fontSize: '36px', marginBottom: '12px' }}>{cap.icon}</div>
+                <h3 className="font-bold text-slate-900 mb-2 text-lg">{cap.title}</h3>
+                <p className="text-slate-600 text-sm">{cap.desc}</p>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Business Impact Section */}
+      <section className="landing-section" style={{ 
+        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+        padding: '80px 24px',
+        color: '#fff'
+      }}>
+        <div className="max-w-6xl mx-auto">
+          <div style={{ textAlign: 'center', marginBottom: '60px' }}>
+            <h2 className="text-4xl font-bold mb-4">Real Business Impact</h2>
+            <p className="text-xl text-emerald-100 max-w-3xl mx-auto">
+              With Fixnest CMMS, organizations achieve measurable results
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+            {[
+              { metric: '⬇️', value: 'Reduce Downtime', desc: 'Minimize operational disruptions' },
+              { metric: '💰', value: 'Lower Costs', desc: 'Proactive planning saves money' },
+              { metric: '⏱️', value: 'Extend Lifespan', desc: 'Assets last longer with care' },
+              { metric: '👥', value: 'Better Coordination', desc: 'Teams work together seamlessly' },
+              { metric: '🎯', value: 'Data-Driven', desc: 'Make smarter decisions' }
+            ].map((item, idx) => (
+              <motion.div
+                key={idx}
+                whileHover={{ scale: 1.05 }}
+                className="p-6 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 text-center hover:bg-white/20 transition-all"
+              >
+                <div style={{ fontSize: '40px', marginBottom: '12px' }}>{item.metric}</div>
+                <h3 className="font-bold text-lg mb-2">{item.value}</h3>
+                <p className="text-emerald-100 text-sm">{item.desc}</p>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Why Fixnest is Different */}
+      <section className="landing-section" style={{ backgroundColor: '#fff', padding: '80px 24px' }}>
+        <div className="max-w-4xl mx-auto">
+          <div style={{ textAlign: 'center', marginBottom: '60px' }}>
+            <h2 className="text-4xl font-bold text-slate-900 mb-4">Beyond Traditional CMMS</h2>
+            <p className="text-xl text-slate-600">
+              Fixnest is not just another CMMS. Here's what makes it different:
+            </p>
+          </div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="grid grid-cols-1 md:grid-cols-3 gap-8"
+          >
+            {[
+              {
+                icon: '🎯',
+                old: 'Just tracking work',
+                new: 'Driving strategy',
+              },
+              {
+                icon: '💾',
+                old: 'Just storing data',
+                new: 'Generating insights',
+              },
+              {
+                icon: '🔧',
+                old: 'Just managing tasks',
+                new: 'Transforming operations',
+              }
+            ].map((item, idx) => (
+              <div key={idx} className="p-8 border-2 border-slate-200 rounded-2xl hover:border-indigo-500 transition-colors">
+                <div style={{ fontSize: '48px', marginBottom: '20px' }}>{item.icon}</div>
+                <div className="space-y-4">
+                  <div className="text-red-600 line-through text-lg">{item.old}</div>
+                  <div className="flex items-center gap-2">
+                    <ArrowRight className="w-5 h-5 text-green-600" />
+                    <span className="text-green-600 font-bold text-lg">{item.new}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </motion.div>
+
+          <div style={{ 
+            marginTop: '60px', 
+            padding: '40px',
+            backgroundColor: 'linear-gradient(135deg, #667eea15 0%, #764ba215 100%)',
+            border: '2px solid #667eea',
+            borderRadius: '20px',
+            textAlign: 'center'
+          }}>
+            <h3 className="text-2xl font-bold text-slate-900 mb-2">Fixnest becomes the operating system for maintenance excellence.</h3>
+            <p className="text-slate-700 text-lg">One platform. Total visibility. Smarter maintenance at any scale.</p>
+          </div>
+        </div>
       </section>
 
       <section className="landing-section landing-products">
@@ -698,6 +980,118 @@ const LandingPage = () => {
           <div className="landing-badges">
             <span className="badge-pill">IDC CMMS Leader 2021</span>
             <span className="badge-pill">Gartner Peer Insights</span>
+          </div>
+        </div>
+      </section>
+
+      {/* Team Section */}
+      <section className="landing-section" data-section="team" style={{ backgroundColor: '#fff', padding: '80px 24px' }}>
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-16">
+            <div className="landing-kicker">OUR TEAM</div>
+            <h2 className="text-4xl font-bold text-slate-900 mb-4">The Minds Behind Fixnest</h2>
+            <p className="text-xl text-slate-600 max-w-2xl mx-auto">
+              A dedicated team of innovators and professionals committed to transforming maintenance management.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {/* Team Member 1 - Thierry */}
+            <motion.div 
+              whileHover={{ y: -8 }}
+              className="bg-slate-50 rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-shadow"
+            >
+              <div className="h-48 bg-gray-200 relative overflow-hidden">
+                <img 
+                  src={ThierryImage} 
+                  alt="Ndagano Thierry" 
+                  className="w-full h-full object-cover object-top hover:scale-110 transition-transform duration-300"
+                />
+              </div>
+              <div className="p-6 text-center">
+                <h3 className="text-2xl font-bold text-slate-900 mb-1">Ndagano Thierry</h3>
+                <p className="text-indigo-600 font-semibold mb-3">Leadership</p>
+                <p className="text-slate-600 text-sm">Visionary leader driving the strategic direction and mission of Fixnest CMMS.</p>
+              </div>
+            </motion.div>
+
+            {/* Team Member 2 - Olivier */}
+            <motion.div 
+              whileHover={{ y: -8 }}
+              className="bg-slate-50 rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-shadow"
+            >
+              <div className="h-48 bg-gray-200 relative overflow-hidden">
+                <img 
+                  src={OlivierImage} 
+                  alt="Byishimo Olivier" 
+                  className="w-full h-full object-cover object-top hover:scale-110 transition-transform duration-300"
+                />
+              </div>
+              <div className="p-6 text-center">
+                <h3 className="text-2xl font-bold text-slate-900 mb-1">Byishimo Olivier</h3>
+                <p className="text-purple-600 font-semibold mb-3">Software Developer</p>
+                <p className="text-slate-600 text-sm">Expert software engineer building the robust technical foundation of Fixnest.</p>
+              </div>
+            </motion.div>
+
+            {/* Team Member 3 */}
+            <motion.div 
+              whileHover={{ y: -8 }}
+              className="bg-slate-50 rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-shadow"
+            >
+              <div className="h-48 bg-gradient-to-br from-pink-400 to-pink-600 flex items-center justify-center">
+                <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center text-2xl font-bold text-pink-600">
+                  BS
+                </div>
+              </div>
+              <div className="p-6 text-center">
+                <h3 className="text-2xl font-bold text-slate-900 mb-1">BYARUHANGA SHEMA</h3>
+                <p className="text-pink-600 font-semibold mb-3">Social Media Manager</p>
+                <p className="text-slate-600 text-sm">Building our online presence and connecting with the Fixnest community globally.</p>
+              </div>
+            </motion.div>
+
+            {/* Team Member 4 */}
+            <motion.div 
+              whileHover={{ y: -8 }}
+              className="bg-slate-50 rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-shadow"
+            >
+              <div className="h-48 bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center">
+                <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center text-2xl font-bold text-green-600">
+                  RK
+                </div>
+              </div>
+              <div className="p-6 text-center">
+                <h3 className="text-2xl font-bold text-slate-900 mb-1">Ruzibiza Kellia</h3>
+                <p className="text-green-600 font-semibold mb-3">Developer</p>
+                <p className="text-slate-600 text-sm">Talented developer contributing to the innovation and scalability of our platform.</p>
+              </div>
+            </motion.div>
+
+            {/* Team Member 5 */}
+            <motion.div 
+              whileHover={{ y: -8 }}
+              className="bg-slate-50 rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-shadow"
+            >
+              <div className="h-48 bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center">
+                <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center text-2xl font-bold text-amber-600">
+                  HK
+                </div>
+              </div>
+              <div className="p-6 text-center">
+                <h3 className="text-2xl font-bold text-slate-900 mb-1">Hannah Kamanzi</h3>
+                <p className="text-amber-600 font-semibold mb-3">Partnership Manager</p>
+                <p className="text-slate-600 text-sm">Building strategic partnerships to expand Fixnest's reach and impact globally.</p>
+              </div>
+            </motion.div>
+          </div>
+
+          <div className="mt-16 text-center p-8 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-2xl border border-indigo-200">
+            <h3 className="text-2xl font-bold text-slate-900 mb-2">Join Our Growing Team</h3>
+            <p className="text-slate-600 mb-6">We're always looking for talented individuals passionate about revolutionizing maintenance management.</p>
+            <a href="/careers" className="inline-block px-8 py-3 bg-indigo-600 text-white rounded-full font-bold hover:bg-indigo-700 transition-colors">
+              View Open Positions
+            </a>
           </div>
         </div>
       </section>

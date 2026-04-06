@@ -406,8 +406,8 @@ const SubscriptionPlan = ({ userId }) => {
                       {price !== null ? (
                         <div className="mt-4 mb-6">
                           <div className="flex items-baseline gap-1">
-                            <span className="text-3xl font-bold text-gray-900">{currencySymbols[currency] || '$'}{price.toFixed(2)}</span>
-                            <span className="text-gray-600 text-sm">/{billingCycle === 'monthly' ? 'month' : 'year'}</span>
+                            <span className="text-3xl font-bold text-gray-900">{currencySymbols[currency] || '$'}{Math.round(price)}</span>
+                            <span className="text-gray-600 text-sm">/{billingCycle === 'monthly' ? 'monthly' : 'yearly'}</span>
                           </div>
                           {billingCycle === 'yearly' && (
                             <p className="text-green-600 text-xs mt-1">Billed annually • {(price / 12).toFixed(0)} RWF/month</p>

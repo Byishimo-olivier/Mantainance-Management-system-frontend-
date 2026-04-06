@@ -98,6 +98,21 @@ export default function AuthHeader() {
     };
   }, [isSearchOpen]);
 
+  const handleTeamClick = () => {
+    if (location.pathname === '/') {
+      // Already on landing page, scroll to team section
+      setTimeout(() => {
+        const teamSection = document.querySelector('[data-section="team"]');
+        if (teamSection) {
+          teamSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 100);
+    } else {
+      // Navigate to landing page, then scroll
+      navigate('/', { state: { scrollToTeam: true } });
+    }
+  };
+
   return (
     <header className="auth-site-header">
       <div className="auth-nav">
@@ -310,6 +325,7 @@ export default function AuthHeader() {
             </div>
           </details>
 
+          <button type="button" className="nav-link" onClick={handleTeamClick} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 'inherit', color: 'inherit', textDecoration: 'inherit' }}>Team</button>
           <Link to="/pricing" className="nav-link">Pricing</Link>
         </nav>
 
