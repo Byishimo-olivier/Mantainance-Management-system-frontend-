@@ -6933,6 +6933,18 @@ function ClientDashboard() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
+  // Dashboard Card Management
+  const [visibleDashboardCards, setVisibleDashboardCards] = useState({
+    workOrders: true,
+    notepad: true,
+    mentions: true,
+    chart: true,
+    recentIssues: true,
+    tasks: true
+  });
+  const [dashboardCardOrder, setDashboardCardOrder] = useState(['tasks', 'workOrders', 'notepad', 'mentions', 'chart', 'recentIssues']);
+  const [draggingCard, setDraggingCard] = useState(null);
+
   // Handle query parameter to set active tab
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -13861,6 +13873,60 @@ function ClientDashboard() {
     }
   }, [fetchMaterialRequests]);
 
+  // Dashboard Card Management Functions
+  const toggleCardVisibility = useCallback((cardId) => {
+    setVisibleDashboardCards(prev => ({
+      ...prev,
+      [cardId]: !prev[cardId]
+    }));
+  }, []);
+
+  const moveCard = useCallback((fromIndex, toIndex) => {
+    const newOrder = [...dashboardCardOrder];
+    const [removed] = newOrder.splice(fromIndex, 1);
+    newOrder.splice(toIndex, 0, removed);
+    setDashboardCardOrder(newOrder);
+  }, [dashboardCardOrder]);
+
+  const DashboardCardWrapper = ({ cardId, children, title, onRemove }) => {
+    const index = dashboardCardOrder.indexOf(cardId);
+    const isVisible = visibleDashboardCards[cardId];
+
+    if (!isVisible) return null;
+
+    return (
+      <div 
+        draggable
+        onDragStart={() => setDraggingCard(index)}
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={() => {
+          if (draggingCard !== null && draggingCard !== index) {
+            moveCard(draggingCard, index);
+            setDraggingCard(null);
+          }
+        }}
+        className="group relative"
+      >
+        <div className="absolute -top-2 -right-2 z-10 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button
+            onClick={() => toggleCardVisibility(cardId)}
+            className="p-1.5 rounded-lg bg-red-500 text-white hover:bg-red-600 shadow-lg"
+            title="Remove card"
+          >
+            <X className="w-4 h-4" />
+          </button>
+          <button
+            className="p-1.5 rounded-lg bg-blue-500 text-white hover:bg-blue-600 shadow-lg cursor-grab active:cursor-grabbing"
+            title="Drag to reorder"
+          >
+            <GripVertical className="w-4 h-4" />
+          </button>
+        </div>
+        {children}
+      </div>
+    );
+  };
+
   const handleNewRequest = () => {
     setShowWorkOrderModal(true);
   };
@@ -17856,6 +17922,7 @@ function ClientDashboard() {
               )}
 
               <div className="responsive-grid-2 mb-6">
+                <DashboardCardWrapper cardId="workOrders" title="My Work Orders">
                 <div className="glass-surface rounded-2xl border border-gray-200/70 p-6 shadow-xl">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
                     <div>
@@ -17907,6 +17974,9 @@ function ClientDashboard() {
                     )}
                   </div>
                 </div>
+                </DashboardCardWrapper>
+
+                <DashboardCardWrapper cardId="notepad" title="Private Notepad">
 
                 <div className="glass-surface rounded-2xl border border-gray-200/70 p-6 shadow-xl">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
@@ -18013,7 +18083,9 @@ function ClientDashboard() {
                     style={{ width: '100%', minHeight: 220, borderRadius: 16, border: '1px solid #E5E7EB', background: 'rgba(255,255,255,0.72)', padding: 16, fontSize: 14, color: '#374151', outline: 'none' }}
                   />
                 </div>
+                </DashboardCardWrapper>
 
+                <DashboardCardWrapper cardId="mentions" title="Comments Mentioning Me">
                 <div className="glass-surface rounded-2xl border border-gray-200/70 p-6 shadow-xl">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
                     <div>
@@ -18049,6 +18121,7 @@ function ClientDashboard() {
                     )}
                   </div>
                 </div>
+                </DashboardCardWrapper>
               </div>
 
               {/* Charts + Quick Actions */}
@@ -20695,6 +20768,9 @@ function ClientDashboard() {
             </div>
           )}
 
+
+          {/* Tasks Tab */}
+          {activeTab === 'tasks' && <TaskDashboard />}
           {/* â”€â”€ Properties â”€â”€ */}
           {activeTab === 'properties' && (
             <div className="-m-6 bg-[#f8fafc]">

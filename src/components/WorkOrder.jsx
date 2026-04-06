@@ -64,7 +64,7 @@ export function WorkOrderForm({
       if (isVisible('images') && imageFile) fd.append('photo', imageFile);
       if (isVisible('files') && attachFile) fd.append('file', attachFile);
 
-      await api.post('/api/issues', fd, {
+      const response = await api.post('/api/issues', fd, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
@@ -78,8 +78,9 @@ export function WorkOrderForm({
       setAttachFile(null);
       onSubmitted?.();
     } catch (err) {
-      console.error(err);
-      alert('Submit failed');
+      console.error('Work order creation error:', err);
+      const errorMessage = err.response?.data?.error || err.message || 'Submit failed';
+      alert(`Error: ${errorMessage}`);
     } finally {
       setSubmitting(false);
     }
@@ -173,7 +174,7 @@ export function WorkOrderForm({
         <button
           type="submit"
           disabled={submitting || (isVisible('title') && isRequired('title') && !form.title.trim())}
-          className="rounded-md bg-gray-100 px-7 py-3 text-[15px] font-semibold text-gray-400 disabled:cursor-not-allowed"
+          className="rounded-md bg-blue-600 px-7 py-3 text-[15px] font-semibold text-white hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
         >
           {submitting ? 'Submitting...' : submitLabel}
         </button>
