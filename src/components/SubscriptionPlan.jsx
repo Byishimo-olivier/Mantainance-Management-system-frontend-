@@ -34,6 +34,15 @@ const SubscriptionPlan = ({ userId }) => {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
   const [currency, setCurrency] = useState('USD');
+  const [paymentModal, setPaymentModal] = useState({
+    open: false,
+    subscriptionId: '',
+    planId: '',
+    paymentMethod: 'card',
+    provider: 'mtn',
+    phoneNumber: '',
+    amount: 0,
+  });
 
   const currencySymbols = {
     'USD': '$',
@@ -55,18 +64,22 @@ const SubscriptionPlan = ({ userId }) => {
       id: 'premium',
       name: 'Premium',
       description: 'Growing teams ready to move from reactive to preventive maintenance',
+      badge: 'Custom Quote',
+      customPricingLabel: 'Custom Pricing',
       features: [
-        'Dashboard',
-        'Advanced Reporting',
-        'Priority Support',
-        'Basic API Access',
-        'Company Branding',
+        'FixNestStudio',
+        'PM scheduling',
+        'Custom checklists',
+        'Parts & inventory with costing',
+        'Time & labor tracking',
+        '30-day analytics history',
       ],
     },
     {
       id: 'professional',
       name: 'Professional',
       description: 'Departments managing multiple asset types with field mobility',
+      badge: 'Most Popular',
       features: [
         'All Premium Features',
         'Full API Access',
@@ -217,6 +230,133 @@ const SubscriptionPlan = ({ userId }) => {
     }
   };
 
+  const openPaymentModal = (planId, options = {}) => {
+    const {
+      allowCurrentPlan = false,
+      subscriptionId: existingSubscriptionId = '',
+      paymentMethod = 'card',
+      provider = 'mtn',
+      phoneNumber = '',
+    } = options;
+
+    if (!allowCurrentPlan && subscription && planId === subscription.plan) {
+      alert('You are already on this plan');
+      return;
+    }
+
+    if (planId === 'premium') {
+      alert('Premium uses custom pricing. Please request a quotation from the sales team.');
+      return;
+    }
+
+    const amount = getPrice(planId);
+    if (!amount) {
+      setError(`Could not determine price for ${planId}. Please try again in a moment.`);
+      return;
+    }
+
+    const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+    setPaymentModal({
+      open: true,
+      subscriptionId: existingSubscriptionId || subscription?.id || subscription?._id || '',
+      planId,
+      paymentMethod,
+      provider,
+      phoneNumber: phoneNumber || storedUser?.phone || storedUser?.phoneNumber || '',
+      amount,
+    });
+  };
+
+  const closePaymentModal = () => {
+    setPaymentModal((prev) => ({ ...prev, open: false }));
+  };
+
+  const handlePaymentContinue = async () => {
+    const { subscriptionId: existingSubscriptionId, planId, paymentMethod, provider, phoneNumber, amount } = paymentModal;
+    const trimmedPhone = String(phoneNumber || '').trim();
+
+    if (paymentMethod === 'mobile_money' && !trimmedPhone) {
+      setError('Phone number is required for mobile money payments.');
+      return;
+    }
+    if (paymentMethod === 'mobile_money' && String(currency || '').toUpperCase() !== 'RWF') {
+      setError('MTN Rwanda mobile money supports RWF only. Switch the subscription currency to RWF or use card payment.');
+      return;
+    }
+
+    setUpgrading(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+      const userEmail = storedUser?.email || '';
+      const isUpgrade = !!subscription && !existingSubscriptionId;
+      let subData;
+      let subId = existingSubscriptionId;
+
+      if (subId) {
+        subData = { id: subId, email: subscription?.email || userEmail };
+      } else if (isUpgrade) {
+        const resp = await subscriptionAPI.upgradeSubscription(subscription.id, planId);
+        subData = resp.data || resp;
+      } else {
+        const resp = await subscriptionAPI.createSubscription(
+          userId,
+          userEmail,
+          planId,
+          billingCycle,
+          paymentMethod
+        );
+        subData = resp.data || resp;
+      }
+
+      if (subData && (subData.id || subData._id || subId) && amount) {
+        subId = subId || subData.id || subData._id;
+
+        setSuccess(`${isUpgrade ? 'Upgrade' : 'Subscription'} created successfully! Please complete the payment...`);
+        closePaymentModal();
+
+        if (paymentMethod === 'mobile_money') {
+          await subscriptionAPI.initiateMobileMoneyPayment(
+            subId,
+            amount,
+            provider,
+            trimmedPhone,
+            currency,
+            subData.email || userEmail || '',
+            storedUser?.id || storedUser?._id || null
+          );
+          setTimeout(() => {
+            navigate(`/payment-confirmation?status=pending&method=mobile_money&provider=${provider}&subscriptionId=${subId}`);
+          }, 300);
+          return;
+        }
+
+        const paymentResponse = await subscriptionAPI.initiatePesaPalPayment(
+          subId,
+          amount,
+          null,
+          subData.email || userEmail || ''
+        );
+        const redirectUrl = paymentResponse?.redirectUrl || paymentResponse?.data?.redirectUrl;
+        if (redirectUrl) {
+          window.location.href = redirectUrl;
+          return;
+        }
+
+        setError('Failed to start the payment. Please try again.');
+        return;
+      }
+
+      setError('Failed to prepare the payment. Please try again.');
+    } catch (err) {
+      setError(err.error || err.message || 'Failed to process subscription');
+    } finally {
+      setUpgrading(false);
+    }
+  };
+
   const getPrice = (planId) => {
     if (!pricing) return null;
     return pricing[planId]?.[billingCycle];
@@ -299,9 +439,13 @@ const SubscriptionPlan = ({ userId }) => {
                   <h3 className="font-semibold text-blue-900">Current Subscription</h3>
                   <button
                     onClick={() => {
-                      const cycle = subscription.billingCycle || billingCycle;
-                      const amount = pricing?.[subscription.plan]?.[cycle];
-                      navigate(`/payment-selection?subscriptionId=${subscription.id || subscription._id}&plan=${subscription.plan}&cycle=${cycle}&amount=${amount}&currency=${currency}&email=${subscription.email || ''}`);
+                      openPaymentModal(subscription.plan, {
+                        allowCurrentPlan: true,
+                        subscriptionId: subscription.id || subscription._id || '',
+                        paymentMethod: subscription.paymentMethod === 'mobile_money' ? 'mobile_money' : 'card',
+                        provider: subscription.metadata?.provider || 'mtn',
+                        phoneNumber: subscription.metadata?.phoneNumber || subscription.phoneNumber || '',
+                      });
                     }}
                     className="text-sm bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-all"
                   >
@@ -346,7 +490,13 @@ const SubscriptionPlan = ({ userId }) => {
                         </div>
                       </div>
                     <button
-                      onClick={() => handlePayNow()}
+                      onClick={() => openPaymentModal(subscription.plan, {
+                        allowCurrentPlan: true,
+                        subscriptionId: subscription.id || subscription._id || '',
+                        paymentMethod: subscription.paymentMethod === 'mobile_money' ? 'mobile_money' : 'card',
+                        provider: subscription.metadata?.provider || 'mtn',
+                        phoneNumber: subscription.metadata?.phoneNumber || subscription.phoneNumber || '',
+                      })}
                       disabled={upgrading}
                       className="bg-yellow-600 hover:bg-yellow-700 text-white px-6 py-2 rounded-lg text-sm font-bold transition-all shadow-sm active:scale-95 disabled:opacity-50"
                     >
@@ -387,28 +537,46 @@ const SubscriptionPlan = ({ userId }) => {
               {plans.map((plan) => {
                 const price = getPrice(plan.id);
                 const isCurrentPlan = currentPlan === plan.id;
+                const isCustomQuotePlan = plan.id === 'premium';
+                const isPopularPlan = plan.id === 'professional';
 
                 return (
                   <div
                     key={plan.id}
                     className={`rounded-lg border transition-all ${
-                      isCurrentPlan
-                        ? 'border-blue-600 ring-2 ring-blue-200 bg-blue-50'
-                        : 'border-gray-200 bg-white hover:shadow-md'
+                      isCustomQuotePlan
+                        ? 'border-purple-400 bg-purple-50/40 hover:shadow-md'
+                        : isCurrentPlan
+                          ? 'border-blue-600 ring-2 ring-blue-200 bg-blue-50'
+                          : 'border-gray-200 bg-white hover:shadow-md'
                     }`}
                   >
                     <div className="p-6">
                       {/* Plan Name */}
-                      <h3 className="text-lg font-bold text-gray-900">{plan.name}</h3>
-                      <p className="text-sm text-gray-600 mt-2">{plan.description}</p>
+                      <div className="flex items-start justify-between gap-3">
+                        <h3 className={`text-lg font-bold ${isCustomQuotePlan ? 'text-slate-800' : 'text-gray-900'}`}>{plan.name}</h3>
+                        {plan.badge && (
+                          <span className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${
+                            isCustomQuotePlan ? 'bg-purple-600 text-white' : 'bg-blue-100 text-blue-700'
+                          }`}>
+                            {plan.badge}
+                          </span>
+                        )}
+                      </div>
 
                       {/* Price */}
-                      {price !== null ? (
+                      {isCustomQuotePlan ? (
+                        <div className="mt-4 mb-6">
+                          <div className="text-3xl font-bold text-purple-600">{plan.customPricingLabel}</div>
+                          <p className="mt-4 text-sm leading-7 text-slate-500">{plan.description}.</p>
+                        </div>
+                      ) : price !== null ? (
                         <div className="mt-4 mb-6">
                           <div className="flex items-baseline gap-1">
                             <span className="text-3xl font-bold text-gray-900">{currencySymbols[currency] || '$'}{Math.round(price)}</span>
                             <span className="text-gray-600 text-sm">/{billingCycle === 'monthly' ? 'monthly' : 'yearly'}</span>
                           </div>
+                          <p className="mt-4 text-sm leading-7 text-slate-500">{plan.description}.</p>
                           {billingCycle === 'yearly' && (
                             <p className="text-green-600 text-xs mt-1">Billed annually • {(price / 12).toFixed(0)} RWF/month</p>
                           )}
@@ -421,20 +589,24 @@ const SubscriptionPlan = ({ userId }) => {
                       <div className="space-y-2 mb-6">
                         {plan.features.map((feature, idx) => (
                           <div key={idx} className="flex items-start gap-2">
-                            <Check className="text-green-600 flex-shrink-0 mt-0.5" size={16} />
-                            <span className="text-sm text-gray-700">{feature}</span>
+                            <div className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-blue-100">
+                              <Check className="text-blue-600" size={14} />
+                            </div>
+                            <span className="text-sm font-medium text-slate-700">{feature}</span>
                           </div>
                         ))}
                       </div>
 
                       {/* Button */}
                       <button
-                        onClick={() => handleUpgrade(plan.id)}
+                        onClick={() => openPaymentModal(plan.id)}
                         disabled={isCurrentPlan || upgrading}
                         className={`w-full py-2 px-4 rounded-lg font-semibold text-sm transition-all flex items-center justify-center gap-2 ${
                           isCurrentPlan
                             ? 'bg-gray-200 text-gray-600 cursor-not-allowed'
-                            : 'bg-blue-600 text-white hover:bg-blue-700 hover:shadow-md active:scale-95'
+                            : isCustomQuotePlan
+                              ? 'bg-gradient-to-r from-purple-600 to-fuchsia-500 text-white hover:from-purple-700 hover:to-fuchsia-600 hover:shadow-md active:scale-95'
+                              : 'bg-blue-600 text-white hover:bg-blue-700 hover:shadow-md active:scale-95'
                         }`}
                       >
                         {upgrading ? (
@@ -444,11 +616,13 @@ const SubscriptionPlan = ({ userId }) => {
                           </>
                         ) : isCurrentPlan ? (
                           'Current Plan'
+                        ) : isCustomQuotePlan ? (
+                          'Request Quotation'
                         ) : subscription === null ? (
-                          'Select Plan'
+                          'Start a Free Trial'
                         ) : (
                           <>
-                            Upgrade
+                            {isPopularPlan ? 'Start a Free Trial' : 'Upgrade'}
                             <ChevronRight size={14} />
                           </>
                         )}
@@ -458,6 +632,134 @@ const SubscriptionPlan = ({ userId }) => {
                 );
               })}
             </div>
+
+            {paymentModal.open && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
+                <div className="w-full max-w-xl rounded-3xl bg-white shadow-2xl">
+                  <div className="flex items-center justify-between border-b border-gray-100 px-6 py-5">
+                    <div>
+                      <h3 className="text-xl font-bold text-gray-900">Choose Payment Method</h3>
+                      <p className="mt-1 text-sm text-gray-500">
+                        Complete payment for the {paymentModal.planId.charAt(0).toUpperCase() + paymentModal.planId.slice(1)} plan
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={closePaymentModal}
+                      className="rounded-full border border-gray-200 px-3 py-1 text-sm font-semibold text-gray-500 hover:bg-gray-50"
+                    >
+                      Close
+                    </button>
+                  </div>
+
+                  <div className="space-y-6 px-6 py-6">
+                    <div className="rounded-2xl border border-blue-100 bg-blue-50 px-5 py-4">
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <div className="text-sm font-semibold text-blue-700">Selected Plan</div>
+                          <div className="mt-1 text-lg font-bold text-slate-900">
+                            {paymentModal.planId.charAt(0).toUpperCase() + paymentModal.planId.slice(1)}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm font-semibold text-blue-700">Amount</div>
+                          <div className="mt-1 text-2xl font-bold text-slate-900">
+                            {(currencySymbols[currency] || '$')}{Math.round(Number(paymentModal.amount || 0))}
+                          </div>
+                          <div className="text-xs text-slate-500">per {billingCycle}</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <button
+                        type="button"
+                        onClick={() => setPaymentModal((prev) => ({ ...prev, paymentMethod: 'card' }))}
+                        className={`rounded-2xl border p-5 text-left transition ${
+                          paymentModal.paymentMethod === 'card'
+                            ? 'border-blue-600 bg-blue-50 shadow-sm'
+                            : 'border-gray-200 bg-white hover:border-blue-200'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <CreditCard className="h-5 w-5 text-blue-600" />
+                          <div className="text-base font-bold text-slate-900">Card Payment</div>
+                        </div>
+                        <p className="mt-3 text-sm leading-6 text-slate-500">
+                          Pay using Visa, Mastercard, or other supported bank cards.
+                        </p>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setPaymentModal((prev) => ({ ...prev, paymentMethod: 'mobile_money' }))}
+                        className={`rounded-2xl border p-5 text-left transition ${
+                          paymentModal.paymentMethod === 'mobile_money'
+                            ? 'border-blue-600 bg-blue-50 shadow-sm'
+                            : 'border-gray-200 bg-white hover:border-blue-200'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <Smartphone className="h-5 w-5 text-blue-600" />
+                          <div className="text-base font-bold text-slate-900">Mobile Money</div>
+                        </div>
+                        <p className="mt-3 text-sm leading-6 text-slate-500">
+                          Pay with MTN, Airtel, M-Pesa, Orange Money, and other supported wallets.
+                        </p>
+                      </button>
+                    </div>
+
+                    {paymentModal.paymentMethod === 'mobile_money' && (
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <label className="block">
+                          <span className="mb-2 block text-sm font-semibold text-slate-700">Provider</span>
+                          <select
+                            value={paymentModal.provider}
+                            onChange={(e) => setPaymentModal((prev) => ({ ...prev, provider: e.target.value }))}
+                            className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm text-slate-900 outline-none focus:border-blue-500"
+                          >
+                            <option value="mtn">MTN Money</option>
+                            <option value="airtel">Airtel Money</option>
+                            <option value="mpesa">M-Pesa</option>
+                            <option value="orange">Orange Money</option>
+                          </select>
+                        </label>
+
+                        <label className="block">
+                          <span className="mb-2 block text-sm font-semibold text-slate-700">Phone Number</span>
+                          <input
+                            type="tel"
+                            value={paymentModal.phoneNumber}
+                            onChange={(e) => setPaymentModal((prev) => ({ ...prev, phoneNumber: e.target.value }))}
+                            placeholder="e.g. 25078xxxxxxx"
+                            className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm text-slate-900 outline-none focus:border-blue-500"
+                          />
+                        </label>
+                      </div>
+                    )}
+
+                    <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
+                      <button
+                        type="button"
+                        onClick={closePaymentModal}
+                        className="rounded-xl border border-gray-300 px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-gray-50"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handlePaymentContinue}
+                        disabled={upgrading}
+                        className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+                      >
+                        {upgrading && <Loader size={16} className="animate-spin" />}
+                        {upgrading ? 'Preparing Payment...' : 'Continue to Payment'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Supported Payment Methods Footer */}
             <div className="mt-12 pt-8 border-t border-gray-200">

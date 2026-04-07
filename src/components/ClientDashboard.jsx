@@ -7,7 +7,6 @@ import { WorkOrderForm } from './WorkOrder';
 import SubscriptionPlan from './SubscriptionPlan';
 import SubscriptionManagement from './SubscriptionManagement';
 import CompanySubscriptionDashboard from './CompanySubscriptionDashboard';
-import ClientDashboardPricing from './ClientDashboardPricing';
 import { useSubscription } from '../hooks/useSubscription';
 import { getImageUrl } from '../utils/imageUrl';
 import { useLanguage, useTranslation } from "../i18n/LanguageContext";
@@ -7335,6 +7334,28 @@ function ClientDashboard() {
   const [manualClientTasks, setManualClientTasks] = useState([]);
   const [newClientTaskTitle, setNewClientTaskTitle] = useState('');
   const [showNewClientTaskComposer, setShowNewClientTaskComposer] = useState(false);
+  const [dashboardTasks, setDashboardTasks] = useState([]);
+  const [activeTaskTab, setActiveTaskTab] = useState('upcoming');
+  const [loadingDashboardTasks, setLoadingDashboardTasks] = useState(false);
+  const [draggedTaskId, setDraggedTaskId] = useState(null);
+  const [showTaskModal, setShowTaskModal] = useState(false);
+  const [taskFormData, setTaskFormData] = useState({
+    title: '',
+    description: '',
+    dueDate: '',
+    priority: 'medium',
+    color: '#3B82F6',
+    collaborators: [],
+    workOrderId: '',
+    workOrderTitle: '',
+    chat: []
+  });
+  const [collaboratorSearchQuery, setCollaboratorSearchQuery] = useState('');
+  const [showCollaboratorDropdown, setShowCollaboratorDropdown] = useState(false);
+  const [selectedTaskDetail, setSelectedTaskDetail] = useState(null);
+  const [showTaskDetailModal, setShowTaskDetailModal] = useState(false);
+  const [editingTaskData, setEditingTaskData] = useState(null);
+  const [taskDetailChatInput, setTaskDetailChatInput] = useState('');
   const [mentionNotifications, setMentionNotifications] = useState([]);
   const [noteReady, setNoteReady] = useState(false);
   const [branches, setBranches] = useState([]);
@@ -7442,6 +7463,35 @@ function ClientDashboard() {
   });
   const [directMessageThreads, setDirectMessageThreads] = useState({});
   const [directMessageNotifications, setDirectMessageNotifications] = useState([]);
+
+  // Fetch tasks from API
+  useEffect(() => {
+    const fetchDashboardTasks = async () => {
+      try {
+        setLoadingDashboardTasks(true);
+        const token = localStorage.getItem('token');
+        if (!token) {
+          console.warn('No token available for fetching tasks');
+          return;
+        }
+        const response = await api.get('/api/tasks', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setDashboardTasks(Array.isArray(response.data) ? response.data : []);
+      } catch (err) {
+        console.error('Failed to fetch dashboard tasks:', err);
+      } finally {
+        setLoadingDashboardTasks(false);
+      }
+    };
+
+    const timer = setTimeout(() => {
+      fetchDashboardTasks();
+    }, 500); // Delay to ensure auth is ready
+
+    return () => clearTimeout(timer);
+  }, []);
+
   useEffect(() => {
     if (!showSelectedScheduleMenu) return undefined;
     const handlePointerDown = (event) => {
@@ -13888,6 +13938,244 @@ function ClientDashboard() {
     setDashboardCardOrder(newOrder);
   }, [dashboardCardOrder]);
 
+  const moveTask = useCallback((fromIndex, toIndex) => {
+    const tasksInTab = dashboardTasks.filter(task => task.status === activeTaskTab);
+    if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0) return;
+    
+    const newTasks = [...dashboardTasks];
+    const tabTasks = newTasks.filter(task => task.status === activeTaskTab);
+    const [movedTask] = tabTasks.splice(fromIndex, 1);
+    tabTasks.splice(toIndex, 0, movedTask);
+    
+    // Reconstruct the full tasks array with reordered items
+    let tabIndex = 0;
+    const result = newTasks.map(task => 
+      task.status === activeTaskTab ? tabTasks[tabIndex++] : task
+    );
+    setDashboardTasks(result);
+  }, [dashboardTasks, activeTaskTab]);
+
+  const getTaskIdentity = useCallback((task) => String(task?._id || task?.id || ''), []);
+
+  const buildLinkedWorkOrderChecklistItem = useCallback((task) => ({
+    id: getTaskIdentity(task),
+    linkedTaskId: getTaskIdentity(task),
+    title: task?.title || '',
+    text: task?.title || '',
+    description: task?.description || '',
+    completed: String(task?.status || '').toLowerCase() === 'completed',
+    status: task?.status || 'upcoming',
+    priority: task?.priority || 'medium',
+    dueDate: task?.dueDate || null,
+    color: task?.color || '#3B82F6',
+    source: 'task'
+  }), [getTaskIdentity]);
+
+  const syncTaskIntoLocalWorkOrder = useCallback((task, previousWorkOrderId = '') => {
+    const taskId = getTaskIdentity(task);
+    const nextWorkOrderId = String(task?.workOrderId || '').trim();
+    const priorWorkOrderId = String(previousWorkOrderId || '').trim();
+
+    const applyIssueTaskChange = (issue) => {
+      const issueId = String(issue?._id || issue?.id || '');
+      let nextChecklist = Array.isArray(issue?.checklist) ? [...issue.checklist] : [];
+
+      if (priorWorkOrderId && issueId === priorWorkOrderId && priorWorkOrderId !== nextWorkOrderId) {
+        nextChecklist = nextChecklist.filter((entry) => String(entry?.linkedTaskId || entry?.id || '') !== taskId);
+      }
+
+      if (nextWorkOrderId && issueId === nextWorkOrderId) {
+        const nextEntry = buildLinkedWorkOrderChecklistItem(task);
+        nextChecklist = nextChecklist.some((entry) => String(entry?.linkedTaskId || entry?.id || '') === taskId)
+          ? nextChecklist.map((entry) => String(entry?.linkedTaskId || entry?.id || '') === taskId ? { ...entry, ...nextEntry } : entry)
+          : [...nextChecklist, nextEntry];
+      }
+
+      return { ...issue, checklist: nextChecklist };
+    };
+
+    setAllIssues((prev) => prev.map((issue) => applyIssueTaskChange(issue)));
+    setModalData((prev) => {
+      if (!prev?.item) return prev;
+      return { ...prev, item: applyIssueTaskChange(prev.item) };
+    });
+  }, [buildLinkedWorkOrderChecklistItem, getTaskIdentity]);
+
+  const removeTaskFromLocalWorkOrder = useCallback((taskId, workOrderId) => {
+    const normalizedTaskId = String(taskId || '').trim();
+    const normalizedWorkOrderId = String(workOrderId || '').trim();
+    if (!normalizedTaskId || !normalizedWorkOrderId) return;
+
+    const removeFromIssue = (issue) => {
+      const issueId = String(issue?._id || issue?.id || '');
+      if (issueId !== normalizedWorkOrderId) return issue;
+      return {
+        ...issue,
+        checklist: (Array.isArray(issue?.checklist) ? issue.checklist : []).filter(
+          (entry) => String(entry?.linkedTaskId || entry?.id || '') !== normalizedTaskId
+        )
+      };
+    };
+
+    setAllIssues((prev) => prev.map((issue) => removeFromIssue(issue)));
+    setModalData((prev) => {
+      if (!prev?.item) return prev;
+      return { ...prev, item: removeFromIssue(prev.item) };
+    });
+  }, []);
+
+  const createNewTask = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.warn('No token available');
+        return;
+      }
+
+      const payload = {
+        ...taskFormData,
+        userId: currentUser?.id || currentUser?._id,
+        companyName: currentUser?.companyName,
+        status: 'upcoming'
+      };
+
+      const response = await api.post('/api/tasks', payload, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      setDashboardTasks((prev) => [...prev, response.data]);
+      syncTaskIntoLocalWorkOrder(response.data);
+      setTaskFormData({
+        title: '',
+        description: '',
+        dueDate: '',
+        priority: 'medium',
+        color: '#3B82F6',
+        collaborators: [],
+        workOrderId: '',
+        workOrderTitle: '',
+        chat: []
+      });
+      setShowTaskModal(false);
+      setCollaboratorSearchQuery('');
+      setShowCollaboratorDropdown(false);
+    } catch (err) {
+      console.error('Failed to create task:', err);
+    }
+  };
+
+  const deleteTask = async (taskId) => {
+    if (!window.confirm('Are you sure you want to delete this task?')) return;
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+      const taskToDelete = dashboardTasks.find((task) => getTaskIdentity(task) === String(taskId));
+      
+      await api.delete(`/api/tasks/${taskId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      setDashboardTasks((prev) => prev.filter((task) => getTaskIdentity(task) !== String(taskId)));
+      removeTaskFromLocalWorkOrder(taskId, taskToDelete?.workOrderId);
+    } catch (err) {
+      console.error('Failed to delete task:', err);
+    }
+  };
+
+  const updateTaskStatus = async (taskId, newStatus) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+
+      const response = await api.patch(`/api/tasks/${taskId}/status`, { status: newStatus }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      setDashboardTasks((prev) => prev.map((task) =>
+        getTaskIdentity(task) === String(taskId) ? response.data : task
+      ));
+      syncTaskIntoLocalWorkOrder(response.data, selectedTaskDetail?.workOrderId);
+
+      if (selectedTaskDetail && getTaskIdentity(selectedTaskDetail) === String(taskId)) {
+        setSelectedTaskDetail(response.data);
+        setEditingTaskData(response.data);
+      }
+    } catch (err) {
+      console.error('Failed to update task status:', err);
+    }
+  };
+
+  const openTaskDetail = (task) => {
+    setSelectedTaskDetail(task);
+    setEditingTaskData({
+      ...task,
+      collaborators: Array.isArray(task?.collaborators) ? [...task.collaborators] : [],
+      chat: Array.isArray(task?.chat) ? [...task.chat] : []
+    });
+    setTaskDetailChatInput('');
+    setShowTaskDetailModal(true);
+  };
+
+  const saveTaskDetails = async () => {
+    if (!selectedTaskDetail) return;
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+      const previousWorkOrderId = selectedTaskDetail?.workOrderId || '';
+
+      const response = await api.put(`/api/tasks/${selectedTaskDetail._id || selectedTaskDetail.id}`, editingTaskData, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      setDashboardTasks((prev) => prev.map((task) =>
+        getTaskIdentity(task) === getTaskIdentity(response.data) ? response.data : task
+      ));
+      syncTaskIntoLocalWorkOrder(response.data, previousWorkOrderId);
+
+      setSelectedTaskDetail(response.data);
+      setEditingTaskData(response.data);
+      setShowTaskDetailModal(false);
+    } catch (err) {
+      console.error('Failed to save task details:', err);
+    }
+  };
+
+  const sendTaskDetailMessage = async () => {
+    if (!selectedTaskDetail || !editingTaskData) return;
+    const messageText = String(taskDetailChatInput || '').trim();
+    if (!messageText) return;
+
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    const newMessage = {
+      sender: userName || currentUser?.name || 'User',
+      text: messageText,
+      timestamp: new Date().toISOString(),
+      role: String(currentUser?.role || 'client').toLowerCase()
+    };
+
+    const nextTaskPayload = {
+      ...editingTaskData,
+      chat: [...(Array.isArray(editingTaskData.chat) ? editingTaskData.chat : []), newMessage]
+    };
+
+    try {
+      const response = await api.put(`/api/tasks/${selectedTaskDetail._id || selectedTaskDetail.id}`, nextTaskPayload, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      setDashboardTasks((prev) => prev.map((task) =>
+        getTaskIdentity(task) === getTaskIdentity(response.data) ? response.data : task
+      ));
+      setSelectedTaskDetail(response.data);
+      setEditingTaskData(response.data);
+      setTaskDetailChatInput('');
+    } catch (err) {
+      console.error('Failed to send task message:', err);
+    }
+  };
+
   const DashboardCardWrapper = ({ cardId, children, title, onRemove }) => {
     const index = dashboardCardOrder.indexOf(cardId);
     const isVisible = visibleDashboardCards[cardId];
@@ -17982,93 +18270,315 @@ function ClientDashboard() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
                     <div>
                       <div style={{ fontSize: 20, fontWeight: 800, color: '#111827' }}>My Tasks</div>
-                      <div style={{ fontSize: 13, color: '#6B7280', marginTop: 4 }}>Checklist and task items across your requests and work orders.</div>
+                      <div style={{ fontSize: 13, color: '#6B7280', marginTop: 4 }}>Upcoming, overdue, and completed tasks.</div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <button
-                        type="button"
-                        onClick={addManualClientTask}
-                        style={{ border: '1px solid #D1D5DB', background: 'white', color: '#374151', borderRadius: 10, padding: '8px 12px', fontSize: 12, fontWeight: 700 }}
-                      >
-                        {showNewClientTaskComposer ? 'Save Task' : 'Add Task'}
-                      </button>
-                      {showNewClientTaskComposer && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setShowNewClientTaskComposer(false);
-                            setNewClientTaskTitle('');
-                          }}
-                          style={{ border: 'none', background: 'transparent', color: '#6B7280', fontSize: 12, fontWeight: 700 }}
-                        >
-                          Cancel
-                        </button>
-                      )}
-                      <span style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', padding: '6px 10px', borderRadius: 999, background: '#FEF3C7', color: '#92400E' }}>
-                        {combinedClientTasks.filter((task) => !task.completed).length} Active
-                      </span>
-                    </div>
+                    <button
+                      onClick={() => setShowTaskModal(true)}
+                      style={{
+                        border: '1px solid #3B82F6',
+                        background: '#3B82F6',
+                        color: 'white',
+                        borderRadius: 8,
+                        padding: '8px 12px',
+                        fontSize: 12,
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.background = '#2563EB';
+                        e.target.style.borderColor = '#2563EB';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.background = '#3B82F6';
+                        e.target.style.borderColor = '#3B82F6';
+                      }}
+                    >
+                      + Add Task
+                    </button>
                   </div>
-                  {showNewClientTaskComposer && (
-                    <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
-                      <input
-                        value={newClientTaskTitle}
-                        onChange={(e) => setNewClientTaskTitle(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key !== 'Enter') return;
-                          e.preventDefault();
-                          addManualClientTask();
-                        }}
-                        placeholder="Add a personal task..."
-                        autoFocus
-                        style={{ flex: 1, borderRadius: 12, border: '1px solid #D1D5DB', background: 'white', padding: '12px 14px', fontSize: 14, color: '#111827', outline: 'none' }}
-                      />
+
+                  {/* Task Tabs */}
+                  <div style={{ display: 'flex', gap: 24, marginBottom: 16, borderBottom: '1px solid #E5E7EB', paddingBottom: 12 }}>
+                    {['upcoming', 'in-progress', 'overdue', 'completed'].map(tab => {
+                      const filteredTasks = dashboardTasks.filter(task => task.status === tab);
+                      const count = filteredTasks.length;
+                      return (
+                        <button
+                          key={tab}
+                          onClick={() => setActiveTaskTab(tab)}
+                          style={{
+                            fontSize: 14,
+                            fontWeight: 700,
+                            color: activeTaskTab === tab ? '#3B82F6' : '#6B7280',
+                            borderBottom: activeTaskTab === tab ? '2px solid #3B82F6' : 'none',
+                            cursor: 'pointer',
+                            textTransform: 'capitalize',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 8,
+                            marginBottom: -12,
+                            paddingBottom: 16
+                          }}
+                        >
+                          {tab}
+                          {tab === 'overdue' && count > 0 && (
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              minWidth: 20,
+                              height: 20,
+                              borderRadius: '50%',
+                              background: '#EF4444',
+                              color: 'white',
+                              fontSize: 11,
+                              fontWeight: 800
+                            }}>
+                              {count}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Task Cards */}
+                  {loadingDashboardTasks ? (
+                    <div style={{ textAlign: 'center', padding: '28px 16px', color: '#6B7280', fontSize: 14 }}>
+                      Loading tasks...
                     </div>
-                  )}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    {combinedClientTasks.slice(0, 8).map((task) => (
-                      <div key={task.id} style={{ border: '1px solid #E5E7EB', background: 'rgba(255,255,255,0.7)', borderRadius: 14, padding: '12px 14px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-                          <div style={{ minWidth: 0, display: 'flex', gap: 10, alignItems: 'flex-start', flex: 1 }}>
-                            <input
-                              type="checkbox"
-                              checked={!!task.completed}
-                              onChange={() => {
-                                if (!String(task.id || '').startsWith('manual-task-')) return;
-                                setManualClientTasks((prev) => prev.map((entry) => (
-                                  entry.id === task.id ? { ...entry, completed: !entry.completed } : entry
-                                )));
-                              }}
-                              style={{ marginTop: 3, width: 16, height: 16 }}
-                            />
-                            <div style={{ minWidth: 0, flex: 1 }}>
-                              <div style={{ fontSize: 14, fontWeight: 700, color: '#111827', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textDecoration: task.completed ? 'line-through' : 'none', opacity: task.completed ? 0.65 : 1 }}>{task.title}</div>
-                              <div style={{ fontSize: 12, color: '#6B7280', marginTop: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.parentTitle}</div>
+                  ) : dashboardTasks.filter(task => task.status === activeTaskTab).length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {dashboardTasks.filter(task => task.status === activeTaskTab).map((task, index) => (
+                        <div
+                          key={task._id || task.id}
+                          draggable
+                          onDragStart={() => setDraggedTaskId(index)}
+                          onDragOver={(e) => e.preventDefault()}
+                          onDrop={() => {
+                            if (draggedTaskId !== null && draggedTaskId !== index) {
+                              moveTask(draggedTaskId, index);
+                              setDraggedTaskId(null);
+                            }
+                          }}
+                          onDragEnd={() => setDraggedTaskId(null)}
+                          style={{
+                            border: '1px solid #E5E7EB',
+                            background: draggedTaskId === index ? '#F3F4F6' : 'rgba(255,255,255,0.7)',
+                            borderRadius: 14,
+                            padding: '12px 14px',
+                            borderLeft: `4px solid ${task.color || '#3B82F6'}`,
+                            cursor: 'grab',
+                            opacity: draggedTaskId === index ? 0.6 : 1,
+                            transition: 'all 0.2s ease',
+                            boxShadow: draggedTaskId === index ? '0 4px 12px rgba(0,0,0,0.15)' : 'none'
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
+                            <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', minWidth: 0, flex: 1 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', color: '#D1D5DB', fontSize: 18, fontWeight: 700, cursor: 'grab', marginTop: -2, userSelect: 'none' }}>
+                                ⋮⋮
+                              </div>
+                              <div style={{ minWidth: 0, flex: 1 }}>
+                                <div style={{ fontSize: 14, fontWeight: 700, color: '#111827', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {task.title}
+                                </div>
+                                {task.description && (
+                                  <div style={{ fontSize: 12, color: '#6B7280', marginTop: 4, whiteSpace: 'normal', overflow: 'hidden', maxHeight: '2.4em', textOverflow: 'ellipsis' }}>
+                                    {task.description}
+                                  </div>
+                                )}
+                                {task.dueDate && (
+                                  <div style={{ fontSize: 12, color: '#6B7280', marginTop: 4 }}>
+                                    Due: {new Date(task.dueDate).toLocaleDateString()}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
+                              {task.priority && (
+                                <span style={{
+                                  fontSize: 10,
+                                  fontWeight: 800,
+                                  textTransform: 'uppercase',
+                                  padding: '4px 8px',
+                                  borderRadius: 6,
+                                  background: task.priority === 'high' ? '#FEE2E2' : task.priority === 'medium' ? '#FEF3C7' : '#DBEAFE',
+                                  color: task.priority === 'high' ? '#991B1B' : task.priority === 'medium' ? '#92400E' : '#1D4ED8'
+                                }}>
+                                  {task.priority}
+                                </span>
+                              )}
+                              <span style={{
+                                fontSize: 10,
+                                fontWeight: 800,
+                                textTransform: 'uppercase',
+                                padding: '4px 8px',
+                                borderRadius: 6,
+                                background: task.status === 'completed' ? '#D1FAE5' : task.status === 'overdue' ? '#FEE2E2' : task.status === 'in-progress' ? '#FEF3C7' : '#DBEAFE',
+                                color: task.status === 'completed' ? '#065F46' : task.status === 'overdue' ? '#991B1B' : task.status === 'in-progress' ? '#92400E' : '#1D4ED8'
+                              }}>
+                                {task.status}
+                              </span>
                             </div>
                           </div>
-                          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                            <span style={{ alignSelf: 'flex-start', fontSize: 10, fontWeight: 800, textTransform: 'uppercase', padding: '4px 8px', borderRadius: 999, background: task.completed ? '#D1FAE5' : task.overdue ? '#FEE2E2' : '#DBEAFE', color: task.completed ? '#065F46' : task.overdue ? '#991B1B' : '#1D4ED8' }}>
-                              {task.completed ? 'Completed' : task.overdue ? 'Overdue' : 'Open'}
-                            </span>
-                            {String(task.id || '').startsWith('manual-task-') && (
+                          
+                          {/* Action Buttons */}
+                          <div style={{ display: 'flex', gap: 8, marginTop: 12, paddingTop: 12, borderTop: '1px solid #E5E7EB', flexWrap: 'wrap' }}>
+                            <button
+                              onClick={() => openTaskDetail(task)}
+                              style={{
+                                fontSize: 11,
+                                fontWeight: 700,
+                                padding: '6px 10px',
+                                borderRadius: 6,
+                                border: '1px solid #D1D5DB',
+                                background: '#F3F4F6',
+                                color: '#374151',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s'
+                              }}
+                              onMouseEnter={(e) => {
+                                e.target.style.background = '#E5E7EB';
+                                e.target.style.borderColor = '#BFDBFE';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.target.style.background = '#F3F4F6';
+                                e.target.style.borderColor = '#D1D5DB';
+                              }}
+                            >
+                              View Details
+                            </button>
+                            
+                            {task.status !== 'in-progress' && (
                               <button
-                                type="button"
-                                onClick={() => setManualClientTasks((prev) => prev.filter((entry) => entry.id !== task.id))}
-                                style={{ border: 'none', background: 'transparent', color: '#9CA3AF', cursor: 'pointer', padding: 0 }}
+                                onClick={() => updateTaskStatus(task._id || task.id, 'in-progress')}
+                                style={{
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  padding: '6px 10px',
+                                  borderRadius: 6,
+                                  border: '1px solid #FBBF24',
+                                  background: '#FEF3C7',
+                                  color: '#92400E',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s'
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.target.style.background = '#FCD34D';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.target.style.background = '#FEF3C7';
+                                }}
                               >
-                                <Trash2 className="h-4 w-4" />
+                                In Progress
                               </button>
                             )}
+                            
+                            {task.status !== 'completed' && (
+                              <button
+                                onClick={() => updateTaskStatus(task._id || task.id, 'completed')}
+                                style={{
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  padding: '6px 10px',
+                                  borderRadius: 6,
+                                  border: '1px solid #10B981',
+                                  background: '#D1FAE5',
+                                  color: '#065F46',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s'
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.target.style.background = '#A7F3D0';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.target.style.background = '#D1FAE5';
+                                }}
+                              >
+                                Complete
+                              </button>
+                            )}
+                            
+                            <button
+                              onClick={() => deleteTask(task._id || task.id)}
+                              style={{
+                                fontSize: 11,
+                                fontWeight: 700,
+                                padding: '6px 10px',
+                                borderRadius: 6,
+                                border: '1px solid #F87171',
+                                background: '#FEE2E2',
+                                color: '#991B1B',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                                marginLeft: 'auto'
+                              }}
+                              onMouseEnter={(e) => {
+                                e.target.style.background = '#FCA5A5';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.target.style.background = '#FEE2E2';
+                              }}
+                            >
+                              Delete
+                            </button>
                           </div>
+                          {task.collaborators && task.collaborators.length > 0 && (
+                            <div style={{ display: 'flex', marginTop: 8, gap: -4 }}>
+                              {task.collaborators.slice(0, 3).map((collab, idx) => (
+                                <div
+                                  key={idx}
+                                  style={{
+                                    width: 24,
+                                    height: 24,
+                                    borderRadius: '50%',
+                                    background: '#3B82F6',
+                                    color: 'white',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: 10,
+                                    fontWeight: 700,
+                                    marginLeft: idx > 0 ? -8 : 0,
+                                    border: '2px solid white',
+                                    title: collab.name
+                                  }}
+                                >
+                                  {collab.name?.charAt(0).toUpperCase() || '?'}
+                                </div>
+                              ))}
+                              {task.collaborators.length > 3 && (
+                                <div
+                                  style={{
+                                    width: 24,
+                                    height: 24,
+                                    borderRadius: '50%',
+                                    background: '#E5E7EB',
+                                    color: '#6B7280',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: 10,
+                                    fontWeight: 700,
+                                    marginLeft: -8,
+                                    border: '2px solid white'
+                                  }}
+                                >
+                                  +{task.collaborators.length - 3}
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    ))}
-                    {combinedClientTasks.length === 0 && (
-                      <div style={{ border: '2px dashed #E5E7EB', borderRadius: 16, padding: '28px 16px', textAlign: 'center', color: '#6B7280', fontSize: 14 }}>
-                        No tasks yet.
-                      </div>
-                    )}
-                  </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ border: '2px dashed #E5E7EB', borderRadius: 16, padding: '28px 16px', textAlign: 'center', color: '#6B7280', fontSize: 14 }}>
+                      No {activeTaskTab} tasks.
+                    </div>
+                  )}
                 </div>
 
                 <div className="glass-surface rounded-2xl border border-gray-200/70 p-6 shadow-xl">
@@ -18123,6 +18633,1039 @@ function ClientDashboard() {
                 </div>
                 </DashboardCardWrapper>
               </div>
+
+              {/* Task Creation Modal - Rendered at Root Level */}
+              {showTaskModal && (
+                <div style={{
+                  position: 'fixed',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  background: 'rgba(0, 0, 0, 0.6)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  zIndex: 9999,
+                  animation: 'fadeIn 0.2s ease-in-out'
+                }}
+                onClick={(e) => {
+                  if (e.target === e.currentTarget) {
+                    setShowCollaboratorDropdown(false);
+                  }
+                }}>
+                  <div style={{
+                    background: 'white',
+                    borderRadius: 16,
+                    padding: '32px 28px',
+                    maxWidth: 520,
+                    width: '95%',
+                    maxHeight: '85vh',
+                    overflow: 'auto',
+                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                    animation: 'slideUp 0.3s ease-out'
+                  }}>
+                    {/* Header */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28 }}>
+                      <h2 style={{ fontSize: 20, fontWeight: 800, color: '#111827', margin: 0 }}>Create New Task</h2>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowTaskModal(false);
+                          setTaskFormData({ title: '', description: '', dueDate: '', priority: 'medium', color: '#3B82F6', collaborators: [], workOrderId: '', workOrderTitle: '', chat: [] });
+                          setCollaboratorSearchQuery('');
+                          setShowCollaboratorDropdown(false);
+                        }}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          fontSize: 28,
+                          cursor: 'pointer',
+                          color: '#9CA3AF',
+                          padding: 0,
+                          width: 32,
+                          height: 32,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                      >
+                        ×
+                      </button>
+                    </div>
+
+                    {/* Form Fields */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                      {/* Title Field */}
+                      <div>
+                        <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 8 }}>
+                          Task Title <span style={{ color: '#EF4444' }}>*</span>
+                        </label>
+                        <input
+                          type="text"
+                          autoFocus
+                          placeholder="What needs to be done?"
+                          value={taskFormData.title || ''}
+                          onChange={(e) => setTaskFormData({ ...taskFormData, title: e.target.value })}
+                          style={{
+                            width: '100%',
+                            border: '1.5px solid #E5E7EB',
+                            borderRadius: 10,
+                            padding: '12px 14px',
+                            fontSize: 14,
+                            fontFamily: 'inherit',
+                            boxSizing: 'border-box',
+                            backgroundColor: '#FAFBFC'
+                          }}
+                          onFocus={(e) => {
+                            e.target.style.borderColor = '#3B82F6';
+                            e.target.style.backgroundColor = '#FFFFFF';
+                          }}
+                          onBlur={(e) => {
+                            e.target.style.borderColor = '#E5E7EB';
+                            e.target.style.backgroundColor = '#FAFBFC';
+                          }}
+                        />
+                      </div>
+
+                      {/* Description Field */}
+                      <div>
+                        <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 8 }}>Description</label>
+                        <textarea
+                          placeholder="Add details about this task..."
+                          value={taskFormData.description || ''}
+                          onChange={(e) => setTaskFormData({ ...taskFormData, description: e.target.value })}
+                          style={{
+                            width: '100%',
+                            border: '1.5px solid #E5E7EB',
+                            borderRadius: 10,
+                            padding: '12px 14px',
+                            fontSize: 14,
+                            fontFamily: 'inherit',
+                            boxSizing: 'border-box',
+                            minHeight: 100,
+                            resize: 'none',
+                            backgroundColor: '#FAFBFC'
+                          }}
+                          onFocus={(e) => {
+                            e.target.style.borderColor = '#3B82F6';
+                            e.target.style.backgroundColor = '#FFFFFF';
+                          }}
+                          onBlur={(e) => {
+                            e.target.style.borderColor = '#E5E7EB';
+                            e.target.style.backgroundColor = '#FAFBFC';
+                          }}
+                        />
+                      </div>
+
+                      {/* Due Date Field */}
+                      <div>
+                        <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 8 }}>Due Date</label>
+                        <input
+                          type="date"
+                          value={taskFormData.dueDate || ''}
+                          onChange={(e) => setTaskFormData({ ...taskFormData, dueDate: e.target.value })}
+                          style={{
+                            width: '100%',
+                            border: '1.5px solid #E5E7EB',
+                            borderRadius: 10,
+                            padding: '12px 14px',
+                            fontSize: 14,
+                            fontFamily: 'inherit',
+                            boxSizing: 'border-box',
+                            backgroundColor: '#FAFBFC'
+                          }}
+                          onFocus={(e) => {
+                            e.target.style.borderColor = '#3B82F6';
+                            e.target.style.backgroundColor = '#FFFFFF';
+                          }}
+                          onBlur={(e) => {
+                            e.target.style.borderColor = '#E5E7EB';
+                            e.target.style.backgroundColor = '#FAFBFC';
+                          }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 8 }}>Linked Work Order</label>
+                        <select
+                          value={taskFormData.workOrderId || ''}
+                          onChange={(e) => {
+                            const selectedWorkOrder = workOrders.find((issue) => String(issue?._id || issue?.id) === String(e.target.value));
+                            setTaskFormData({
+                              ...taskFormData,
+                              workOrderId: e.target.value,
+                              workOrderTitle: selectedWorkOrder?.title || selectedWorkOrder?.name || ''
+                            });
+                          }}
+                          style={{
+                            width: '100%',
+                            border: '1.5px solid #E5E7EB',
+                            borderRadius: 10,
+                            padding: '12px 14px',
+                            fontSize: 14,
+                            fontFamily: 'inherit',
+                            boxSizing: 'border-box',
+                            backgroundColor: '#FAFBFC',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <option value="">Not linked to a work order</option>
+                          {workOrders.map((issue) => {
+                            const issueId = String(issue?._id || issue?.id || '');
+                            return (
+                              <option key={issueId} value={issueId}>
+                                {issue.title || issue.name || 'Work Order'}
+                              </option>
+                            );
+                          })}
+                        </select>
+                        <div style={{ fontSize: 12, color: '#6B7280', marginTop: 6 }}>
+                          When linked, the task will also appear in that work order's task list.
+                        </div>
+                      </div>
+
+                      {/* Priority & Color Row */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                        {/* Priority */}
+                        <div>
+                          <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 8 }}>Priority</label>
+                          <select
+                            value={taskFormData.priority || 'medium'}
+                            onChange={(e) => setTaskFormData({ ...taskFormData, priority: e.target.value })}
+                            style={{
+                              width: '100%',
+                              border: '1.5px solid #E5E7EB',
+                              borderRadius: 10,
+                              padding: '12px 14px',
+                              fontSize: 14,
+                              fontFamily: 'inherit',
+                              boxSizing: 'border-box',
+                              backgroundColor: '#FAFBFC',
+                              cursor: 'pointer'
+                            }}
+                            onFocus={(e) => {
+                              e.target.style.borderColor = '#3B82F6';
+                              e.target.style.backgroundColor = '#FFFFFF';
+                            }}
+                            onBlur={(e) => {
+                              e.target.style.borderColor = '#E5E7EB';
+                              e.target.style.backgroundColor = '#FAFBFC';
+                            }}
+                          >
+                            <option value="low">Low</option>
+                            <option value="medium">Medium</option>
+                            <option value="high">High</option>
+                          </select>
+                        </div>
+
+                        {/* Color Picker */}
+                        <div>
+                          <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 8 }}>Color</label>
+                          <div style={{ display: 'flex', gap: 10, justifyContent: 'space-between' }}>
+                            {['#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#8B5CF6'].map(color => (
+                              <button
+                                key={color}
+                                type="button"
+                                onClick={() => setTaskFormData({ ...taskFormData, color })}
+                                style={{
+                                  width: 44,
+                                  height: 44,
+                                  borderRadius: '50%',
+                                  background: color,
+                                  border: taskFormData.color === color ? '3px solid #1F2937' : '2px solid #D1D5DB',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s',
+                                  flex: 1
+                                }}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Collaborators Section */}
+                      <div>
+                        <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 8 }}>Collaborators</label>
+                        
+                        {/* Display Added Collaborators */}
+                        {(taskFormData.collaborators || []).length > 0 && (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+                            {taskFormData.collaborators.map((collab, idx) => (
+                              <div
+                                key={idx}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 8,
+                                  background: '#F3F4F6',
+                                  borderRadius: 24,
+                                  padding: '6px 10px 6px 4px',
+                                  fontSize: 12,
+                                  fontWeight: 500
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    width: 28,
+                                    height: 28,
+                                    borderRadius: '50%',
+                                    background: collab.color || '#3B82F6',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    color: 'white',
+                                    fontSize: 12,
+                                    fontWeight: 700
+                                  }}
+                                >
+                                  {collab.name?.charAt(0)?.toUpperCase() || '?'}
+                                </div>
+                                <span>{collab.name}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setTaskFormData({
+                                    ...taskFormData,
+                                    collaborators: taskFormData.collaborators.filter((_, i) => i !== idx)
+                                  })}
+                                  style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    color: '#9CA3AF',
+                                    cursor: 'pointer',
+                                    fontSize: 16,
+                                    padding: 0,
+                                    display: 'flex',
+                                    alignItems: 'center'
+                                  }}
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Collaborator Search Input with Dropdown */}
+                        <div style={{ position: 'relative' }}>
+                          <input
+                            type="text"
+                            placeholder="Search and add team members..."
+                            value={collaboratorSearchQuery}
+                            onChange={(e) => {
+                              setCollaboratorSearchQuery(e.target.value);
+                              setShowCollaboratorDropdown(true);
+                            }}
+                            onFocus={() => setShowCollaboratorDropdown(true)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Escape') {
+                                setShowCollaboratorDropdown(false);
+                              }
+                            }}
+                            style={{
+                              width: '100%',
+                              border: '1.5px solid #E5E7EB',
+                              borderRadius: 10,
+                              padding: '12px 14px',
+                              fontSize: 14,
+                              fontFamily: 'inherit',
+                              boxSizing: 'border-box',
+                              backgroundColor: '#FAFBFC'
+                            }}
+                            onMouseEnter={(e) => {
+                              if (collaboratorSearchQuery) setShowCollaboratorDropdown(true);
+                            }}
+                          />
+
+                          {/* Dropdown Results */}
+                          {showCollaboratorDropdown && (
+                            (() => {
+                              // Filter people based on search query, exclude already added collaborators
+                              const filteredPeople = people.filter(person => {
+                                const searchLower = collaboratorSearchQuery.toLowerCase();
+                                const alreadyAdded = taskFormData.collaborators.some(c => c.email === person.email);
+                                return !alreadyAdded && (
+                                  person.name.toLowerCase().includes(searchLower) ||
+                                  person.email?.toLowerCase().includes(searchLower) ||
+                                  (person.jobTitle || '').toLowerCase().includes(searchLower)
+                                );
+                              });
+
+                              return (
+                                <div style={{
+                                  position: 'absolute',
+                                  top: '100%',
+                                  left: 0,
+                                  right: 0,
+                                  background: 'white',
+                                  border: '1px solid #E5E7EB',
+                                  borderRadius: 10,
+                                  marginTop: 8,
+                                  maxHeight: 280,
+                                  overflowY: 'auto',
+                                  zIndex: 10000,
+                                  boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)'
+                                }}>
+                                  {filteredPeople.length > 0 ? (
+                                    filteredPeople.map((person, idx) => (
+                                      <button
+                                        key={idx}
+                                        type="button"
+                                        onClick={() => {
+                                          const newCollab = {
+                                            name: person.name,
+                                            email: person.email,
+                                            color: ['#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#8B5CF6'][Math.floor(Math.random() * 5)],
+                                            jobTitle: person.jobTitle || 'Team Member'
+                                          };
+                                          setTaskFormData({
+                                            ...taskFormData,
+                                            collaborators: [...(taskFormData.collaborators || []), newCollab]
+                                          });
+                                          setCollaboratorSearchQuery('');
+                                          setShowCollaboratorDropdown(false);
+                                        }}
+                                        style={{
+                                          width: '100%',
+                                          padding: '12px 14px',
+                                          border: 'none',
+                                          background: idx % 2 === 0 ? '#FFFFFF' : '#F9FAFB',
+                                          textAlign: 'left',
+                                          cursor: 'pointer',
+                                          transition: 'background 0.2s',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: 12,
+                                          fontSize: 14
+                                        }}
+                                        onMouseEnter={(e) => e.target.style.background = '#F3F4F6'}
+                                        onMouseLeave={(e) => e.target.style.background = idx % 2 === 0 ? '#FFFFFF' : '#F9FAFB'}
+                                      >
+                                        <div
+                                          style={{
+                                            width: 32,
+                                            height: 32,
+                                            borderRadius: '50%',
+                                            background: '#E5E7EB',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            color: '#6B7280',
+                                            fontSize: 13,
+                                            fontWeight: 700,
+                                            flexShrink: 0
+                                          }}
+                                        >
+                                          {person.name?.charAt(0)?.toUpperCase() || '?'}
+                                        </div>
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                          <div style={{ fontWeight: 600, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            {person.name}
+                                          </div>
+                                          <div style={{ fontSize: 12, color: '#9CA3AF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            {person.jobTitle || person.email}
+                                          </div>
+                                        </div>
+                                      </button>
+                                    ))
+                                  ) : collaboratorSearchQuery ? (
+                                    <div style={{ padding: '16px 14px', textAlign: 'center', color: '#9CA3AF', fontSize: 13 }}>
+                                      No team members found
+                                    </div>
+                                  ) : (
+                                    <div style={{ padding: '8px 14px' }}>
+                                      {people.filter(p => !taskFormData.collaborators.some(c => c.email === p.email)).slice(0, 8).map((person, idx) => (
+                                        <button
+                                          key={idx}
+                                          type="button"
+                                          onClick={() => {
+                                            const newCollab = {
+                                              name: person.name,
+                                              email: person.email,
+                                              color: ['#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#8B5CF6'][Math.floor(Math.random() * 5)],
+                                              jobTitle: person.jobTitle || 'Team Member'
+                                            };
+                                            setTaskFormData({
+                                              ...taskFormData,
+                                              collaborators: [...(taskFormData.collaborators || []), newCollab]
+                                            });
+                                            setCollaboratorSearchQuery('');
+                                            setShowCollaboratorDropdown(false);
+                                          }}
+                                          style={{
+                                            width: '100%',
+                                            padding: '12px 14px',
+                                            border: 'none',
+                                            background: idx % 2 === 0 ? '#FFFFFF' : '#F9FAFB',
+                                            textAlign: 'left',
+                                            cursor: 'pointer',
+                                            transition: 'background 0.2s',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 12,
+                                            fontSize: 14,
+                                            marginBottom: idx < 7 ? 0 : 0
+                                          }}
+                                          onMouseEnter={(e) => e.target.style.background = '#F3F4F6'}
+                                          onMouseLeave={(e) => e.target.style.background = idx % 2 === 0 ? '#FFFFFF' : '#F9FAFB'}
+                                        >
+                                          <div
+                                            style={{
+                                              width: 32,
+                                              height: 32,
+                                              borderRadius: '50%',
+                                              background: '#E5E7EB',
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              justifyContent: 'center',
+                                              color: '#6B7280',
+                                              fontSize: 13,
+                                              fontWeight: 700,
+                                              flexShrink: 0
+                                            }}
+                                          >
+                                            {person.name?.charAt(0)?.toUpperCase() || '?'}
+                                          </div>
+                                          <div style={{ flex: 1, minWidth: 0 }}>
+                                            <div style={{ fontWeight: 600, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                              {person.name}
+                                            </div>
+                                            <div style={{ fontSize: 12, color: '#9CA3AF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                              {person.jobTitle || person.email}
+                                            </div>
+                                          </div>
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })()
+                          )}
+                        </div>
+                        <div style={{ fontSize: 12, color: '#9CA3AF', marginTop: 6 }}>Search team members or click to view available options</div>
+                      </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 28 }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowTaskModal(false);
+                          setTaskFormData({ title: '', description: '', dueDate: '', priority: 'medium', color: '#3B82F6', collaborators: [], workOrderId: '', workOrderTitle: '', chat: [] });
+                          setCollaboratorSearchQuery('');
+                          setShowCollaboratorDropdown(false);
+                        }}
+                        style={{
+                          background: '#F3F4F6',
+                          border: '1px solid #D1D5DB',
+                          color: '#374151',
+                          borderRadius: 10,
+                          padding: '12px 20px',
+                          fontSize: 13,
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          transition: 'all 0.2s'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.target.style.background = '#E5E7EB';
+                          e.target.style.borderColor = '#BFDBFE';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.target.style.background = '#F3F4F6';
+                          e.target.style.borderColor = '#D1D5DB';
+                        }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!taskFormData.title.trim()) {
+                            alert('Please enter a task title');
+                            return;
+                          }
+                          createNewTask();
+                        }}
+                        style={{
+                          background: '#3B82F6',
+                          border: '1px solid #3B82F6',
+                          color: 'white',
+                          borderRadius: 10,
+                          padding: '12px 24px',
+                          fontSize: 13,
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          transition: 'all 0.2s'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.target.style.background = '#2563EB';
+                          e.target.style.borderColor = '#1D4ED8';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.target.style.background = '#3B82F6';
+                          e.target.style.borderColor = '#3B82F6';
+                        }}
+                      >
+                        Create Task
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Task Details Modal */}
+              {showTaskDetailModal && selectedTaskDetail && (
+                <div style={{
+                  position: 'fixed',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  background: 'rgba(0, 0, 0, 0.6)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  zIndex: 9999
+                }}
+                onClick={(e) => {
+                  if (e.target === e.currentTarget) {
+                    setShowTaskDetailModal(false);
+                  }
+                }}>
+                  <div style={{
+                    background: 'white',
+                    borderRadius: 16,
+                    padding: '32px 28px',
+                    maxWidth: 1180,
+                    width: '95%',
+                    maxHeight: '85vh',
+                    overflow: 'auto',
+                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+                  }}>
+                    {/* Header */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28 }}>
+                      <h2 style={{ fontSize: 20, fontWeight: 800, color: '#111827', margin: 0 }}>Task Details</h2>
+                      <button
+                        type="button"
+                        onClick={() => setShowTaskDetailModal(false)}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          fontSize: 28,
+                          cursor: 'pointer',
+                          color: '#9CA3AF',
+                          padding: 0
+                        }}
+                      >
+                        ×
+                      </button>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                      <div style={{ flex: '0 0 380px', minWidth: 320, alignSelf: 'stretch' }}>
+                        <div className="border border-gray-200 bg-white rounded-2xl overflow-hidden">
+                          <div className="px-0 py-0 bg-white flex items-center justify-between">
+                            <div className="px-4 py-4 border-b border-gray-200 w-full">
+                              <h4 className="text-[18px] font-bold text-gray-900">Internal</h4>
+                              <p className="mt-1 text-xs text-gray-500">Shared discussion for everyone who can access this task.</p>
+                            </div>
+                          </div>
+
+                          <div className="flex-1 p-5 overflow-y-auto bg-gradient-to-b from-slate-50 via-white to-white" style={{ maxHeight: 430 }}>
+                            {(editingTaskData?.chat || []).length === 0 ? (
+                              <div className="rounded-2xl border border-dashed border-gray-200 bg-white px-5 py-10 text-center">
+                                <div className="text-sm font-semibold text-gray-700">No comments yet</div>
+                                <div className="mt-1 text-xs text-gray-500">Start the thread with an update, a question, or tag someone with @.</div>
+                              </div>
+                            ) : (
+                              <div className="space-y-4">
+                                {(editingTaskData?.chat || []).map((msg, index) => (
+                                  <div key={`task-message-${index}`} className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                                    <div className="flex items-start gap-3">
+                                      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xs font-bold ${String(msg.sender || msg.user || msg.createdBy || '').trim() === userName ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'}`}>
+                                        {String(msg.sender || msg.user || msg.createdBy || 'U').trim().split(' ').map(part => part?.[0] || '').join('').slice(0, 2).toUpperCase() || 'U'}
+                                      </div>
+                                      <div className="min-w-0 flex-1">
+                                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                          <span className="text-sm font-bold text-gray-900">{msg.sender || msg.user || msg.createdBy || 'Unknown'}</span>
+                                          {msg.role && (
+                                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
+                                              {String(msg.role).replace(/_/g, ' ')}
+                                            </span>
+                                          )}
+                                          <span className="text-[11px] text-gray-400">
+                                            {new Date(msg.timestamp || msg.createdAt || Date.now()).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                          </span>
+                                        </div>
+                                        <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-gray-700">{msg.text || msg.message}</p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="border-t border-gray-200 bg-white p-4">
+                            <div className="rounded-2xl border border-gray-200 bg-slate-50/80 p-4 shadow-sm">
+                              <div className="mb-3 flex items-center justify-between">
+                                <div>
+                                  <div className="text-sm font-bold text-gray-900">Add a public comment</div>
+                                  <div className="text-xs text-gray-500">Everyone with access to this task can read this thread.</div>
+                                </div>
+                                <span className="rounded-full bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500 shadow-sm">
+                                  {(editingTaskData?.chat || []).length} comments
+                                </span>
+                              </div>
+                              <div className="relative">
+                                <textarea
+                                  className="min-h-[120px] w-full resize-none rounded-2xl border border-white bg-white px-4 py-3 text-[15px] text-gray-800 outline-none ring-1 ring-slate-100 transition focus:ring-2 focus:ring-blue-100"
+                                  placeholder="Share an update, ask a question, or use @ to mention someone..."
+                                  value={taskDetailChatInput}
+                                  onChange={(e) => setTaskDetailChatInput(e.target.value)}
+                                />
+                                <div className="mt-3 flex items-center justify-between">
+                                  <button type="button" className="inline-flex items-center gap-2 text-xs font-semibold text-gray-500 hover:text-gray-700">
+                                    <Paperclip className="w-6 h-6" />
+                                    Attach
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={sendTaskDetailMessage}
+                                    className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700"
+                                  >
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                                      <path d="M3.4 20.4L20.85 12 3.4 3.6 3.39 10.13l12.47 1.87-12.47 1.87z" />
+                                    </svg>
+                                    Post
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div style={{ flex: '1 1 460px', minWidth: 320 }}>
+                    {/* Form Fields */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                      {/* Title */}
+                      <div>
+                        <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 8 }}>Task Title</label>
+                        <input
+                          type="text"
+                          value={editingTaskData?.title || ''}
+                          onChange={(e) => setEditingTaskData({ ...editingTaskData, title: e.target.value })}
+                          style={{
+                            width: '100%',
+                            border: '1.5px solid #E5E7EB',
+                            borderRadius: 10,
+                            padding: '12px 14px',
+                            fontSize: 14,
+                            fontFamily: 'inherit',
+                            boxSizing: 'border-box',
+                            backgroundColor: '#FAFBFC'
+                          }}
+                          onFocus={(e) => {
+                            e.target.style.borderColor = '#3B82F6';
+                            e.target.style.backgroundColor = '#FFFFFF';
+                          }}
+                          onBlur={(e) => {
+                            e.target.style.borderColor = '#E5E7EB';
+                            e.target.style.backgroundColor = '#FAFBFC';
+                          }}
+                        />
+                      </div>
+
+                      {/* Description */}
+                      <div>
+                        <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 8 }}>Description</label>
+                        <textarea
+                          value={editingTaskData?.description || ''}
+                          onChange={(e) => setEditingTaskData({ ...editingTaskData, description: e.target.value })}
+                          style={{
+                            width: '100%',
+                            border: '1.5px solid #E5E7EB',
+                            borderRadius: 10,
+                            padding: '12px 14px',
+                            fontSize: 14,
+                            fontFamily: 'inherit',
+                            boxSizing: 'border-box',
+                            minHeight: 100,
+                            resize: 'none',
+                            backgroundColor: '#FAFBFC'
+                          }}
+                          onFocus={(e) => {
+                            e.target.style.borderColor = '#3B82F6';
+                            e.target.style.backgroundColor = '#FFFFFF';
+                          }}
+                          onBlur={(e) => {
+                            e.target.style.borderColor = '#E5E7EB';
+                            e.target.style.backgroundColor = '#FAFBFC';
+                          }}
+                        />
+                      </div>
+
+                      {/* Status */}
+                      <div>
+                        <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 8 }}>Status</label>
+                        <select
+                          value={editingTaskData?.status || 'upcoming'}
+                          onChange={(e) => setEditingTaskData({ ...editingTaskData, status: e.target.value })}
+                          style={{
+                            width: '100%',
+                            border: '1.5px solid #E5E7EB',
+                            borderRadius: 10,
+                            padding: '12px 14px',
+                            fontSize: 14,
+                            fontFamily: 'inherit',
+                            boxSizing: 'border-box',
+                            backgroundColor: '#FAFBFC',
+                            cursor: 'pointer'
+                          }}
+                          onFocus={(e) => {
+                            e.target.style.borderColor = '#3B82F6';
+                            e.target.style.backgroundColor = '#FFFFFF';
+                          }}
+                          onBlur={(e) => {
+                            e.target.style.borderColor = '#E5E7EB';
+                            e.target.style.backgroundColor = '#FAFBFC';
+                          }}
+                        >
+                          <option value="upcoming">Upcoming</option>
+                          <option value="in-progress">In Progress</option>
+                          <option value="completed">Completed</option>
+                          <option value="overdue">Overdue</option>
+                        </select>
+                      </div>
+
+                      {/* Due Date & Priority Row */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 8 }}>Due Date</label>
+                          <input
+                            type="date"
+                            value={editingTaskData?.dueDate ? String(editingTaskData.dueDate).split('T')[0] : ''}
+                            onChange={(e) => setEditingTaskData({ ...editingTaskData, dueDate: e.target.value })}
+                            style={{
+                              width: '100%',
+                              border: '1.5px solid #E5E7EB',
+                              borderRadius: 10,
+                              padding: '12px 14px',
+                              fontSize: 14,
+                              fontFamily: 'inherit',
+                              boxSizing: 'border-box',
+                              backgroundColor: '#FAFBFC'
+                            }}
+                            onFocus={(e) => {
+                              e.target.style.borderColor = '#3B82F6';
+                              e.target.style.backgroundColor = '#FFFFFF';
+                            }}
+                            onBlur={(e) => {
+                              e.target.style.borderColor = '#E5E7EB';
+                              e.target.style.backgroundColor = '#FAFBFC';
+                            }}
+                          />
+                        </div>
+
+                        <div>
+                          <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 8 }}>Priority</label>
+                          <select
+                            value={editingTaskData?.priority || 'medium'}
+                            onChange={(e) => setEditingTaskData({ ...editingTaskData, priority: e.target.value })}
+                            style={{
+                              width: '100%',
+                              border: '1.5px solid #E5E7EB',
+                              borderRadius: 10,
+                              padding: '12px 14px',
+                              fontSize: 14,
+                              fontFamily: 'inherit',
+                              boxSizing: 'border-box',
+                              backgroundColor: '#FAFBFC',
+                              cursor: 'pointer'
+                            }}
+                            onFocus={(e) => {
+                              e.target.style.borderColor = '#3B82F6';
+                              e.target.style.backgroundColor = '#FFFFFF';
+                            }}
+                            onBlur={(e) => {
+                              e.target.style.borderColor = '#E5E7EB';
+                              e.target.style.backgroundColor = '#FAFBFC';
+                            }}
+                          >
+                            <option value="low">Low</option>
+                            <option value="medium">Medium</option>
+                            <option value="high">High</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 8 }}>Linked Work Order</label>
+                        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                          <select
+                            value={editingTaskData?.workOrderId || ''}
+                            onChange={(e) => {
+                              const selectedWorkOrder = workOrders.find((issue) => String(issue?._id || issue?.id) === String(e.target.value));
+                              setEditingTaskData({
+                                ...editingTaskData,
+                                workOrderId: e.target.value,
+                                workOrderTitle: selectedWorkOrder?.title || selectedWorkOrder?.name || ''
+                              });
+                            }}
+                            style={{
+                              flex: 1,
+                              minWidth: 220,
+                              border: '1.5px solid #E5E7EB',
+                              borderRadius: 10,
+                              padding: '12px 14px',
+                              fontSize: 14,
+                              fontFamily: 'inherit',
+                              boxSizing: 'border-box',
+                              backgroundColor: '#FAFBFC',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            <option value="">Not linked</option>
+                            {workOrders.map((issue) => {
+                              const issueId = String(issue?._id || issue?.id || '');
+                              return (
+                                <option key={issueId} value={issueId}>
+                                  {issue.title || issue.name || 'Work Order'}
+                                </option>
+                              );
+                            })}
+                          </select>
+                          {!!editingTaskData?.workOrderId && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const linkedIssue = workOrders.find((issue) => String(issue?._id || issue?.id) === String(editingTaskData.workOrderId));
+                                if (linkedIssue) {
+                                  setShowTaskDetailModal(false);
+                                  setModalData({ open: true, type: 'issue', item: linkedIssue });
+                                }
+                              }}
+                              style={{
+                                border: '1px solid #BFDBFE',
+                                background: '#EFF6FF',
+                                color: '#1D4ED8',
+                                borderRadius: 10,
+                                padding: '12px 14px',
+                                fontSize: 12,
+                                fontWeight: 700,
+                                cursor: 'pointer'
+                              }}
+                            >
+                              Open Work Order
+                            </button>
+                          )}
+                        </div>
+                        <div style={{ fontSize: 12, color: '#6B7280', marginTop: 6 }}>
+                          This task will also be saved into the linked work order task list.
+                        </div>
+                      </div>
+
+                      {/* Collaborators Display */}
+                      {editingTaskData?.collaborators && editingTaskData.collaborators.length > 0 && (
+                        <div>
+                          <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 8 }}>Collaborators ({editingTaskData.collaborators.length})</label>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                            {editingTaskData.collaborators.map((collab, idx) => (
+                              <div
+                                key={idx}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 8,
+                                  background: '#F3F4F6',
+                                  borderRadius: 24,
+                                  padding: '6px 10px',
+                                  fontSize: 12,
+                                  fontWeight: 500
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    width: 28,
+                                    height: 28,
+                                    borderRadius: '50%',
+                                    background: collab.color || '#3B82F6',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    color: 'white',
+                                    fontSize: 11,
+                                    fontWeight: 700
+                                  }}
+                                >
+                                  {collab.name?.charAt(0)?.toUpperCase() || '?'}
+                                </div>
+                                <span>{collab.name}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 28 }}>
+                      <button
+                        type="button"
+                        onClick={() => setShowTaskDetailModal(false)}
+                        style={{
+                          background: '#F3F4F6',
+                          border: '1px solid #D1D5DB',
+                          color: '#374151',
+                          borderRadius: 10,
+                          padding: '12px 20px',
+                          fontSize: 13,
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          transition: 'all 0.2s'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.target.style.background = '#E5E7EB';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.target.style.background = '#F3F4F6';
+                        }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={saveTaskDetails}
+                        style={{
+                          background: '#3B82F6',
+                          border: '1px solid #3B82F6',
+                          color: 'white',
+                          borderRadius: 10,
+                          padding: '12px 24px',
+                          fontSize: 13,
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          transition: 'all 0.2s'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.target.style.background = '#2563EB';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.target.style.background = '#3B82F6';
+                        }}
+                      >
+                        Save Changes
+                      </button>
+                    </div>
+                    </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Charts + Quick Actions */}
               <div className="flex flex-col lg:flex-row responsive-gap mb-8">
@@ -18318,10 +19861,6 @@ function ClientDashboard() {
               onOpenMetersTab={() => handleAssistantAction('openMetersTab')}
               onOpenEdgeTab={() => handleAssistantAction('openEdgeTab')}
             />
-          )}
-
-          {activeTab === 'subscription' && (
-            <ClientDashboardPricing />
           )}
 
           {activeTab === 'maintenanceTemplates' && (
@@ -20756,19 +22295,14 @@ function ClientDashboard() {
           {activeTab === 'subscription' && (
             <div style={{ padding: '0' }}>
               {(currentUser?.role === 'superadmin' || currentUser?.role === 'super-admin') ? (
-                // System admin sees all subscriptions management
                 <SubscriptionManagement />
               ) : (currentUser?.role === 'admin' || currentUser?.role === 'manager') ? (
-                // Company admin sees their company subscription dashboard
                 <CompanySubscriptionDashboard />
               ) : (
-                // Regular users see their personal subscription
                 <SubscriptionPlan userId={currentUser?._id || currentUser?.id} />
               )}
             </div>
           )}
-
-
           {/* Tasks Tab */}
           {activeTab === 'tasks' && <TaskDashboard />}
           {/* â”€â”€ Properties â”€â”€ */}
@@ -24718,7 +26252,15 @@ function ClientDashboard() {
             </div>
           )}
 
-          {activeTab === 'imports' && <ImportExportPanel />}
+          {activeTab === 'imports' && (
+            <ImportExportTabs
+              workOrders={issues}
+              assets={assets}
+              properties={properties}
+              onImportLocations={handleImportPropertiesFile}
+              onImportAssets={handleImportAssetsFile}
+            />
+          )}
 
         </div>
         {showUserProfileModal && (
@@ -35336,6 +36878,347 @@ const ImportExportPanel = () => {
 
         <div className="mt-4 text-sm text-gray-600">
           <span className="font-bold text-gray-700">Tip:</span> If you are assigning any people, teams, assets, locations, parts or purchase orders, ensure they are already created in your account.
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ImportExportTabs = ({
+  workOrders = [],
+  assets = [],
+  properties = [],
+  onImportLocations,
+  onImportAssets,
+}) => {
+  const tabOptions = ['import', 'export'];
+  const importDatasets = ['Locations', 'Assets', 'Parts', 'Vendors', 'Customers'];
+  const exportDatasets = ['Work Orders', 'Assets', 'Locations', 'Parts', 'Vendors', 'Customers'];
+  const [activeTab, setActiveTab] = React.useState('import');
+  const [dataset, setDataset] = React.useState('Locations');
+  const [busy, setBusy] = React.useState(false);
+  const fileInputRef = React.useRef(null);
+
+  React.useEffect(() => {
+    setDataset(activeTab === 'import' ? 'Locations' : 'Work Orders');
+  }, [activeTab]);
+
+  const buildCsv = React.useCallback((rows) => {
+    if (!Array.isArray(rows) || rows.length === 0) return '';
+    const headers = Array.from(
+      rows.reduce((set, row) => {
+        Object.keys(row || {}).forEach((key) => set.add(key));
+        return set;
+      }, new Set())
+    );
+    return [
+      headers.join(','),
+      ...rows.map((row) => headers.map((header) => `"${String(row?.[header] ?? '').replace(/"/g, '""')}"`).join(',')),
+    ].join('\n');
+  }, []);
+
+  const downloadCsvFile = React.useCallback((filename, rows) => {
+    const csv = buildCsv(rows);
+    if (!csv) {
+      alert(`No ${filename.replace('.csv', '')} data available to export.`);
+      return;
+    }
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, [buildCsv]);
+
+  const exportRowsByDataset = React.useMemo(() => ({
+    'Work Orders': (workOrders || []).map((item) => ({
+      Title: item?.title || item?.workOrderTitle || '',
+      Status: item?.status || '',
+      Priority: item?.priority || '',
+      Category: item?.category || '',
+      Location: item?.property?.name || item?.propertyName || item?.location || '',
+      Asset: item?.asset?.name || item?.assetName || '',
+      Assignee: item?.assignedTo?.name || item?.assigneeName || '',
+      Description: item?.description || '',
+      CreatedAt: item?.createdAt || '',
+    })),
+    Assets: (assets || []).map((item) => ({
+      Name: item?.name || '',
+      Type: item?.type || '',
+      Description: item?.description || '',
+      Quantity: item?.quantity ?? '',
+      Location: item?.property?.name || item?.propertyName || '',
+      Building: item?.building || '',
+      Room: item?.room || '',
+      Status: item?.status || '',
+    })),
+    Locations: (properties || []).map((item) => ({
+      Name: item?.name || '',
+      Type: item?.type || '',
+      Address: item?.address || '',
+      Hierarchy: item?.hierarchy || item?.parentName || '',
+      Latitude: item?.latitude ?? '',
+      Longitude: item?.longitude ?? '',
+    })),
+  }), [assets, properties, workOrders]);
+
+  const templateRows = React.useMemo(() => ({
+    Locations: [{
+      Name: 'Kigali HQ',
+      Type: 'Office',
+      Address: 'KG 7 Ave',
+      Hierarchy: 'Rwanda / Kigali',
+      Latitude: '-1.9441',
+      Longitude: '30.0619',
+    }],
+    Assets: [{
+      Name: 'Generator A',
+      Type: 'Power',
+      Description: 'Backup generator',
+      Quantity: '1',
+      Location: 'Kigali HQ',
+      Building: 'Main Block',
+      Blocks: 'A',
+      Room: 'Power Room',
+    }],
+    Parts: [{
+      Name: 'Air Filter',
+      SKU: 'AF-100',
+      Category: 'Filters',
+      Unit: 'pcs',
+      Cost: '25',
+      Quantity: '10',
+      MinStock: '2',
+      Vendor: 'Prime Supplies',
+    }],
+    Vendors: [{
+      Name: 'Prime Supplies',
+      Email: 'purchasing@example.com',
+      Phone: '+250700000000',
+      Address: 'Kigali',
+      Notes: 'Preferred vendor',
+    }],
+    Customers: [{
+      Name: 'Acme Rwanda',
+      Email: 'ops@example.com',
+      Phone: '+250700000001',
+      Address: 'Kigali',
+      Company: 'Acme Rwanda',
+    }],
+  }), []);
+
+  const importInstructions = React.useMemo(() => ({
+    Locations: 'Upload a CSV with location names and optional address, hierarchy, and coordinates.',
+    Assets: 'Upload an Excel or CSV file with asset name and a matching location name.',
+    Parts: 'Upload a CSV with part name, SKU, category, stock levels, and optional vendor.',
+    Vendors: 'Upload a CSV with vendor contact information.',
+    Customers: 'Upload a CSV with customer contact and company details.',
+  }), []);
+
+  const normalizeImportRows = React.useCallback((rows, selectedDataset) => {
+    if (!Array.isArray(rows)) return [];
+    if (selectedDataset === 'Parts') {
+      return rows.map((row) => ({
+        name: row.name || row.part || row.partname || '',
+        sku: row.sku || row.code || '',
+        category: row.category || '',
+        unit: row.unit || '',
+        cost: Number(row.cost || row.price || 0) || 0,
+        quantity: Number(row.quantity || row.qty || row.stock || 0) || 0,
+        minStock: Number(row.minstock || row.minimumstock || 0) || 0,
+        vendor: row.vendor || row.vendorname || '',
+      })).filter((row) => row.name);
+    }
+    if (selectedDataset === 'Vendors') {
+      return rows.map((row) => ({
+        name: row.name || row.vendor || '',
+        email: row.email || '',
+        phone: row.phone || '',
+        address: row.address || '',
+        notes: row.notes || '',
+      })).filter((row) => row.name);
+    }
+    return rows.map((row) => ({
+      name: row.name || row.customer || row.client || row.company || '',
+      email: row.email || '',
+      phone: row.phone || '',
+      address: row.address || '',
+      company: row.company || row.name || '',
+    })).filter((row) => row.name);
+  }, []);
+
+  const handleTemplateDownload = React.useCallback(() => {
+    downloadCsvFile(`${dataset.toLowerCase().replace(/\s+/g, '-')}-template.csv`, templateRows[dataset] || []);
+  }, [dataset, downloadCsvFile, templateRows]);
+
+  const handleImportAction = React.useCallback(async (file) => {
+    if (!file) return;
+    if (dataset === 'Locations') {
+      await onImportLocations?.(file);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+    if (dataset === 'Assets') {
+      await onImportAssets?.(file);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const rawText = await file.text();
+      const rows = normalizeImportRows(parseCsvText(rawText), dataset);
+      if (!rows.length) {
+        alert(`No valid ${dataset.toLowerCase()} rows were found.`);
+        return;
+      }
+      const endpoint = dataset === 'Parts'
+        ? '/api/parts/bulk'
+        : dataset === 'Vendors'
+          ? '/api/vendors/bulk'
+          : '/api/clients/bulk';
+      await api.post(endpoint, { items: rows });
+      alert(`Imported ${rows.length} ${dataset.toLowerCase()} record(s).`);
+    } catch (error) {
+      alert(error?.response?.data?.error || error?.message || `Failed to import ${dataset.toLowerCase()}.`);
+    } finally {
+      setBusy(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  }, [dataset, normalizeImportRows, onImportAssets, onImportLocations]);
+
+  const handleExportAction = React.useCallback(async () => {
+    if (dataset === 'Work Orders' || dataset === 'Assets' || dataset === 'Locations') {
+      downloadCsvFile(`${dataset.toLowerCase().replace(/\s+/g, '-')}.csv`, exportRowsByDataset[dataset] || []);
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const endpoint = dataset === 'Parts'
+        ? '/api/parts'
+        : dataset === 'Vendors'
+          ? '/api/vendors'
+          : '/api/clients';
+      const response = await api.get(endpoint);
+      const records = Array.isArray(response?.data)
+        ? response.data
+        : Array.isArray(response?.data?.data)
+          ? response.data.data
+          : [];
+      const rows = records.map((item) => ({
+        Name: item?.name || '',
+        Email: item?.email || '',
+        Phone: item?.phone || '',
+        Address: item?.address || '',
+        Category: item?.category || '',
+        SKU: item?.sku || '',
+        Quantity: item?.quantity ?? '',
+        Cost: item?.cost ?? '',
+        Company: item?.company || '',
+        Notes: item?.notes || '',
+      }));
+      downloadCsvFile(`${dataset.toLowerCase().replace(/\s+/g, '-')}.csv`, rows);
+    } catch (error) {
+      alert(error?.response?.data?.error || error?.message || `Failed to export ${dataset.toLowerCase()}.`);
+    } finally {
+      setBusy(false);
+    }
+  }, [dataset, downloadCsvFile, exportRowsByDataset]);
+
+  const tabDatasets = activeTab === 'import' ? importDatasets : exportDatasets;
+
+  return (
+    <div className="min-h-screen bg-gray-50 px-6 py-12">
+      <div className="mx-auto w-full max-w-5xl rounded-3xl border border-gray-200 bg-white px-8 py-10 shadow-sm">
+        <div className="flex flex-col gap-4 border-b border-gray-200 pb-6 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Import and Export</h1>
+            <p className="mt-2 text-sm text-gray-600">
+              Bring data in cleanly or download the latest records for your company.
+            </p>
+          </div>
+          <div className="inline-flex rounded-2xl bg-gray-100 p-1">
+            {tabOptions.map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setActiveTab(tab)}
+                className={`rounded-xl px-5 py-2.5 text-sm font-semibold transition ${
+                  activeTab === tab ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                {tab === 'import' ? 'Import' : 'Export'}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1.3fr)_minmax(280px,0.7fr)]">
+          <div className="rounded-2xl border border-gray-200 bg-gray-50 p-6">
+            <label className="block text-sm font-bold text-gray-700">Data Set</label>
+            <select
+              value={dataset}
+              onChange={(e) => setDataset(e.target.value)}
+              className="mt-3 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm text-gray-900 shadow-sm outline-none focus:border-blue-500"
+            >
+              {tabDatasets.map((entry) => <option key={entry}>{entry}</option>)}
+            </select>
+
+            <p className="mt-4 text-sm text-gray-600">
+              {activeTab === 'import'
+                ? importInstructions[dataset]
+                : `Download the current ${dataset.toLowerCase()} records as a CSV file.`}
+            </p>
+
+            {activeTab === 'import' ? (
+              <div className="mt-6">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept={dataset === 'Assets' ? '.xlsx,.xls,.csv' : '.csv'}
+                  onChange={(e) => handleImportAction(e.target.files?.[0])}
+                  disabled={busy}
+                  className="block w-full rounded-xl border border-dashed border-gray-300 bg-white px-4 py-4 text-sm text-gray-700 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-600 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70"
+                />
+                <button
+                  type="button"
+                  onClick={handleTemplateDownload}
+                  className="mt-4 inline-flex items-center rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100"
+                >
+                  Download Template
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={handleExportAction}
+                disabled={busy}
+                className="mt-6 inline-flex items-center rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+              >
+                {busy ? 'Preparing export...' : `Export ${dataset}`}
+              </button>
+            )}
+          </div>
+
+          <div className="rounded-2xl border border-gray-200 bg-white p-6">
+            <div className="text-sm font-bold uppercase tracking-wide text-gray-500">Tips</div>
+            <div className="mt-4 space-y-3 text-sm text-gray-600">
+              <p>Use the provided templates so the headers match what the importer expects.</p>
+              <p>For asset imports, the location name in the sheet must already exist in your account.</p>
+              <p>Meter and edge records are now scoped by company on the backend, so each company only loads its own data.</p>
+            </div>
+            <div className="mt-6 rounded-2xl bg-gray-50 p-4 text-sm text-gray-600">
+              <span className="font-semibold text-gray-800">Current mode:</span>{' '}
+              {activeTab === 'import'
+                ? `Ready to import ${dataset.toLowerCase()}.`
+                : `Ready to export ${dataset.toLowerCase()}.`}
+            </div>
+          </div>
         </div>
       </div>
     </div>

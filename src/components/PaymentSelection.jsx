@@ -23,6 +23,8 @@ export default function PaymentSelection() {
   const companyPhone = searchParams.get('phone') || '';
   const subscriptionId = searchParams.get('subscriptionId');
   const amount = searchParams.get('amount') || '0';
+  const paymentMethod = searchParams.get('paymentMethod') || 'card';
+  const provider = searchParams.get('provider') || 'mtn';
 
   // Fetch system currency on mount
   useEffect(() => {
@@ -65,6 +67,11 @@ export default function PaymentSelection() {
         setProcessing(false);
         return;
       }
+      if (paymentMethod === 'mobile_money' && String(currency || '').toUpperCase() !== 'RWF') {
+        setError('MTN Rwanda mobile money supports RWF only. Switch the subscription currency to RWF or use card payment.');
+        setProcessing(false);
+        return;
+      }
 
       // If no subscriptionId, create a subscription first
       let subId = subscriptionId;
@@ -94,7 +101,6 @@ export default function PaymentSelection() {
         }
       }
 
-      // Send to PesaPal with complete data
       const paymentData = {
         subscriptionId: subId,
         amount: finalAmount,
@@ -106,18 +112,25 @@ export default function PaymentSelection() {
         cycle,
       };
 
-      console.log('Sending payment request:', paymentData);
+      console.log('Sending payment request:', { ...paymentData, paymentMethod, provider });
 
-      const paymentResponse = await api.post(
-        '/api/subscriptions/payments/initiate-pesapal',
-        paymentData
-      );
-
-      if (paymentResponse.data?.redirectUrl) {
-        // Redirect to PesaPal
-        window.location.href = paymentResponse.data.redirectUrl;
+      if (paymentMethod === 'mobile_money') {
+        await api.post('/api/subscriptions/payments/initiate-mobile-money', {
+          ...paymentData,
+          provider,
+        });
+        navigate(`/payment-confirmation?status=pending&method=mobile_money&provider=${provider}&subscriptionId=${subId}`);
       } else {
-        setError('Failed to get payment redirect. Please try again.');
+        const paymentResponse = await api.post(
+          '/api/subscriptions/payments/initiate-pesapal',
+          paymentData
+        );
+
+        if (paymentResponse.data?.redirectUrl) {
+          window.location.href = paymentResponse.data.redirectUrl;
+        } else {
+          setError('Failed to get payment redirect. Please try again.');
+        }
       }
     } catch (err) {
       console.error('Payment processing error:', err);
@@ -184,6 +197,37 @@ export default function PaymentSelection() {
           </div>
         </div>
 
+        <div style={{ marginBottom: '30px', display: 'grid', gap: '16px', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+          <div style={{
+            border: paymentMethod === 'card' ? '2px solid #2563eb' : '1px solid #d1d5db',
+            borderRadius: '14px',
+            padding: '18px',
+            background: paymentMethod === 'card' ? '#eff6ff' : '#fff'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+              <CreditCard size={20} style={{ color: '#2563eb' }} />
+              <strong>Card Payment</strong>
+            </div>
+            <p style={{ margin: 0, fontSize: '14px', color: '#555', lineHeight: '1.6' }}>
+              Pay with Visa, Mastercard, or another supported card provider.
+            </p>
+          </div>
+          <div style={{
+            border: paymentMethod === 'mobile_money' ? '2px solid #2563eb' : '1px solid #d1d5db',
+            borderRadius: '14px',
+            padding: '18px',
+            background: paymentMethod === 'mobile_money' ? '#eff6ff' : '#fff'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+              <Smartphone size={20} style={{ color: '#2563eb' }} />
+              <strong>Mobile Money</strong>
+            </div>
+            <p style={{ margin: 0, fontSize: '14px', color: '#555', lineHeight: '1.6' }}>
+              Provider: <strong>{provider.toUpperCase()}</strong>{companyPhone ? ` • Phone: ${companyPhone}` : ''}
+            </p>
+          </div>
+        </div>
+
         {/* Payment Summary */}
         <div style={{ backgroundColor: '#f9f9f9', border: '1px solid #e0e0e0', borderRadius: '8px', padding: '20px', marginBottom: '30px' }}>
           <h3 style={{ fontSize: '16px', marginBottom: '15px', fontWeight: '600' }}>Payment Summary</h3>
@@ -201,6 +245,16 @@ export default function PaymentSelection() {
               <span style={{ color: '#666' }}>Company:</span>
               <span style={{ fontWeight: '600' }}>{companyName}</span>
             </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
+              <span style={{ color: '#666' }}>Payment Method:</span>
+              <span style={{ fontWeight: '600' }}>{paymentMethod === 'mobile_money' ? 'Mobile Money' : 'Card'}</span>
+            </div>
+            {paymentMethod === 'mobile_money' && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
+                <span style={{ color: '#666' }}>Provider:</span>
+                <span style={{ fontWeight: '600' }}>{provider.toUpperCase()}</span>
+              </div>
+            )}
           </div>
 
           <div style={{ borderTop: '1px solid #e0e0e0', paddingTop: '15px', display: 'flex', justifyContent: 'space-between', fontSize: '18px', fontWeight: '600' }}>

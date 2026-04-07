@@ -218,6 +218,32 @@ const subscriptionAPI = {
     }
   },
 
+  // Initiate mobile money payment
+  initiateMobileMoneyPayment: async (
+    subscriptionId,
+    amount,
+    provider,
+    phoneNumber,
+    currency = 'USD',
+    email = null,
+    userId = null
+  ) => {
+    try {
+      const response = await api.post(`${BASE}/payments/initiate-mobile-money`, {
+        subscriptionId,
+        amount,
+        provider,
+        phoneNumber,
+        currency,
+        email,
+        userId,
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
   // Get payment by ID
   getPaymentById: async (paymentId) => {
     try {

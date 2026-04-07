@@ -270,7 +270,7 @@ const TaskDashboard = () => {
 
         {/* Tabs */}
         <div className="flex gap-4 mb-6 border-b border-gray-200">
-          {['upcoming', 'overdue', 'completed'].map(tab => (
+          {['upcoming', 'in-progress', 'overdue', 'completed'].map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -281,9 +281,9 @@ const TaskDashboard = () => {
               }`}
             >
               {tab}
-              {tab === 'overdue' && filteredTasks.length > 0 && (
+              {tab === 'overdue' && tasks.filter(task => task.status === tab).length > 0 && (
                 <span className="ml-2 px-2 py-1 bg-red-100 text-red-800 rounded-full text-sm">
-                  {filteredTasks.length}
+                  {tasks.filter(task => task.status === tab).length}
                 </span>
               )}
             </button>
