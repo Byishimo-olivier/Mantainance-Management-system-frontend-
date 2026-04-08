@@ -73,19 +73,30 @@ export default function PaymentSelection() {
         return;
       }
 
+      const subscriptionMetadata = {
+        companyName: company,
+        phone: companyPhone || user.phone || user.phoneNumber || '',
+        branchLocation: user.branchLocation || '',
+        branchName: user.branchName || '',
+        branchDetails: user.branchDetails || '',
+        companyType: user.companyType || '',
+        countryCode: user.countryCode || '',
+      };
+
       // If no subscriptionId, create a subscription first
       let subId = subscriptionId;
       if (!subId) {
         try {
-          const createSubResponse = await api.post('/api/subscriptions', {
-            plan,
-            billingCycle: cycle,
-            currency,
-            companyName: company,
-            email,
+          const createSubResponse = await subscriptionAPI.createSubscription(
             userId,
-          });
-          subId = createSubResponse.data?.subscription?._id || createSubResponse.data?._id;
+            email,
+            plan,
+            cycle,
+            paymentMethod === 'mobile_money' ? 'mobile_money' : 'card',
+            subscriptionMetadata
+          );
+          const createdSubscription = createSubResponse?.data || createSubResponse;
+          subId = createdSubscription?.id || createdSubscription?._id;
           console.log('Subscription created:', subId);
           
           if (!subId) {

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import subscriptionAPI from '../api/subscription';
+import api from '../api/axios';
+import useCompanySubscription from '../hooks/useCompanySubscription';
 import { DollarSign, Zap, Check, Plus, Info } from 'lucide-react';
 
 const planMetadata = {
@@ -36,6 +38,7 @@ export default function ClientDashboardPricing({ currentUser = null }) {
   const [billingCycle, setBillingCycle] = useState('monthly');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const { hasActive: hasActiveCompanySubscription, subscription: companySubscription, loading: subscriptionLoading } = useCompanySubscription();
 
   const navigate = useNavigate();
 
@@ -44,10 +47,29 @@ export default function ClientDashboardPricing({ currentUser = null }) {
     'RWF': 'FRw'
   };
 
+  const handlePremiumQuoteRequest = async () => {
+    const user = currentUser || JSON.parse(localStorage.getItem('user') || '{}');
+    const userEmail = user.email || '';
+    const companyName = user.companyName || user.company || 'Unknown Company';
+
+    try {
+      await api.post('/api/quote-requests', {
+        requesterEmail: userEmail,
+        requesterName: user.name || 'Unknown',
+        companyName,
+        plan: 'premium',
+        message: `Quote request for Premium plan from ${companyName}.`,
+      });
+      alert('Quote request sent. The administrator will contact you shortly.');
+    } catch (quoteError) {
+      console.error('Error sending quote request:', quoteError);
+      alert('Failed to send quote request. Please contact the administrator directly.');
+    }
+  };
+
   const handleSubscribe = (planKey) => {
     if (planKey === 'premium') {
-      // For premium plan, could show a contact form or request form
-      alert('Please contact our sales team for a custom quote.');
+      handlePremiumQuoteRequest();
       return;
     }
     
@@ -61,6 +83,10 @@ export default function ClientDashboardPricing({ currentUser = null }) {
     const companyId = user.companyId || user.id;
     const email = user.email || '';
     const companyName = user.companyName || user.company || '';
+    const phone = user.phone || user.phoneNumber || '';
+    const branchLocation = user.branchLocation || '';
+    const branchName = user.branchName || '';
+    const companyType = user.companyType || '';
     
     // Redirect to payment selection page with all required data
     const params = new URLSearchParams({
@@ -72,6 +98,10 @@ export default function ClientDashboardPricing({ currentUser = null }) {
       companyId: companyId,
       email: email,
       companyName: companyName,
+      phone: phone,
+      branchLocation: branchLocation,
+      branchName: branchName,
+      companyType: companyType,
     });
     
     navigate(`/payment-selection?${params.toString()}`);
@@ -215,6 +245,7 @@ export default function ClientDashboardPricing({ currentUser = null }) {
         {pricingPlans.map((plan) => {
           const cyclePrice = plan.billingCycles[billingCycle];
           const displayPrice = cyclePrice ? `${symbol}${cyclePrice.toFixed(2)}` : 'Custom';
+          const isCurrentPlan = hasActiveCompanySubscription && String(companySubscription?.plan || '').toLowerCase() === String(plan.key || '').toLowerCase();
           
           return (
             <div
@@ -302,24 +333,29 @@ export default function ClientDashboardPricing({ currentUser = null }) {
 
               {/* CTA Button */}
               <button
-                onClick={() => handleSubscribe(plan.key)}
+                onClick={() => !isCurrentPlan && handleSubscribe(plan.key)}
+                disabled={subscriptionLoading || isCurrentPlan}
                 style={{
                   width: '100%',
                   padding: '12px 16px',
                   borderRadius: '8px',
-                  border: plan.badge ? 'none' : '1px solid #D1D5DB',
-                  backgroundColor: plan.badge ? '#1D4ED8' : '#F3F4F6',
-                  color: plan.badge ? '#FFFFFF' : '#111827',
+                  border: isCurrentPlan ? 'none' : (plan.badge ? 'none' : '1px solid #D1D5DB'),
+                  backgroundColor: isCurrentPlan ? '#10B981' : (plan.badge ? '#1D4ED8' : '#F3F4F6'),
+                  color: isCurrentPlan ? '#FFFFFF' : (plan.badge ? '#FFFFFF' : '#111827'),
                   fontSize: '14px',
                   fontWeight: '600',
-                  cursor: 'pointer',
+                  cursor: subscriptionLoading || isCurrentPlan ? 'not-allowed' : 'pointer',
                   transition: 'all 0.2s',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: '8px'
+                  gap: '8px',
+                  opacity: subscriptionLoading ? 0.7 : 1,
                 }}
                 onMouseEnter={(e) => {
+                  if (subscriptionLoading || isCurrentPlan) {
+                    return;
+                  }
                   if (plan.badge) {
                     e.currentTarget.style.backgroundColor = '#1E40AF';
                   } else {
@@ -327,6 +363,10 @@ export default function ClientDashboardPricing({ currentUser = null }) {
                   }
                 }}
                 onMouseLeave={(e) => {
+                  if (subscriptionLoading || isCurrentPlan) {
+                    e.currentTarget.style.backgroundColor = isCurrentPlan ? '#10B981' : (plan.badge ? '#1D4ED8' : '#F3F4F6');
+                    return;
+                  }
                   if (plan.badge) {
                     e.currentTarget.style.backgroundColor = '#1D4ED8';
                   } else {
@@ -334,8 +374,8 @@ export default function ClientDashboardPricing({ currentUser = null }) {
                   }
                 }}
               >
-                <Plus className="h-4 w-4" />
-                {plan.isPremium ? 'Request Quotation' : 'Subscribe'}
+                {!isCurrentPlan && <Plus className="h-4 w-4" />}
+                {subscriptionLoading ? 'Loading...' : isCurrentPlan ? 'Active' : (plan.isPremium ? 'Request Quotation' : 'Subscribe')}
               </button>
             </div>
           );

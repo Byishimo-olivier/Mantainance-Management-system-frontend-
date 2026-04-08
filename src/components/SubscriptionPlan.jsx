@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useSubscription } from '../hooks/useSubscription';
 import subscriptionAPI from '../api/subscription';
+import api from '../api/axios';
+import useCompanySubscription from '../hooks/useCompanySubscription';
 import {
   Check,
   Download,
@@ -16,6 +18,7 @@ import {
 
 const SubscriptionPlan = ({ userId }) => {
   const { subscription, loading, refresh } = useSubscription(userId);
+  const { hasActive: hasActiveCompanySubscription, subscription: companySubscription, loading: companySubscriptionLoading } = useCompanySubscription();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   
@@ -172,6 +175,27 @@ const SubscriptionPlan = ({ userId }) => {
     navigate(`/payment-selection?subscriptionId=${subscription.id || subscription._id}&plan=${subscription.plan}&cycle=${cycle}&amount=${amount}&currency=${currency}&email=${subscription.email || ''}`);
   };
 
+  const handlePremiumQuoteRequest = async () => {
+    const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+    const companyName = storedUser?.companyName || storedUser?.company || 'Unknown Company';
+    const requesterEmail = storedUser?.email || subscription?.email || '';
+
+    try {
+      await api.post('/api/quote-requests', {
+        requesterEmail,
+        requesterName: storedUser?.name || 'Unknown',
+        companyName,
+        plan: 'premium',
+        message: `Quote request for Premium plan from ${companyName}.`,
+      });
+      setSuccess('Quote request sent. The administrator will contact you shortly.');
+      setError(null);
+    } catch (quoteError) {
+      console.error('Error sending quote request:', quoteError);
+      setError('Failed to send quote request. Please contact the administrator directly.');
+    }
+  };
+
   const handleUpgrade = async (newPlanId) => {
     // If user has a subscription already and clicks their current plan
     if (subscription && newPlanId === subscription.plan) {
@@ -245,7 +269,7 @@ const SubscriptionPlan = ({ userId }) => {
     }
 
     if (planId === 'premium') {
-      alert('Premium uses custom pricing. Please request a quotation from the sales team.');
+      handlePremiumQuoteRequest();
       return;
     }
 

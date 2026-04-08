@@ -10,15 +10,39 @@ const subscriptionAPI = {
   // Create a new subscription
   createSubscription: async (userId, email, plan = 'basic', billingCycle = 'monthly', paymentMethod = 'card', metadata = {}) => {
     try {
+      let currentUser = null;
+      try {
+        currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+      } catch {
+        currentUser = {};
+      }
+
+      const resolvedCompanyName = metadata?.companyName || currentUser?.companyName || currentUser?.company || '';
+      const resolvedCompanyId = metadata?.companyId || currentUser?.company?.id || currentUser?.companyId || '';
+      const resolvedEmail = email || metadata?.managerEmail || currentUser?.email || '';
+      const resolvedMetadata = {
+        ...metadata,
+        companyName: resolvedCompanyName,
+        companyId: resolvedCompanyId,
+        companyType: metadata?.companyType || currentUser?.companyType || '',
+        branchName: metadata?.branchName || currentUser?.branchName || '',
+        branchDetails: metadata?.branchDetails || currentUser?.branchDetails || '',
+        branchLocation: metadata?.branchLocation || currentUser?.branchLocation || '',
+        phone: metadata?.phone || currentUser?.phone || currentUser?.phoneNumber || '',
+        countryCode: metadata?.countryCode || currentUser?.countryCode || '',
+      };
+
       const response = await api.post(`${BASE}`, {
         userId,
-        email,
+        email: resolvedEmail,
         plan,
         billingCycle,
         clientId: CLIENT_ID,
         secretId: SECRET_ID,
         paymentMethod,
-        metadata,
+        companyId: resolvedCompanyId || undefined,
+        managerEmail: resolvedEmail,
+        metadata: resolvedMetadata,
       });
       return response.data;
     } catch (error) {

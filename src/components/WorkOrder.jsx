@@ -76,7 +76,7 @@ export function WorkOrderForm({
       }));
       setImageFile(null);
       setAttachFile(null);
-      onSubmitted?.();
+      onSubmitted?.(response?.data || null);
     } catch (err) {
       console.error('Work order creation error:', err);
       const errorMessage = err.response?.data?.error || err.message || 'Submit failed';

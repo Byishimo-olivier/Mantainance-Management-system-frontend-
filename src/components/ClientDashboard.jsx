@@ -7,6 +7,7 @@ import { WorkOrderForm } from './WorkOrder';
 import SubscriptionPlan from './SubscriptionPlan';
 import SubscriptionManagement from './SubscriptionManagement';
 import CompanySubscriptionDashboard from './CompanySubscriptionDashboard';
+import { useCompanySubscription } from '../hooks/useCompanySubscription';
 import { useSubscription } from '../hooks/useSubscription';
 import { getImageUrl } from '../utils/imageUrl';
 import { useLanguage, useTranslation } from "../i18n/LanguageContext";
@@ -6911,10 +6912,14 @@ function AssetEditorModal({
 function ClientDashboard() {
   const navigate = useNavigate();
   const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
-  const { isActive } = useSubscription(storedUser?.id || storedUser?._id);
+  const subscriptionLookupId = storedUser?.companyName || storedUser?.company?.name || storedUser?.company?.id || storedUser?.companyId || storedUser?.id || storedUser?._id;
+  const { hasActive: hasActiveCompanySubscription, loading: companySubscriptionLoading } = useCompanySubscription();
+  const { subscription: directSubscription, isActive: isDirectSubscriptionActive, loading: directSubscriptionLoading } = useSubscription(subscriptionLookupId);
   const { language, setLanguage } = useLanguage();
   const { t } = useTranslation();
   const backendBase = (import.meta.env.VITE_API_URL || '') + '';
+  const hasPaidSubscription = hasActiveCompanySubscription || isDirectSubscriptionActive || String(directSubscription?.status || '').toLowerCase() === 'active';
+  const subscriptionVisibilityLoading = companySubscriptionLoading || directSubscriptionLoading;
 
   const imageSrc = useCallback((path) => {
     if (!path || path === 'null' || path === 'undefined') return null;
@@ -14219,6 +14224,82 @@ function ClientDashboard() {
     setShowWorkOrderModal(true);
   };
 
+  const requestShouldAlsoCreatePm = useCallback((issue) => {
+    if (!issue) return false;
+    const tags = Array.isArray(issue.tags) ? issue.tags.map((tag) => String(typeof tag === 'string' ? tag : tag?.label || tag?.name || '').toLowerCase()) : [];
+    const looksPreventiveWord = (value) => String(value || '').toLowerCase().includes('prevent');
+    const fingerprint = [
+      issue?.title,
+      issue?.description,
+      issue?.type,
+      issue?.issueType,
+      issue?.category,
+      issue?.submissionType,
+      issue?.preventiveMaintenanceName,
+      issue?.scheduleName,
+      issue?.pmName,
+      ...tags,
+    ].filter(Boolean).join(' ').toLowerCase();
+    return (
+      Boolean(issue?.isPreventive) ||
+      tags.some((tag) => looksPreventiveWord(tag)) ||
+      looksPreventiveWord(issue?.issueType || issue?.type || issue?.category || '') ||
+      looksPreventiveWord(fingerprint)
+    );
+  }, []);
+
+  const createPmFromRequest = useCallback(async (issue) => {
+    if (!requestShouldAlsoCreatePm(issue)) return;
+    const issueId = String(issue?._id || issue?.id || '');
+    if (!issueId) return;
+    const alreadyExists = (maintenanceSchedules || []).some((schedule) => String(schedule?.sourceIssueId || schedule?.requestIssueId || '') === issueId);
+    if (alreadyExists) return;
+
+    const sourceDate = normalizeDate(issue?.nextDate || issue?.dueDate || issue?.fixDeadline || issue?.createdAt) || new Date();
+    const yyyy = sourceDate.getFullYear();
+    const mm = String(sourceDate.getMonth() + 1).padStart(2, '0');
+    const dd = String(sourceDate.getDate()).padStart(2, '0');
+    const hh = String(sourceDate.getHours()).padStart(2, '0');
+    const min = String(sourceDate.getMinutes()).padStart(2, '0');
+
+    const payload = {
+      name: issue?.title || issue?.name || 'Preventive Maintenance Request',
+      description: issue?.description || 'Generated from a preventive maintenance request.',
+      workOrderTitle: issue?.title || issue?.name || 'Preventive Maintenance Request',
+      workOrderDescription: issue?.description || 'Generated from a preventive maintenance request.',
+      category: issue?.category || issue?.issueType || 'preventive',
+      priority: issue?.priority || 'Medium',
+      date: `${yyyy}-${mm}-${dd}`,
+      time: `${hh}:${min}`,
+      location: issue?.location || issue?.propertyName || issue?.address || '',
+      status: 'Pending',
+      sourceIssueId: issueId,
+      requestIssueId: issueId,
+      source: 'request',
+      createFirstWorkOrder: false,
+      assetsRows: [
+        {
+          id: `request-${issueId}`,
+          assetId: issue?.assetId || issue?.asset?._id || issue?.asset?.id || '',
+          locationId: issue?.propertyId || issue?.property?._id || issue?.property?.id || '',
+          startDate: `${yyyy}-${mm}-${dd}`,
+          endDate: '',
+          timezone: '(UTC+02:00) Africa/Kigali',
+          assignee: issue?.assignedTo || '',
+        },
+      ],
+      checklist: [],
+      tasks: [],
+      tags: ['preventive', 'request'],
+    };
+
+    const response = await api.post('/api/maintenance-schedules', payload);
+    const createdSchedule = response?.data;
+    if (createdSchedule) {
+      setMaintenanceSchedules((prev) => [createdSchedule, ...(prev || [])]);
+    }
+  }, [maintenanceSchedules, requestShouldAlsoCreatePm]);
+
   useEffect(() => {
     try {
       const raw = localStorage.getItem(REQUEST_FORM_SETTINGS_STORAGE_KEY);
@@ -17952,7 +18033,7 @@ function ClientDashboard() {
           ))}
         </nav>
 
-        {!isActive && (
+        {!subscriptionVisibilityLoading && !hasPaidSubscription && (
           <div style={{ padding: '0 12px 12px' }}>
             <button
               onClick={() => setActiveTab('subscription')}
@@ -26702,9 +26783,12 @@ function ClientDashboard() {
                 submitLabel="Submit Request"
                 fieldSettings={requestFormSettings}
                 onCancel={() => setShowWorkOrderModal(false)}
-                onSubmitted={() => {
+                onSubmitted={(createdIssue) => {
                   setShowWorkOrderModal(false);
-                  fetchIssues().catch(() => { });
+                  Promise.allSettled([
+                    fetchIssues(),
+                    createPmFromRequest(createdIssue),
+                  ]).catch(() => { });
                   setActiveTab('requests');
                 }}
               />
@@ -30035,6 +30119,27 @@ const ClientAnalyticsTab = ({
   const [customDashboardSettingsTab, setCustomDashboardSettingsTab] = useState('general');
   const [customDashboardSettingsDraft, setCustomDashboardSettingsDraft] = useState(null);
   const [customDashboardDraft, setCustomDashboardDraft] = useState(null);
+  const [analyticsMeters, setAnalyticsMeters] = useState([]);
+  const [analyticsPurchaseOrders, setAnalyticsPurchaseOrders] = useState([]);
+  const [analyticsUsers, setAnalyticsUsers] = useState([]);
+
+  React.useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const [metersRes, purchaseOrdersRes, usersRes] = await Promise.allSettled([
+        api.get('/api/meters'),
+        api.get('/api/purchase-orders'),
+        api.get('/api/users'),
+      ]);
+      if (!mounted) return;
+      setAnalyticsMeters(metersRes.status === 'fulfilled' && Array.isArray(metersRes.value?.data) ? metersRes.value.data : []);
+      setAnalyticsPurchaseOrders(purchaseOrdersRes.status === 'fulfilled' && Array.isArray(purchaseOrdersRes.value?.data) ? purchaseOrdersRes.value.data : []);
+      setAnalyticsUsers(usersRes.status === 'fulfilled' && Array.isArray(usersRes.value?.data) ? usersRes.value.data : []);
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const now = new Date();
   const formatBucketLabel = (date, stepDaysValue) => date.toLocaleDateString('en-US', stepDaysValue >= 30
@@ -30119,6 +30224,7 @@ const ClientAnalyticsTab = ({
   const isPreventiveIssue = (issue) => {
     if (!issue) return false;
     const tags = Array.isArray(issue.tags) ? issue.tags.map((tag) => String(typeof tag === 'string' ? tag : tag?.label || tag?.name || '').toLowerCase()) : [];
+    const looksPreventiveWord = (value) => String(value || '').toLowerCase().includes('prevent');
     const fingerprint = [
       issue.isPreventive ? 'preventive' : '',
       issue.type,
@@ -30131,9 +30237,8 @@ const ClientAnalyticsTab = ({
     ].join(' ').toLowerCase();
     return (
       Boolean(issue.isPreventive) ||
-      String(issue.type || '').toUpperCase() === 'PREVENTIVE' ||
-      fingerprint.includes('preventive') ||
-      fingerprint.includes('preventative') ||
+      looksPreventiveWord(issue.type || '') ||
+      looksPreventiveWord(fingerprint) ||
       fingerprint.includes('inspection') ||
       Boolean(issue.scheduleId || issue.maintenanceScheduleId || issue.pmTrigger || issue.preventiveMaintenanceName || issue.scheduleName || issue.pmName)
     );
@@ -31094,6 +31199,361 @@ const ClientAnalyticsTab = ({
     };
   }, [allIssues, assets, bucketIndexForDate, getIssueAnalyticsDate, labels, rangeEnd, rangeStart, stepDays]);
 
+  const formatAnalyticsDate = React.useCallback((value, options = { month: 'short', day: 'numeric', year: 'numeric' }) => {
+    const dt = normalizeDate(value);
+    if (!dt) return '—';
+    return dt.toLocaleDateString('en-US', options);
+  }, []);
+
+  const formatAnalyticsDateTime = React.useCallback((value) => {
+    const dt = normalizeDate(value);
+    if (!dt) return '—';
+    return dt.toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  }, []);
+
+  const formatMetricNumber = React.useCallback((value, digits = 0) => {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return digits > 0 ? `0.${'0'.repeat(digits)}` : '0';
+    return parsed.toLocaleString('en-US', {
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits,
+    });
+  }, []);
+
+  const adoptionMetrics = React.useMemo(() => {
+    const activeUsers = (analyticsUsers.length ? analyticsUsers : technicians).filter((user) => {
+      const status = String(user?.status || user?.accountStatus || '').toLowerCase();
+      return !status || ['active', 'approved', 'enabled'].includes(status);
+    }).length;
+    const pmShare = totalPreventive + totalReactive ? Math.round((totalPreventive / (totalPreventive + totalReactive)) * 100) : 0;
+    return [
+      { label: 'Active Users', value: activeUsers, tone: 'border-blue-100 bg-blue-50 text-blue-700' },
+      { label: 'Assets Tracked', value: assets.length, tone: 'border-emerald-100 bg-emerald-50 text-emerald-700' },
+      { label: 'Meters Live', value: analyticsMeters.length, tone: 'border-amber-100 bg-amber-50 text-amber-700' },
+      { label: 'PM Adoption', value: `${pmShare}%`, tone: 'border-violet-100 bg-violet-50 text-violet-700' },
+    ];
+  }, [analyticsMeters.length, analyticsUsers, assets.length, technicians, totalPreventive, totalReactive]);
+
+  const userAnalytics = React.useMemo(() => {
+    const source = analyticsUsers.length ? analyticsUsers : technicians;
+    const map = new Map();
+    source.forEach((user, index) => {
+      const id = String(user?._id || user?.id || user?.userId || user?.email || `user-${index}`);
+      if (!map.has(id)) {
+        map.set(id, {
+          id,
+          name: user?.name || user?.fullName || user?.username || user?.email || 'User',
+          email: user?.email || '',
+          role: user?.role || user?.accountType || user?.jobTitle || 'User',
+          status: user?.status || user?.accountStatus || 'Active',
+          lastLogin: user?.lastLogin || user?.updatedAt || user?.createdAt || null,
+          createdAt: user?.createdAt || null,
+          completed: 0,
+          open: 0,
+          hours: 0,
+        });
+      }
+    });
+    (workOrderItems || []).forEach((issue) => {
+      const assigneeRaw = issue?.assignedTo || issue?.primaryWorker?._id || issue?.primaryWorker?.id || issue?.primaryWorker?.name || issue?.assignedWorker?.name;
+      if (!assigneeRaw) return;
+      const assigneeKey = String(assigneeRaw);
+      let row = map.get(assigneeKey);
+      if (!row) {
+        row = {
+          id: assigneeKey,
+          name: issue?.primaryWorker?.name || issue?.assignedWorker?.name || assigneeKey,
+          email: '',
+          role: 'Worker',
+          status: 'Active',
+          lastLogin: issue?.updatedAt || issue?.createdAt || null,
+          createdAt: issue?.createdAt || null,
+          completed: 0,
+          open: 0,
+          hours: 0,
+        };
+        map.set(assigneeKey, row);
+      }
+      if (isCompleted(issue?.status)) row.completed += 1;
+      else row.open += 1;
+      row.hours += Number(issue?.timeSpent || issue?.time || issue?.totalTime || issue?.estimatedDuration || issue?.estimatedHours || 0) || 0;
+    });
+    const rows = Array.from(map.values());
+    return {
+      rows: rows.sort((a, b) => b.completed - a.completed || b.hours - a.hours),
+      recentLogins: [...rows]
+        .filter((row) => row.lastLogin)
+        .sort((a, b) => normalizeDate(b.lastLogin) - normalizeDate(a.lastLogin))
+        .slice(0, 8),
+    };
+  }, [analyticsUsers, technicians, workOrderItems]);
+
+  const requestAnalytics = React.useMemo(() => {
+    const rows = (requestItems || []).map((request, index) => {
+      const submittedAt = getIssueAnalyticsDate(request);
+      const updatedAt = normalizeDate(request?.updatedAt || request?.completedAt || request?.resolvedAt);
+      const responseHours = submittedAt && updatedAt ? Math.max(0, (updatedAt - submittedAt) / 3600000) : null;
+      return {
+        id: getIssueKey(request) || `request-${index}`,
+        title: request?.title || request?.name || 'Request',
+        status: request?.status || 'Pending',
+        requester: request?.requestorName || request?.createdBy?.name || request?.submittedBy?.name || 'Unknown',
+        asset: request?.assetName || request?.asset?.name || request?.location || request?.propertyName || 'Unassigned',
+        submittedAt,
+        responseHours,
+      };
+    });
+    const submitted = rows.length;
+    const approved = rows.filter((row) => String(row.status || '').toLowerCase().includes('approved')).length;
+    const pending = rows.filter((row) => isPending(row.status)).length;
+    const avgResponseHours = rows.filter((row) => row.responseHours !== null).length
+      ? Number((rows.filter((row) => row.responseHours !== null).reduce((sum, row) => sum + row.responseHours, 0) / rows.filter((row) => row.responseHours !== null).length).toFixed(1))
+      : 0;
+    return {
+      submitted,
+      approved,
+      pending,
+      avgResponseHours,
+      rows: rows.sort((a, b) => (b.submittedAt?.getTime() || 0) - (a.submittedAt?.getTime() || 0)),
+    };
+  }, [requestItems, getIssueAnalyticsDate]);
+
+  const partsAnalytics = React.useMemo(() => {
+    const partMap = new Map();
+    const ensurePart = (name) => {
+      const key = String(name || '').trim();
+      if (!key) return null;
+      if (!partMap.has(key)) {
+        partMap.set(key, {
+          name: key,
+          onHand: 0,
+          consumedQty: 0,
+          spend: 0,
+          eventCount: 0,
+          lastUsedAt: null,
+          assets: new Set(),
+        });
+      }
+      return partMap.get(key);
+    };
+    (assets || []).forEach((asset) => {
+      const spareParts = Array.isArray(asset?.spareParts) ? asset.spareParts : [];
+      spareParts.forEach((entry) => {
+        const row = ensurePart(entry?.name || entry?.partName || entry?.title || entry?.sku);
+        if (!row) return;
+        row.onHand += Number(entry?.quantity || entry?.stock || entry?.onHand || 0) || 0;
+        if (asset?.name) row.assets.add(asset.name);
+      });
+    });
+    (allIssues || []).forEach((issue) => {
+      const entries = Array.isArray(issue?.parts) ? issue.parts : Array.isArray(issue?.materials) ? issue.materials : Array.isArray(issue?.lineItems) ? issue.lineItems : [];
+      entries.forEach((entry) => {
+        const row = ensurePart(entry?.name || entry?.partName || entry?.title || entry?.sku);
+        if (!row) return;
+        const quantity = Number(entry?.quantity || entry?.qty || 1) || 1;
+        const unitCost = toCostNumber(entry?.unitCost ?? entry?.cost ?? entry?.price);
+        row.consumedQty += quantity;
+        row.spend += quantity * unitCost;
+        row.eventCount += 1;
+        row.lastUsedAt = normalizeDate(issue?.updatedAt || issue?.createdAt || issue?.completedAt) || row.lastUsedAt;
+        if (issue?.assetName) row.assets.add(issue.assetName);
+      });
+    });
+    const rows = Array.from(partMap.values()).map((row) => ({
+      ...row,
+      assetCount: row.assets.size,
+      assets: undefined,
+    }));
+    return {
+      rows: rows.sort((a, b) => b.consumedQty - a.consumedQty || b.onHand - a.onHand),
+      totalOnHand: rows.reduce((sum, row) => sum + row.onHand, 0),
+      totalConsumed: rows.reduce((sum, row) => sum + row.consumedQty, 0),
+      totalSpend: rows.reduce((sum, row) => sum + row.spend, 0),
+      totalEvents: rows.reduce((sum, row) => sum + row.eventCount, 0),
+    };
+  }, [allIssues, assets]);
+
+  const meterAnalytics = React.useMemo(() => {
+    const rows = (analyticsMeters || []).map((meter, index) => {
+      const history = Array.isArray(meter?.readings) ? meter.readings : [];
+      const sortedHistory = [...history].sort((a, b) => (normalizeDate(b?.recordedAt || b?.createdAt) || 0) - (normalizeDate(a?.recordedAt || a?.createdAt) || 0));
+      const latest = sortedHistory[0];
+      const previous = sortedHistory[1];
+      const latestValue = Number(latest?.value ?? meter?.reading ?? 0) || 0;
+      const previousValue = Number(previous?.value ?? 0) || 0;
+      return {
+        id: String(meter?._id || meter?.id || `meter-${index}`),
+        name: meter?.name || meter?.title || 'Meter',
+        category: meter?.category || meter?.type || 'General',
+        location: meter?.location || meter?.assetLocation || meter?.propertyName || 'Unknown',
+        asset: meter?.asset || meter?.assetName || '—',
+        unit: meter?.unit || '',
+        status: meter?.status || 'Normal',
+        currentReading: latestValue,
+        delta: Math.max(0, latestValue - previousValue),
+        lastRecordedAt: latest?.recordedAt || latest?.createdAt || meter?.updatedAt || meter?.createdAt || null,
+        readingsCount: history.length,
+      };
+    });
+    return {
+      rows: rows.sort((a, b) => (normalizeDate(b.lastRecordedAt)?.getTime() || 0) - (normalizeDate(a.lastRecordedAt)?.getTime() || 0)),
+      activeCount: rows.filter((row) => String(row.status || '').toLowerCase() !== 'inactive').length,
+    };
+  }, [analyticsMeters]);
+
+  const purchaseOrderAnalytics = React.useMemo(() => {
+    const rows = (analyticsPurchaseOrders || []).map((po, index) => {
+      const total = Number(po?.totalCost || po?.cost) || (Array.isArray(po?.items)
+        ? po.items.reduce((sum, item) => sum + ((Number(item?.quantity) || 0) * (Number(item?.unitCost || item?.cost) || 0)), 0)
+        : 0);
+      return {
+        id: String(po?._id || po?.id || po?.poNumber || `po-${index}`),
+        title: po?.title || po?.name || 'Purchase Order',
+        status: po?.status || 'Pending',
+        vendor: po?.vendor?.name || po?.vendor || po?.vendorDetails?.name || 'Unknown',
+        category: po?.category || 'Uncategorized',
+        total,
+        itemsCount: Array.isArray(po?.items) ? po.items.length : Number(po?.itemsCount || 0) || 0,
+        createdAt: po?.createdAt || po?.purchaseDate || null,
+        dueAt: po?.expectedDate || null,
+      };
+    });
+    return {
+      rows: rows.sort((a, b) => (normalizeDate(b.createdAt)?.getTime() || 0) - (normalizeDate(a.createdAt)?.getTime() || 0)),
+      spend: rows.reduce((sum, row) => sum + row.total, 0),
+      openCount: rows.filter((row) => !String(row.status || '').toLowerCase().includes('approved') && !String(row.status || '').toLowerCase().includes('complete')).length,
+    };
+  }, [analyticsPurchaseOrders]);
+
+  const assetMaintenanceCostRows = React.useMemo(() => {
+    const map = new Map();
+    (assets || []).forEach((asset, index) => {
+      const key = String(asset?._id || asset?.id || asset?.name || `asset-${index}`);
+      map.set(key, {
+        id: key,
+        name: asset?.name || asset?.assetName || 'Asset',
+        category: asset?.category || asset?.type || 'Uncategorized',
+        location: asset?.location || asset?.propertyName || 'Unknown',
+        workOrders: 0,
+        cost: 0,
+        downtimeHours: 0,
+      });
+    });
+    (allIssues || []).forEach((issue, index) => {
+      const key = String(issue?.assetId || issue?.asset?._id || issue?.asset?.id || issue?.assetName || `issue-asset-${index}`);
+      const existing = map.get(key) || {
+        id: key,
+        name: issue?.assetName || issue?.asset?.name || 'Asset',
+        category: issue?.assetCategory || issue?.category || 'Uncategorized',
+        location: issue?.location || issue?.propertyName || 'Unknown',
+        workOrders: 0,
+        cost: 0,
+        downtimeHours: 0,
+      };
+      existing.workOrders += 1;
+      existing.cost += extractIssueCostSummary(issue).totalCost;
+      const startedAt = normalizeDate(issue?.startedAt || issue?.createdAt);
+      const endedAt = normalizeDate(issue?.completedAt || issue?.resolvedAt || issue?.updatedAt);
+      if (startedAt && endedAt && endedAt >= startedAt) {
+        existing.downtimeHours += (endedAt - startedAt) / 3600000;
+      }
+      map.set(key, existing);
+    });
+    return Array.from(map.values()).sort((a, b) => b.cost - a.cost);
+  }, [allIssues, assets]);
+
+  const usefulLifeRows = React.useMemo(() => {
+    return (assets || []).map((asset, index) => {
+      const createdAt = normalizeDate(asset?.purchaseDate || asset?.installedAt || asset?.createdAt);
+      const ageYears = createdAt ? Math.max(0, (now - createdAt) / (365.25 * 86400000)) : 0;
+      const targetLifeYears = Number(asset?.usefulLifeYears || asset?.expectedLifeYears || asset?.lifespanYears || 10) || 10;
+      const remainingYears = Math.max(0, targetLifeYears - ageYears);
+      const health = targetLifeYears ? Math.max(0, Math.round((remainingYears / targetLifeYears) * 100)) : 0;
+      return {
+        id: String(asset?._id || asset?.id || `useful-life-${index}`),
+        name: asset?.name || asset?.assetName || 'Asset',
+        category: asset?.category || asset?.type || 'Uncategorized',
+        ageYears: Number(ageYears.toFixed(1)),
+        targetLifeYears,
+        remainingYears: Number(remainingYears.toFixed(1)),
+        health,
+      };
+    }).sort((a, b) => a.health - b.health);
+  }, [assets, now]);
+
+  const assetAuditTrailRows = React.useMemo(() => {
+    const events = [];
+    const pushEvents = (entityType, entityLabel, activity) => {
+      (activity || []).forEach((entry, index) => {
+        const timestamp = normalizeDate(entry?.createdAt || entry?.updatedAt || entry?.timestamp || entry?.date);
+        if (!timestamp) return;
+        events.push({
+          id: `${entityType}-${entityLabel}-${index}-${timestamp.toISOString()}`,
+          entityType,
+          entityLabel,
+          action: entry?.action || entry?.type || entry?.label || 'Updated',
+          actor: entry?.userName || entry?.author || entry?.actor || entry?.createdBy?.name || 'System',
+          timestamp,
+          note: entry?.note || entry?.description || entry?.message || '',
+        });
+      });
+    };
+    (assets || []).forEach((asset) => {
+      pushEvents('Asset', asset?.name || asset?.assetName || 'Asset', Array.isArray(asset?.activity) ? asset.activity : Array.isArray(asset?.history) ? asset.history : asset?.logs);
+    });
+    (allIssues || []).forEach((issue) => {
+      const assetLabel = issue?.assetName || issue?.asset?.name || issue?.title || issue?.name || 'Issue';
+      pushEvents('Work Order', assetLabel, Array.isArray(issue?.activity) ? issue.activity : Array.isArray(issue?.history) ? issue.history : issue?.logs);
+    });
+    return events.sort((a, b) => b.timestamp - a.timestamp);
+  }, [allIssues, assets]);
+
+  const requestStatusChart = React.useMemo(() => ([
+    { label: 'Approved', value: requestAnalytics.approved, color: '#10b981' },
+    { label: 'Pending', value: requestAnalytics.pending, color: '#f59e0b' },
+    { label: 'Other', value: Math.max(0, requestAnalytics.submitted - requestAnalytics.approved - requestAnalytics.pending), color: '#94a3b8' },
+  ]), [requestAnalytics]);
+
+  const requestStatusTotal = requestStatusChart.reduce((sum, item) => sum + item.value, 0);
+  const requestStatusDonut = React.useMemo(() => {
+    if (!requestStatusTotal) return 'conic-gradient(#e5e7eb 0deg 360deg)';
+    let cursor = 0;
+    const stops = requestStatusChart.map((item) => {
+      const share = (item.value / requestStatusTotal) * 360;
+      const start = cursor;
+      cursor += share;
+      return `${item.color} ${start}deg ${cursor}deg`;
+    });
+    return `conic-gradient(${stops.join(', ')})`;
+  }, [requestStatusChart, requestStatusTotal]);
+
+  const userHoursSeries = React.useMemo(() => {
+    const buckets = labels.map(() => 0);
+    (workOrderItems || []).forEach((issue) => {
+      const bucketIndex = bucketIndexForDate(issue?.updatedAt || getIssueAnalyticsDate(issue));
+      if (bucketIndex < 0) return;
+      buckets[bucketIndex] += Number(issue?.timeSpent || issue?.time || issue?.totalTime || issue?.estimatedDuration || issue?.estimatedHours || 0) || 0;
+    });
+    return buckets.map((value) => Number(value.toFixed(1)));
+  }, [bucketIndexForDate, getIssueAnalyticsDate, labels, workOrderItems]);
+
+  const purchaseOrderMonthlySeries = React.useMemo(() => {
+    return labels.map((label, index) => {
+      const bucket = chartBuckets[index];
+      return purchaseOrderAnalytics.rows.reduce((sum, row) => {
+        const dt = normalizeDate(row.createdAt);
+        if (!dt || dt < bucket.start || dt > bucket.end) return sum;
+        return sum + row.total;
+      }, 0);
+    });
+  }, [chartBuckets, labels, purchaseOrderAnalytics.rows]);
+
   const subTabs = [
     { id: 'team-performance', label: 'Team Performance' },
     { id: 'cost-of-maintenance', label: 'Cost of Maintenance' },
@@ -31127,8 +31587,12 @@ const ClientAnalyticsTab = ({
     { id: 'explore-parts-inventory', label: 'Explore Parts Inventory', category: 'Parts' },
     { id: 'explore-parts-events', label: 'Explore Parts Events', category: 'Parts' },
     { id: 'requests-dashboard', label: 'Requests', category: 'Requests' },
+    { id: 'explore-requests', label: 'Explore Requests', category: 'Requests' },
     { id: 'itemized-time-report', label: 'Itemized Time Report', category: 'Users' },
     { id: 'user-login', label: 'User Login', category: 'Users' },
+    { id: 'explore-users', label: 'Explore Users', category: 'Users' },
+    { id: 'explore-itemized-time-report', label: 'Explore Itemized Time Report', category: 'Users' },
+    { id: 'explore-purchase-orders', label: 'Explore Purchase Orders', category: 'Purchase Orders' },
     { id: 'asset-audit-trail', label: 'Asset Audit Trail', category: 'Audit Trail' },
     { id: 'explore-audit-trail', label: 'Explore Audit Trail', category: 'Audit Trail' },
   ];
@@ -33242,7 +33706,723 @@ const ClientAnalyticsTab = ({
           </div>
         )}
 
-        {!['team-performance', 'cost-of-maintenance', 'asset-downtime', 'status-report', 'work-order-analysis', 'maintenance-compliance', 'work-order-aging', 'time-cost'].includes(subTab) && (
+        {subTab === 'adoption-metrics' && (
+          <div className="flex flex-col gap-6">
+            <div>
+              <h2 className="text-2xl font-bold">Fixnest Adoption Metrics</h2>
+              <p className="text-gray-500 mt-1">A quick view of platform adoption across users, assets, work orders, and meters.</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+              {adoptionMetrics.map((card) => (
+                <div key={card.label} className={`rounded-2xl border p-5 shadow-sm ${card.tone}`}>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] opacity-80">{card.label}</p>
+                  <p className="mt-4 text-3xl font-black">{card.value}</p>
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-1 xl:grid-cols-[1.15fr_0.85fr] gap-6">
+              <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-sm font-bold text-gray-700">Operational Coverage</p>
+                  <span className="text-xs font-semibold text-gray-400">{statusCounts.total} total maintenance records</span>
+                </div>
+                <div className="space-y-4">
+                  {[
+                    { label: 'Completed Work Orders', value: statusCounts.completed, total: Math.max(1, statusCounts.total), color: '#2563eb' },
+                    { label: 'Open Requests', value: requestAnalytics.pending, total: Math.max(1, requestAnalytics.submitted || 1), color: '#0f766e' },
+                    { label: 'Operational Assets', value: assetAnalytics.summary.operationalCount, total: Math.max(1, assetAnalytics.summary.totalAssets || 1), color: '#f59e0b' },
+                    { label: 'Meters With Readings', value: meterAnalytics.rows.filter((row) => row.readingsCount > 0).length, total: Math.max(1, meterAnalytics.rows.length || 1), color: '#7c3aed' },
+                  ].map((row) => (
+                    <div key={row.label}>
+                      <div className="flex items-center justify-between text-sm mb-2">
+                        <span className="font-semibold text-gray-700">{row.label}</span>
+                        <span className="font-bold text-gray-900">{row.value}/{row.total}</span>
+                      </div>
+                      <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+                        <div className="h-full rounded-full" style={{ width: `${Math.min(100, (row.value / row.total) * 100)}%`, backgroundColor: row.color }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-sm font-bold text-gray-700">Most Active Users</p>
+                  <span className="text-xs font-semibold text-gray-400">{userAnalytics.rows.length} users tracked</span>
+                </div>
+                <div className="space-y-3">
+                  {userAnalytics.rows.slice(0, 6).map((user) => (
+                    <div key={user.id} className="flex items-center justify-between rounded-xl border border-gray-100 px-4 py-3">
+                      <div>
+                        <p className="text-sm font-bold text-gray-900">{user.name}</p>
+                        <p className="text-xs text-gray-500 mt-1">{user.role}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-bold text-gray-900">{user.completed} completed</p>
+                        <p className="text-xs text-gray-500 mt-1">{formatMetricNumber(user.hours, 1)}h logged</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {subTab === 'reliability-dashboard' && (
+          <div className="flex flex-col gap-6">
+            <div>
+              <h2 className="text-2xl font-bold">Reliability Dashboard</h2>
+              <p className="text-gray-500 mt-1">Reliability and maintenance intensity by asset across your portfolio.</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+              {[
+                { label: 'Total Assets', value: assetAnalytics.summary.totalAssets, tone: 'border-blue-100 bg-blue-50 text-blue-700' },
+                { label: 'Operational', value: assetAnalytics.summary.operationalCount, tone: 'border-emerald-100 bg-emerald-50 text-emerald-700' },
+                { label: 'Not Operational', value: assetAnalytics.summary.notOperationalCount, tone: 'border-rose-100 bg-rose-50 text-rose-700' },
+                { label: 'Utilization', value: `${assetAnalytics.summary.utilization.toFixed(1)}%`, tone: 'border-amber-100 bg-amber-50 text-amber-700' },
+              ].map((card) => (
+                <div key={card.label} className={`rounded-2xl border p-5 shadow-sm ${card.tone}`}>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] opacity-80">{card.label}</p>
+                  <p className="mt-4 text-3xl font-black">{card.value}</p>
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-1 xl:grid-cols-[1.1fr_0.9fr] gap-6">
+              <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-sm font-bold text-gray-700">Assets With Highest Maintenance Load</p>
+                  <span className="text-xs font-semibold text-gray-400">{assetMaintenanceCostRows.length} assets</span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[640px] text-left">
+                    <thead>
+                      <tr className="border-b border-gray-100 text-xs uppercase tracking-[0.18em] text-gray-400">
+                        {['Asset', 'Category', 'Work Orders', 'Downtime', 'Cost'].map((head) => <th key={head} className="py-3 pr-4 font-bold">{head}</th>)}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {assetMaintenanceCostRows.slice(0, 8).map((row) => (
+                        <tr key={row.id} className="border-b border-gray-50 text-sm">
+                          <td className="py-4 pr-4 font-semibold text-gray-900">{row.name}</td>
+                          <td className="py-4 pr-4 text-gray-600">{row.category}</td>
+                          <td className="py-4 pr-4 text-gray-600">{row.workOrders}</td>
+                          <td className="py-4 pr-4 text-gray-600">{formatMetricNumber(row.downtimeHours, 1)}h</td>
+                          <td className="py-4 pr-4 font-semibold text-gray-900">{formatCost(row.cost)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-sm font-bold text-gray-700">Reliability By Category</p>
+                  <span className="text-xs font-semibold text-gray-400">Top categories</span>
+                </div>
+                <div className="space-y-4">
+                  {assetAnalytics.utilizationByCategory.map((entry) => (
+                    <div key={entry.label}>
+                      <div className="flex items-center justify-between text-sm mb-1.5">
+                        <span className="font-semibold text-gray-700">{entry.label}</span>
+                        <span className="font-bold text-gray-900">{entry.utilization}%</span>
+                      </div>
+                      <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+                        <div className="h-full rounded-full" style={{ width: `${entry.utilization}%`, backgroundColor: entry.color }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {subTab === 'total-maintenance-cost' && (
+          <div className="flex flex-col gap-6">
+            <div>
+              <h2 className="text-2xl font-bold">Total Maintenance Cost</h2>
+              <p className="text-gray-500 mt-1">Asset-level cost concentration and spending exposure across your maintenance portfolio.</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+              {[
+                { label: 'Total Spend', value: formatCost(costSummary.total), tone: 'border-gray-200 bg-gray-50 text-gray-900' },
+                { label: 'Asset Spend', value: formatCost(assetMaintenanceCostRows.reduce((sum, row) => sum + row.cost, 0)), tone: 'border-blue-100 bg-blue-50 text-blue-700' },
+                { label: 'Reactive', value: formatCost(costSummary.reactive), tone: 'border-teal-100 bg-teal-50 text-teal-700' },
+                { label: 'Preventive', value: formatCost(costSummary.preventive), tone: 'border-indigo-100 bg-indigo-50 text-indigo-700' },
+              ].map((card) => (
+                <div key={card.label} className={`rounded-2xl border p-5 shadow-sm ${card.tone}`}>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] opacity-80">{card.label}</p>
+                  <p className="mt-4 text-3xl font-black">{card.value}</p>
+                </div>
+              ))}
+            </div>
+            <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-sm font-bold text-gray-700">Top Assets By Maintenance Spend</p>
+                <span className="text-xs font-semibold text-gray-400">{assetMaintenanceCostRows.length} assets</span>
+              </div>
+              <div className="space-y-4">
+                {assetMaintenanceCostRows.slice(0, 10).map((row) => {
+                  const share = costSummary.total ? Math.min(100, (row.cost / costSummary.total) * 100) : 0;
+                  return (
+                    <div key={row.id}>
+                      <div className="flex items-center justify-between text-sm mb-1.5">
+                        <span className="font-semibold text-gray-700">{row.name}</span>
+                        <span className="font-bold text-gray-900">{formatCost(row.cost)}</span>
+                      </div>
+                      <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+                        <div className="h-full rounded-full bg-blue-600" style={{ width: `${share}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {subTab === 'useful-life' && (
+          <div className="flex flex-col gap-6">
+            <div>
+              <h2 className="text-2xl font-bold">Useful Life</h2>
+              <p className="text-gray-500 mt-1">Asset age, expected lifespan, and renewal pressure across the installed base.</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {[
+                { label: 'Tracked Assets', value: usefulLifeRows.length, tone: 'border-blue-100 bg-blue-50 text-blue-700' },
+                { label: 'Near End of Life', value: usefulLifeRows.filter((row) => row.health <= 25).length, tone: 'border-rose-100 bg-rose-50 text-rose-700' },
+                { label: 'Healthy Assets', value: usefulLifeRows.filter((row) => row.health > 50).length, tone: 'border-emerald-100 bg-emerald-50 text-emerald-700' },
+              ].map((card) => (
+                <div key={card.label} className={`rounded-2xl border p-5 shadow-sm ${card.tone}`}>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] opacity-80">{card.label}</p>
+                  <p className="mt-4 text-3xl font-black">{card.value}</p>
+                </div>
+              ))}
+            </div>
+            <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm overflow-x-auto">
+              <table className="w-full min-w-[700px] text-left">
+                <thead>
+                  <tr className="border-b border-gray-100 text-xs uppercase tracking-[0.18em] text-gray-400">
+                    {['Asset', 'Category', 'Age', 'Useful Life', 'Remaining', 'Health'].map((head) => <th key={head} className="py-3 pr-4 font-bold">{head}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {usefulLifeRows.slice(0, 12).map((row) => (
+                    <tr key={row.id} className="border-b border-gray-50 text-sm">
+                      <td className="py-4 pr-4 font-semibold text-gray-900">{row.name}</td>
+                      <td className="py-4 pr-4 text-gray-600">{row.category}</td>
+                      <td className="py-4 pr-4 text-gray-600">{formatMetricNumber(row.ageYears, 1)} yrs</td>
+                      <td className="py-4 pr-4 text-gray-600">{formatMetricNumber(row.targetLifeYears, 1)} yrs</td>
+                      <td className="py-4 pr-4 text-gray-600">{formatMetricNumber(row.remainingYears, 1)} yrs</td>
+                      <td className="py-4 pr-4">
+                        <div className="flex items-center gap-3">
+                          <div className="h-2 w-28 rounded-full bg-gray-100 overflow-hidden">
+                            <div className={`h-full rounded-full ${row.health <= 25 ? 'bg-rose-500' : row.health <= 50 ? 'bg-amber-500' : 'bg-emerald-500'}`} style={{ width: `${row.health}%` }} />
+                          </div>
+                          <span className="font-semibold text-gray-700">{row.health}%</span>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {subTab === 'explore-assets' && (
+          <div className="flex flex-col gap-6">
+            <div>
+              <h2 className="text-2xl font-bold">Explore Assets</h2>
+              <p className="text-gray-500 mt-1">Browse utilization, downtime, and maintenance cost by asset.</p>
+            </div>
+            <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm overflow-x-auto">
+              <table className="w-full min-w-[820px] text-left">
+                <thead>
+                  <tr className="border-b border-gray-100 text-xs uppercase tracking-[0.18em] text-gray-400">
+                    {['Asset', 'Category', 'Location', 'Utilization', 'Downtime', 'Work Orders', 'Cost'].map((head) => <th key={head} className="py-3 pr-4 font-bold">{head}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {assetMaintenanceCostRows.slice(0, 14).map((row) => {
+                    const utilization = assetAnalytics.tableRows.find((item) => item.name === row.name)?.utilization ?? 100;
+                    return (
+                      <tr key={row.id} className="border-b border-gray-50 text-sm">
+                        <td className="py-4 pr-4 font-semibold text-gray-900">{row.name}</td>
+                        <td className="py-4 pr-4 text-gray-600">{row.category}</td>
+                        <td className="py-4 pr-4 text-gray-600">{row.location}</td>
+                        <td className="py-4 pr-4 text-gray-600">{formatMetricNumber(utilization, 1)}%</td>
+                        <td className="py-4 pr-4 text-gray-600">{formatMetricNumber(row.downtimeHours, 1)}h</td>
+                        <td className="py-4 pr-4 text-gray-600">{row.workOrders}</td>
+                        <td className="py-4 pr-4 font-semibold text-gray-900">{formatCost(row.cost)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {['meters-dashboard', 'explore-meters'].includes(subTab) && (
+          <div className="flex flex-col gap-6">
+            <div>
+              <h2 className="text-2xl font-bold">{subTab === 'meters-dashboard' ? 'Meters' : 'Explore Meters'}</h2>
+              <p className="text-gray-500 mt-1">Meter coverage, latest readings, and activity across connected assets and locations.</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {[
+                { label: 'Total Meters', value: meterAnalytics.rows.length, tone: 'border-blue-100 bg-blue-50 text-blue-700' },
+                { label: 'Active', value: meterAnalytics.activeCount, tone: 'border-emerald-100 bg-emerald-50 text-emerald-700' },
+                { label: 'With Readings', value: meterAnalytics.rows.filter((row) => row.readingsCount > 0).length, tone: 'border-amber-100 bg-amber-50 text-amber-700' },
+              ].map((card) => (
+                <div key={card.label} className={`rounded-2xl border p-5 shadow-sm ${card.tone}`}>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] opacity-80">{card.label}</p>
+                  <p className="mt-4 text-3xl font-black">{card.value}</p>
+                </div>
+              ))}
+            </div>
+            <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm overflow-x-auto">
+              <table className="w-full min-w-[780px] text-left">
+                <thead>
+                  <tr className="border-b border-gray-100 text-xs uppercase tracking-[0.18em] text-gray-400">
+                    {['Meter', 'Category', 'Location', 'Asset', 'Current Reading', 'Delta', 'Last Reading'].map((head) => <th key={head} className="py-3 pr-4 font-bold">{head}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {meterAnalytics.rows.slice(0, 12).map((row) => (
+                    <tr key={row.id} className="border-b border-gray-50 text-sm">
+                      <td className="py-4 pr-4 font-semibold text-gray-900">{row.name}</td>
+                      <td className="py-4 pr-4 text-gray-600">{row.category}</td>
+                      <td className="py-4 pr-4 text-gray-600">{row.location}</td>
+                      <td className="py-4 pr-4 text-gray-600">{row.asset}</td>
+                      <td className="py-4 pr-4 text-gray-600">{formatMetricNumber(row.currentReading, 1)} {row.unit}</td>
+                      <td className="py-4 pr-4 text-gray-600">{formatMetricNumber(row.delta, 1)} {row.unit}</td>
+                      <td className="py-4 pr-4 text-gray-600">{formatAnalyticsDateTime(row.lastRecordedAt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {['parts-consumption', 'parts-in-inventory', 'explore-parts-inventory', 'explore-parts-events'].includes(subTab) && (
+          <div className="flex flex-col gap-6">
+            <div>
+              <h2 className="text-2xl font-bold">{otherDashboardCatalog.find((d) => d.id === subTab)?.label}</h2>
+              <p className="text-gray-500 mt-1">Inventory position, usage, and part-related maintenance activity across recent jobs.</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+              {[
+                { label: 'Parts Tracked', value: partsAnalytics.rows.length, tone: 'border-blue-100 bg-blue-50 text-blue-700' },
+                { label: 'On Hand', value: formatMetricNumber(partsAnalytics.totalOnHand), tone: 'border-emerald-100 bg-emerald-50 text-emerald-700' },
+                { label: 'Consumed', value: formatMetricNumber(partsAnalytics.totalConsumed), tone: 'border-amber-100 bg-amber-50 text-amber-700' },
+                { label: 'Spend', value: formatCost(partsAnalytics.totalSpend), tone: 'border-violet-100 bg-violet-50 text-violet-700' },
+              ].map((card) => (
+                <div key={card.label} className={`rounded-2xl border p-5 shadow-sm ${card.tone}`}>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] opacity-80">{card.label}</p>
+                  <p className="mt-4 text-3xl font-black">{card.value}</p>
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-1 xl:grid-cols-[1.05fr_0.95fr] gap-6">
+              <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-sm font-bold text-gray-700">Top Parts Consumption</p>
+                  <span className="text-xs font-semibold text-gray-400">{partsAnalytics.totalEvents} events</span>
+                </div>
+                <div className="space-y-4">
+                  {partsAnalytics.rows.slice(0, 6).map((row) => {
+                    const share = partsAnalytics.totalConsumed ? Math.min(100, (row.consumedQty / partsAnalytics.totalConsumed) * 100) : 0;
+                    return (
+                      <div key={row.name}>
+                        <div className="flex items-center justify-between text-sm mb-1.5">
+                          <span className="font-semibold text-gray-700">{row.name}</span>
+                          <span className="font-bold text-gray-900">{formatMetricNumber(row.consumedQty)}</span>
+                        </div>
+                        <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+                          <div className="h-full rounded-full bg-cyan-500" style={{ width: `${share}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-sm font-bold text-gray-700">Spend By Part</p>
+                  <span className="text-xs font-semibold text-gray-400">{formatCost(partsAnalytics.totalSpend)}</span>
+                </div>
+                <div className="flex h-[260px] items-end gap-3">
+                  {partsAnalytics.rows.slice(0, 6).map((row, index) => {
+                    const maxSpend = Math.max(1, ...partsAnalytics.rows.slice(0, 6).map((item) => item.spend));
+                    const barHeight = `${Math.max(10, (row.spend / maxSpend) * 100)}%`;
+                    return (
+                      <div key={row.name} className="flex min-w-0 flex-1 flex-col items-center gap-2 h-full">
+                        <div className="flex h-full w-full items-end justify-center">
+                          <div className="w-full max-w-[52px] rounded-t-xl" style={{ height: barHeight, backgroundColor: palette[index % palette.length] }} />
+                        </div>
+                        <span className="max-w-full truncate text-center text-[10px] text-gray-500">{row.name}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+            <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm overflow-x-auto">
+              <table className="w-full min-w-[760px] text-left">
+                <thead>
+                  <tr className="border-b border-gray-100 text-xs uppercase tracking-[0.18em] text-gray-400">
+                    {['Part', 'On Hand', 'Consumed', 'Events', 'Assets', 'Spend', 'Last Used'].map((head) => <th key={head} className="py-3 pr-4 font-bold">{head}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {partsAnalytics.rows.slice(0, 14).map((row) => (
+                    <tr key={row.name} className="border-b border-gray-50 text-sm">
+                      <td className="py-4 pr-4 font-semibold text-gray-900">{row.name}</td>
+                      <td className="py-4 pr-4 text-gray-600">{formatMetricNumber(row.onHand)}</td>
+                      <td className="py-4 pr-4 text-gray-600">{formatMetricNumber(row.consumedQty)}</td>
+                      <td className="py-4 pr-4 text-gray-600">{row.eventCount}</td>
+                      <td className="py-4 pr-4 text-gray-600">{row.assetCount}</td>
+                      <td className="py-4 pr-4 font-semibold text-gray-900">{formatCost(row.spend)}</td>
+                      <td className="py-4 pr-4 text-gray-600">{formatAnalyticsDateTime(row.lastUsedAt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {['requests-dashboard', 'explore-requests'].includes(subTab) && (
+          <div className="flex flex-col gap-6">
+            <div>
+              <h2 className="text-2xl font-bold">{subTab === 'requests-dashboard' ? 'Requests' : 'Explore Requests'}</h2>
+              <p className="text-gray-500 mt-1">Request flow, response pace, and requester-level visibility into incoming demand.</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+              {[
+                { label: 'Submitted', value: requestAnalytics.submitted, tone: 'border-blue-100 bg-blue-50 text-blue-700' },
+                { label: 'Approved', value: requestAnalytics.approved, tone: 'border-emerald-100 bg-emerald-50 text-emerald-700' },
+                { label: 'Pending', value: requestAnalytics.pending, tone: 'border-amber-100 bg-amber-50 text-amber-700' },
+                { label: 'Avg Response', value: `${formatMetricNumber(requestAnalytics.avgResponseHours, 1)}h`, tone: 'border-violet-100 bg-violet-50 text-violet-700' },
+              ].map((card) => (
+                <div key={card.label} className={`rounded-2xl border p-5 shadow-sm ${card.tone}`}>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] opacity-80">{card.label}</p>
+                  <p className="mt-4 text-3xl font-black">{card.value}</p>
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-1 xl:grid-cols-[0.9fr_1.1fr] gap-6">
+              <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-sm font-bold text-gray-700">Request Status Mix</p>
+                  <span className="text-xs font-semibold text-gray-400">{requestStatusTotal} requests</span>
+                </div>
+                <div className="flex flex-col items-center gap-5 py-4">
+                  <div className="h-44 w-44 rounded-full" style={{ background: requestStatusDonut }}>
+                    <div className="m-7 flex h-[120px] w-[120px] items-center justify-center rounded-full bg-white text-center">
+                      <div>
+                        <p className="text-3xl font-black text-gray-900">{requestAnalytics.submitted}</p>
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-400">Requests</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-center gap-4 text-xs font-medium text-gray-500">
+                    {requestStatusChart.map((item) => (
+                      <span key={item.label} className="flex items-center gap-2">
+                        <span className="h-3 w-3 rounded-full" style={{ backgroundColor: item.color }} />
+                        {item.label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-sm font-bold text-gray-700">Requests Over Time</p>
+                  <span className="text-xs font-semibold text-gray-400">{labels.length} buckets</span>
+                </div>
+                <div className="overflow-x-auto">
+                  <svg viewBox={`0 0 ${lineChartWidth} ${lineChartHeight}`} className="w-full min-w-[620px] h-[230px]">
+                    {[0, 1, 2, 3, 4].map((step) => {
+                      const y = linePadding + (linePlotHeight / 4) * step;
+                      return <line key={step} x1={linePadding} y1={y} x2={lineChartWidth - linePadding} y2={y} stroke="#e5e7eb" strokeDasharray="4 4" />;
+                    })}
+                    <path d={buildMetricPath(labels.map((_, index) => requestAnalytics.rows.filter((row) => {
+                      const dt = row.submittedAt;
+                      const bucket = chartBuckets[index];
+                      return dt && dt >= bucket.start && dt <= bucket.end;
+                    }).length))} fill="none" stroke="#2563eb" strokeWidth="3" strokeLinecap="round" />
+                    {labels.map((label, index) => (
+                      <text key={label} x={linePadding + index * xStep} y={lineChartHeight - 6} textAnchor="middle" className="fill-gray-400 text-[10px]">
+                        {label}
+                      </text>
+                    ))}
+                  </svg>
+                </div>
+              </div>
+            </div>
+            <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm overflow-x-auto">
+              <table className="w-full min-w-[820px] text-left">
+                <thead>
+                  <tr className="border-b border-gray-100 text-xs uppercase tracking-[0.18em] text-gray-400">
+                    {['Request', 'Requester', 'Asset / Location', 'Status', 'Submitted', 'Response Time'].map((head) => <th key={head} className="py-3 pr-4 font-bold">{head}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {requestAnalytics.rows.slice(0, 14).map((row) => (
+                    <tr key={row.id} className="border-b border-gray-50 text-sm">
+                      <td className="py-4 pr-4 font-semibold text-gray-900">{row.title}</td>
+                      <td className="py-4 pr-4 text-gray-600">{row.requester}</td>
+                      <td className="py-4 pr-4 text-gray-600">{row.asset}</td>
+                      <td className="py-4 pr-4 text-gray-600">{row.status}</td>
+                      <td className="py-4 pr-4 text-gray-600">{formatAnalyticsDateTime(row.submittedAt)}</td>
+                      <td className="py-4 pr-4 text-gray-600">{row.responseHours === null ? '—' : `${formatMetricNumber(row.responseHours, 1)}h`}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {['user-login', 'itemized-time-report', 'explore-users', 'explore-itemized-time-report'].includes(subTab) && (
+          <div className="flex flex-col gap-6">
+            <div>
+              <h2 className="text-2xl font-bold">{otherDashboardCatalog.find((d) => d.id === subTab)?.label}</h2>
+              <p className="text-gray-500 mt-1">User access, login recency, completed work, and logged maintenance time by person.</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+              {[
+                { label: 'Users', value: userAnalytics.rows.length, tone: 'border-blue-100 bg-blue-50 text-blue-700' },
+                { label: 'Recent Logins', value: userAnalytics.recentLogins.length, tone: 'border-emerald-100 bg-emerald-50 text-emerald-700' },
+                { label: 'Completed Work', value: userAnalytics.rows.reduce((sum, row) => sum + row.completed, 0), tone: 'border-amber-100 bg-amber-50 text-amber-700' },
+                { label: 'Hours Logged', value: `${formatMetricNumber(userAnalytics.rows.reduce((sum, row) => sum + row.hours, 0), 1)}h`, tone: 'border-violet-100 bg-violet-50 text-violet-700' },
+              ].map((card) => (
+                <div key={card.label} className={`rounded-2xl border p-5 shadow-sm ${card.tone}`}>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] opacity-80">{card.label}</p>
+                  <p className="mt-4 text-3xl font-black">{card.value}</p>
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-1 xl:grid-cols-[1.1fr_0.9fr] gap-6">
+              <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-sm font-bold text-gray-700">Logged Hours Trend</p>
+                  <span className="text-xs font-semibold text-gray-400">{formatMetricNumber(userHoursSeries.reduce((sum, value) => sum + value, 0), 1)}h total</span>
+                </div>
+                <div className="overflow-x-auto">
+                  <svg viewBox={`0 0 ${lineChartWidth} ${lineChartHeight}`} className="w-full min-w-[620px] h-[230px]">
+                    {[0, 1, 2, 3, 4].map((step) => {
+                      const y = linePadding + (linePlotHeight / 4) * step;
+                      return <line key={step} x1={linePadding} y1={y} x2={lineChartWidth - linePadding} y2={y} stroke="#e5e7eb" strokeDasharray="4 4" />;
+                    })}
+                    <path d={buildMetricPath(userHoursSeries)} fill="none" stroke="#7c3aed" strokeWidth="3" strokeLinecap="round" />
+                    {userHoursSeries.map((value, index) => (
+                      <circle key={`${labels[index]}-${value}`} cx={linePadding + index * xStep} cy={getMetricPointY(userHoursSeries, value)} r="4.5" fill="#8b5cf6" />
+                    ))}
+                    {labels.map((label, index) => (
+                      <text key={label} x={linePadding + index * xStep} y={lineChartHeight - 6} textAnchor="middle" className="fill-gray-400 text-[10px]">
+                        {label}
+                      </text>
+                    ))}
+                  </svg>
+                </div>
+              </div>
+              <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-sm font-bold text-gray-700">Top Contributors</p>
+                  <span className="text-xs font-semibold text-gray-400">By completed work</span>
+                </div>
+                <div className="space-y-4">
+                  {userAnalytics.rows.slice(0, 6).map((row) => {
+                    const maxCompleted = Math.max(1, ...userAnalytics.rows.slice(0, 6).map((item) => item.completed));
+                    const share = (row.completed / maxCompleted) * 100;
+                    return (
+                      <div key={row.id}>
+                        <div className="flex items-center justify-between text-sm mb-1.5">
+                          <span className="font-semibold text-gray-700">{row.name}</span>
+                          <span className="font-bold text-gray-900">{row.completed}</span>
+                        </div>
+                        <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+                          <div className="h-full rounded-full bg-violet-500" style={{ width: `${share}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+            <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm overflow-x-auto">
+              <table className="w-full min-w-[840px] text-left">
+                <thead>
+                  <tr className="border-b border-gray-100 text-xs uppercase tracking-[0.18em] text-gray-400">
+                    {['User', 'Role', 'Status', 'Completed', 'Open', 'Hours', 'Last Login'].map((head) => <th key={head} className="py-3 pr-4 font-bold">{head}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {userAnalytics.rows.slice(0, 14).map((row) => (
+                    <tr key={row.id} className="border-b border-gray-50 text-sm">
+                      <td className="py-4 pr-4">
+                        <div className="font-semibold text-gray-900">{row.name}</div>
+                        <div className="text-xs text-gray-500 mt-1">{row.email || 'No email'}</div>
+                      </td>
+                      <td className="py-4 pr-4 text-gray-600">{row.role}</td>
+                      <td className="py-4 pr-4 text-gray-600">{row.status}</td>
+                      <td className="py-4 pr-4 text-gray-600">{row.completed}</td>
+                      <td className="py-4 pr-4 text-gray-600">{row.open}</td>
+                      <td className="py-4 pr-4 text-gray-600">{formatMetricNumber(row.hours, 1)}h</td>
+                      <td className="py-4 pr-4 text-gray-600">{formatAnalyticsDateTime(row.lastLogin)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {subTab === 'explore-purchase-orders' && (
+          <div className="flex flex-col gap-6">
+            <div>
+              <h2 className="text-2xl font-bold">Explore Purchase Orders</h2>
+              <p className="text-gray-500 mt-1">Track vendor commitments, open approvals, and purchasing spend over time.</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {[
+                { label: 'Purchase Orders', value: purchaseOrderAnalytics.rows.length, tone: 'border-blue-100 bg-blue-50 text-blue-700' },
+                { label: 'Open Approvals', value: purchaseOrderAnalytics.openCount, tone: 'border-amber-100 bg-amber-50 text-amber-700' },
+                { label: 'Committed Spend', value: formatCost(purchaseOrderAnalytics.spend), tone: 'border-emerald-100 bg-emerald-50 text-emerald-700' },
+              ].map((card) => (
+                <div key={card.label} className={`rounded-2xl border p-5 shadow-sm ${card.tone}`}>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] opacity-80">{card.label}</p>
+                  <p className="mt-4 text-3xl font-black">{card.value}</p>
+                </div>
+              ))}
+            </div>
+            <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-sm font-bold text-gray-700">Purchase Order Spend Trend</p>
+                <span className="text-xs font-semibold text-gray-400">{labels.length} periods</span>
+              </div>
+              <div className="overflow-x-auto">
+                <svg viewBox={`0 0 ${lineChartWidth} ${lineChartHeight}`} className="w-full min-w-[620px] h-[230px]">
+                  {[0, 1, 2, 3, 4].map((step) => {
+                    const y = linePadding + (linePlotHeight / 4) * step;
+                    return <line key={step} x1={linePadding} y1={y} x2={lineChartWidth - linePadding} y2={y} stroke="#e5e7eb" strokeDasharray="4 4" />;
+                  })}
+                  <path d={buildMetricPath(purchaseOrderMonthlySeries)} fill="none" stroke="#059669" strokeWidth="3" strokeLinecap="round" />
+                  {purchaseOrderMonthlySeries.map((value, index) => (
+                    <circle key={`${labels[index]}-${value}`} cx={linePadding + index * xStep} cy={getMetricPointY(purchaseOrderMonthlySeries, value)} r="4.5" fill="#10b981" />
+                  ))}
+                  {labels.map((label, index) => (
+                    <text key={label} x={linePadding + index * xStep} y={lineChartHeight - 6} textAnchor="middle" className="fill-gray-400 text-[10px]">
+                      {label}
+                    </text>
+                  ))}
+                </svg>
+              </div>
+            </div>
+            <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm overflow-x-auto">
+              <table className="w-full min-w-[760px] text-left">
+                <thead>
+                  <tr className="border-b border-gray-100 text-xs uppercase tracking-[0.18em] text-gray-400">
+                    {['Purchase Order', 'Vendor', 'Category', 'Status', 'Items', 'Total', 'Created'].map((head) => <th key={head} className="py-3 pr-4 font-bold">{head}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {purchaseOrderAnalytics.rows.slice(0, 12).map((row) => (
+                    <tr key={row.id} className="border-b border-gray-50 text-sm">
+                      <td className="py-4 pr-4 font-semibold text-gray-900">{row.title}</td>
+                      <td className="py-4 pr-4 text-gray-600">{row.vendor}</td>
+                      <td className="py-4 pr-4 text-gray-600">{row.category}</td>
+                      <td className="py-4 pr-4 text-gray-600">{row.status}</td>
+                      <td className="py-4 pr-4 text-gray-600">{row.itemsCount}</td>
+                      <td className="py-4 pr-4 font-semibold text-gray-900">{formatCost(row.total)}</td>
+                      <td className="py-4 pr-4 text-gray-600">{formatAnalyticsDate(row.createdAt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {['asset-audit-trail', 'explore-audit-trail'].includes(subTab) && (
+          <div className="flex flex-col gap-6">
+            <div>
+              <h2 className="text-2xl font-bold">{otherDashboardCatalog.find((d) => d.id === subTab)?.label}</h2>
+              <p className="text-gray-500 mt-1">Chronological activity across assets and work orders based on in-app history records.</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {[
+                { label: 'Events', value: assetAuditTrailRows.length, tone: 'border-blue-100 bg-blue-50 text-blue-700' },
+                { label: 'Asset Events', value: assetAuditTrailRows.filter((row) => row.entityType === 'Asset').length, tone: 'border-emerald-100 bg-emerald-50 text-emerald-700' },
+                { label: 'Work Order Events', value: assetAuditTrailRows.filter((row) => row.entityType === 'Work Order').length, tone: 'border-amber-100 bg-amber-50 text-amber-700' },
+              ].map((card) => (
+                <div key={card.label} className={`rounded-2xl border p-5 shadow-sm ${card.tone}`}>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] opacity-80">{card.label}</p>
+                  <p className="mt-4 text-3xl font-black">{card.value}</p>
+                </div>
+              ))}
+            </div>
+            <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-sm font-bold text-gray-700">Activity Volume</p>
+                <span className="text-xs font-semibold text-gray-400">Recent 8 events</span>
+              </div>
+              <div className="flex h-[220px] items-end gap-3">
+                {assetAuditTrailRows.slice(0, 8).reverse().map((row, index, list) => {
+                  const grouped = {};
+                  list.forEach((entry) => {
+                    const key = formatAnalyticsDate(entry.timestamp, { month: 'short', day: 'numeric' });
+                    grouped[key] = (grouped[key] || 0) + 1;
+                  });
+                  const entries = Object.entries(grouped);
+                  const [label, value] = entries[index] || [`E${index + 1}`, 1];
+                  const maxValue = Math.max(1, ...entries.map(([, count]) => count));
+                  const barHeight = `${Math.max(10, (value / maxValue) * 100)}%`;
+                  return (
+                    <div key={`${label}-${index}`} className="flex min-w-0 flex-1 flex-col items-center gap-2 h-full">
+                      <div className="flex h-full w-full items-end justify-center">
+                        <div className="w-full max-w-[52px] rounded-t-xl bg-slate-500" style={{ height: barHeight }} />
+                      </div>
+                      <span className="max-w-full truncate text-center text-[10px] text-gray-500">{label}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+              <div className="space-y-4">
+                {assetAuditTrailRows.slice(0, 14).map((row) => (
+                  <div key={row.id} className="rounded-xl border border-gray-100 px-4 py-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="text-sm font-bold text-gray-900">{row.action}</p>
+                        <p className="text-xs text-gray-500 mt-1">{row.entityType}: {row.entityLabel}</p>
+                        {row.note ? <p className="text-sm text-gray-600 mt-3">{row.note}</p> : null}
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs font-semibold text-gray-500">{row.actor}</p>
+                        <p className="text-xs text-gray-400 mt-1">{formatAnalyticsDateTime(row.timestamp)}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {!assetAuditTrailRows.length && (
+                  <div className="rounded-xl border border-dashed border-gray-200 px-4 py-12 text-center text-sm text-gray-500">
+                    No audit-style activity records were found for the current dataset.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {!['team-performance', 'cost-of-maintenance', 'asset-downtime', 'status-report', 'work-order-analysis', 'maintenance-compliance', 'work-order-aging', 'time-cost', 'adoption-metrics', 'reliability-dashboard', 'total-maintenance-cost', 'useful-life', 'explore-assets', 'meters-dashboard', 'explore-meters', 'parts-consumption', 'parts-in-inventory', 'explore-parts-inventory', 'explore-parts-events', 'requests-dashboard', 'explore-requests', 'user-login', 'itemized-time-report', 'explore-users', 'explore-itemized-time-report', 'explore-purchase-orders', 'asset-audit-trail', 'explore-audit-trail'].includes(subTab) && (
           <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
             <div className="bg-white border border-gray-100 rounded-2xl p-10 shadow-sm flex flex-col items-center justify-center text-center min-h-[450px]">
               <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mb-5 shadow-sm border border-blue-100">
@@ -34532,11 +35712,25 @@ const ClientMetersTab = ({
         )}
 
         {showEditMeter && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="fixed inset-0 z-50 overflow-y-auto px-4 py-6 sm:px-6">
             <div className="absolute inset-0 bg-black/40" onClick={() => setShowEditMeter(false)} />
-            <div className="relative glass-surface-strong z-10 w-full max-w-2xl rounded-xl p-6">
-              <h3 className="mb-5 text-xl font-bold">Edit Meter</h3>
-              <div className="space-y-4">
+            <div className="relative z-10 mx-auto flex min-h-full w-full max-w-4xl items-center justify-center">
+              <div className="glass-surface-strong flex max-h-[92vh] w-full flex-col overflow-hidden rounded-2xl shadow-2xl">
+                <div className="flex items-center justify-between border-b border-white/40 px-5 py-4 sm:px-6">
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900">Edit Meter</h3>
+                    <p className="mt-1 text-sm text-gray-500">Update meter details, assignment, and notifications.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowEditMeter(false)}
+                    className="rounded-full p-2 text-gray-500 transition hover:bg-white/70 hover:text-gray-900"
+                    aria-label="Close edit meter modal"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+                <div className="space-y-4 overflow-y-auto px-5 py-5 sm:px-6">
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div>
                     <label className="mb-1 block text-sm font-semibold text-gray-700">Name *</label>
@@ -34624,7 +35818,8 @@ const ClientMetersTab = ({
                     </label>
                   </div>
                 </div>
-                <div className="mt-4 flex justify-end gap-2">
+                </div>
+                <div className="flex flex-col-reverse gap-2 border-t border-white/40 px-5 py-4 sm:flex-row sm:justify-end sm:px-6">
                   <button type="button" onClick={() => setShowEditMeter(false)} className="rounded bg-white px-3 py-2 text-gray-700 shadow">
                     Cancel
                   </button>
@@ -35011,11 +36206,25 @@ const ClientMetersTab = ({
         </div>
       </div>
       {showAdd && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="fixed inset-0 z-50 overflow-y-auto px-4 py-6 sm:px-6">
           <div className="absolute inset-0 bg-black/40" onClick={() => setShowAdd(false)} />
-          <div className="relative glass-surface-strong rounded-xl p-6 w-full max-w-2xl z-10">
-            <h3 className="text-xl font-bold mb-5">Add Meter</h3>
-            <div className="space-y-4">
+          <div className="relative z-10 mx-auto flex min-h-full w-full max-w-4xl items-center justify-center">
+            <div className="glass-surface-strong flex max-h-[92vh] w-full flex-col overflow-hidden rounded-2xl shadow-2xl">
+              <div className="flex items-center justify-between border-b border-white/40 px-5 py-4 sm:px-6">
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">Add Meter</h3>
+                  <p className="mt-1 text-sm text-gray-500">Create a meter with details, assignment, and notifications.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowAdd(false)}
+                  className="rounded-full p-2 text-gray-500 transition hover:bg-white/70 hover:text-gray-900"
+                  aria-label="Close add meter modal"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="space-y-4 overflow-y-auto px-5 py-5 sm:px-6">
               <div className="text-sm font-semibold text-gray-700">Details</div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -35142,8 +36351,8 @@ const ClientMetersTab = ({
                     ))}
                 </div>
               </div>
-
-              <div className="flex justify-end gap-2 mt-4">
+              </div>
+              <div className="flex flex-col-reverse gap-2 border-t border-white/40 px-5 py-4 sm:flex-row sm:justify-end sm:px-6">
                 <button onClick={() => setShowAdd(false)} className="px-3 py-2 glass-ghost rounded">Cancel</button>
                 <button
                   onClick={async () => {
@@ -35340,9 +36549,9 @@ const ClientEdgeTab = () => {
       )}
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: 'Total Devices', value: devices.length, icon: 'ðŸ–¥ï¸', color: 'from-blue-50 to-indigo-50 border-blue-100' },
-          { label: 'Online', value: online, icon: 'ðŸŸ¢', color: 'from-emerald-50 to-green-50 border-emerald-100' },
-          { label: 'Offline', value: devices.length - online, icon: 'ðŸ”´', color: 'from-rose-50 to-pink-50 border-rose-100' },
+          { label: 'Total Devices', value: devices.length, color: 'from-blue-50 to-indigo-50 border-blue-100' },
+          { label: 'Online', value: online, color: 'from-emerald-50 to-green-50 border-emerald-100' },
+          { label: 'Offline', value: devices.length - online, color: 'from-rose-50 to-pink-50 border-rose-100' },
         ].map(c => (
           <div key={c.label} className={`bg-gradient-to-br ${c.color} border rounded-xl p-4 flex items-center gap-4`}>
             <span className="text-3xl">{c.icon}</span>
