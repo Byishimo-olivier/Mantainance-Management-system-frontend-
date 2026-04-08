@@ -561,6 +561,7 @@ const SubscriptionPlan = ({ userId }) => {
               {plans.map((plan) => {
                 const price = getPrice(plan.id);
                 const isCurrentPlan = currentPlan === plan.id;
+                const isCurrentCompanyPlan = hasActiveCompanySubscription && String(companySubscription?.plan || '').toLowerCase() === String(plan.id || '').toLowerCase();
                 const isCustomQuotePlan = plan.id === 'premium';
                 const isPopularPlan = plan.id === 'professional';
 
@@ -624,10 +625,10 @@ const SubscriptionPlan = ({ userId }) => {
                       {/* Button */}
                       <button
                         onClick={() => openPaymentModal(plan.id)}
-                        disabled={isCurrentPlan || upgrading}
+                        disabled={isCurrentPlan || isCurrentCompanyPlan || upgrading || companySubscriptionLoading}
                         className={`w-full py-2 px-4 rounded-lg font-semibold text-sm transition-all flex items-center justify-center gap-2 ${
-                          isCurrentPlan
-                            ? 'bg-gray-200 text-gray-600 cursor-not-allowed'
+                          isCurrentPlan || isCurrentCompanyPlan
+                            ? 'bg-emerald-500 text-white cursor-not-allowed'
                             : isCustomQuotePlan
                               ? 'bg-gradient-to-r from-purple-600 to-fuchsia-500 text-white hover:from-purple-700 hover:to-fuchsia-600 hover:shadow-md active:scale-95'
                               : 'bg-blue-600 text-white hover:bg-blue-700 hover:shadow-md active:scale-95'
@@ -638,8 +639,10 @@ const SubscriptionPlan = ({ userId }) => {
                             <Loader size={14} className="animate-spin" />
                             {subscription ? 'Upgrading...' : 'Processing...'}
                           </>
-                        ) : isCurrentPlan ? (
-                          'Current Plan'
+                        ) : companySubscriptionLoading ? (
+                          'Loading...'
+                        ) : isCurrentPlan || isCurrentCompanyPlan ? (
+                          'Active'
                         ) : isCustomQuotePlan ? (
                           'Request Quotation'
                         ) : subscription === null ? (
