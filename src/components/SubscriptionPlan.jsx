@@ -17,7 +17,9 @@ import {
 } from 'lucide-react';
 
 const SubscriptionPlan = ({ userId }) => {
-  const { subscription, loading, refresh } = useSubscription(userId);
+  const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const subscriptionLookupName = storedUser?.companyName || storedUser?.company?.name || storedUser?.company || userId;
+  const { subscription, loading, refresh } = useSubscription(subscriptionLookupName);
   const { hasActive: hasActiveCompanySubscription, subscription: companySubscription, loading: companySubscriptionLoading } = useCompanySubscription();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();

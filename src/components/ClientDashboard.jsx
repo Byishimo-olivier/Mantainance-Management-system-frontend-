@@ -6912,14 +6912,12 @@ function AssetEditorModal({
 function ClientDashboard() {
   const navigate = useNavigate();
   const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
-  const subscriptionLookupId = storedUser?.companyName || storedUser?.company?.name || storedUser?.company?.id || storedUser?.companyId || storedUser?.id || storedUser?._id;
   const { hasActive: hasActiveCompanySubscription, loading: companySubscriptionLoading } = useCompanySubscription();
-  const { subscription: directSubscription, isActive: isDirectSubscriptionActive, loading: directSubscriptionLoading } = useSubscription(subscriptionLookupId);
   const { language, setLanguage } = useLanguage();
   const { t } = useTranslation();
   const backendBase = (import.meta.env.VITE_API_URL || '') + '';
-  const hasPaidSubscription = hasActiveCompanySubscription || isDirectSubscriptionActive || String(directSubscription?.status || '').toLowerCase() === 'active';
-  const subscriptionVisibilityLoading = companySubscriptionLoading || directSubscriptionLoading;
+  const hasPaidSubscription = hasActiveCompanySubscription;
+  const subscriptionVisibilityLoading = companySubscriptionLoading;
 
   const imageSrc = useCallback((path) => {
     if (!path || path === 'null' || path === 'undefined') return null;
@@ -7204,8 +7202,8 @@ function ClientDashboard() {
   const [allIssues, setAllIssues] = useState([]);
   const [selectedTechs, setSelectedTechs] = useState({});
   const [assignLoading, setAssignLoading] = useState({});
-  const [statusCounts, setStatusCounts] = useState({ Pending: 0, 'In Progress': 0, Completed: 0, Overdue: 0 });
-  const [maintenanceCounts, setMaintenanceCounts] = useState({ Preventive: 0, Routine: 0, Pending: 0, 'In Progress': 0, Completed: 0, Overdue: 0 });
+  const [statusCounts, setStatusCounts] = useState({ Open: 0, Pending: 0, 'In Progress': 0, Completed: 0, Overdue: 0 });
+  const [maintenanceCounts, setMaintenanceCounts] = useState({ Preventive: 0, Routine: 0, Open: 0, Pending: 0, 'In Progress': 0, Completed: 0, Overdue: 0 });
   const [userName, setUserName] = useState('');
   const [currentUser, setCurrentUser] = useState(null);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
@@ -7289,6 +7287,16 @@ function ClientDashboard() {
   const [propertyModalOpen, setPropertyModalOpen] = useState(false);
   const [loading, setLoading] = useState({ properties: false, assets: false, internalTechnicians: false, people: false, teams: false });
   const [materialRequests, setMaterialRequests] = useState([]);
+  const [materialRequestPoStatusMap, setMaterialRequestPoStatusMap] = useState({});
+  const [materialRequestStockInfo, setMaterialRequestStockInfo] = useState({});
+  const [materialRequestAdjustModal, setMaterialRequestAdjustModal] = useState({
+    open: false,
+    requestId: '',
+    title: '',
+    entries: [],
+    vendorId: '',
+  });
+  const [materialRequestAdjustSaving, setMaterialRequestAdjustSaving] = useState(false);
   const [showNotificationsMenu, setShowNotificationsMenu] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showUserProfileModal, setShowUserProfileModal] = useState(false);
@@ -7361,6 +7369,11 @@ function ClientDashboard() {
   const [showTaskDetailModal, setShowTaskDetailModal] = useState(false);
   const [editingTaskData, setEditingTaskData] = useState(null);
   const [taskDetailChatInput, setTaskDetailChatInput] = useState('');
+  const [showTaskCompletionModal, setShowTaskCompletionModal] = useState(false);
+  const [taskCompletionTarget, setTaskCompletionTarget] = useState(null);
+  const [taskCompletionFeedback, setTaskCompletionFeedback] = useState('');
+  const [taskCompletionFiles, setTaskCompletionFiles] = useState([]);
+  const [taskCompletionSubmitting, setTaskCompletionSubmitting] = useState(false);
   const [mentionNotifications, setMentionNotifications] = useState([]);
   const [noteReady, setNoteReady] = useState(false);
   const [branches, setBranches] = useState([]);
@@ -8145,6 +8158,7 @@ function ClientDashboard() {
     });
     const [activeTab, setActiveTab] = useState('overview');
     const [chatInput, setChatInput] = useState('');
+    const [chatAttachmentFiles, setChatAttachmentFiles] = useState([]);
     const [mentionCandidates, setMentionCandidates] = useState([]);
     const [mentionContext, setMentionContext] = useState(null);
     const [localFiles, setLocalFiles] = useState([]);
@@ -8170,6 +8184,7 @@ function ClientDashboard() {
       showCancel: false,
       onConfirm: null,
     });
+    const chatAttachmentInputRef = useRef(null);
     const [providerEnabled, setProviderEnabled] = useState(false);
     const [providerPortalUrl, setProviderPortalUrl] = useState('');
     const [isBookmarked, setIsBookmarked] = useState(Boolean(item?.bookmarked || item?.saved || item?.isBookmarked));
@@ -8198,7 +8213,7 @@ function ClientDashboard() {
       paymentDue: '',
       title: '',
       description: '',
-      currency: 'USD - United States Dollar - $',
+      currency: 'RWF - Rwandan Franc',
       useCompanyAddress: false,
       companyFullName: '',
       companyAddress1: '',
@@ -8225,6 +8240,9 @@ function ClientDashboard() {
     const [inventoryLoading, setInventoryLoading] = useState(false);
     const [inventorySearch, setInventorySearch] = useState('');
     const [selectedInventoryParts, setSelectedInventoryParts] = useState({});
+    const [partRequestReason, setPartRequestReason] = useState('');
+    const [requestPartsSubmitting, setRequestPartsSubmitting] = useState(false);
+    const [selectedPartVendorId, setSelectedPartVendorId] = useState('');
     const [localParts, setLocalParts] = useState([]);
     const [addLaborOpen, setAddLaborOpen] = useState(false);
     const [laborForm, setLaborForm] = useState({ worker: '', rate: 0, startedAt: '', hours: 0, minutes: 0, category: '' });
@@ -9040,6 +9058,10 @@ function ClientDashboard() {
     const availableWorkOrders = Array.isArray(workOrders)
       ? workOrders.filter(wo => String(wo._id || wo.id) !== String(itemId))
       : [];
+    const vendorContacts = (Array.isArray(contacts) ? contacts : []).filter((entry) => {
+      const source = String(entry?.__source || entry?.type || '').toLowerCase();
+      return source.includes('vendor');
+    });
     const invoiceCustomerOptions = dedupeById(
       [...(Array.isArray(contacts) ? contacts : []), ...(Array.isArray(people) ? people : [])],
       (entry) => entry?._id || entry?.id || entry?.userId || entry?.email || entry?.phone || entry?.name
@@ -9051,6 +9073,7 @@ function ClientDashboard() {
       const cost = typeof part === 'string' ? '' : (part.unitCost ?? part.cost ?? part.price ?? '');
       const quantity = typeof part === 'string' ? 1 : (part.quantity ?? part.qty ?? 1);
       const location = typeof part === 'string' ? '' : (part.location || part.room || part.area || part.site || '');
+      const notes = typeof part === 'string' ? '' : (part.notes || part.reason || part.comment || '');
       return {
         id: part?._id || part?.id || `remote-part-${idx}`,
         name,
@@ -9058,6 +9081,7 @@ function ClientDashboard() {
         cost,
         quantity,
         location,
+        notes,
         source: 'remote'
       };
     });
@@ -9066,7 +9090,29 @@ function ClientDashboard() {
       const num = Number(String(val).replace(/[^0-9.-]/g, ''));
       return Number.isFinite(num) ? num : 0;
     };
-    const combinedParts = [...localParts, ...normalizedParts];
+    const dedupedPartsMap = new Map();
+    [...localParts, ...normalizedParts].forEach((entry, idx) => {
+      const entryId = String(entry?.id || '').trim();
+      const fallbackKey = [
+        String(entry?.name || '').trim().toLowerCase(),
+        String(entry?.status || '').trim().toLowerCase(),
+        String(entry?.location || '').trim().toLowerCase(),
+        String(entry?.notes || '').trim().toLowerCase(),
+        String(entry?.quantity || '').trim(),
+        String(entry?.cost || '').trim()
+      ].join('|');
+      const dedupeKey = entryId || fallbackKey || `part-${idx}`;
+      if (!dedupedPartsMap.has(dedupeKey)) {
+        dedupedPartsMap.set(dedupeKey, entry);
+      } else {
+        const existing = dedupedPartsMap.get(dedupeKey);
+        dedupedPartsMap.set(dedupeKey, {
+          ...entry,
+          id: existing?.id || entry?.id,
+        });
+      }
+    });
+    const combinedParts = Array.from(dedupedPartsMap.values());
     const partsTotal = combinedParts.reduce((sum, entry) => sum + (toNumber(entry.cost) * toNumber(entry.quantity || 1)), 0);
     const estimatedHours = Number(formData.estimatedTime || item?.estimatedTime || item?.laborHours || 0) || 0;
     const normalizedLabor = laborEntries.map((entry, idx) => {
@@ -9091,7 +9137,7 @@ function ClientDashboard() {
     });
     const combinedLabor = [...localLabor, ...normalizedLabor];
     const laborTotal = combinedLabor.reduce((sum, entry) => sum + toNumber(entry.cost), 0);
-    const moneyFormatter = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
+    const moneyFormatter = new Intl.NumberFormat('en-RW', { style: 'currency', currency: 'RWF', maximumFractionDigits: 0 });
     const formatMoney = (val) => moneyFormatter.format(Number.isFinite(val) ? val : 0);
     const laborCost = laborTotal || toNumber(item?.laborCost ?? item?.laborTotal ?? item?.labor?.total ?? item?.labor?.cost);
     const partsCost = toNumber(item?.partsCost ?? item?.materialsCost ?? item?.totalPartsCost ?? item?.parts?.total ?? item?.itemsCost);
@@ -9941,18 +9987,74 @@ function ClientDashboard() {
     const handleOpenAddPart = () => {
       setPartForm({ name: '', status: '', cost: '', quantity: 1, location: '' });
       setSelectedInventoryParts({});
+      setPartRequestReason('');
+      setSelectedPartVendorId('');
       setPartModalTab('parts');
       setAddPartOpen(true);
       fetchInventoryParts();
+    };
+
+    const createPurchaseOrderForPartSelections = async (selections, reasonText = '') => {
+      if (!Array.isArray(selections) || selections.length === 0) return null;
+      const vendor = vendorContacts.find((entry) => String(entry?._id || entry?.id || '') === String(selectedPartVendorId || ''));
+      if (!vendor?.email) {
+        throw new Error('Select a vendor with an email address before creating a purchase order.');
+      }
+
+      const poItems = selections.map((sel) => {
+        const part = sel.part || {};
+        const requestedQty = Math.max(1, Number(sel.quantity) || 1);
+        const availableQty = Math.max(0, Number(getAvailableQty(part)) || 0);
+        const shortage = Math.max(1, requestedQty - availableQty);
+        return {
+          name: part.name || part.partNumber || 'Material',
+          quantity: shortage,
+          unitCost: Number(part.cost ?? part.unitCost ?? part.price ?? 0) || 0,
+          partId: part._id || part.id || undefined,
+          notes: reasonText || `Created because requested quantity exceeded in-stock quantity.`,
+        };
+      });
+
+      return api.post('/api/purchase-orders', {
+        title: `Purchase Order for ${item?.title || itemId || 'Work Order'}`,
+        status: 'Draft',
+        items: poItems,
+        currency: 'RWF',
+        vendorId: vendor?._id || vendor?.id || '',
+        vendor: vendor?.name || '',
+        vendorEmail: vendor?.email || '',
+        companyName: currentUser?.companyName || '',
+        issueId: item?._id || item?.id || itemId || '',
+        workOrderId: item?._id || item?.id || itemId || '',
+        source: 'WORK_ORDER_PART_SHORTAGE',
+        requisitioner: userName || currentUser?.name || currentUser?.email || '',
+        notes: reasonText || 'Created from Add Parts because requested quantity was higher than stock.',
+        sendVendorLink: true,
+      });
     };
 
     const handleConfirmPart = async () => {
       const selections = Object.values(selectedInventoryParts || {});
       if (selections.length === 0) return;
       try {
+        const shortageSelections = selections.filter((sel) => {
+          const part = sel.part || {};
+          const qty = Number(sel.quantity) || 1;
+          return qty > getAvailableQty(part);
+        });
+
+        if (shortageSelections.length > 0) {
+          const poResponse = await createPurchaseOrderForPartSelections(shortageSelections, partRequestReason?.trim());
+          window.dispatchEvent(new CustomEvent('purchase-order-created', { detail: poResponse?.data || null }));
+          setAddPartOpen(false);
+          alert('Requested quantity was higher than stock. A purchase order public link was sent to the selected vendor.');
+          return;
+        }
+
         for (const sel of selections) {
           const part = sel.part || {};
           const qty = Number(sel.quantity) || 1;
+          const availableStock = getAvailableQty(part);
           const payload = {
             name: part.name || part.partNumber || 'Part',
             status: part.status || 'In stock',
@@ -9990,6 +10092,83 @@ function ClientDashboard() {
       }
     };
 
+    const handleRequestSelectedParts = async () => {
+      const selections = Object.values(selectedInventoryParts || {});
+      if (selections.length === 0) return;
+      if (!itemId) {
+        alert('Open a saved work order before requesting parts.');
+        return;
+      }
+
+      try {
+        setRequestPartsSubmitting(true);
+        const reasonText = partRequestReason?.trim() || 'Requested from work order parts tab.';
+        const requestedItems = selections.map((sel) => {
+          const part = sel.part || {};
+          return {
+            materialId: part.name || part.partNumber || part._id || part.id || 'Part',
+            title: part.name || part.partNumber || 'Part',
+            quantity: Math.max(1, Number(sel.quantity) || 1),
+          };
+        });
+
+        const stockSummary = selections.map((sel) => {
+          const part = sel.part || {};
+          const qty = Math.max(1, Number(sel.quantity) || 1);
+          const availableStock = getAvailableQty(part);
+          return `${part.name || part.partNumber || 'Part'}: requested ${qty}, in stock ${availableStock}`;
+        }).join('\n');
+
+        const requestedPartEntries = [];
+        for (const sel of selections) {
+          const part = sel.part || {};
+          const qty = Math.max(1, Number(sel.quantity) || 1);
+          const payload = {
+            name: part.name || part.partNumber || 'Part',
+            status: 'Requested',
+            cost: Number(part.cost ?? part.unitCost ?? part.price ?? 0) || 0,
+            quantity: qty,
+            location: part.location || '',
+            notes: reasonText,
+            source: 'requested'
+          };
+
+          const res = await api.post(`/api/issues/${itemId}/parts`, payload);
+          requestedPartEntries.push(res?.data || {
+            id: `part-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            ...payload
+          });
+        }
+
+        await api.post('/api/material-requests', {
+          title: `Parts request for ${item?.title || item?.requestId || item?.id || itemId}`,
+          description: `${reasonText}\n\nInventory snapshot:\n${stockSummary}`,
+          items: requestedItems,
+          issueId: itemId,
+          technicianId: currentUser?.userId || currentUser?.id || currentUser?._id || '',
+          technicianName: userName || currentUser?.name || currentUser?.email || 'User',
+          clientId: item?.clientId || currentUser?.userId || currentUser?.id || currentUser?._id || '',
+          urgency: item?.priority || 'MEDIUM',
+          status: 'PENDING',
+        });
+
+        if (typeof fetchMaterialRequests === 'function') {
+          await fetchMaterialRequests();
+        }
+        if (requestedPartEntries.length > 0) {
+          setLocalParts(prev => [...requestedPartEntries, ...prev]);
+        }
+        setAddPartOpen(false);
+        setPartRequestReason('');
+        logActivity('Requested parts', `${selections.length} part(s) requested for approval`);
+        alert('Parts request submitted and saved to the work order. The part cost now appears in the work order totals too.');
+      } catch (err) {
+        alert(err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Failed to submit parts request.');
+      } finally {
+        setRequestPartsSubmitting(false);
+      }
+    };
+
     const handleOpenAddLabor = () => {
       const now = new Date();
       const pad = (n) => String(n).padStart(2, '0');
@@ -10006,6 +10185,7 @@ function ClientDashboard() {
     };
 
     const filteredInventoryParts = inventoryParts
+      .filter((part) => getAvailableQty(part) > 0)
       .filter((part) => {
         const q = inventorySearch.toLowerCase();
         if (!q) return true;
@@ -10141,21 +10321,49 @@ function ClientDashboard() {
 
     const handleSendMessage = async () => {
       const messageText = chatInput.trim();
-      if (!messageText) return;
+      const attachmentFiles = Array.isArray(chatAttachmentFiles) ? chatAttachmentFiles : [];
+      if (!messageText && attachmentFiles.length === 0) return;
+
+      let uploadedFiles = [];
+      if (attachmentFiles.length > 0) {
+        const uploadFormData = new FormData();
+        attachmentFiles.forEach((file) => uploadFormData.append('files', file));
+        const uploadResponse = await api.post(`/api/issues/${item.id || item._id}/files`, uploadFormData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        uploadedFiles = Array.isArray(uploadResponse?.data) ? uploadResponse.data : [];
+        setLocalFiles((prev) => [
+          ...uploadedFiles.map((file, idx) => ({
+            id: file.id || `file-${Date.now()}-${idx}`,
+            ...file,
+            url: file.url ? getImageUrl(file.url) : file.url,
+            source: file.source || 'remote'
+          })),
+          ...prev,
+        ]);
+      }
+
       const newMessage = {
         sender: userName,
         text: messageText,
         timestamp: new Date().toISOString(),
-        role: 'manager'
+        role: 'manager',
+        attachments: uploadedFiles.map((file, index) => ({
+          id: file?.id || `attachment-${index}`,
+          name: file?.name || `Attachment ${index + 1}`,
+          url: file?.url ? getImageUrl(file.url) : '',
+          type: file?.type || '',
+        }))
       };
       const updatedChat = [...formData.chat, newMessage];
       try {
         await api.put(`/api/issues/${item.id || item._id}`, { chat: updatedChat });
         setFormData(prev => ({ ...prev, chat: updatedChat }));
         setChatInput('');
+        setChatAttachmentFiles([]);
         setMentionCandidates([]);
         setMentionContext(null);
-        logActivity('Sent message', messageText);
+        logActivity('Sent message', messageText || `Uploaded ${uploadedFiles.length} attachment(s)`);
       } catch (err) {
         console.error('Failed to send message:', err);
         alert('Failed to send message.');
@@ -11206,6 +11414,7 @@ function ClientDashboard() {
                                 <td className="px-4 py-3">
                                   <div className="text-sm font-semibold text-blue-700">{part.name || 'Part'}</div>
                                   {part.location && <div className="text-xs text-gray-500">{part.location}</div>}
+                                  {part.notes && <div className="text-xs text-amber-700">{part.notes}</div>}
                                 </td>
                                 <td className="px-4 py-3">
                                   <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${getStockBadge(part.status)}`}>
@@ -11729,6 +11938,34 @@ function ClientDashboard() {
                           </span>
                         </div>
                         <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-gray-700">{msg.text}</p>
+                        {Array.isArray(msg.attachments) && msg.attachments.length > 0 && (
+                          <div className="mt-3 grid gap-3">
+                            {msg.attachments.map((attachment, attachmentIndex) => {
+                              const attachmentUrl = attachment?.url ? getImageUrl(attachment.url) : '';
+                              const attachmentName = attachment?.name || `Attachment ${attachmentIndex + 1}`;
+                              const isImage = String(attachment?.type || attachmentName).toLowerCase().match(/image|png|jpe?g|gif|webp|bmp|svg/);
+                              return (
+                                <a
+                                  key={attachment?.id || `${attachmentName}-${attachmentIndex}`}
+                                  href={attachmentUrl || '#'}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="block rounded-xl border border-gray-200 bg-slate-50 p-3 hover:bg-slate-100"
+                                >
+                                  {isImage && attachmentUrl ? (
+                                    <img
+                                      src={attachmentUrl}
+                                      alt={attachmentName}
+                                      className="mb-3 max-h-48 w-full rounded-lg object-cover"
+                                    />
+                                  ) : null}
+                                  <div className="text-sm font-semibold text-gray-800">{attachmentName}</div>
+                                  <div className="text-xs text-gray-500">{attachmentUrl ? 'Open attachment' : 'Attachment saved'}</div>
+                                </a>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -11771,11 +12008,38 @@ function ClientDashboard() {
                   value={chatInput}
                   onChange={handleChatInputChange}
                 />
+                {chatAttachmentFiles.length > 0 && (
+                  <div className="mt-3 grid gap-2">
+                    {chatAttachmentFiles.map((file, index) => (
+                      <div key={`${file.name}-${index}`} className="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700">
+                        <span className="truncate pr-3">{file.name}</span>
+                        <button
+                          type="button"
+                          onClick={() => setChatAttachmentFiles((prev) => prev.filter((_, fileIndex) => fileIndex !== index))}
+                          className="text-xs font-semibold text-rose-600 hover:text-rose-700"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <div className="mt-3 flex items-center justify-between">
-                  <button type="button" className="inline-flex items-center gap-2 text-xs font-semibold text-gray-500 hover:text-gray-700">
+                  <button
+                    type="button"
+                    onClick={() => chatAttachmentInputRef.current?.click()}
+                    className="inline-flex items-center gap-2 text-xs font-semibold text-gray-500 hover:text-gray-700"
+                  >
                     <Paperclip className="w-6 h-6" />
                     Attach
                   </button>
+                  <input
+                    ref={chatAttachmentInputRef}
+                    type="file"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => setChatAttachmentFiles(Array.from(e.target.files || []))}
+                  />
                   <button
                     onClick={handleSendMessage}
                     className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700"
@@ -11868,7 +12132,7 @@ function ClientDashboard() {
                   <div>
                     <label className="mb-2 block text-[15px] font-medium text-gray-700">Cost <span className="text-rose-500">*</span></label>
                     <div className="flex overflow-hidden rounded-md border border-gray-300 shadow-sm">
-                      <div className="flex items-center border-r border-gray-300 px-4 text-[18px] text-gray-500">$</div>
+                      <div className="flex items-center border-r border-gray-300 px-4 text-[18px] text-gray-500">RF</div>
                       <input
                         type="number"
                         min="0"
@@ -12377,7 +12641,7 @@ function ClientDashboard() {
                           </tr>
                         ) : filteredInventoryParts.length === 0 ? (
                           <tr>
-                            <td colSpan="9" className="px-8 py-8 text-center text-[15px] text-gray-500">No inventory parts found.</td>
+                            <td colSpan="9" className="px-8 py-8 text-center text-[15px] text-gray-500">No in-stock parts found.</td>
                           </tr>
                         ) : (
                           filteredInventoryParts.map((part, idx) => {
@@ -12419,20 +12683,26 @@ function ClientDashboard() {
                                   <div className="flex items-center gap-3">
                                     <span>{Number(stock).toFixed(2)}</span>
                                     {selected && (
-                                      <input
-                                        type="number"
-                                        min="1"
-                                        max={stock || undefined}
-                                        value={selectedInventoryParts[key]?.quantity || 1}
-                                        onChange={(e) => {
-                                          const val = Number(e.target.value) || 1;
-                                          setSelectedInventoryParts((prev) => ({
-                                            ...prev,
-                                            [key]: { part, quantity: val }
-                                          }));
-                                        }}
-                                        className="w-16 rounded border border-gray-300 px-2 py-1 text-xs"
-                                      />
+                                      <div className="flex flex-col gap-1">
+                                        <input
+                                          type="number"
+                                          min="1"
+                                          value={selectedInventoryParts[key]?.quantity || 1}
+                                          onChange={(e) => {
+                                            const val = Math.max(1, Number(e.target.value) || 1);
+                                            setSelectedInventoryParts((prev) => ({
+                                              ...prev,
+                                              [key]: { part, quantity: val }
+                                            }));
+                                          }}
+                                          className="w-16 rounded border border-gray-300 px-2 py-1 text-xs"
+                                        />
+                                        {(Number(selectedInventoryParts[key]?.quantity || 1) > Number(stock || 0)) && (
+                                          <span className="whitespace-nowrap text-[11px] font-medium text-amber-600">
+                                            Short by {Math.max(0, Number(selectedInventoryParts[key]?.quantity || 1) - Number(stock || 0))}
+                                          </span>
+                                        )}
+                                      </div>
                                     )}
                                   </div>
                                 </td>
@@ -12455,6 +12725,31 @@ function ClientDashboard() {
                   </div>
                 )}
               </div>
+              <div className="border-t border-gray-100 px-8 py-4">
+                <label className="mb-2 block text-[14px] font-medium text-gray-700">Vendor for public purchase order link</label>
+                <select
+                  value={selectedPartVendorId}
+                  onChange={(e) => setSelectedPartVendorId(e.target.value)}
+                  className="w-full rounded-lg border border-gray-200 px-4 py-3 text-[14px] text-gray-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                >
+                  <option value="">Select vendor</option>
+                  {vendorContacts.map((vendor) => (
+                    <option key={vendor._id || vendor.id || vendor.email} value={vendor._id || vendor.id}>
+                      {vendor.name} {vendor.email ? `(${vendor.email})` : '(no email)'}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="border-t border-gray-100 px-8 py-4">
+                <label className="mb-2 block text-[14px] font-medium text-gray-700">Request reason for approval</label>
+                <textarea
+                  value={partRequestReason}
+                  onChange={(e) => setPartRequestReason(e.target.value)}
+                  rows={3}
+                  placeholder="Explain why these parts are needed, what work they support, or any stock concern the approver should review."
+                  className="w-full rounded-lg border border-gray-200 px-4 py-3 text-[14px] text-gray-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                />
+              </div>
               <div className="flex flex-wrap items-center justify-between gap-4 border-t border-gray-200 px-8 py-4">
                 <div className="text-[15px] text-gray-500">
                   {Object.keys(selectedInventoryParts).length} {Object.keys(selectedInventoryParts).length === 1 ? 'Part' : 'Parts'} selected
@@ -12472,6 +12767,13 @@ function ClientDashboard() {
                     className="rounded-md bg-blue-600 px-5 py-3 text-[16px] font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     Add
+                  </button>
+                  <button
+                    onClick={handleRequestSelectedParts}
+                    disabled={Object.keys(selectedInventoryParts).length === 0 || requestPartsSubmitting}
+                    className="rounded-md bg-emerald-600 px-5 py-3 text-[16px] font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {requestPartsSubmitting ? 'Requesting...' : 'Request Approval'}
                   </button>
                 </div>
               </div>
@@ -13449,12 +13751,13 @@ function ClientDashboard() {
 
       setIssues(scoped);
       setAllIssues(scoped);
-      const counts = { Pending: 0, 'In Progress': 0, Completed: 0, Overdue: 0 };
+      const counts = { Open: 0, Pending: 0, 'In Progress': 0, Completed: 0, Overdue: 0 };
       scoped.forEach(issue => {
         const st = (issue.status || '').toLowerCase().replace(/_/g, ' ');
-        if (st.includes('pending')) counts.Pending++;
+        if (st === 'open' || st.startsWith('open ') || st.includes('approved')) counts.Open++;
+        else if (st.includes('pending')) counts.Pending++;
         else if (st.includes('progress')) counts['In Progress']++;
-        else if (st.includes('complete') || st.includes('verified') || st.includes('approved')) counts.Completed++;
+        else if (st.includes('complete') || st.includes('verified')) counts.Completed++;
         if (issue.overdue) counts.Overdue++;
       });
       setStatusCounts(counts);
@@ -13665,8 +13968,27 @@ function ClientDashboard() {
 
   const fetchMaterialRequests = useCallback(async () => {
     try {
-      const res = await api.get('/api/material-requests');
-      setMaterialRequests(res.data || []);
+      const [materialRes, poRes] = await Promise.all([
+        api.get('/api/material-requests'),
+        api.get('/api/purchase-orders').catch(() => ({ data: [] })),
+      ]);
+
+      const requests = materialRes.data || [];
+      const purchaseOrders = Array.isArray(poRes?.data) ? poRes.data : [];
+      const poMap = purchaseOrders.reduce((acc, po) => {
+        const key = String(po?.materialRequestId || '').trim();
+        if (!key) return acc;
+        const current = acc[key];
+        const currentDate = current?.createdAt ? new Date(current.createdAt).getTime() : 0;
+        const nextDate = po?.createdAt ? new Date(po.createdAt).getTime() : 0;
+        if (!current || nextDate >= currentDate) {
+          acc[key] = po;
+        }
+        return acc;
+      }, {});
+
+      setMaterialRequests(requests);
+      setMaterialRequestPoStatusMap(poMap);
     } catch (err) {
       console.error('Failed to fetch material requests:', err);
     }
@@ -13776,12 +14098,13 @@ function ClientDashboard() {
         const now = new Date();
         const cutoff = new Date(now.getTime() + 24 * 60 * 60 * 1000);
         setReminders(scopedSchedules.filter(s => s?.routine && s.nextDate && new Date(s.nextDate) <= cutoff && (!s.lastReminder || new Date(s.lastReminder) < new Date(s.nextDate))));
-        const counts = { Preventive: 0, Routine: 0, Pending: 0, 'In Progress': 0, Completed: 0, Overdue: 0 };
+        const counts = { Preventive: 0, Routine: 0, Open: 0, Pending: 0, 'In Progress': 0, Completed: 0, Overdue: 0 };
         scopedSchedules.forEach(s => {
           if (!s) return;
           s.routine ? counts.Routine++ : counts.Preventive++;
           const st = (s.status || '').toLowerCase();
-          if (st.includes('pending')) counts.Pending++;
+          if (st === 'open' || st.startsWith('open ')) counts.Open++;
+          else if (st.includes('pending')) counts.Pending++;
           else if (st.includes('progress')) counts['In Progress']++;
           else if (st.includes('complete')) counts.Completed++;
           if (s.nextDate && new Date(s.nextDate) < now && !st.includes('complete')) counts.Overdue++;
@@ -13908,15 +14231,182 @@ function ClientDashboard() {
     navigate('/login', { replace: true });
   }, [navigate]);
 
-  const handleApproveMaterial = useCallback(async (id) => {
+  const normalizeMaterialLabel = useCallback((value) => String(value || '').trim().toLowerCase(), []);
+
+  const getPartAvailableStock = useCallback((part) => {
+    const directQty = Number(part?.available ?? part?.quantity ?? part?.onHand ?? 0);
+    const lineQty = Array.isArray(part?.inventoryLines)
+      ? part.inventoryLines.reduce((sum, line) => sum + (Number(line?.availQty || 0) || 0), 0)
+      : 0;
+    return Math.max(directQty, lineQty);
+  }, []);
+
+  const findInventoryPartMatch = useCallback((partsList, item) => {
+    const labels = [
+      item?.title,
+      item?.materialId,
+      item?.name,
+      item?.partNumber,
+    ].map(normalizeMaterialLabel).filter(Boolean);
+
+    if (!labels.length) return null;
+
+    return (partsList || []).find((part) => {
+      const partName = normalizeMaterialLabel(part?.name);
+      const partNumber = normalizeMaterialLabel(part?.partNumber);
+      const category = normalizeMaterialLabel(part?.category);
+      return labels.some((label) => (
+        label === partName ||
+        label === partNumber ||
+        label === category ||
+        (partName && partName.includes(label)) ||
+        (label && label.includes(partName))
+      ));
+    }) || null;
+  }, [normalizeMaterialLabel]);
+
+  const handleApproveMaterial = useCallback(async (id, options = {}) => {
     try {
-      await api.post(`/api/material-requests/${id}/respond`, { response: 'APPROVED' });
+      const targetRequest = (materialRequests || []).find((entry) => String(entry?.id || entry?._id || '') === String(id));
+      if (!targetRequest) {
+        alert('Material request not found.');
+        return;
+      }
+
+      const partsResponse = await api.get('/api/parts');
+      const partsList = Array.isArray(partsResponse?.data) ? partsResponse.data : [];
+      const requestedItems = Array.isArray(targetRequest.items) && targetRequest.items.length > 0
+        ? targetRequest.items
+        : [{
+            title: targetRequest.title || targetRequest.materialId || 'Material',
+            materialId: targetRequest.materialId || targetRequest.title || 'Material',
+            quantity: targetRequest.quantity || 1,
+          }];
+
+      const stockFulfilled = [];
+      const shortageItems = [];
+      const forceCreatePo = Boolean(options.forceCreatePo);
+
+      requestedItems.forEach((item) => {
+        const quantityNeeded = Math.max(1, Number(item?.quantity || 1));
+        const matchingPart = findInventoryPartMatch(partsList, item);
+        const availableStock = matchingPart ? getPartAvailableStock(matchingPart) : 0;
+
+        if (matchingPart && availableStock >= quantityNeeded) {
+          stockFulfilled.push({ item, part: matchingPart, quantityNeeded, availableStock });
+        } else {
+          shortageItems.push({
+            item,
+            part: matchingPart,
+            quantityNeeded,
+            availableStock,
+            shortage: Math.max(quantityNeeded - availableStock, quantityNeeded),
+          });
+        }
+      });
+
+      if (shortageItems.length === 0 && !forceCreatePo) {
+        for (const entry of stockFulfilled) {
+          await api.post(`/api/parts/${entry.part._id || entry.part.id}/adjust`, {
+            quantity: -Math.abs(entry.quantityNeeded),
+            reason: `Issued to material request ${targetRequest.requestId || targetRequest.id || targetRequest._id}`,
+            createdBy: userName || currentUser?.name || currentUser?.email || 'User',
+          });
+        }
+
+        const linkedIssueId = targetRequest.issueId || targetRequest.workOrderId || targetRequest.issue?.id || targetRequest.issue?._id || '';
+        if (linkedIssueId) {
+          await api.post(`/api/issues/${linkedIssueId}/parts/reconcile`, {
+            entries: stockFulfilled.map((entry) => ({
+              name: entry.item?.title || entry.item?.materialId || entry.part?.name || 'Material',
+              status: 'Approved',
+              cost: Number(entry.part?.cost ?? entry.part?.unitCost ?? entry.part?.price ?? 0),
+              quantity: entry.quantityNeeded,
+              location: entry.part?.location || '',
+              notes: `Approved from material request ${targetRequest.requestId || targetRequest.id || targetRequest._id}. Stock available: ${entry.availableStock}.`,
+              source: 'approved',
+              inventoryPartId: entry.part?._id || entry.part?.id || null,
+            }))
+          });
+        }
+
+        await api.post(`/api/material-requests/${id}/respond`, { response: 'APPROVED' });
+        await fetchMaterialRequests();
+        if (linkedIssueId && typeof fetchIssues === 'function') {
+          await fetchIssues();
+        }
+        alert('Request approved and fulfilled from Parts & Inventory.');
+        return;
+      }
+
+      const selectedVendor = (contactPeople || []).find((person) => (
+        String(person?._id || person?.id || '') === String(options.vendorId || '')
+      ));
+      if (!selectedVendor?.email) {
+        alert('Select a vendor with a valid email address before creating a purchase order.');
+        return;
+      }
+
+      const poSourceEntries = forceCreatePo
+        ? requestedItems.map((item) => {
+            const quantityNeeded = Math.max(1, Number(item?.quantity || 1));
+            const matchingPart = findInventoryPartMatch(partsList, item);
+            const availableStock = matchingPart ? getPartAvailableStock(matchingPart) : 0;
+            return {
+              item,
+              part: matchingPart,
+              quantityNeeded,
+              availableStock,
+              shortage: Math.max(quantityNeeded - availableStock, 0),
+            };
+          })
+        : shortageItems;
+
+      const poItems = poSourceEntries.map((entry) => ({
+        name: entry.item?.title || entry.item?.materialId || entry.part?.name || 'Material',
+        quantity: forceCreatePo
+          ? entry.quantityNeeded
+          : Math.max(1, Number(entry.shortage || entry.quantityNeeded || 1)),
+        unitCost: Number(entry.part?.inventoryLines?.[0]?.cost || entry.part?.cost || 0),
+        partId: entry.part?._id || entry.part?.id || undefined,
+        notes: `Raised from material request ${targetRequest.requestId || targetRequest.id || targetRequest._id}`,
+      }));
+
+      const poResponse = await api.post('/api/purchase-orders', {
+        title: `Material Request ${targetRequest.requestId || String(id).slice(-6)} Procurement`,
+        status: 'Draft',
+        items: poItems,
+        currency: 'RWF',
+        vendorId: selectedVendor?._id || selectedVendor?.id || '',
+        vendor: selectedVendor?.name || '',
+        vendorEmail: selectedVendor?.email || '',
+        companyName: currentUser?.companyName || '',
+        materialRequestId: targetRequest.id || targetRequest._id || '',
+        issueId: targetRequest.issueId || targetRequest.workOrderId || targetRequest.issue?.id || targetRequest.issue?._id || '',
+        workOrderId: targetRequest.workOrderId || targetRequest.issueId || targetRequest.issue?.id || targetRequest.issue?._id || '',
+        source: 'MATERIAL_REQUEST_SHORTAGE',
+        notes: `Created automatically because requested items were not fully available in inventory.`,
+        requisitioner: targetRequest.technicianName || userName || currentUser?.name || '',
+        sendVendorLink: Boolean(selectedVendor?.email),
+      });
+      window.dispatchEvent(new CustomEvent('purchase-order-created', { detail: poResponse?.data || null }));
+
+      const poNumber = poResponse?.data?.poNumber || poResponse?.data?.number || 'Draft PO';
+      const shortageSummary = poSourceEntries
+        .map((entry) => `${entry.item?.title || entry.item?.materialId || entry.part?.name || 'Material'} (needed ${entry.quantityNeeded}, available ${entry.availableStock || 0})`)
+        .join(', ');
+
+      await api.put(`/api/material-requests/${id}`, {
+        status: 'WAITING_VENDOR_APPROVAL',
+        description: `${targetRequest.description || ''}${targetRequest.description ? '\n\n' : ''}Procurement required: ${shortageSummary}. Purchase order: ${poNumber}. Waiting for vendor approval.`,
+      });
       await fetchMaterialRequests();
-      alert('Request approved successfully!');
+
+      alert(`Purchase order ${poNumber} was created and sent to the selected vendor. This request will be approved only after the vendor approves that purchase order.`);
     } catch (err) {
       alert('Failed to approve request: ' + (err.response?.data?.error || err.message));
     }
-  }, [fetchMaterialRequests]);
+  }, [contactPeople, currentUser?.companyName, currentUser?.email, currentUser?.name, fetchIssues, fetchMaterialRequests, findInventoryPartMatch, getPartAvailableStock, materialRequests, userName]);
 
   const handleDeclineMaterial = useCallback(async (id) => {
     try {
@@ -13927,6 +14417,153 @@ function ClientDashboard() {
       alert('Failed to decline request: ' + (err.response?.data?.error || err.message));
     }
   }, [fetchMaterialRequests]);
+
+  const openMaterialRequestAdjustModal = useCallback(async (id) => {
+    try {
+      const targetRequest = (materialRequests || []).find((entry) => String(entry?.id || entry?._id || '') === String(id));
+      if (!targetRequest) {
+        alert('Material request not found.');
+        return;
+      }
+
+      const partsResponse = await api.get('/api/parts');
+      const partsList = Array.isArray(partsResponse?.data) ? partsResponse.data : [];
+      const requestedItems = Array.isArray(targetRequest.items) && targetRequest.items.length > 0
+        ? targetRequest.items
+        : [{
+            title: targetRequest.title || targetRequest.materialId || 'Material',
+            materialId: targetRequest.materialId || targetRequest.title || 'Material',
+            quantity: targetRequest.quantity || 1,
+          }];
+
+      const shortageEntries = requestedItems.map((item) => {
+        const quantityNeeded = Math.max(1, Number(item?.quantity || 1));
+        const matchingPart = findInventoryPartMatch(partsList, item);
+        const availableStock = matchingPart ? getPartAvailableStock(matchingPart) : 0;
+        return {
+          item,
+          part: matchingPart,
+          availableStock,
+          quantityNeeded,
+          shortage: Math.max(quantityNeeded - availableStock, quantityNeeded),
+          adjustmentQuantity: 0,
+          reason: `Stock adjustment before creating PO for request ${targetRequest.requestId || targetRequest.id || targetRequest._id}`,
+        };
+      }).filter((entry) => entry.part && entry.quantityNeeded > entry.availableStock);
+
+      if (shortageEntries.length === 0) {
+        await handleApproveMaterial(id);
+        return;
+      }
+
+      setMaterialRequestAdjustModal({
+        open: true,
+        requestId: String(id),
+        title: targetRequest.title || targetRequest.items?.[0]?.title || 'Material Request',
+        entries: shortageEntries,
+        vendorId: '',
+      });
+    } catch (err) {
+      alert(err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Failed to open stock adjustment modal.');
+    }
+  }, [findInventoryPartMatch, getPartAvailableStock, handleApproveMaterial, materialRequests]);
+
+  const applyMaterialRequestAdjustments = useCallback(async () => {
+    if (!materialRequestAdjustModal.requestId) return;
+
+    try {
+      setMaterialRequestAdjustSaving(true);
+      const createdBy = userName || currentUser?.name || currentUser?.email || 'User';
+      if (!materialRequestAdjustModal.vendorId) {
+        alert('Select a vendor before continuing to purchase order.');
+        return;
+      }
+
+      for (const entry of materialRequestAdjustModal.entries) {
+        const adjustmentValue = Number(entry.adjustmentQuantity || 0);
+        if (!entry.part?._id && !entry.part?.id) continue;
+        if (!adjustmentValue) continue;
+
+        await api.post(`/api/parts/${entry.part._id || entry.part.id}/adjust`, {
+          quantity: adjustmentValue,
+          reason: entry.reason || `Stock adjustment before creating PO for material request ${materialRequestAdjustModal.requestId}`,
+          createdBy,
+        });
+      }
+
+      setMaterialRequestAdjustModal({ open: false, requestId: '', title: '', entries: [], vendorId: '' });
+      await handleApproveMaterial(materialRequestAdjustModal.requestId, {
+        vendorId: materialRequestAdjustModal.vendorId,
+        forceCreatePo: true,
+      });
+    } catch (err) {
+      alert(err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Failed to adjust stock quantity.');
+    } finally {
+      setMaterialRequestAdjustSaving(false);
+    }
+  }, [currentUser?.email, currentUser?.name, handleApproveMaterial, materialRequestAdjustModal, userName]);
+
+  useEffect(() => {
+    let isActive = true;
+
+    const loadMaterialRequestStockInfo = async () => {
+      if (!Array.isArray(materialRequests) || materialRequests.length === 0) {
+        if (isActive) setMaterialRequestStockInfo({});
+        return;
+      }
+
+      try {
+        const partsResponse = await api.get('/api/parts');
+        const partsList = Array.isArray(partsResponse?.data) ? partsResponse.data : [];
+        const next = {};
+
+        materialRequests.forEach((request, index) => {
+          const reqId = String(request?.id || request?._id || `request-${index}`);
+          const requestedItems = Array.isArray(request?.items) && request.items.length > 0
+            ? request.items
+            : [{
+                title: request?.title || request?.materialId || 'Material',
+                materialId: request?.materialId || request?.title || 'Material',
+                quantity: request?.quantity || 1,
+              }];
+
+          const shortages = [];
+          const fulfilled = [];
+
+          requestedItems.forEach((item) => {
+            const quantityNeeded = Math.max(1, Number(item?.quantity || 1));
+            const matchingPart = findInventoryPartMatch(partsList, item);
+            const availableStock = matchingPart ? getPartAvailableStock(matchingPart) : 0;
+
+            if (matchingPart && availableStock >= quantityNeeded) {
+              fulfilled.push({ item, availableStock, quantityNeeded });
+            } else {
+              shortages.push({
+                item,
+                availableStock,
+                quantityNeeded,
+                shortage: Math.max(quantityNeeded - availableStock, quantityNeeded),
+              });
+            }
+          });
+
+          next[reqId] = {
+            requiresPo: shortages.length > 0,
+            shortages,
+            fulfilled,
+          };
+        });
+
+        if (isActive) setMaterialRequestStockInfo(next);
+      } catch (error) {
+        if (isActive) setMaterialRequestStockInfo({});
+        console.warn('Failed to load material request stock info', error);
+      }
+    };
+
+    loadMaterialRequestStockInfo();
+    return () => { isActive = false; };
+  }, [findInventoryPartMatch, getPartAvailableStock, materialRequests]);
 
   // Dashboard Card Management Functions
   const toggleCardVisibility = useCallback((cardId) => {
@@ -14091,6 +14728,34 @@ function ClientDashboard() {
     try {
       const token = localStorage.getItem('token');
       if (!token) return;
+      const linkedTask = taskCardItems.find((task) => String(task?._id || task?.id || '') === String(taskId));
+
+      if (linkedTask?.linkedIssueId) {
+        const normalizedIssueStatus = newStatus === 'completed'
+          ? 'COMPLETED'
+          : newStatus === 'in-progress'
+            ? 'IN PROGRESS'
+            : String(newStatus || 'OPEN').toUpperCase();
+
+        const response = await api.put(`/api/issues/${linkedTask.linkedIssueId}`, { status: normalizedIssueStatus }, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        const updatedIssue = response?.data || {};
+        setAllIssues((prev) => prev.map((issue) => (
+          String(issue?._id || issue?.id || '') === String(linkedTask.linkedIssueId)
+            ? { ...issue, ...updatedIssue }
+            : issue
+        )));
+        setModalData((prev) => (
+          prev?.item && String(prev.item?._id || prev.item?.id || '') === String(linkedTask.linkedIssueId)
+            ? { ...prev, item: { ...prev.item, ...updatedIssue } }
+            : prev
+        ));
+
+        alert(`${linkedTask.sourceLabel || 'Item'} marked as ${newStatus.replace('-', ' ')}.`);
+        return;
+      }
 
       const response = await api.patch(`/api/tasks/${taskId}/status`, { status: newStatus }, {
         headers: { Authorization: `Bearer ${token}` }
@@ -14107,10 +14772,19 @@ function ClientDashboard() {
       }
     } catch (err) {
       console.error('Failed to update task status:', err);
+      alert(err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Failed to update status.');
     }
   };
 
   const openTaskDetail = (task) => {
+    if (task?.linkedIssueId && task?.issueSnapshot) {
+      setModalData({
+        open: true,
+        type: task?.linkedIssueType === 'request' ? 'request' : 'issue',
+        item: task.issueSnapshot,
+      });
+      return;
+    }
     setSelectedTaskDetail(task);
     setEditingTaskData({
       ...task,
@@ -14119,6 +14793,131 @@ function ClientDashboard() {
     });
     setTaskDetailChatInput('');
     setShowTaskDetailModal(true);
+  };
+
+  const openTaskCompletionModal = (task) => {
+    setTaskCompletionTarget(task);
+    setTaskCompletionFeedback('');
+    setTaskCompletionFiles([]);
+    setShowTaskCompletionModal(true);
+  };
+
+  const closeTaskCompletionModal = () => {
+    if (taskCompletionSubmitting) return;
+    setShowTaskCompletionModal(false);
+    setTaskCompletionTarget(null);
+    setTaskCompletionFeedback('');
+    setTaskCompletionFiles([]);
+  };
+
+  const submitTaskCompletionFeedback = async () => {
+    const linkedTask = taskCompletionTarget;
+    const feedback = String(taskCompletionFeedback || '').trim();
+    if (!linkedTask?.linkedIssueId) return;
+    if (!feedback) {
+      alert('Please enter completion feedback before marking this item completed.');
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+      setTaskCompletionSubmitting(true);
+
+      const issueId = linkedTask.linkedIssueId;
+      const timestamp = new Date().toISOString();
+      const actorName = userName || currentUser?.name || currentUser?.username || 'User';
+      const existingIssue = linkedTask.issueSnapshot || allIssues.find((issue) => String(issue?._id || issue?.id || '') === String(issueId)) || {};
+      let uploadedFiles = [];
+
+      if (Array.isArray(taskCompletionFiles) && taskCompletionFiles.length > 0) {
+        const formData = new FormData();
+        taskCompletionFiles.forEach((file) => formData.append('files', file));
+        const fileResponse = await api.post(`/api/issues/${issueId}/files`, formData, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'multipart/form-data',
+          }
+        });
+        uploadedFiles = Array.isArray(fileResponse?.data) ? fileResponse.data : [];
+      }
+
+      const fileLabel = uploadedFiles.length
+        ? `Evidence attached: ${uploadedFiles.map((file) => file?.name || 'file').join(', ')}`
+        : 'No evidence files attached.';
+
+      const completionMessage = {
+        sender: actorName,
+        text: `Completed update:\n${feedback}${uploadedFiles.length ? `\n\n${fileLabel}` : ''}`,
+        timestamp,
+        role: String(currentUser?.role || 'client').toLowerCase(),
+        attachments: uploadedFiles.map((file, index) => ({
+          id: file?.id || `attachment-${index}`,
+          name: file?.name || `Evidence ${index + 1}`,
+          url: file?.url ? getImageUrl(file.url) : '',
+          type: file?.type || '',
+        })),
+      };
+      const updatedChat = [...(Array.isArray(existingIssue?.chat) ? existingIssue.chat : []), completionMessage];
+
+      const issueResponse = await api.put(`/api/issues/${issueId}`, {
+        status: 'COMPLETED',
+        chat: updatedChat,
+        completedAt: timestamp,
+        completionFeedback: feedback,
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      const updatedIssue = issueResponse?.data || {};
+      await api.post(`/api/issues/${issueId}/activity`, {
+        action: 'Completed with feedback',
+        detail: `${feedback}${uploadedFiles.length ? ` | ${fileLabel}` : ''}`,
+        user: actorName,
+        role: String(currentUser?.role || 'client').toLowerCase(),
+        timestamp,
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      setAllIssues((prev) => prev.map((issue) => (
+        String(issue?._id || issue?.id || '') === String(issueId)
+          ? {
+              ...issue,
+              ...updatedIssue,
+              status: updatedIssue?.status || 'COMPLETED',
+              chat: updatedChat,
+              completionFeedback: feedback,
+              completedAt: updatedIssue?.completedAt || timestamp,
+              files: [...(Array.isArray(issue?.files) ? issue.files : []), ...uploadedFiles],
+            }
+          : issue
+      )));
+      setModalData((prev) => (
+        prev?.item && String(prev.item?._id || prev.item?.id || '') === String(issueId)
+          ? {
+              ...prev,
+              item: {
+                ...prev.item,
+                ...updatedIssue,
+                status: updatedIssue?.status || 'COMPLETED',
+                chat: updatedChat,
+                completionFeedback: feedback,
+                completedAt: updatedIssue?.completedAt || timestamp,
+                files: [...(Array.isArray(prev.item?.files) ? prev.item.files : []), ...uploadedFiles],
+              }
+            }
+          : prev
+      ));
+
+      alert(`${linkedTask.sourceLabel || 'Item'} completed. Feedback and evidence were saved to the record.`);
+      closeTaskCompletionModal();
+    } catch (err) {
+      console.error('Failed to submit completion feedback:', err);
+      alert(err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Failed to save completion feedback.');
+    } finally {
+      setTaskCompletionSubmitting(false);
+    }
   };
 
   const saveTaskDetails = async () => {
@@ -15490,11 +16289,6 @@ function ClientDashboard() {
     return d.toLocaleDateString(locale, { weekday: 'short' });
   });
 
-  const combinedPending = (statusCounts.Pending || 0) + (maintenanceCounts.Pending || 0);
-  const combinedInProgress = (statusCounts['In Progress'] || 0) + (maintenanceCounts['In Progress'] || 0);
-  const combinedCompleted = (statusCounts.Completed || 0) + (maintenanceCounts.Completed || 0);
-  const combinedOverdue = (statusCounts.Overdue || 0) + (maintenanceCounts.Overdue || 0);
-
   const openDashboardStatusView = (statusKey) => {
     const normalized = String(statusKey || '').toUpperCase();
 
@@ -15515,6 +16309,13 @@ function ClientDashboard() {
       setSelectedRequestStatuses(['Pending']);
       setSelectedWorkOrderStatuses([]);
       setActiveTab('requests');
+      return;
+    }
+
+    if (normalized === 'OPEN') {
+      setSelectedRequestStatuses([]);
+      setSelectedWorkOrderStatuses(['OPEN']);
+      setActiveTab('workOrders');
       return;
     }
 
@@ -15591,7 +16392,62 @@ function ClientDashboard() {
     return isRequestRecord(issue) || !isApprovedWorkOrder(issue);
   };
 
+  const doesIssueBelongToCurrentUser = React.useCallback((issue) => {
+    if (!issue) return false;
+
+    const currentIds = Array.from(new Set([
+      currentUser?._id,
+      currentUser?.id,
+      currentUser?.userId,
+      currentUser?.email,
+    ].filter(Boolean).map((value) => String(value).trim().toLowerCase())));
+
+    const currentNames = Array.from(new Set([
+      currentUser?.name,
+      currentUser?.fullName,
+      currentUser?.username,
+      userName,
+    ].filter(Boolean).map((value) => String(value).trim().toLowerCase())));
+
+    const matchesPerson = (value) => {
+      if (!value && value !== 0) return false;
+      if (Array.isArray(value)) return value.some(matchesPerson);
+      if (typeof value === 'object') {
+        return matchesPerson(value._id)
+          || matchesPerson(value.id)
+          || matchesPerson(value.userId)
+          || matchesPerson(value.email)
+          || matchesPerson(value.name)
+          || matchesPerson(value.fullName);
+      }
+
+      const normalized = String(value).trim().toLowerCase();
+      if (!normalized) return false;
+      return currentIds.includes(normalized) || currentNames.includes(normalized);
+    };
+
+    const resolvedAssignedName = String(getAssignedName(issue) || '').trim().toLowerCase();
+    return (
+      matchesPerson(issue.assignedTo)
+      || matchesPerson(issue.assignees)
+      || matchesPerson(issue.additionalResponsibleWorkers)
+      || matchesPerson(issue.primaryWorker)
+      || (resolvedAssignedName && currentNames.includes(resolvedAssignedName))
+    );
+  }, [currentUser, getAssignedName, userName]);
+
   const pendingRequests = allIssues.filter((issue) => isRequestIssue(issue));
+  const combinedOpen = (statusCounts.Open || 0) + (maintenanceCounts.Open || 0);
+  const combinedPending = pendingRequests.filter((request) => {
+    const rawStatus = String(request.status || '').toUpperCase();
+    const isDeclined = request.rejected || rawStatus === 'DECLINED' || rawStatus === 'REJECTED';
+    const isInProgress = rawStatus === 'IN PROGRESS' || rawStatus === 'IN_PROGRESS' || rawStatus.includes('IN PROGRESS');
+    const isApproved = request.approved || rawStatus === 'APPROVED' || isInProgress;
+    return !isDeclined && !isApproved;
+  }).length;
+  const combinedInProgress = (statusCounts['In Progress'] || 0) + (maintenanceCounts['In Progress'] || 0);
+  const combinedCompleted = (statusCounts.Completed || 0) + (maintenanceCounts.Completed || 0);
+  const combinedOverdue = (statusCounts.Overdue || 0) + (maintenanceCounts.Overdue || 0);
   const requestStatusOptions = ['Pending', 'Approved', 'In Progress', 'Declined'];
   const requestLocationOptions = React.useMemo(
     () => Array.from(new Set(
@@ -15839,6 +16695,39 @@ function ClientDashboard() {
       return true;
     });
   }, [pendingRequests, workOrders]);
+  const assignedIssueTasks = React.useMemo(() => {
+    const assignedItems = [...pendingRequests, ...workOrders].filter((issue) => doesIssueBelongToCurrentUser(issue));
+    const seen = new Set();
+
+    return assignedItems.flatMap((issue) => {
+      const issueId = String(issue?._id || issue?.id || '');
+      if (!issueId || seen.has(issueId)) return [];
+      seen.add(issueId);
+
+      const rawStatus = String(issue?.status || '').toUpperCase();
+      const dueDate = issue?.fixDeadline || issue?.dueDate || issue?.nextDate || issue?.date || null;
+      const isCompleted = rawStatus.includes('COMPLETE') || rawStatus === 'CLOSED' || rawStatus === 'DONE';
+      const isInProgress = rawStatus.includes('IN PROGRESS') || rawStatus.includes('IN_PROGRESS');
+      const isOverdue = dueDate ? new Date(dueDate) < new Date() && !isCompleted : false;
+      const taskStatus = isCompleted ? 'completed' : isOverdue ? 'overdue' : isInProgress ? 'in-progress' : 'upcoming';
+      const isRequest = isRequestIssue(issue);
+
+      return [{
+        id: `assigned-issue-${issueId}`,
+        linkedIssueId: issueId,
+        linkedIssueType: isRequest ? 'request' : 'issue',
+        title: issue?.title || issue?.name || (isRequest ? 'Assigned request' : 'Assigned work order'),
+        description: issue?.description || (isRequest ? 'Assigned request awaiting your action.' : 'Assigned work order ready for you.'),
+        dueDate,
+        priority: String(issue?.priority || 'medium').toLowerCase(),
+        color: isRequest ? '#8B5CF6' : '#3B82F6',
+        status: taskStatus,
+        sourceLabel: isRequest ? 'Request' : 'Work Order',
+        assignedName: getAssignedName(issue),
+        issueSnapshot: issue,
+      }];
+    });
+  }, [doesIssueBelongToCurrentUser, getAssignedName, pendingRequests, workOrders]);
   const clientTasks = allIssues.flatMap((issue) => {
     const rawTasks = Array.isArray(issue?.tasks) && issue.tasks.length
       ? issue.tasks
@@ -15864,6 +16753,16 @@ function ClientDashboard() {
   const combinedClientTasks = React.useMemo(() => (
     [...manualClientTasks, ...clientTasks]
   ), [clientTasks, manualClientTasks]);
+  const taskCardItems = React.useMemo(() => {
+    const seen = new Set();
+    return [...dashboardTasks, ...assignedIssueTasks].filter((task) => {
+      const key = String(task?.linkedIssueId || task?._id || task?.id || '');
+      if (!key) return true;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [assignedIssueTasks, dashboardTasks]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -18261,6 +19160,8 @@ function ClientDashboard() {
 
               {/* Stats */}
               <div className="responsive-grid-auto mb-6">
+                <StatCard label="Open" value={combinedOpen} sub="Ready to start" accent="slate" onClick={() => openDashboardStatusView('OPEN')}
+                  icon={<svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M12 5v14" /><path d="M5 12h14" /></svg>} />
                 <StatCard label="Pending" value={combinedPending} sub="Awaiting action" accent="amber" onClick={() => openDashboardStatusView('PENDING')}
                   icon={<svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>} />
                 <StatCard label="In Progress" value={combinedInProgress} sub="Currently active" accent="blue" onClick={() => openDashboardStatusView('IN PROGRESS')}
@@ -18382,7 +19283,7 @@ function ClientDashboard() {
                   {/* Task Tabs */}
                   <div style={{ display: 'flex', gap: 24, marginBottom: 16, borderBottom: '1px solid #E5E7EB', paddingBottom: 12 }}>
                     {['upcoming', 'in-progress', 'overdue', 'completed'].map(tab => {
-                      const filteredTasks = dashboardTasks.filter(task => task.status === tab);
+                      const filteredTasks = taskCardItems.filter(task => task.status === tab);
                       const count = filteredTasks.length;
                       return (
                         <button
@@ -18429,16 +19330,19 @@ function ClientDashboard() {
                     <div style={{ textAlign: 'center', padding: '28px 16px', color: '#6B7280', fontSize: 14 }}>
                       Loading tasks...
                     </div>
-                  ) : dashboardTasks.filter(task => task.status === activeTaskTab).length > 0 ? (
+                  ) : taskCardItems.filter(task => task.status === activeTaskTab).length > 0 ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                      {dashboardTasks.filter(task => task.status === activeTaskTab).map((task, index) => (
+                      {taskCardItems.filter(task => task.status === activeTaskTab).map((task, index) => (
                         <div
                           key={task._id || task.id}
-                          draggable
-                          onDragStart={() => setDraggedTaskId(index)}
+                          draggable={!task.linkedIssueId}
+                          onDragStart={() => {
+                            if (task.linkedIssueId) return;
+                            setDraggedTaskId(index);
+                          }}
                           onDragOver={(e) => e.preventDefault()}
                           onDrop={() => {
-                            if (draggedTaskId !== null && draggedTaskId !== index) {
+                            if (!task.linkedIssueId && draggedTaskId !== null && draggedTaskId !== index) {
                               moveTask(draggedTaskId, index);
                               setDraggedTaskId(null);
                             }
@@ -18450,7 +19354,7 @@ function ClientDashboard() {
                             borderRadius: 14,
                             padding: '12px 14px',
                             borderLeft: `4px solid ${task.color || '#3B82F6'}`,
-                            cursor: 'grab',
+                            cursor: task.linkedIssueId ? 'default' : 'grab',
                             opacity: draggedTaskId === index ? 0.6 : 1,
                             transition: 'all 0.2s ease',
                             boxShadow: draggedTaskId === index ? '0 4px 12px rgba(0,0,0,0.15)' : 'none'
@@ -18465,6 +19369,11 @@ function ClientDashboard() {
                                 <div style={{ fontSize: 14, fontWeight: 700, color: '#111827', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                   {task.title}
                                 </div>
+                                {task.sourceLabel && (
+                                  <div style={{ fontSize: 11, fontWeight: 700, color: '#6366F1', marginTop: 4, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                    {task.sourceLabel}
+                                  </div>
+                                )}
                                 {task.description && (
                                   <div style={{ fontSize: 12, color: '#6B7280', marginTop: 4, whiteSpace: 'normal', overflow: 'hidden', maxHeight: '2.4em', textOverflow: 'ellipsis' }}>
                                     {task.description}
@@ -18559,7 +19468,7 @@ function ClientDashboard() {
                             
                             {task.status !== 'completed' && (
                               <button
-                                onClick={() => updateTaskStatus(task._id || task.id, 'completed')}
+                                onClick={() => task.linkedIssueId ? openTaskCompletionModal(task) : updateTaskStatus(task._id || task.id, 'completed')}
                                 style={{
                                   fontSize: 11,
                                   fontWeight: 700,
@@ -18582,29 +19491,31 @@ function ClientDashboard() {
                               </button>
                             )}
                             
-                            <button
-                              onClick={() => deleteTask(task._id || task.id)}
-                              style={{
-                                fontSize: 11,
-                                fontWeight: 700,
-                                padding: '6px 10px',
-                                borderRadius: 6,
-                                border: '1px solid #F87171',
-                                background: '#FEE2E2',
-                                color: '#991B1B',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s',
-                                marginLeft: 'auto'
-                              }}
-                              onMouseEnter={(e) => {
-                                e.target.style.background = '#FCA5A5';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.target.style.background = '#FEE2E2';
-                              }}
-                            >
-                              Delete
-                            </button>
+                            {!task.linkedIssueId && (
+                              <button
+                                onClick={() => deleteTask(task._id || task.id)}
+                                style={{
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  padding: '6px 10px',
+                                  borderRadius: 6,
+                                  border: '1px solid #F87171',
+                                  background: '#FEE2E2',
+                                  color: '#991B1B',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s',
+                                  marginLeft: 'auto'
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.target.style.background = '#FCA5A5';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.target.style.background = '#FEE2E2';
+                                }}
+                              >
+                                Delete
+                              </button>
+                            )}
                           </div>
                           {task.collaborators && task.collaborators.length > 0 && (
                             <div style={{ display: 'flex', marginTop: 8, gap: -4 }}>
@@ -19296,6 +20207,171 @@ function ClientDashboard() {
                 </div>
               )}
 
+              {showTaskCompletionModal && taskCompletionTarget && (
+                <div
+                  style={{
+                    position: 'fixed',
+                    inset: 0,
+                    background: 'rgba(15, 23, 42, 0.55)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 10000,
+                    padding: 20,
+                  }}
+                  onClick={(e) => {
+                    if (e.target === e.currentTarget) closeTaskCompletionModal();
+                  }}
+                >
+                  <div
+                    style={{
+                      background: 'white',
+                      width: '100%',
+                      maxWidth: 720,
+                      borderRadius: 20,
+                      boxShadow: '0 25px 50px rgba(15, 23, 42, 0.28)',
+                      border: '1px solid rgba(226, 232, 240, 0.9)',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <div style={{ padding: '24px 28px', borderBottom: '1px solid #E5E7EB', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
+                      <div>
+                        <div style={{ fontSize: 22, fontWeight: 800, color: '#111827' }}>Complete with Feedback</div>
+                        <div style={{ fontSize: 13, color: '#6B7280', marginTop: 6 }}>
+                          Add completion notes and evidence. This will be saved in the record chat, activity, and files.
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={closeTaskCompletionModal}
+                        disabled={taskCompletionSubmitting}
+                        style={{ border: 'none', background: 'transparent', fontSize: 26, color: '#94A3B8', cursor: taskCompletionSubmitting ? 'not-allowed' : 'pointer' }}
+                      >
+                        ×
+                      </button>
+                    </div>
+
+                    <div style={{ padding: 28, display: 'grid', gap: 20 }}>
+                      <div>
+                        <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase', color: '#6366F1', marginBottom: 8 }}>
+                          {taskCompletionTarget.sourceLabel || 'Assigned Item'}
+                        </div>
+                        <div style={{ fontSize: 18, fontWeight: 700, color: '#111827' }}>
+                          {taskCompletionTarget.title}
+                        </div>
+                        {taskCompletionTarget.description && (
+                          <div style={{ marginTop: 6, fontSize: 14, color: '#6B7280' }}>
+                            {taskCompletionTarget.description}
+                          </div>
+                        )}
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: 14, fontWeight: 700, color: '#111827', marginBottom: 8 }}>
+                          Completion Feedback
+                        </label>
+                        <textarea
+                          value={taskCompletionFeedback}
+                          onChange={(e) => setTaskCompletionFeedback(e.target.value)}
+                          placeholder="Describe what was done, what was fixed, and anything the team should know."
+                          style={{
+                            width: '100%',
+                            minHeight: 150,
+                            resize: 'vertical',
+                            borderRadius: 16,
+                            border: '1px solid #D1D5DB',
+                            padding: '14px 16px',
+                            fontSize: 14,
+                            color: '#111827',
+                            outline: 'none',
+                            background: '#F8FAFC',
+                            boxSizing: 'border-box',
+                          }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: 14, fontWeight: 700, color: '#111827', marginBottom: 8 }}>
+                          Evidence Files
+                        </label>
+                        <label
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            border: '1.5px dashed #C7D2FE',
+                            borderRadius: 16,
+                            padding: '18px 16px',
+                            background: '#F8FAFF',
+                            color: '#4338CA',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Upload photos or documents
+                          <input
+                            type="file"
+                            multiple
+                            className="hidden"
+                            onChange={(e) => setTaskCompletionFiles(Array.from(e.target.files || []))}
+                          />
+                        </label>
+                        <div style={{ fontSize: 12, color: '#6B7280', marginTop: 8 }}>
+                          Uploaded evidence will appear in the item&apos;s Files tab.
+                        </div>
+                        {taskCompletionFiles.length > 0 && (
+                          <div style={{ marginTop: 12, display: 'grid', gap: 8 }}>
+                            {taskCompletionFiles.map((file, index) => (
+                              <div key={`${file.name}-${index}`} style={{ fontSize: 13, color: '#334155', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 12, padding: '10px 12px' }}>
+                                {file.name}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div style={{ padding: '20px 28px', borderTop: '1px solid #E5E7EB', display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+                      <button
+                        type="button"
+                        onClick={closeTaskCompletionModal}
+                        disabled={taskCompletionSubmitting}
+                        style={{
+                          border: '1px solid #D1D5DB',
+                          background: 'white',
+                          color: '#374151',
+                          borderRadius: 12,
+                          padding: '10px 16px',
+                          fontSize: 14,
+                          fontWeight: 700,
+                          cursor: taskCompletionSubmitting ? 'not-allowed' : 'pointer',
+                        }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={submitTaskCompletionFeedback}
+                        disabled={taskCompletionSubmitting}
+                        style={{
+                          border: '1px solid #16A34A',
+                          background: '#16A34A',
+                          color: 'white',
+                          borderRadius: 12,
+                          padding: '10px 18px',
+                          fontSize: 14,
+                          fontWeight: 800,
+                          cursor: taskCompletionSubmitting ? 'not-allowed' : 'pointer',
+                          opacity: taskCompletionSubmitting ? 0.7 : 1,
+                        }}
+                      >
+                        {taskCompletionSubmitting ? 'Saving...' : 'Complete and Save Feedback'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Task Details Modal */}
               {showTaskDetailModal && selectedTaskDetail && (
                 <div style={{
@@ -19381,6 +20457,34 @@ function ClientDashboard() {
                                           </span>
                                         </div>
                                         <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-gray-700">{msg.text || msg.message}</p>
+                                        {Array.isArray(msg.attachments) && msg.attachments.length > 0 && (
+                                          <div className="mt-3 grid gap-3">
+                                            {msg.attachments.map((attachment, attachmentIndex) => {
+                                              const attachmentUrl = attachment?.url ? getImageUrl(attachment.url) : '';
+                                              const attachmentName = attachment?.name || `Attachment ${attachmentIndex + 1}`;
+                                              const isImage = String(attachment?.type || attachmentName).toLowerCase().match(/image|png|jpe?g|gif|webp|bmp|svg/);
+                                              return (
+                                                <a
+                                                  key={attachment?.id || `${attachmentName}-${attachmentIndex}`}
+                                                  href={attachmentUrl || '#'}
+                                                  target="_blank"
+                                                  rel="noreferrer"
+                                                  className="block rounded-xl border border-gray-200 bg-slate-50 p-3 hover:bg-slate-100"
+                                                >
+                                                  {isImage && attachmentUrl ? (
+                                                    <img
+                                                      src={attachmentUrl}
+                                                      alt={attachmentName}
+                                                      className="mb-3 max-h-48 w-full rounded-lg object-cover"
+                                                    />
+                                                  ) : null}
+                                                  <div className="text-sm font-semibold text-gray-800">{attachmentName}</div>
+                                                  <div className="text-xs text-gray-500">{attachmentUrl ? 'Open attachment' : 'Attachment saved'}</div>
+                                                </a>
+                                              );
+                                            })}
+                                          </div>
+                                        )}
                                       </div>
                                     </div>
                                   </div>
@@ -22313,7 +23417,20 @@ function ClientDashboard() {
                     const reqId = req.id || req._id;
                     const items = req.items || [];
                     const firstItem = items[0] || {};
-                    const isPending = req.status === 'FORWARDED' || req.status === 'PENDING';
+                    const linkedPo = materialRequestPoStatusMap[String(reqId || '')] || null;
+                    const normalizedReqStatus = String(req.status || '').toUpperCase();
+                    const normalizedPoStatus = String(linkedPo?.vendorResponse || linkedPo?.status || '').toUpperCase();
+                    const vendorApprovedPo = normalizedPoStatus === 'APPROVED';
+                    const vendorDeclinedPo = normalizedPoStatus === 'DECLINED';
+                    const awaitingVendorApproval = !!linkedPo && !vendorApprovedPo && !vendorDeclinedPo;
+                    const effectiveStatus = awaitingVendorApproval
+                      ? 'WAITING_VENDOR_APPROVAL'
+                      : vendorDeclinedPo
+                        ? 'VENDOR_DECLINED'
+                        : normalizedReqStatus;
+                    const isPending = effectiveStatus === 'FORWARDED' || effectiveStatus === 'PENDING';
+                    const stockInfo = materialRequestStockInfo[String(reqId || '')] || { requiresPo: false, shortages: [], fulfilled: [] };
+                    const primaryActionLabel = stockInfo.requiresPo ? 'Create PO' : 'Approve';
                     return (
                       <div key={reqId || idx} className="glass-surface rounded-2xl hover:shadow-md transition-all overflow-hidden flex flex-col">
                         <div className="p-5 flex-1">
@@ -22321,11 +23438,13 @@ function ClientDashboard() {
                             <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-full uppercase tracking-wider">
                               #{String(reqId).slice(-6).toUpperCase()}
                             </span>
-                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-black border ${req.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
-                              req.status === 'DECLINED' ? 'bg-rose-50 text-rose-700 border-rose-100' :
+                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-black border ${effectiveStatus === 'APPROVED' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+                              effectiveStatus === 'DECLINED' ? 'bg-rose-50 text-rose-700 border-rose-100' :
+                              effectiveStatus === 'WAITING_VENDOR_APPROVAL' ? 'bg-blue-50 text-blue-700 border-blue-100' :
+                              effectiveStatus === 'VENDOR_DECLINED' ? 'bg-rose-50 text-rose-700 border-rose-100' :
                                 'bg-amber-50 text-amber-700 border-amber-200'
                               }`}>
-                              {req.status}
+                              {effectiveStatus.replace(/_/g, ' ')}
                             </span>
                           </div>
                           <h4 className="font-bold text-gray-900 text-base mb-1">
@@ -22346,6 +23465,23 @@ function ClientDashboard() {
                             <p className="text-xs text-gray-600 leading-relaxed italic line-clamp-3">
                               "{req.description || 'No description provided'}"
                             </p>
+                            {awaitingVendorApproval ? (
+                              <div className="mt-3 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-[11px] font-medium text-blue-700">
+                                Purchase order {linkedPo?.poNumber || ''} was created and emailed to the selected vendor. This request will only be approved after the vendor approves that purchase order.
+                              </div>
+                            ) : vendorDeclinedPo ? (
+                              <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] font-medium text-rose-700">
+                                The selected vendor declined the purchase order. This material request is not approved yet.
+                              </div>
+                            ) : stockInfo.requiresPo ? (
+                              <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-medium text-amber-700">
+                                Requested quantity is higher than available stock. This request should create a purchase order.
+                              </div>
+                            ) : stockInfo.fulfilled.length > 0 ? (
+                              <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-medium text-emerald-700">
+                                Enough stock is available to fulfill this request from inventory.
+                              </div>
+                            ) : null}
                           </div>
                           <div className="flex items-center gap-4 text-[11px] text-gray-400 font-bold border-t border-gray-50 pt-3 mt-3">
                             <div className="flex items-center gap-1.5">
@@ -22360,7 +23496,18 @@ function ClientDashboard() {
                         </div>
                         {isPending && (
                           <div className="p-3 bg-gray-50/50 border-t border-gray-50 flex gap-2">
-                            <button onClick={() => handleApproveMaterial(reqId)} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-xl text-xs font-bold transition-colors shadow-sm">Approve</button>
+                            <button
+                              onClick={() => {
+                                if (stockInfo.requiresPo) {
+                                  openMaterialRequestAdjustModal(reqId);
+                                  return;
+                                }
+                                handleApproveMaterial(reqId);
+                              }}
+                              className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-xl text-xs font-bold transition-colors shadow-sm"
+                            >
+                              {primaryActionLabel}
+                            </button>
                             <button onClick={() => handleDeclineMaterial(reqId)} className="flex-1 glass-ghost hover:bg-rose-50 text-slate-700 hover:text-rose-600 py-2 rounded-xl text-xs font-bold transition-all">Decline</button>
                           </div>
                         )}
@@ -22373,6 +23520,116 @@ function ClientDashboard() {
           )}
 
           {/* â”€â”€ Subscription â”€â”€ */}
+          {materialRequestAdjustModal.open && (
+            <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-4">
+              <div className="w-full max-w-[860px] rounded-2xl border border-gray-200 bg-white shadow-2xl">
+                <div className="flex items-center justify-between px-8 py-6">
+                  <div>
+                    <h3 className="text-[28px] font-bold tracking-tight text-gray-900">Adjust Stock Quantity</h3>
+                    <p className="mt-1 text-sm text-gray-500">
+                      Review stock first, then continue to inventory fulfillment or purchase order creation.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setMaterialRequestAdjustModal({ open: false, requestId: '', title: '', entries: [], vendorId: '' })}
+                    className="p-1 text-gray-700 hover:text-gray-900"
+                  >
+                    <X className="h-8 w-8" strokeWidth={1.75} />
+                  </button>
+                </div>
+                <div className="max-h-[60vh] overflow-auto border-t border-gray-100 px-8 py-6">
+                  <div className="space-y-4">
+                    <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
+                      <label className="mb-2 block text-sm font-medium text-blue-900">Vendor to receive public PO link</label>
+                      <select
+                        value={materialRequestAdjustModal.vendorId}
+                        onChange={(e) => setMaterialRequestAdjustModal((prev) => ({ ...prev, vendorId: e.target.value }))}
+                        className="w-full rounded-xl border border-blue-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none focus:border-blue-500"
+                      >
+                        <option value="">Select vendor</option>
+                        {((contactPeople || []).filter((person) => person.__source === 'vendor')).map((vendor) => (
+                          <option key={vendor._id || vendor.id || vendor.email} value={vendor._id || vendor.id}>
+                            {vendor.name} {vendor.email ? `(${vendor.email})` : '(no email)'}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    {materialRequestAdjustModal.entries.map((entry, index) => (
+                      <div key={`${entry.part?._id || entry.part?.id || index}`} className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <div className="text-base font-bold text-gray-900">{entry.item?.title || entry.item?.materialId || entry.part?.name || 'Material'}</div>
+                            <div className="mt-1 text-sm text-gray-500">{entry.part?.location || 'No location set'}</div>
+                          </div>
+                          <div className="rounded-xl bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
+                            Requested: {entry.quantityNeeded} | In stock: {entry.availableStock}
+                          </div>
+                        </div>
+                        <div className="mt-4 grid gap-4 md:grid-cols-[0.8fr_1.2fr]">
+                          <div>
+                            <label className="mb-2 block text-sm font-medium text-gray-700">Adjustment Quantity</label>
+                            <input
+                              type="number"
+                              value={entry.adjustmentQuantity}
+                              onChange={(e) => {
+                                const value = Number(e.target.value || 0);
+                                setMaterialRequestAdjustModal((prev) => ({
+                                  ...prev,
+                                  entries: prev.entries.map((currentEntry, currentIndex) => (
+                                    currentIndex === index ? { ...currentEntry, adjustmentQuantity: value } : currentEntry
+                                  )),
+                                }));
+                              }}
+                              className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none focus:border-blue-500"
+                            />
+                            <p className="mt-2 text-xs text-gray-500">
+                              Use a positive number if the stock count should be increased before the request is processed. Leave `0` to continue directly with PO creation.
+                            </p>
+                          </div>
+                          <div>
+                            <label className="mb-2 block text-sm font-medium text-gray-700">Reason</label>
+                            <input
+                              value={entry.reason}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                setMaterialRequestAdjustModal((prev) => ({
+                                  ...prev,
+                                  entries: prev.entries.map((currentEntry, currentIndex) => (
+                                    currentIndex === index ? { ...currentEntry, reason: value } : currentEntry
+                                  )),
+                                }));
+                              }}
+                              className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none focus:border-blue-500"
+                              placeholder="Reason for stock adjustment"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex items-center justify-end gap-3 border-t border-gray-200 px-8 py-4">
+                  <button
+                    type="button"
+                    onClick={() => setMaterialRequestAdjustModal({ open: false, requestId: '', title: '', entries: [], vendorId: '' })}
+                    className="rounded-xl border border-gray-300 bg-white px-5 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={applyMaterialRequestAdjustments}
+                    disabled={materialRequestAdjustSaving}
+                    className="rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+                  >
+                    {materialRequestAdjustSaving ? 'Processing...' : 'Continue'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {activeTab === 'subscription' && (
             <div style={{ padding: '0' }}>
               {(currentUser?.role === 'superadmin' || currentUser?.role === 'super-admin') ? (
@@ -28993,7 +30250,7 @@ const ClientPurchaseOrdersTab = () => {
     if (selectedPo) setShowDetails(true);
   }, [selectedPo]);
   React.useEffect(() => {
-    (async () => {
+    const loadPurchaseOrders = async () => {
       try {
         const [poRes, venRes] = await Promise.all([
           api.get('/api/purchase-orders'),
@@ -29005,7 +30262,18 @@ const ClientPurchaseOrdersTab = () => {
         setOrders([]);
         setVendors([]);
       }
-    })();
+    };
+
+    loadPurchaseOrders();
+
+    const handleRefresh = () => {
+      loadPurchaseOrders();
+    };
+
+    window.addEventListener('purchase-order-created', handleRefresh);
+    return () => {
+      window.removeEventListener('purchase-order-created', handleRefresh);
+    };
   }, []);
   const exportCSV = () => {
     if (!orders.length) return;
@@ -29100,8 +30368,10 @@ const ClientPurchaseOrdersTab = () => {
           phone: form.shippingPhone || ''
         },
         poNumber: form.poNumber || `PO-${Date.now()}`,
+        vendorEmail: vendors.find((vendor) => String(vendor._id || vendor.id) === String(form.vendorId))?.email || undefined,
         notes: form.additionalDetails || '',
-        items: form.itemName ? [{ name: form.itemName, quantity: Number(form.quantity) || 1, unitCost: Number(form.unitCost) || 0 }] : []
+        items: form.itemName ? [{ name: form.itemName, quantity: Number(form.quantity) || 1, unitCost: Number(form.unitCost) || 0 }] : [],
+        sendVendorLink: Boolean(vendors.find((vendor) => String(vendor._id || vendor.id) === String(form.vendorId))?.email)
       };
       let res;
       if (editingId) {
@@ -29196,7 +30466,7 @@ const ClientPurchaseOrdersTab = () => {
                 <div className="rounded-2xl border border-gray-200 overflow-hidden"><div className="px-6 py-4 bg-gray-50 text-lg font-bold text-gray-900">Line Items</div><div className="overflow-x-auto"><table className="w-full text-left"><thead className="bg-gray-50 text-xs font-bold text-gray-600"><tr><th className="py-3 px-4">Item</th><th className="py-3 px-4">Cost</th><th className="py-3 px-4">Qty</th><th className="py-3 px-4 text-right">Total</th></tr></thead><tbody className="text-sm">{(selectedPo.items || []).map((item, idx) => { const qty = Number(item.quantity) || 0; const cost = Number(item.unitCost || item.cost) || 0; return (<tr key={idx} className="border-t border-gray-100"><td className="py-3 px-4"><div className="font-semibold text-gray-900">{item.name || 'Item'}</div>{item.description && <div className="text-xs text-gray-500 mt-1">{item.description}</div>}</td><td className="py-3 px-4 text-gray-700">${cost.toFixed(2)}</td><td className="py-3 px-4 text-gray-700">{qty}</td><td className="py-3 px-4 text-right font-bold text-gray-900">${(qty * cost).toFixed(2)}</td></tr>); })}{(selectedPo.items || []).length === 0 && (<tr><td colSpan={4} className="py-8 text-center text-gray-400">No items</td></tr>)}</tbody></table></div></div>
                 <div className="rounded-2xl border border-gray-200 overflow-hidden"><div className="px-6 py-4 bg-gray-50 text-lg font-bold text-gray-900">Additional Details</div><div className="divide-y divide-gray-100 text-sm"><div className="grid grid-cols-2 gap-4 px-6 py-5"><span className="text-gray-500">Purchase Date</span><span className="font-medium text-gray-900">{formatDate(selectedPo.purchaseDate || selectedPo.createdAt)}</span></div><div className="grid grid-cols-2 gap-4 px-6 py-5"><span className="text-gray-500">Shipping Method</span><span className="font-medium text-gray-900">{selectedPo.shippingMethod || 'None'}</span></div><div className="grid grid-cols-2 gap-4 px-6 py-5"><span className="text-gray-500">Terms</span><span className="font-medium text-gray-900">{selectedPo.terms || 'None'}</span></div><div className="grid grid-cols-2 gap-4 px-6 py-5"><span className="text-gray-500">F.O.B. Shipping Point</span><span className="font-medium text-gray-900">{selectedPo.fobShippingPoint || 'None'}</span></div><div className="grid grid-cols-2 gap-4 px-6 py-5"><span className="text-gray-500">Notes</span><span className="font-medium text-gray-900">{selectedPo.notes || selectedPo.additionalDetails || 'None'}</span></div></div></div>
               </div>
-              <div className="rounded-2xl border border-gray-200 bg-white"><div className="p-6 space-y-5"><div className="flex items-center justify-between gap-4"><span className="text-gray-500">Status</span><span className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold ${requestStatusColor(selectedPo.status || 'PENDING')}`}>{String(selectedPo.status || 'Pending').replace(/_/g, ' ')}</span></div><div className="flex items-center justify-between gap-4"><span className="text-gray-500">Vendor</span><span className="font-medium text-gray-900 text-right">{selectedPo.vendor?.name || selectedPo.vendorDetails?.name || selectedPo.vendor || '—'}</span></div><div className="flex items-center justify-between gap-4"><span className="text-gray-500">Due Date</span><span className="font-medium text-gray-900 text-right">{formatDate(selectedPo.expectedDate)}</span></div><div className="flex items-center justify-between gap-4"><span className="text-gray-500">Added By</span><span className="font-medium text-gray-900 text-right">{selectedPo.createdBy?.name || selectedPo.createdBy?.email || '—'}</span></div><div className="flex items-center justify-between gap-4"><span className="text-gray-500">Date Added</span><span className="font-medium text-gray-900 text-right">{formatDate(selectedPo.createdAt)}</span></div><div className="flex items-center justify-between gap-4"><span className="text-gray-500">Cost</span><span className="font-medium text-gray-900 text-right">${getPoTotal(selectedPo).toFixed(2)}</span></div><div className="flex items-center justify-between gap-4"><span className="text-gray-500">Category</span><span className="font-medium text-gray-900 text-right">{selectedPo.category || 'None'}</span></div><div className="border-t border-gray-100 pt-5"><div className="grid grid-cols-[96px_minmax(0,1fr)] gap-4 text-sm"><span className="text-gray-500">Additional Details</span><span className="font-medium text-gray-900">{selectedPo.notes || selectedPo.additionalDetails || 'None'}</span></div></div></div><div className="border-t border-gray-100 p-6"><h4 className="text-lg font-bold text-gray-900 mb-5">Requester Information</h4><div className="space-y-5 text-sm"><div className="flex items-start justify-between gap-4"><span className="text-gray-500">Requisitioner</span><span className="font-medium text-gray-900 text-right">{selectedPo.requisitioner || selectedPo.createdBy?.name || 'Requisitioner'}</span></div><div className="flex items-start justify-between gap-4"><span className="text-gray-500">Company Name</span><span className="font-medium text-gray-900 text-right">{selectedPo.billing?.companyName || selectedPo.shipping?.name || '—'}</span></div><div className="flex items-start justify-between gap-4"><span className="text-gray-500">Address</span><span className="font-medium text-gray-900 text-right">{selectedPo.billing?.address || selectedPo.shipping?.address || '—'}</span></div><div className="flex items-start justify-between gap-4"><span className="text-gray-500">Phone Number</span><span className="font-medium text-gray-900 text-right">{selectedPo.billing?.phone || selectedPo.shipping?.phone || '—'}</span></div><div className="flex items-start justify-between gap-4"><span className="text-gray-500">Fax</span><span className="font-medium text-gray-900 text-right">{selectedPo.billing?.fax || '—'}</span></div></div></div></div>
+              <div className="rounded-2xl border border-gray-200 bg-white"><div className="p-6 space-y-5"><div className="flex items-center justify-between gap-4"><span className="text-gray-500">Status</span><span className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold ${requestStatusColor(selectedPo.status || 'PENDING')}`}>{String(selectedPo.status || 'Pending').replace(/_/g, ' ')}</span></div><div className="flex items-center justify-between gap-4"><span className="text-gray-500">Vendor</span><span className="font-medium text-gray-900 text-right">{selectedPo.vendor?.name || selectedPo.vendorDetails?.name || selectedPo.vendor || '—'}</span></div><div className="flex items-center justify-between gap-4"><span className="text-gray-500">Due Date</span><span className="font-medium text-gray-900 text-right">{formatDate(selectedPo.expectedDate)}</span></div><div className="flex items-center justify-between gap-4"><span className="text-gray-500">Added By</span><span className="font-medium text-gray-900 text-right">{selectedPo.createdBy?.name || selectedPo.createdBy?.email || '—'}</span></div><div className="flex items-center justify-between gap-4"><span className="text-gray-500">Date Added</span><span className="font-medium text-gray-900 text-right">{formatDate(selectedPo.createdAt)}</span></div><div className="flex items-center justify-between gap-4"><span className="text-gray-500">Cost</span><span className="font-medium text-gray-900 text-right">${getPoTotal(selectedPo).toFixed(2)}</span></div><div className="flex items-center justify-between gap-4"><span className="text-gray-500">Category</span><span className="font-medium text-gray-900 text-right">{selectedPo.category || 'None'}</span></div><div className="flex items-start justify-between gap-4"><span className="text-gray-500">Public Link</span><div className="flex max-w-[240px] items-center gap-2 text-right"><span className="truncate font-medium text-blue-700">{selectedPo.publicLink || 'Not available'}</span>{selectedPo.publicLink ? <button type="button" className="rounded-lg border border-gray-200 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50" onClick={async () => { try { await navigator.clipboard.writeText(selectedPo.publicLink); alert('Public link copied.'); } catch (error) { alert(`Copy failed. Use this link manually:\n${selectedPo.publicLink}`); } }}>Copy Link</button> : null}</div></div><div className="border-t border-gray-100 pt-5"><div className="grid grid-cols-[96px_minmax(0,1fr)] gap-4 text-sm"><span className="text-gray-500">Additional Details</span><span className="font-medium text-gray-900">{selectedPo.notes || selectedPo.additionalDetails || 'None'}</span></div></div></div><div className="border-t border-gray-100 p-6"><h4 className="text-lg font-bold text-gray-900 mb-5">Requester Information</h4><div className="space-y-5 text-sm"><div className="flex items-start justify-between gap-4"><span className="text-gray-500">Requisitioner</span><span className="font-medium text-gray-900 text-right">{selectedPo.requisitioner || selectedPo.createdBy?.name || 'Requisitioner'}</span></div><div className="flex items-start justify-between gap-4"><span className="text-gray-500">Company Name</span><span className="font-medium text-gray-900 text-right">{selectedPo.billing?.companyName || selectedPo.shipping?.name || '—'}</span></div><div className="flex items-start justify-between gap-4"><span className="text-gray-500">Address</span><span className="font-medium text-gray-900 text-right">{selectedPo.billing?.address || selectedPo.shipping?.address || '—'}</span></div><div className="flex items-start justify-between gap-4"><span className="text-gray-500">Phone Number</span><span className="font-medium text-gray-900 text-right">{selectedPo.billing?.phone || selectedPo.shipping?.phone || '—'}</span></div><div className="flex items-start justify-between gap-4"><span className="text-gray-500">Fax</span><span className="font-medium text-gray-900 text-right">{selectedPo.billing?.fax || '—'}</span></div></div></div></div>
             </div>
           </div>
         </div>

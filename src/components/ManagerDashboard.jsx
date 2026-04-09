@@ -67,7 +67,8 @@ import {
   Repeat,
   X,
   CreditCard,
-  Send
+  Send,
+  Copy
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -6399,7 +6400,7 @@ const PurchaseOrdersTab = () => {
   }, [selectedPo]);
 
   useEffect(() => {
-    (async () => {
+    const loadPurchaseOrders = async () => {
       try {
         const [poRes, venRes] = await Promise.all([
           api.get('/api/purchase-orders'),
@@ -6411,7 +6412,18 @@ const PurchaseOrdersTab = () => {
         setOrders([]);
         setVendors([]);
       }
-    })();
+    };
+
+    loadPurchaseOrders();
+
+    const handleRefresh = () => {
+      loadPurchaseOrders();
+    };
+
+    window.addEventListener('purchase-order-created', handleRefresh);
+    return () => {
+      window.removeEventListener('purchase-order-created', handleRefresh);
+    };
   }, []);
 
   const exportCSV = () => {
@@ -6555,11 +6567,13 @@ const PurchaseOrdersTab = () => {
     if (!form.title.trim()) { alert('Title required'); return; }
     setSaving(true);
     try {
+      const selectedVendor = vendors.find((vendor) => String(vendor._id || vendor.id) === String(form.vendorId));
       const payload = {
         title: form.title,
         poNumber: form.poNumber || `PO-${Date.now()}`,
-        vendor: form.vendor || vendors.find(v => String(v._id || v.id) === String(form.vendorId))?.name,
+        vendor: form.vendor || selectedVendor?.name,
         vendorId: form.vendorId || undefined,
+        vendorEmail: selectedVendor?.email || undefined,
         expectedDate: form.dueDate || undefined,
         dueDate: form.dueDate || undefined,
         category: form.category || undefined,
@@ -6595,7 +6609,8 @@ const PurchaseOrdersTab = () => {
           name: it.name,
           quantity: Number(it.quantity) || 1,
           unitCost: Number(it.unitCost) || 0
-        }))
+        })),
+        sendVendorLink: Boolean(selectedVendor?.email),
       };
       let res;
       if (editingId) {
@@ -6995,6 +7010,31 @@ const PurchaseOrdersTab = () => {
                   <div className="flex items-center justify-between gap-4"><span className="text-gray-500">Date Added</span><span className="font-medium text-gray-900 text-right">{formatDate(selectedPo.createdAt)}</span></div>
                   <div className="flex items-center justify-between gap-4"><span className="text-gray-500">Cost</span><span className="font-medium text-gray-900 text-right">${getPoTotal(selectedPo).toFixed(2)}</span></div>
                   <div className="flex items-center justify-between gap-4"><span className="text-gray-500">Category</span><span className="font-medium text-gray-900 text-right">{selectedPo.category || 'None'}</span></div>
+                  <div className="flex items-start justify-between gap-4">
+                    <span className="text-gray-500">Public Link</span>
+                    <div className="flex max-w-[240px] items-center gap-2 text-right">
+                      <span className="truncate font-medium text-blue-700">
+                        {selectedPo.publicLink || 'Not available'}
+                      </span>
+                      {selectedPo.publicLink ? (
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                          onClick={async () => {
+                            try {
+                              await navigator.clipboard.writeText(selectedPo.publicLink);
+                              alert('Public link copied.');
+                            } catch (error) {
+                              alert(`Copy failed. Use this link manually:\n${selectedPo.publicLink}`);
+                            }
+                          }}
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                          Copy Link
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
                   <div className="border-t border-gray-100 pt-5">
                     <div className="grid grid-cols-[96px_minmax(0,1fr)] gap-4 text-sm">
                       <span className="text-gray-500">Additional Details</span>

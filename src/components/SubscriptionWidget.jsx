@@ -15,7 +15,9 @@ import {
 } from 'lucide-react';
 
 const SubscriptionWidget = ({ userId }) => {
-  const { subscription, loading, isActive, isProfessional, isEnterprise, userRole, canUpdate, refresh } = useSubscription(userId);
+  const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const subscriptionLookupName = storedUser?.companyName || storedUser?.company?.name || storedUser?.company || userId;
+  const { subscription, loading, isActive, isProfessional, isEnterprise, userRole, canUpdate, refresh } = useSubscription(subscriptionLookupName);
 
   // Modal state
   const [showModal, setShowModal] = useState(false);

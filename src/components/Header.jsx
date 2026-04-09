@@ -28,11 +28,53 @@ export default function Header({ title, subtitle, right, user, className = "", o
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const dropdownRef = useRef(null);
+  const knownNotificationIdsRef = useRef(new Set());
+  const browserPermissionRequestedRef = useRef(false);
 
   const fetchNotifications = async () => {
     try {
       const res = await api.get("/api/notifications");
-      setNotifications(res.data);
+      const nextNotifications = Array.isArray(res.data) ? res.data : [];
+
+      if (typeof window !== "undefined" && "Notification" in window) {
+        const shouldRequestPermission =
+          user &&
+          !browserPermissionRequestedRef.current &&
+          Notification.permission === "default";
+
+        if (shouldRequestPermission) {
+          browserPermissionRequestedRef.current = true;
+          Notification.requestPermission().catch(() => {});
+        }
+
+        const knownIds = knownNotificationIdsRef.current;
+        nextNotifications.forEach((notification) => {
+          const id = String(notification?.id || notification?._id || "");
+          if (!id) return;
+
+          const isKnown = knownIds.has(id);
+          if (!isKnown) {
+            knownIds.add(id);
+            if (Notification.permission === "granted" && !notification?.read) {
+              try {
+                const systemNotification = new Notification(notification.title || "New notification", {
+                  body: notification.message || "",
+                  tag: `mms-${id}`,
+                });
+                systemNotification.onclick = () => {
+                  window.focus();
+                  handleNotificationNavigate(notification);
+                  systemNotification.close();
+                };
+              } catch (_) {
+                /* ignore browser notification failures */
+              }
+            }
+          }
+        });
+      }
+
+      setNotifications(nextNotifications);
     } catch (err) {
       console.error("Failed to fetch notifications:", err);
     }
@@ -46,6 +88,14 @@ export default function Header({ title, subtitle, right, user, className = "", o
       return () => clearInterval(interval);
     }
   }, [user]);
+
+  useEffect(() => {
+    if (!Array.isArray(notifications) || notifications.length === 0) return;
+    notifications.forEach((notification) => {
+      const id = String(notification?.id || notification?._id || "");
+      if (id) knownNotificationIdsRef.current.add(id);
+    });
+  }, [notifications]);
 
   useEffect(() => {
     function handleClickOutside(event) {

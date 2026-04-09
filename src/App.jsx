@@ -30,6 +30,7 @@ import PropertyPublicView from './components/PropertyPublicView';
 import PropertiesCards from './components/PropertiesCards';
 import PropertyDetails from './components/PropertyDetails';
 import PublicRequestForm from './components/PublicRequestForm';
+import PublicPurchaseOrder from './components/PublicPurchaseOrder';
 
 import RequestsPage from './components/RequestsPage';
 
@@ -192,6 +193,7 @@ function App() {
           <Route path="/property/:id" element={<PropertyPublicView />} />
           <Route path="/property/:id" element={<PropertyPublicView />} />
           <Route path="/public-request/:companySlug" element={<PublicRequestForm />} />
+          <Route path="/public-purchase-order/:token" element={<PublicPurchaseOrder />} />
           <Route path="/feedback" element={<Feedback />} />
           <Route path="/manager-feedback" element={auth ? <ManagerFeedback /> : <Login onLogin={handleLogin} />} />
 

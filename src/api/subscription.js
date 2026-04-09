@@ -17,7 +17,7 @@ const subscriptionAPI = {
         currentUser = {};
       }
 
-      const resolvedCompanyName = metadata?.companyName || currentUser?.companyName || currentUser?.company || '';
+      const resolvedCompanyName = metadata?.companyName || currentUser?.companyName || currentUser?.company?.name || currentUser?.company || '';
       const resolvedCompanyId = metadata?.companyId || currentUser?.company?.id || currentUser?.companyId || '';
       const resolvedEmail = email || metadata?.managerEmail || currentUser?.email || '';
       const resolvedMetadata = {
@@ -50,20 +50,22 @@ const subscriptionAPI = {
     }
   },
 
-  // Get subscription by client ID (alias for user subscription)
-  getSubscriptionByClientId: async (clientId) => {
+  // Get subscription by company lookup value, preferring company name
+  getSubscriptionByClientId: async (clientIdentifier) => {
     try {
-      const response = await api.get(`${BASE}/client/${clientId}`);
+      const response = await api.get(`${BASE}/client/${encodeURIComponent(clientIdentifier)}`);
       return response.data;
     } catch (error) {
+      if (error?.response?.status === 404) {
+        return { data: null, notFound: true };
+      }
       throw error.response?.data || error.message;
     }
   },
 
   // Convenience method used by frontend hooks
-  getSubscriptionByUserId: async (userId) => {
-    // clientId and userId are treated interchangeably on the backend
-    return subscriptionAPI.getSubscriptionByClientId(userId);
+  getSubscriptionByUserId: async (lookupValue) => {
+    return subscriptionAPI.getSubscriptionByClientId(lookupValue);
   },
 
   // Get subscription by subscription ID
