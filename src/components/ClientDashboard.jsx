@@ -7204,6 +7204,7 @@ function ClientDashboard() {
   const [assignLoading, setAssignLoading] = useState({});
   const [statusCounts, setStatusCounts] = useState({ Open: 0, Pending: 0, 'In Progress': 0, Completed: 0, Overdue: 0 });
   const [maintenanceCounts, setMaintenanceCounts] = useState({ Preventive: 0, Routine: 0, Open: 0, Pending: 0, 'In Progress': 0, Completed: 0, Overdue: 0 });
+  const [statusChartHover, setStatusChartHover] = useState(null);
   const [userName, setUserName] = useState('');
   const [currentUser, setCurrentUser] = useState(null);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
@@ -33197,6 +33198,13 @@ const ClientAnalyticsTab = ({
     { label: 'Pending', value: statusCounts.pending, tone: 'border-amber-200 bg-amber-50 text-amber-700' },
     { label: 'Overdue', value: statusCounts.overdue, tone: 'border-rose-200 bg-rose-50 text-rose-700' },
   ];
+  const workOrderStatusBars = [
+    { key: 'completed', label: 'Completed', value: statusCounts.completed || 0, color: '#10b981' },
+    { key: 'in-progress', label: 'In Progress', value: statusCounts.inProgress || 0, color: '#3b82f6' },
+    { key: 'pending', label: 'Pending', value: statusCounts.pending || 0, color: '#f59e0b' },
+    { key: 'overdue', label: 'Overdue', value: statusCounts.overdue || 0, color: '#ef4444' },
+  ];
+  const workOrderStatusBarMax = Math.max(1, ...workOrderStatusBars.map((item) => item.value || 0));
 
   const loadAnalyticsPreferences = React.useCallback(async () => {
     try {
@@ -35166,10 +35174,60 @@ const ClientAnalyticsTab = ({
                    </div>
                  </div>
 
-                 <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-6 flex flex-col items-center justify-center min-h-[300px]">
-                   <h3 className="text-sm font-semibold text-gray-700 mb-8 w-full text-center">Work Order Status</h3>
-                   <div className="relative w-48 h-48 rounded-full flex items-center justify-center shadow-inner" style={{ background: `conic-gradient(#10b981 0deg ${(statusCounts.completed / Math.max(1, statusCounts.total)) * 360}deg, #3b82f6 ${(statusCounts.completed / Math.max(1, statusCounts.total)) * 360}deg ${((statusCounts.completed + statusCounts.inProgress) / Math.max(1, statusCounts.total)) * 360}deg, #f59e0b ${((statusCounts.completed + statusCounts.inProgress) / Math.max(1, statusCounts.total)) * 360}deg ${((statusCounts.completed + statusCounts.inProgress + statusCounts.pending) / Math.max(1, statusCounts.total)) * 360}deg, #e5e7eb ${((statusCounts.completed + statusCounts.inProgress + statusCounts.pending) / Math.max(1, statusCounts.total)) * 360}deg 360deg)` }}>
-                     <div className="w-32 h-32 bg-white rounded-full flex flex-col items-center justify-center absolute shadow-lg" />
+                 <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-6 flex flex-col min-h-[300px]">
+                   <h3 className="text-sm font-semibold text-gray-700 mb-6 w-full text-center">Work Order Status</h3>
+                   <div className="relative flex-1">
+                     <div className="h-56">
+                       <div className="flex h-full items-end justify-between gap-4 rounded-2xl border border-gray-100 bg-gradient-to-b from-slate-50 to-white px-4 pb-4 pt-6">
+                         {workOrderStatusBars.map((item) => {
+                           const heightPercent = Math.max(10, (item.value / workOrderStatusBarMax) * 100);
+                           const isActive = statusChartHover?.key === item.key;
+                           return (
+                             <div
+                               key={item.key}
+                               className="relative flex h-full flex-1 flex-col items-center justify-end"
+                               onMouseEnter={() => setStatusChartHover(item)}
+                               onMouseLeave={() => setStatusChartHover(null)}
+                             >
+                               <div className="mb-2 text-xs font-semibold text-gray-500">{item.value}</div>
+                               <div
+                                 className={`w-full max-w-[56px] rounded-t-2xl transition-all duration-200 ${isActive ? 'opacity-100 shadow-lg' : 'opacity-90'}`}
+                                 style={{
+                                   height: `${heightPercent}%`,
+                                   background: item.color,
+                                   boxShadow: isActive ? `0 14px 30px ${item.color}33` : 'none',
+                                 }}
+                               />
+                               <div className="mt-3 text-center text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                                 {item.label}
+                               </div>
+                             </div>
+                           );
+                         })}
+                       </div>
+                     </div>
+                     <div className="mt-4 grid grid-cols-2 gap-3">
+                       {workOrderStatusBars.map((item) => (
+                         <div
+                           key={`legend-${item.key}`}
+                           className={`rounded-xl border px-3 py-2 text-sm transition ${statusChartHover?.key === item.key ? 'border-slate-300 bg-slate-50' : 'border-gray-100 bg-white'}`}
+                           onMouseEnter={() => setStatusChartHover(item)}
+                           onMouseLeave={() => setStatusChartHover(null)}
+                         >
+                           <div className="flex items-center gap-2">
+                             <span className="h-2.5 w-2.5 rounded-full" style={{ background: item.color }} />
+                             <span className="font-semibold text-gray-700">{item.label}</span>
+                           </div>
+                           <div className="mt-1 text-xs text-gray-500">{item.value} work orders</div>
+                         </div>
+                       ))}
+                     </div>
+                     {statusChartHover && (
+                       <div className="pointer-events-none absolute right-0 top-0 rounded-xl border border-gray-200 bg-white/95 px-3 py-2 shadow-lg backdrop-blur">
+                         <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">{statusChartHover.label}</div>
+                         <div className="mt-1 text-sm font-bold text-gray-900">{statusChartHover.value} work orders</div>
+                       </div>
+                     )}
                    </div>
                  </div>
                </div>
