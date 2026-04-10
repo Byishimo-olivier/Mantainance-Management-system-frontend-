@@ -7,6 +7,11 @@ import Header from "./Header";
 import { useTranslation } from "../i18n/LanguageContext";
 import { MessageSquare } from "lucide-react";
 
+const isCompletedStatus = (status) => {
+  const normalized = String(status || '').toUpperCase();
+  return normalized.includes('COMPLETE') || normalized === 'RESOLVED';
+};
+
 const buildMentionHandle = (person) => {
   const emailLocal = String(person?.email || '').split('@')[0].trim().toLowerCase();
   const compactName = String(person?.name || '').replace(/\s+/g, '').toLowerCase();
@@ -601,13 +606,13 @@ const TechnicianDashboard = () => {
 
   const getJobStatus = (job) => {
     const status = (job.status || 'PENDING').toUpperCase();
-    if (status.includes('COMPLETE')) {
+    if (isCompletedStatus(status)) {
       return status;
     }
     if (status === 'IN PROGRESS' || status === 'IN_PROGRESS') {
       return 'IN PROGRESS';
     }
-    if (isOverdue(job.dueDate)) {
+    if (status !== 'OVERDUE' && isOverdue(job.fixDeadline || job.dueDate)) {
       return 'OVERDUE';
     }
     return status;

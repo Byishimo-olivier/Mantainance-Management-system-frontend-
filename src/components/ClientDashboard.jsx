@@ -7449,6 +7449,21 @@ function ClientDashboard() {
   const [editingPmScheduleId, setEditingPmScheduleId] = useState('');
   const [pmAssetRowsSeed, setPmAssetRowsSeed] = useState([{ id: 1, assetId: '', locationId: '', startDate: '', endDate: '', timezone: '(UTC+02:00) Africa/Kigali', assignee: '' }]);
   const [showWorkOrderDetails, setShowWorkOrderDetails] = useState(false);
+  const [showStandaloneWorkOrderCreate, setShowStandaloneWorkOrderCreate] = useState(false);
+  const [standaloneWorkOrderDraft, setStandaloneWorkOrderDraft] = useState({
+    pmTitle: '',
+    title: '',
+    description: '',
+    createNow: false,
+    priority: 'Medium',
+    category: 'General',
+    durationHours: '',
+    requiresSignature: false,
+  });
+  const [standaloneWorkOrderTasks, setStandaloneWorkOrderTasks] = useState([{ id: 1, title: '', status: 'Open' }]);
+  const [standaloneWorkOrderChecklist, setStandaloneWorkOrderChecklist] = useState([
+    { id: Date.now(), text: '', type: 'Status', meter: '' },
+  ]);
   const [workOrderDetailsMode, setWorkOrderDetailsMode] = useState('create');
   const [editingWorkOrderId, setEditingWorkOrderId] = useState('');
   const [launchChecklistBuilderFromMain, setLaunchChecklistBuilderFromMain] = useState(false);
@@ -7584,6 +7599,44 @@ function ClientDashboard() {
     setPmChecklist([{ id: Date.now() + 1, text: '', type: 'Status', meter: '' }]);
     setShowWorkOrderDetails(true);
   };
+  const handleOpenWorkOrderCreateForm = useCallback((event) => {
+    console.info('[WorkOrders] Create Work Order button clicked', {
+      activeTab,
+      showStandaloneWorkOrderCreateBefore: showStandaloneWorkOrderCreate,
+      showWorkOrderDetails,
+      showWorkOrderModal,
+      showCreatePm,
+      showScheduleForm,
+    });
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    setModalData({ open: false, type: '', item: null });
+    setShowWorkOrderModal(false);
+    setShowCreatePm(false);
+    setShowScheduleForm(false);
+    setLaunchChecklistBuilderFromMain(false);
+    setStandaloneWorkOrderDraft({
+      pmTitle: '',
+      title: '',
+      description: '',
+      createNow: false,
+      priority: 'Medium',
+      category: 'General',
+      durationHours: '',
+      requiresSignature: false,
+    });
+    setStandaloneWorkOrderTasks([{ id: Date.now(), title: '', status: 'Open' }]);
+    setStandaloneWorkOrderChecklist([{ id: Date.now() + 1, text: '', type: 'Status', meter: '' }]);
+    setShowStandaloneWorkOrderCreate(true);
+    console.info('[WorkOrders] Requested standalone work order modal open');
+  }, [activeTab, showCreatePm, showScheduleForm, showStandaloneWorkOrderCreate, showWorkOrderDetails, showWorkOrderModal]);
+
+  useEffect(() => {
+    console.info('[WorkOrders] showStandaloneWorkOrderCreate changed', {
+      open: showStandaloneWorkOrderCreate,
+      activeTab,
+    });
+  }, [activeTab, showStandaloneWorkOrderCreate]);
   const openAssetWorkOrderDetails = (assetSnapshot) => {
     setShowWorkOrderModal(false);
     setActiveTab('preventiveMaintenance');
@@ -7594,7 +7647,6 @@ function ClientDashboard() {
     setWorkOrderDetailsMode('create');
     setEditingWorkOrderId('');
     setPmWorkOrder({
-      pmTitle: '',
       title: '',
       description: '',
       createNow: false,
@@ -13270,9 +13322,66 @@ function ClientDashboard() {
   const selectedPropertyAssets = React.useMemo(() => (
     (assets || []).filter((asset) => String(asset.propertyId || asset.property?._id || asset.property?.id || '') === String(selectedProperty?._id || selectedProperty?.id || ''))
   ), [assets, selectedProperty]);
-  const selectedPropertyWorkOrders = React.useMemo(() => (
-    (issues || []).filter((issue) => String(issue.propertyId || issue.property?._id || issue.property?.id || '') === String(selectedProperty?._id || selectedProperty?.id || ''))
-  ), [issues, selectedProperty]);
+  const selectedPropertyWorkOrders = React.useMemo(() => {
+    if (!selectedProperty) return [];
+
+    const selectedPropertyId = String(selectedProperty?._id || selectedProperty?.id || '').trim();
+    const selectedLocationNames = Array.from(new Set([
+      selectedProperty?.name,
+      selectedProperty?.title,
+      selectedProperty?.address,
+      selectedProperty?.parentName,
+      selectedProperty?.hierarchy,
+      selectedProperty?.location,
+    ].map((value) => String(value || '').trim().toLowerCase()).filter(Boolean)));
+
+    return (issues || []).filter((issue) => {
+      const issuePropertyId = String(issue?.propertyId || issue?.property?._id || issue?.property?.id || '').trim();
+      if (selectedPropertyId && issuePropertyId === selectedPropertyId) return true;
+
+      const issueLocationCandidates = [
+        issue?.property?.name,
+        issue?.propertyName,
+        issue?.location,
+        issue?.assetLocation,
+        issue?.branch?.name,
+        issue?.address,
+      ].map((value) => String(value || '').trim().toLowerCase()).filter(Boolean);
+
+      return issueLocationCandidates.some((candidate) => (
+        selectedLocationNames.includes(candidate) ||
+        selectedLocationNames.some((locationName) => candidate.includes(locationName) || locationName.includes(candidate))
+      ));
+    });
+  }, [issues, selectedProperty]);
+  const selectedPropertyParts = React.useMemo(() => {
+    const rows = [];
+
+    (selectedPropertyWorkOrders || []).forEach((workOrder, workOrderIndex) => {
+      const workOrderId = String(workOrder?._id || workOrder?.id || `work-order-${workOrderIndex}`);
+      const workOrderTitle = workOrder?.title || workOrder?.name || workOrder?.workOrderNumber || 'Untitled work order';
+
+      (Array.isArray(workOrder?.parts) ? workOrder.parts : []).forEach((part, partIndex) => {
+        const quantity = Number(part?.quantity ?? part?.qty ?? 0);
+        const unitCost = Number(part?.cost ?? part?.unitCost ?? 0);
+        rows.push({
+          id: String(part?._id || part?.id || `${workOrderId}-part-${partIndex}`),
+          name: part?.name || part?.title || part?.partName || 'Unnamed part',
+          quantity: Number.isFinite(quantity) ? quantity : 0,
+          cost: Number.isFinite(unitCost) ? unitCost : 0,
+          totalCost: (Number.isFinite(quantity) ? quantity : 0) * (Number.isFinite(unitCost) ? unitCost : 0),
+          status: part?.status || 'Used',
+          category: part?.category || '—',
+          partNumber: part?.partNumber || part?.sku || '—',
+          workOrderId,
+          workOrderTitle,
+          note: part?.note || part?.description || '',
+        });
+      });
+    });
+
+    return rows;
+  }, [selectedPropertyWorkOrders]);
   const selectedPropertyFloorplans = React.useMemo(() => (
     Array.isArray(selectedProperty?.floorplans) ? selectedProperty.floorplans : []
   ), [selectedProperty]);
@@ -13737,8 +13846,9 @@ function ClientDashboard() {
         const hours = Math.floor(diff / 3600000);
         const time = hours > 24 ? `${Math.floor(hours / 24)}d ago` : hours > 0 ? `${hours}h ago` : 'Just now';
         const st = (issue.status || '').toUpperCase();
+        const isCompleted = st.includes('COMPLETE') || st === 'CLOSED' || st === 'DONE' || st === 'RESOLVED';
         const isOverdue = (st === 'PENDING' || st.includes('PROGRESS')) && hours > 72;
-        return { ...issue, time, overdue: issue.overdue ?? isOverdue };
+        return { ...issue, time, overdue: !isCompleted && (issue.overdue ?? isOverdue) };
       }).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
       const user = context.user || getCurrentUser();
       const userId = user?.id || user?._id || null;
@@ -13754,11 +13864,12 @@ function ClientDashboard() {
       const counts = { Open: 0, Pending: 0, 'In Progress': 0, Completed: 0, Overdue: 0 };
       scoped.forEach(issue => {
         const st = (issue.status || '').toLowerCase().replace(/_/g, ' ');
+        const isCompleted = st.includes('complete') || st.includes('verified') || st === 'closed' || st === 'done' || st === 'resolved';
         if (st === 'open' || st.startsWith('open ') || st.includes('approved')) counts.Open++;
         else if (st.includes('pending')) counts.Pending++;
         else if (st.includes('progress')) counts['In Progress']++;
         else if (st.includes('complete') || st.includes('verified')) counts.Completed++;
-        if (issue.overdue) counts.Overdue++;
+        if (!isCompleted && (issue.overdue || st === 'overdue')) counts.Overdue++;
       });
       setStatusCounts(counts);
     } catch {
@@ -16437,7 +16548,7 @@ function ClientDashboard() {
   }, [currentUser, getAssignedName, userName]);
 
   const pendingRequests = allIssues.filter((issue) => isRequestIssue(issue));
-  const combinedOpen = (statusCounts.Open || 0) + (maintenanceCounts.Open || 0);
+  const combinedOpen = (statusCounts.open || statusCounts.Open || 0) + (maintenanceCounts.open || maintenanceCounts.Open || 0);
   const combinedPending = pendingRequests.filter((request) => {
     const rawStatus = String(request.status || '').toUpperCase();
     const isDeclined = request.rejected || rawStatus === 'DECLINED' || rawStatus === 'REJECTED';
@@ -16445,9 +16556,9 @@ function ClientDashboard() {
     const isApproved = request.approved || rawStatus === 'APPROVED' || isInProgress;
     return !isDeclined && !isApproved;
   }).length;
-  const combinedInProgress = (statusCounts['In Progress'] || 0) + (maintenanceCounts['In Progress'] || 0);
-  const combinedCompleted = (statusCounts.Completed || 0) + (maintenanceCounts.Completed || 0);
-  const combinedOverdue = (statusCounts.Overdue || 0) + (maintenanceCounts.Overdue || 0);
+  const combinedInProgress = (statusCounts.inProgress || statusCounts['In Progress'] || 0) + (maintenanceCounts.inProgress || maintenanceCounts['In Progress'] || 0);
+  const combinedCompleted = (statusCounts.completed || statusCounts.Completed || 0) + (maintenanceCounts.completed || maintenanceCounts.Completed || 0);
+  const combinedOverdue = (statusCounts.overdue || statusCounts.Overdue || 0) + (maintenanceCounts.overdue || maintenanceCounts.Overdue || 0);
   const requestStatusOptions = ['Pending', 'Approved', 'In Progress', 'Declined'];
   const requestLocationOptions = React.useMemo(
     () => Array.from(new Set(
@@ -16706,7 +16817,7 @@ function ClientDashboard() {
 
       const rawStatus = String(issue?.status || '').toUpperCase();
       const dueDate = issue?.fixDeadline || issue?.dueDate || issue?.nextDate || issue?.date || null;
-      const isCompleted = rawStatus.includes('COMPLETE') || rawStatus === 'CLOSED' || rawStatus === 'DONE';
+      const isCompleted = rawStatus.includes('COMPLETE') || rawStatus === 'CLOSED' || rawStatus === 'DONE' || rawStatus === 'RESOLVED';
       const isInProgress = rawStatus.includes('IN PROGRESS') || rawStatus.includes('IN_PROGRESS');
       const isOverdue = dueDate ? new Date(dueDate) < new Date() && !isCompleted : false;
       const taskStatus = isCompleted ? 'completed' : isOverdue ? 'overdue' : isInProgress ? 'in-progress' : 'upcoming';
@@ -16745,8 +16856,10 @@ function ClientDashboard() {
         id: normalized.id || normalized._id || `${issue._id || issue.id}-task-${idx}`,
         title: normalized.title || normalized.text || normalized.name || `Task ${idx + 1}`,
         parentTitle: issue.title || 'Work order',
-        completed: status.includes('COMPLETE'),
-        overdue: dueDate ? new Date(dueDate) < new Date() && !status.includes('COMPLETE') : false
+        completed: status.includes('COMPLETE') || status === 'CLOSED' || status === 'DONE' || status === 'RESOLVED',
+        overdue: dueDate
+          ? new Date(dueDate) < new Date() && !(status.includes('COMPLETE') || status === 'CLOSED' || status === 'DONE' || status === 'RESOLVED')
+          : false
       };
     });
   });
@@ -18828,6 +18941,55 @@ function ClientDashboard() {
     { key: 'customers', label: 'Customers', icon: <Icon.Staff />, group: 'procurement' },
   ];
 
+  const handleSidebarTabNavigation = useCallback((nextTab) => {
+    // Reset Work Order & Request Modals
+    setModalData({ open: false, type: '', item: null });
+    setShowWorkOrderModal(false);
+    setShowWorkOrderDetails(false);
+    setShowStandaloneWorkOrderCreate(false);
+
+    // Reset Preventive Maintenance Details & Editors
+    setShowCreatePm(false);
+    setShowCalendarSchedule(false);
+    setShowMeterSchedule(false);
+    setShowCombinedSchedule(false);
+    setSelectedSchedule(null);
+    setScheduleDetailTab('assets');
+    setShowSelectedScheduleMenu(false);
+    setEditingSchedule(null);
+
+    // Reset Requests states
+    setShowRequestSettingsModal(false);
+    setShowRequestActionsMenu(false);
+    setShowRequestSortMenu(false);
+
+    // Reset Property (Location) Details
+    setPropertyModalOpen(false);
+    setEditingProperty(null);
+    setSelectedProperty(null);
+    setPropertyDetailTab('details');
+    setShowAddFloorplanModal(false);
+    setShowPropertyActionsMenu(false);
+
+    // Reset Asset Details
+    setAssetModalOpen(false);
+    setSelectedAsset(null);
+    setAssetDetailTab('workOrders');
+    setShowSelectedAssetActionsMenu(false);
+    setShowAssetActivityModal(false);
+    setShowAssetQrPopover(false);
+    setShowAssetAddDowntimeModal(false);
+    setShowAssetDowntimeLogModal(false);
+
+    // Reset Checklist & PO Editors
+    setEditingChecklistTemplate(null);
+    // Reset Miscellaneous
+    setEditingTech(null);
+    setShowUserProfileModal(false);
+    setIsMobileMenuOpen(false);
+    setActiveTab(nextTab);
+  }, []);
+
   useEffect(() => {
     if ((activeTab === 'branches' || activeTab === 'assets') && currentUser?.companyName) {
       fetchBranches();
@@ -18918,7 +19080,7 @@ function ClientDashboard() {
         {/* Nav */}
         <nav style={{ flex: 1, padding: '12px 10px' }}>
           {navItems.filter(n => !n.group).map(({ key, label, icon }) => (
-            <NavItem key={key} label={label} icon={icon} active={activeTab === key} onClick={() => setActiveTab(key)} />
+            <NavItem key={key} label={label} icon={icon} active={activeTab === key} onClick={() => handleSidebarTabNavigation(key)} />
           ))}
           {navSections.map(section => (
             <div key={section.key}>
@@ -18926,7 +19088,7 @@ function ClientDashboard() {
                 {section.label}
               </div>
               {navItems.filter(n => n.group === section.key).map(({ key, label, icon }) => (
-                <NavItem key={key} label={label} icon={icon} active={activeTab === key} onClick={() => setActiveTab(key)} />
+                <NavItem key={key} label={label} icon={icon} active={activeTab === key} onClick={() => handleSidebarTabNavigation(key)} />
               ))}
             </div>
           ))}
@@ -18935,7 +19097,7 @@ function ClientDashboard() {
         {!subscriptionVisibilityLoading && !hasPaidSubscription && (
           <div style={{ padding: '0 12px 12px' }}>
             <button
-              onClick={() => setActiveTab('subscription')}
+              onClick={() => handleSidebarTabNavigation('subscription')}
               style={{
                 width: '100%',
                 padding: '10px',
@@ -18979,7 +19141,7 @@ function ClientDashboard() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
             <button
               type="button"
-              onClick={() => setActiveTab('dashboard')}
+              onClick={() => handleSidebarTabNavigation('dashboard')}
               title="Dashboard"
               style={{ width: 42, height: 42, borderRadius: 12, border: activeTab === 'dashboard' ? '1px solid #CBD5E1' : '1px solid transparent', background: activeTab === 'dashboard' ? 'white' : 'transparent', color: activeTab === 'dashboard' ? '#334155' : '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: activeTab === 'dashboard' ? '0 6px 16px rgba(15,23,42,0.08)' : 'none' }}
             >
@@ -18992,7 +19154,7 @@ function ClientDashboard() {
               <button type="button" title="Contact" onClick={() => setShowContactSupportModal(true)} style={{ width: 34, height: 34, borderRadius: 999, border: 'none', background: 'transparent', color: '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <MessageSquare className="h-4 w-4" />
               </button>
-              <button type="button" title="Subscription" onClick={() => setActiveTab('subscription')} style={{ width: 34, height: 34, borderRadius: 999, border: 'none', background: 'transparent', color: activeTab === 'subscription' ? '#2563EB' : '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <button type="button" title="Subscription" onClick={() => handleSidebarTabNavigation('subscription')} style={{ width: 34, height: 34, borderRadius: 999, border: 'none', background: 'transparent', color: activeTab === 'subscription' ? '#2563EB' : '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Icon.Subscription />
               </button>
               <button type="button" title="Settings" onClick={() => setShowRequestSettingsModal(true)} style={{ width: 34, height: 34, borderRadius: 999, border: 'none', background: 'transparent', color: '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -19181,7 +19343,7 @@ function ClientDashboard() {
                         {combinedOverdue} overdue {combinedOverdue === 1 ? 'item needs' : 'items need'} attention.
                       </div>
                       <div className="mt-1 text-sm text-rose-700/80">
-                        Review overdue work orders and maintenance items before they fall further behind.
+                        Review overdue work orders and requests before they fall further behind.
                       </div>
                     </div>
                     <Btn onClick={() => setActiveTab('workOrders')} style={{ background: '#E11D48', color: 'white', border: '1px solid #E11D48' }}>
@@ -21843,8 +22005,6 @@ function ClientDashboard() {
                                 <th className="px-6 py-4 font-bold">Last Work Order</th>
                                 <th className="px-6 py-4 font-bold">Next Due Date</th>
                                 <th className="px-6 py-4 font-bold">Next Trigger</th>
-                                <th className="px-6 py-4 font-bold">Start Date</th>
-                                <th className="px-6 py-4 font-bold">End Date</th>
                                 <th className="px-6 py-4 font-bold">Assigned To</th>
                                 <th className="px-6 py-4 w-12"></th>
                               </tr>
@@ -21900,12 +22060,6 @@ function ClientDashboard() {
                                       </td>
                                       <td className="px-6 py-5 text-[15px] text-gray-800">
                                         {nextTriggerDate ? nextTriggerDate.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' }) : '-'}
-                                      </td>
-                                      <td className="px-6 py-5 text-[15px] text-gray-800">
-                                        {normalizeDate(row.startDate)?.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' }) || '-'}
-                                      </td>
-                                      <td className="px-6 py-5 text-[15px] text-gray-800">
-                                        {normalizeDate(row.endDate)?.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' }) || '-'}
                                       </td>
                                       <td className="px-6 py-5 text-[15px] text-gray-800">{row.assigneeName || '-'}</td>
                                       <td className="px-6 py-5 text-right text-gray-500">
@@ -22447,7 +22601,7 @@ function ClientDashboard() {
               if (workOrderDetailsMode === 'edit-pm' && editingWorkOrderId) {
                 const requestPayload = {
                   name: payload?.pmTitle || payload?.title || selectedSchedule?.name || '',
-                  workOrderTitle: payload?.title || '',
+                  workOrderTitle: payload?.title || payload?.pmTitle || '',
                   workOrderDescription: payload?.description || '',
                   description: payload?.description || selectedSchedule?.description || '',
                   category: payload?.category || selectedSchedule?.category || '',
@@ -22572,6 +22726,7 @@ function ClientDashboard() {
             onChecklistSaved={refreshChecklists}
             launchChecklistBuilderDirect={launchChecklistBuilderFromMain}
           />
+          {/* Moved elsewhere for global availability */}
           <CalendarScheduleModal
             resetKey={pmSessionId}
             open={showCalendarSchedule}
@@ -22623,7 +22778,8 @@ function ClientDashboard() {
                   </div>
                   <div className="flex items-center gap-3">
                     <button
-                      onClick={openNewWorkOrderDetails}
+                      type="button"
+                      onClick={handleOpenWorkOrderCreateForm}
                       className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
                     >
                       Create Work Order
@@ -22905,7 +23061,9 @@ function ClientDashboard() {
                       <tbody>
                         {filteredClientWorkOrders.map((issue, i) => {
                           const due = normalizeDate(issue.fixDeadline || issue.dueDate || issue.nextDate);
-                          const isOverdue = due && due < new Date();
+                          const issueStatus = String(issue?.status || '').toUpperCase();
+                          const isCompleted = issueStatus.includes('COMPLETE') || issueStatus === 'CLOSED' || issueStatus === 'DONE' || issueStatus === 'RESOLVED';
+                          const isOverdue = due && due < new Date() && !isCompleted;
                           const imgSrc = imageSrc(issue.photo || issue.image || issue.beforePhoto);
                           const workOrderStatus = getWorkOrderDisplayStatus(issue);
                           return (
@@ -24563,7 +24721,15 @@ function ClientDashboard() {
                             <tbody className="divide-y divide-gray-100">
                               {selectedPropertyWorkOrders.length ? selectedPropertyWorkOrders.map((issue, index) => (
                                 <tr key={issue._id || issue.id || index}>
-                                  <td className="px-6 py-4 text-gray-900">{issue.title || issue.name || 'Untitled'}</td>
+                                  <td className="px-6 py-4 text-gray-900">
+                                    <button
+                                      type="button"
+                                      className="font-semibold text-blue-600 hover:underline"
+                                      onClick={() => setModalData({ open: true, type: 'issue', item: issue })}
+                                    >
+                                      {issue.title || issue.name || 'Untitled'}
+                                    </button>
+                                  </td>
                                   <td className="px-6 py-4 text-gray-600">{issue.status || 'Open'}</td>
                                   <td className="px-6 py-4 text-gray-600">{issue.priority || '—'}</td>
                                   <td className="px-6 py-4 text-gray-600">{issue.createdAt ? new Date(issue.createdAt).toLocaleDateString() : '—'}</td>
@@ -24606,9 +24772,55 @@ function ClientDashboard() {
                       </div>
                     )}
 
-                    {['files', 'parts'].includes(propertyDetailTab) && (
+                    {propertyDetailTab === 'parts' && (
+                      <div className="rounded-2xl border border-gray-200 bg-white p-8">
+                        <div className="text-[1.25rem] font-bold text-gray-900">{selectedPropertyParts.length} Parts Used</div>
+                        <div className="mt-6 overflow-hidden rounded-2xl border border-gray-200">
+                          <table className="min-w-full text-left text-sm">
+                            <thead className="border-b border-gray-200 bg-white">
+                              <tr>
+                                {['Part', 'Work Order', 'Status', 'Quantity', 'Cost', 'Total'].map((head) => (
+                                  <th key={head} className="px-6 py-4 font-bold text-gray-900">{head}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                              {selectedPropertyParts.length ? selectedPropertyParts.map((part, index) => (
+                                <tr key={part.id || `${part.workOrderId}-${index}`}>
+                                  <td className="px-6 py-4 text-gray-900">
+                                    <div className="font-semibold text-blue-600">{part.name || 'Unnamed part'}</div>
+                                    <div className="mt-1 text-xs text-gray-500">{part.partNumber || '—'}</div>
+                                    {part.note ? <div className="mt-1 text-xs text-amber-700">{part.note}</div> : null}
+                                  </td>
+                                  <td className="px-6 py-4 text-gray-600">
+                                    <button
+                                      type="button"
+                                      className="font-semibold text-blue-600 hover:underline"
+                                      onClick={() => {
+                                        const linkedIssue = (selectedPropertyWorkOrders || []).find((issue) => String(issue?._id || issue?.id) === String(part.workOrderId));
+                                        if (linkedIssue) setModalData({ open: true, type: 'issue', item: linkedIssue });
+                                      }}
+                                    >
+                                      {part.workOrderTitle}
+                                    </button>
+                                  </td>
+                                  <td className="px-6 py-4 text-gray-600">{part.status || 'Used'}</td>
+                                  <td className="px-6 py-4 text-gray-600">{part.quantity ?? 0}</td>
+                                  <td className="px-6 py-4 text-gray-600">RF {Number(part.cost || 0).toLocaleString()}</td>
+                                  <td className="px-6 py-4 text-gray-600">RF {Number(part.totalCost || 0).toLocaleString()}</td>
+                                </tr>
+                              )) : (
+                                <tr><td colSpan="6" className="px-6 py-16 text-center text-sm text-gray-500">No parts have been used on work orders for this location yet.</td></tr>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+
+                    {propertyDetailTab === 'files' && (
                       <div className="rounded-2xl border border-dashed border-gray-300 bg-white px-6 py-20 text-center text-sm text-gray-500">
-                        No {propertyDetailTab} available for this location yet.
+                        No files available for this location yet.
                       </div>
                     )}
 
@@ -27601,6 +27813,69 @@ function ClientDashboard() {
           )}
 
         </div>
+        
+
+<WorkOrderDetailsModal
+            open={showStandaloneWorkOrderCreate}
+            showDates={true}
+            onClose={() => setShowStandaloneWorkOrderCreate(false)}
+            onSave={async (payload) => {
+              try {
+                // Prepare the payload for issue creation
+                const fd = new FormData();
+                fd.append('title', payload?.title || '');
+                fd.append('description', payload?.description || '');
+                fd.append('priority', (payload?.priority || 'Medium').toUpperCase());
+                fd.append('category', payload?.category || 'General');
+                fd.append('assetId', payload?.assetId || '');
+                fd.append('location', payload?.location || '');
+                fd.append('assignedTo', payload?.assignedTo || '');
+                fd.append('team', payload?.team || '');
+                fd.append('additionalResponsibleWorkers', payload?.additionalResponsibleWorkers || '');
+                fd.append('durationHours', payload?.durationHours || '');
+                fd.append('approved', 'true');
+                fd.append('status', 'OPEN');
+                
+                if (Array.isArray(pmTasks) && pmTasks.length) {
+                   fd.append('tasks', JSON.stringify(pmTasks));
+                }
+                if (Array.isArray(pmChecklist) && pmChecklist.length) {
+                   fd.append('checklist', JSON.stringify(pmChecklist));
+                }
+                if (Array.isArray(payload?.lineItems) && payload.lineItems.length) {
+                   fd.append('parts', JSON.stringify(payload.lineItems));
+                }
+
+                const res = await api.post('/api/issues', fd, {
+                  headers: { 'Content-Type': 'multipart/form-data' },
+                });
+                
+                await fetchIssues();
+                setShowStandaloneWorkOrderCreate(false);
+                setActiveTab('workOrders');
+              } catch (err) {
+                console.error('Failed to create standalone work order', err);
+                alert('Failed to create work order');
+              }
+            }}
+            mode="create"
+            tasks={pmTasks}
+            setTasks={setPmTasks}
+            workOrderDetails={pmWorkOrder}
+            setWorkOrderDetails={setPmWorkOrder}
+            checklist={pmChecklist}
+            setChecklist={setPmChecklist}
+            checklistLibrary={pmChecklistLibrary}
+            setChecklistLibrary={setPmChecklistLibrary}
+            companyAssets={assets}
+            companyProperties={properties}
+            technicians={allWorkers}
+            teams={teams}
+            onChecklistSaved={refreshChecklists}
+            launchChecklistBuilderDirect={launchChecklistBuilderFromMain}
+          />
+
+
         {showUserProfileModal && (
           <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/45 p-4">
             <div className="w-full max-w-4xl rounded-[18px] bg-white shadow-2xl">
@@ -31628,7 +31903,7 @@ const ClientAnalyticsTab = ({
       completed: source.filter((item) => isCompleted(item.status)).length,
       inProgress: source.filter((item) => isInProgress(item.status)).length,
       pending: source.filter((item) => isPending(item.status)).length,
-      overdue: source.filter((item) => item.overdue || String(item.status || '').toLowerCase() === 'overdue').length,
+      overdue: source.filter((item) => !isCompleted(item.status) && (item.overdue || String(item.status || '').toLowerCase() === 'overdue')).length,
     };
   }, [allIssues, inRangeIssues]);
 
@@ -40113,8 +40388,6 @@ function CreatePmModal({
                   <th className="px-4 py-3 text-left">#</th>
                   <th className="px-4 py-3 text-left">Asset</th>
                   <th className="px-4 py-3 text-left">Location</th>
-                  <th className="px-4 py-3 text-left">Start Date</th>
-                  <th className="px-4 py-3 text-left">End Date</th>
                   <th className="px-4 py-3 text-left">Timezone</th>
                   <th className="px-4 py-3 text-left">Assigned To</th>
                   <th className="px-4 py-3 text-left"></th>
@@ -40159,22 +40432,6 @@ function CreatePmModal({
                           </option>
                         ))}
                       </select>
-                    </td>
-                    <td className="px-4 py-3">
-                      <input
-                        type="date"
-                        className="border border-gray-300 rounded-lg px-2 py-2 text-sm text-gray-700"
-                        value={row.startDate}
-                        onChange={(e) => updateAssetRow(idx, 'startDate', e.target.value)}
-                      />
-                    </td>
-                    <td className="px-4 py-3">
-                      <input
-                        type="datetime-local"
-                        className="border border-gray-300 rounded-lg px-2 py-2 text-sm text-gray-700"
-                        value={row.endDate}
-                        onChange={(e) => updateAssetRow(idx, 'endDate', e.target.value)}
-                      />
                     </td>
                     <td className="px-4 py-3">
                       <select
@@ -40224,7 +40481,7 @@ function CreatePmModal({
 }
 
 // --- Work Order Details Modal (for PM) ---
-function WorkOrderDetailsModal({ open, onClose, onSave, mode = 'create', tasks = [], setTasks, workOrderDetails, setWorkOrderDetails, checklist = [], setChecklist, checklistLibrary = [], setChecklistLibrary, companyAssets = [], companyProperties = [], technicians = [], teams = [], onChecklistSaved, launchChecklistBuilderDirect = false }) {
+function WorkOrderDetailsModal({ open, onClose, onSave, mode = 'create', tasks = [], setTasks, workOrderDetails, setWorkOrderDetails, checklist = [], setChecklist, checklistLibrary = [], setChecklistLibrary, companyAssets = [], companyProperties = [], technicians = [], teams = [], onChecklistSaved, launchChecklistBuilderDirect = false, showDates = false }) {
   const imageInputRef = React.useRef(null);
   const fileInputRef = React.useRef(null);
   const checklistImportInputRef = React.useRef(null);
@@ -40739,7 +40996,8 @@ function WorkOrderDetailsModal({ open, onClose, onSave, mode = 'create', tasks =
   };
 
   if (!open) return null;
-  return (
+
+  const modalContent = (
     <div className="fixed inset-0 z-[60] flex items-start justify-center bg-black/40 overflow-auto py-6">
       <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-[1400px] mx-4">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
@@ -40752,7 +41010,7 @@ function WorkOrderDetailsModal({ open, onClose, onSave, mode = 'create', tasks =
         <div className="max-h-[82vh] overflow-y-auto px-6 py-6 space-y-8">
           <section className="space-y-4 border-b border-gray-100 pb-8">
             <h3 className="text-[22px] font-bold text-gray-900">Work Order Details</h3>
-            {(mode === 'edit-pm' || mode === 'create') && (
+            {mode === 'edit-pm' && (
               <div className="space-y-1">
                 <label className="text-sm font-bold text-gray-800">PM Title <span className="text-rose-500">*</span></label>
                 <input
@@ -40763,15 +41021,17 @@ function WorkOrderDetailsModal({ open, onClose, onSave, mode = 'create', tasks =
                 />
               </div>
             )}
-            <div className="space-y-1">
-              <label className="text-sm font-bold text-gray-800">Work Order Title <span className="text-rose-500">*</span></label>
-              <input
-                className="w-full border border-gray-300 rounded-lg px-4 py-3 text-[15px]"
-                placeholder="Work Order Title"
-                value={workOrderDetails?.title || ''}
-                onChange={(e) => setWorkOrderDetails?.((w) => ({ ...w, title: e.target.value }))}
-              />
-            </div>
+            {mode !== 'edit-pm' && (
+              <div className="space-y-1">
+                <label className="text-sm font-bold text-gray-800">Work Order Title <span className="text-rose-500">*</span></label>
+                <input
+                  className="w-full border border-gray-300 rounded-lg px-4 py-3 text-[15px]"
+                  placeholder="Work Order Title"
+                  value={workOrderDetails?.title || ''}
+                  onChange={(e) => setWorkOrderDetails?.((w) => ({ ...w, title: e.target.value }))}
+                />
+              </div>
+            )}
             <div className="space-y-1">
               <label className="text-sm font-bold text-gray-800">Description</label>
               <textarea
@@ -40890,26 +41150,31 @@ function WorkOrderDetailsModal({ open, onClose, onSave, mode = 'create', tasks =
                     <option key={location} value={location}>{location}</option>
                   ))}
                 </select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-sm font-bold text-gray-800">Start Date</label>
-                <input
-                  type="datetime-local"
-                  className="w-full border border-gray-300 rounded-lg px-4 py-3 text-[15px]"
-                  value={workOrderDetails?.startDate || ''}
-                  onChange={(e) => setWorkOrderDetails?.((w) => ({ ...w, startDate: e.target.value }))}
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-sm font-bold text-gray-800">Due Date</label>
-                <input
-                  type="datetime-local"
-                  className="w-full border border-gray-300 rounded-lg px-4 py-3 text-[15px]"
-                  value={workOrderDetails?.dueDate || ''}
-                  onChange={(e) => setWorkOrderDetails?.((w) => ({ ...w, dueDate: e.target.value }))}
-                />
-              </div>
-              <div className="md:col-span-2 space-y-1">
+               </div>
+               {showDates && (
+                 <>
+                   <div className="space-y-1">
+                     <label className="text-sm font-bold text-gray-800">Start Date</label>
+                     <input
+                       type="datetime-local"
+                       className="w-full border border-gray-300 rounded-lg px-4 py-3 text-[15px]"
+                       value={workOrderDetails?.startDate || ''}
+                       onChange={(e) => setWorkOrderDetails?.((w) => ({ ...w, startDate: e.target.value }))}
+                     />
+                   </div>
+                   <div className="space-y-1">
+                     <label className="text-sm font-bold text-gray-800">Due Date</label>
+                     <input
+                       type="datetime-local"
+                       className="w-full border border-gray-300 rounded-lg px-4 py-3 text-[15px]"
+                       value={workOrderDetails?.dueDate || ''}
+                       onChange={(e) => setWorkOrderDetails?.((w) => ({ ...w, dueDate: e.target.value }))}
+                     />
+                   </div>
+                 </>
+               )}
+
+               <div className="md:col-span-2 space-y-1">
                 <label className="text-sm font-bold text-gray-800">Duration (as hours)</label>
                 <input
                   className="w-full border border-gray-300 rounded-lg px-4 py-3 text-[15px]"
@@ -42062,6 +42327,12 @@ function WorkOrderDetailsModal({ open, onClose, onSave, mode = 'create', tasks =
       )}
     </div>
   );
+
+  if (typeof document !== 'undefined' && document.body) {
+    return createPortal(modalContent, document.body);
+  }
+
+  return modalContent;
 }
 
 // --- Calendar Schedule Modal ---

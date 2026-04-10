@@ -3,6 +3,11 @@ import api from "../api/axios";
 import { useNavigate } from "react-router-dom";
 import { getImageUrl } from "../utils/imageUrl";
 
+const isCompletedStatus = (status) => {
+  const normalized = String(status || '').toUpperCase();
+  return normalized.includes('COMPLETE') || normalized === 'RESOLVED';
+};
+
 // Updated IssueCard to handle missing properties
 const IssueCard = ({ issue, userRole, actions }) => {
   // Handle missing or undefined properties
@@ -249,7 +254,10 @@ function AllIssues() {
       const transformedIssues = issuesData.map(issue => ({
         ...issue,
         time: issue.createdAt ? new Date(issue.createdAt).toLocaleDateString() : 'No date',
-        overdue: issue.status === 'OVERDUE' || (issue.dueDate && new Date(issue.dueDate) < new Date())
+        overdue: !isCompletedStatus(issue.status) && (
+          issue.status === 'OVERDUE' ||
+          (issue.dueDate && new Date(issue.dueDate) < new Date())
+        )
       }));
 
       console.log('FETCHDATA: Transformed issues:', transformedIssues?.length || 0);

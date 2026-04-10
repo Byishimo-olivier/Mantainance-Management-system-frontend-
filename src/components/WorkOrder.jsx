@@ -6,6 +6,7 @@ export function WorkOrderForm({
   onCancel,
   submitLabel = 'Submit Request',
   fieldSettings = {},
+  title = 'Create Request',
 }) {
   const [form, setForm] = useState({
     name: '',
@@ -187,7 +188,7 @@ export default function WorkOrder() {
   return (
     <div className="min-h-screen bg-gray-50 px-4 py-10">
       <div className="mx-auto max-w-4xl rounded-xl border border-gray-200 bg-white p-8 shadow-sm">
-        <div className="mb-6 text-2xl font-bold text-gray-900">Create Request</div>
+        <div className="mb-6 text-2xl font-bold text-gray-900">{title}</div>
         <WorkOrderForm />
       </div>
     </div>
