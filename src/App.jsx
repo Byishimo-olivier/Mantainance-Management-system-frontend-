@@ -36,6 +36,7 @@ import RequestsPage from './components/RequestsPage';
 
 import Feedback from './components/Feedback';
 import ManagerFeedback from './components/ManagerFeedback';
+import AdminChat from './components/AdminChat';
 import AIChatbot from './components/AIChatbot';
 import { LanguageProvider } from './i18n/LanguageContext';
 
@@ -196,6 +197,7 @@ function App() {
           <Route path="/public-purchase-order/:token" element={<PublicPurchaseOrder />} />
           <Route path="/feedback" element={<Feedback />} />
           <Route path="/manager-feedback" element={auth ? <ManagerFeedback /> : <Login onLogin={handleLogin} />} />
+          <Route path="/admin-chat" element={auth && auth.user?.role === 'superadmin' ? <AdminChat /> : <Login onLogin={handleLogin} />} />
 
           {/* Product Pages */}
           <Route path="/product/cmms" element={<CMSSProduct />} />
@@ -261,7 +263,15 @@ function App() {
           <Route path="/resource/qr-generator" element={<QRGeneratorResource />} />
         </Routes>
         {!shouldHideFooter && <Footer />}
-        <AIChatbot />
+        {/* Only show AIChatbot on authenticated/internal app routes, not on landing page or public pages */}
+        {auth && (
+          location.pathname.includes('/dashboard') || 
+          location.pathname.includes('/technician-dashboard') || 
+          location.pathname.includes('/manager-dashboard') ||
+          location.pathname.includes('/issues') ||
+          location.pathname.includes('/requests') ||
+          location.pathname.includes('/subscription')
+        ) && <AIChatbot />}
       </div>
     </LanguageProvider>
   );

@@ -10,6 +10,7 @@ import SubscriptionManagement from './SubscriptionManagement';
 import TeamDetailsModal from './TeamDetailsModal';
 import { WorkOrderForm } from './WorkOrder';
 import PreventiveMaintenanceDetail from './PreventiveMaintenanceDetail';
+import AdminChat from './AdminChat';
 import { useLanguage, useTranslation } from "../i18n/LanguageContext";
 import {
   Shield,
@@ -1536,6 +1537,14 @@ function ManagerDashboard() {
             icon={Users}
             label="Customers"
           />
+
+          <SectionLabel>Communication</SectionLabel>
+          <NavItem
+            active={activeTab === 'contact-messages'}
+            onClick={() => setActiveTab('contact-messages')}
+            icon={MessageSquare}
+            label="Contact Messages"
+          />
         </div>
 
         {/* Sidebar Footer */}
@@ -2053,6 +2062,8 @@ function ManagerDashboard() {
               <VendorsTab type="vendor" />
             ) : activeTab === 'customers' ? (
               <VendorsTab type="customer" />
+            ) : activeTab === 'contact-messages' ? (
+              <AdminChat />
             ) : (
               <FeedbackTab
                 feedbacks={feedbacks}

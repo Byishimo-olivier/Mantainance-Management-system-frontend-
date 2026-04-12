@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, CheckCircle2, ArrowRight, Shield, Zap, Layout, Globe, Truck, GraduationCap, Building2, Factory, Utensils, Lightbulb } from 'lucide-react';
 import AuthHeader from './auth/AuthHeader';
+import ContactWidget from './ContactWidget';
 import subscriptionAPI from '../api/subscription';
 import api from '../api/axios';
 import ThierryImage from '../assets/Thierry.jpeg';
@@ -1076,6 +1077,9 @@ const LandingPage = () => {
           </div>
         </div>
       </section>
+
+      {/* Contact Widget */}
+      <ContactWidget />
     </div>
   );
 };
