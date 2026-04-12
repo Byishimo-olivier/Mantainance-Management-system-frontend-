@@ -14,9 +14,7 @@ export default function AuthHeader() {
     'Intelligence': () => navigate('/product/intelligence'),
     'Learn': () => navigate('/product/learn'),
     'Safety': () => navigate('/product/safety'),
-    'Studio': () => navigate('/product/studio'),
     'Providers': () => navigate('/product/providers'),
-    'Edge Sensors': () => navigate('/product/edge-sensors'),
     'Lattice': () => navigate('/product/lattice'),
     'Fleet': () => navigate('/product/fleet'),
   };
@@ -131,9 +129,7 @@ export default function AuthHeader() {
                   <button type="button" className="mega-chip" onClick={() => productNavigation['Over']()}>Over</button>
                   <button type="button" className="mega-chip" onClick={() => productNavigation['Learn']()}>Learn</button>
                   <button type="button" className="mega-chip" onClick={() => productNavigation['Safety']()}>Safety</button>
-                  <button type="button" className="mega-chip" onClick={() => productNavigation['Studio']()}>Studio</button>
                   <button type="button" className="mega-chip" onClick={() => productNavigation['Providers']()}>Providers</button>
-                  <button type="button" className="mega-chip" onClick={() => productNavigation['Edge Sensors']()}>Edge Sensors</button>
                   <button type="button" className="mega-chip" onClick={() => productNavigation['Lattice']()}>Lattice</button>
                   <button type="button" className="mega-chip" onClick={() => productNavigation['Fleet']()}>Fleet</button>
                   <button type="button" className="mega-chip" onClick={() => productNavigation['Intelligence']()}>Intelligence</button>

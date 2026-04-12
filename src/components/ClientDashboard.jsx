@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import backgroundVideo from "../assets/136906-765457769_small.mp4";
 import { createPortal } from "react-dom";
 import api from "../api/axios";
@@ -42,6 +42,12 @@ const DEFAULT_GENERAL_SETTINGS = {
   dateFormat: 'MM/DD/YY',
   currency: 'RWF - Rwandan Franc',
   timeZone: 'Africa/Kigali +02:00 CAT',
+};
+
+const DEFAULT_DAILY_EMAIL_SUMMARY_SETTINGS = {
+  adminDailySummary: true,
+  technicianDailySummary: true,
+  sendTime: '07:00',
 };
 const DEFAULT_ASSET_SETTINGS = {
   fields: [
@@ -1385,6 +1391,8 @@ const RequestFormSettingsModal = ({
   onCreatePortal,
   generalSettings = DEFAULT_GENERAL_SETTINGS,
   onSaveGeneralSettings,
+  dailyEmailSummarySettings = DEFAULT_DAILY_EMAIL_SUMMARY_SETTINGS,
+  onSaveDailyEmailSummarySettings,
   automationWorkflows = [],
   onSaveAutomationWorkflows,
   roleRows = [],
@@ -1448,6 +1456,7 @@ const RequestFormSettingsModal = ({
   const [portalSaving, setPortalSaving] = useState(false);
   const [editingPortalId, setEditingPortalId] = useState('');
   const [generalForm, setGeneralForm] = useState(DEFAULT_GENERAL_SETTINGS);
+  const [dailyEmailSummaryForm, setDailyEmailSummaryForm] = useState(DEFAULT_DAILY_EMAIL_SUMMARY_SETTINGS);
   const [workflowSaving, setWorkflowSaving] = useState(false);
   const [showWorkflowModal, setShowWorkflowModal] = useState(false);
   const [workflows, setWorkflows] = useState([]);
@@ -1578,6 +1587,9 @@ const RequestFormSettingsModal = ({
   useEffect(() => {
     setGeneralForm({ ...DEFAULT_GENERAL_SETTINGS, ...(generalSettings || {}) });
   }, [generalSettings]);
+  useEffect(() => {
+    setDailyEmailSummaryForm({ ...DEFAULT_DAILY_EMAIL_SUMMARY_SETTINGS, ...(dailyEmailSummarySettings || {}) });
+  }, [dailyEmailSummarySettings]);
 
   useEffect(() => {
     setWorkflows(Array.isArray(automationWorkflows) ? automationWorkflows : []);
@@ -3031,6 +3043,45 @@ const RequestFormSettingsModal = ({
                         {GENERAL_TIME_ZONE_OPTIONS.map((option) => <option key={option}>{option}</option>)}
                       </select>
                     </div>
+                    <div className="mt-8 rounded-2xl border border-blue-100 bg-blue-50 p-5">
+                      <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="max-w-xl">
+                          <div className="text-[16px] font-bold text-gray-900">Daily Report Delivery</div>
+                          <p className="mt-2 text-[14px] leading-6 text-gray-600">
+                            Choose what time administrators and technicians should receive their company daily report email.
+                          </p>
+                        </div>
+                        <div className="min-w-[180px]">
+                          <label className="mb-2 block text-sm font-semibold text-gray-700">Report time</label>
+                          <input
+                            type="time"
+                            value={dailyEmailSummaryForm.sendTime}
+                            onChange={(e) => setDailyEmailSummaryForm((prev) => ({ ...prev, sendTime: e.target.value }))}
+                            className="h-12 w-full rounded-md border border-gray-300 px-4 text-[16px] text-gray-800 outline-none focus:border-blue-500"
+                          />
+                        </div>
+                      </div>
+                      <div className="mt-4 grid gap-3 md:grid-cols-2">
+                        <label className="flex items-center gap-3 rounded-xl border border-white bg-white/80 p-4 text-sm text-gray-700">
+                          <input
+                            type="checkbox"
+                            checked={!!dailyEmailSummaryForm.adminDailySummary}
+                            onChange={(e) => setDailyEmailSummaryForm((prev) => ({ ...prev, adminDailySummary: e.target.checked }))}
+                            className="h-4 w-4"
+                          />
+                          Send company summary to administrators
+                        </label>
+                        <label className="flex items-center gap-3 rounded-xl border border-white bg-white/80 p-4 text-sm text-gray-700">
+                          <input
+                            type="checkbox"
+                            checked={!!dailyEmailSummaryForm.technicianDailySummary}
+                            onChange={(e) => setDailyEmailSummaryForm((prev) => ({ ...prev, technicianDailySummary: e.target.checked }))}
+                            className="h-4 w-4"
+                          />
+                          Send assigned-work summary to technicians
+                        </label>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -4458,7 +4509,10 @@ const RequestFormSettingsModal = ({
                 </button>
                 <button
                   type="button"
-                  onClick={() => onSaveGeneralSettings?.(generalForm)}
+                  onClick={() => {
+                    onSaveGeneralSettings?.(generalForm);
+                    onSaveDailyEmailSummarySettings?.(dailyEmailSummaryForm);
+                  }}
                   className="rounded-md bg-blue-600 px-5 py-2.5 text-[15px] font-semibold text-white hover:bg-blue-700"
                 >
                   Save
@@ -7243,6 +7297,7 @@ function ClientDashboard() {
   const [showRequestSettingsModal, setShowRequestSettingsModal] = useState(false);
   const [requestFormSettings, setRequestFormSettings] = useState(DEFAULT_REQUEST_FORM_SETTINGS);
   const [generalSettings, setGeneralSettings] = useState(DEFAULT_GENERAL_SETTINGS);
+  const [dailyEmailSummarySettings, setDailyEmailSummarySettings] = useState(DEFAULT_DAILY_EMAIL_SUMMARY_SETTINGS);
   const [legacyPublicRequestsEnabled, setLegacyPublicRequestsEnabled] = useState(false);
   const [requestBranding, setRequestBranding] = useState(DEFAULT_REQUEST_BRANDING);
   const [requestPortals, setRequestPortals] = useState([]);
@@ -7269,6 +7324,7 @@ function ClientDashboard() {
   const [selectedPmAssignedTo, setSelectedPmAssignedTo] = useState([]);
   const [selectedPmLocations, setSelectedPmLocations] = useState([]);
   const [selectedPmPriorities, setSelectedPmPriorities] = useState([]);
+  const [pmStatusSavingId, setPmStatusSavingId] = useState('');
   const [pmSortDirection, setPmSortDirection] = useState('desc');
   const [savedPmViews, setSavedPmViews] = useState([]);
   const pmAssignedFilterRef = useRef(null);
@@ -7335,6 +7391,8 @@ function ClientDashboard() {
     notifyVendors: true,
     vendorEmails: '',
   });
+  const [materialRequestSearchQuery, setMaterialRequestSearchQuery] = useState('');
+  const [materialRequestStatusFilter, setMaterialRequestStatusFilter] = useState('');
   const [cookieSettings, setCookieSettings] = useState({
     strictlyNecessary: true,
     performance: true,
@@ -7443,6 +7501,7 @@ function ClientDashboard() {
   const [pmSchedule, setPmSchedule] = useState({
     scheduleType: null,
     calendarRule: null,
+    reminderLeadMinutes: 60,
   });
   const [pmSessionId, setPmSessionId] = useState(0);
   const [showCreatePm, setShowCreatePm] = useState(false);
@@ -7565,7 +7624,7 @@ function ClientDashboard() {
     setPmTasks([{ id: Date.now(), title: '', status: 'Open' }]);
     setPmChecklist([{ id: Date.now() + 1, text: '', type: 'Status', meter: '' }]);
     // keep library across sessions
-    setPmSchedule({ scheduleType: null, calendarRule: null });
+    setPmSchedule({ scheduleType: null, calendarRule: null, reminderLeadMinutes: 60 });
     setPmAssetRowsSeed([{ id: 1, assetId: '', locationId: '', startDate: '', endDate: '', timezone: '(UTC+02:00) Africa/Kigali', assignee: '' }]);
     setPmSessionId((n) => n + 1);
     setShowCreatePm(true);
@@ -7795,6 +7854,7 @@ function ClientDashboard() {
       calendarRule: schedule?.calendarRule || null,
       meterRule: schedule?.meterRule || null,
       combinedRule: schedule?.combinedRule || null,
+      reminderLeadMinutes: Number(schedule?.reminderLeadMinutes || 60),
     });
 
     setSelectedSchedule(schedule);
@@ -7878,6 +7938,7 @@ function ClientDashboard() {
       calendarRule: schedule?.calendarRule || null,
       meterRule: schedule?.meterRule || null,
       combinedRule: schedule?.combinedRule || null,
+      reminderLeadMinutes: Number(schedule?.reminderLeadMinutes || 60),
     });
 
     setPmAssetRowsSeed(assetRows);
@@ -7894,6 +7955,7 @@ function ClientDashboard() {
       calendarRule: schedule?.calendarRule || null,
       meterRule: schedule?.meterRule || null,
       combinedRule: schedule?.combinedRule || null,
+      reminderLeadMinutes: Number(schedule?.reminderLeadMinutes || 60),
     });
     setPmScheduleEditorMode('edit');
     if (schedule?.combinedRule) {
@@ -13392,9 +13454,18 @@ function ClientDashboard() {
     if (role === 'manager' || role === 'admin') return accessLevel === 'limited' ? 'Limited Administrator' : 'Administrator';
     if (role === 'technician') return accessLevel === 'limited' ? 'Limited Technician' : 'Technician';
     if (role === 'requestor') return 'Requester';
-    if (role === 'client') return 'View Only';
+    if (role === 'client') return 'Administrator';
     if (role === 'user') return 'User';
     return person?.role || 'Unassigned';
+  }, []);
+  const getDashboardRoleLabel = useCallback((roleValue, fallback = 'Administrator') => {
+    const role = String(roleValue || '').toLowerCase().trim();
+    if (!role) return fallback;
+    if (role === 'client') return 'Administrator';
+    if (role === 'admin' || role === 'manager') return 'Administrator';
+    if (role === 'requestor') return 'Requester';
+    if (role === 'technician') return 'Technician';
+    return String(roleValue);
   }, []);
   const getPeopleDirectoryName = useCallback((person) => (
     person?.name || person?.fullName || person?.contactName || person?.email?.split('@')[0] || 'Unnamed person'
@@ -14209,7 +14280,14 @@ function ClientDashboard() {
         setMaintenanceSchedules(scopedSchedules);
         const now = new Date();
         const cutoff = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-        setReminders(scopedSchedules.filter(s => s?.routine && s.nextDate && new Date(s.nextDate) <= cutoff && (!s.lastReminder || new Date(s.lastReminder) < new Date(s.nextDate))));
+        setReminders(scopedSchedules.filter((s) => {
+          if (!s?.routine || !s?.nextDate) return false;
+          const statusText = String(s.status || '').toLowerCase();
+          if (statusText.includes('complete') || statusText.includes('archived') || statusText.includes('pause')) return false;
+          const nextDate = new Date(s.nextDate);
+          if (Number.isNaN(nextDate.getTime()) || nextDate > cutoff) return false;
+          return !s.lastReminder || new Date(s.lastReminder) < nextDate;
+        }));
         const counts = { Preventive: 0, Routine: 0, Open: 0, Pending: 0, 'In Progress': 0, Completed: 0, Overdue: 0 };
         scopedSchedules.forEach(s => {
           if (!s) return;
@@ -15248,6 +15326,7 @@ function ClientDashboard() {
       const response = await api.get('/api/request-settings');
       const payload = response.data || {};
       setGeneralSettings({ ...DEFAULT_GENERAL_SETTINGS, ...(payload.general || {}) });
+      setDailyEmailSummarySettings({ ...DEFAULT_DAILY_EMAIL_SUMMARY_SETTINGS, ...(payload.dailyEmailSummary || {}) });
       if (payload.internalRequests) {
         setRequestFormSettings((prev) => ({ ...prev, ...payload.internalRequests }));
       }
@@ -15354,6 +15433,21 @@ function ClientDashboard() {
     } catch (error) {
       console.warn('Failed to save general settings', error);
       alert(error.response?.data?.error || 'Failed to save general settings.');
+    }
+  }, []);
+
+  const saveDailyEmailSummarySettings = useCallback(async (nextDailyEmailSummarySettings) => {
+    try {
+      const response = await api.put('/api/request-settings/daily-email-summary', nextDailyEmailSummarySettings);
+      setDailyEmailSummarySettings({
+        ...DEFAULT_DAILY_EMAIL_SUMMARY_SETTINGS,
+        ...(response.data?.dailyEmailSummary || nextDailyEmailSummarySettings),
+      });
+      return response.data?.dailyEmailSummary || nextDailyEmailSummarySettings;
+    } catch (error) {
+      console.warn('Failed to save daily email summary settings', error);
+      alert(error.response?.data?.error || 'Failed to save daily email summary settings.');
+      throw error;
     }
   }, []);
 
@@ -16867,16 +16961,6 @@ function ClientDashboard() {
   const combinedClientTasks = React.useMemo(() => (
     [...manualClientTasks, ...clientTasks]
   ), [clientTasks, manualClientTasks]);
-  const taskCardItems = React.useMemo(() => {
-    const seen = new Set();
-    return [...dashboardTasks, ...assignedIssueTasks].filter((task) => {
-      const key = String(task?.linkedIssueId || task?._id || task?.id || '');
-      if (!key) return true;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-  }, [assignedIssueTasks, dashboardTasks]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -16921,6 +17005,43 @@ function ClientDashboard() {
       console.warn('Unable to save procurement settings', error);
     }
   }, [procurementSettings]);
+
+  const getMaterialRequestEffectiveStatus = useCallback((req) => {
+    const reqId = req?.id || req?._id;
+    const linkedPo = materialRequestPoStatusMap[String(reqId || '')] || null;
+    const normalizedReqStatus = String(req?.status || '').toUpperCase();
+    const normalizedPoStatus = String(linkedPo?.vendorResponse || linkedPo?.status || '').toUpperCase();
+    const vendorApprovedPo = normalizedPoStatus === 'APPROVED';
+    const vendorDeclinedPo = normalizedPoStatus === 'DECLINED';
+    const awaitingVendorApproval = !!linkedPo && !vendorApprovedPo && !vendorDeclinedPo;
+    if (awaitingVendorApproval) return 'WAITING_VENDOR_APPROVAL';
+    if (vendorDeclinedPo) return 'VENDOR_DECLINED';
+    return normalizedReqStatus;
+  }, [materialRequestPoStatusMap]);
+
+  const materialRequestStatusOptions = useMemo(
+    () => Array.from(new Set((materialRequests || []).map((req) => getMaterialRequestEffectiveStatus(req)).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    [getMaterialRequestEffectiveStatus, materialRequests]
+  );
+  const filteredMaterialRequests = useMemo(() => {
+    const query = String(materialRequestSearchQuery || '').trim().toLowerCase();
+    return (materialRequests || []).filter((req) => {
+      const effectiveStatus = getMaterialRequestEffectiveStatus(req);
+      if (materialRequestStatusFilter && effectiveStatus !== materialRequestStatusFilter) return false;
+      if (!query) return true;
+      const firstItem = (req?.items || [])[0] || {};
+      const haystack = [
+        firstItem?.title,
+        firstItem?.materialId,
+        req?.description,
+        req?.technicianName,
+        effectiveStatus,
+        req?.id,
+        req?._id,
+      ].join(' ').toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [getMaterialRequestEffectiveStatus, materialRequestSearchQuery, materialRequestStatusFilter, materialRequests]);
 
   const addManualClientTask = () => {
     const trimmed = String(newClientTaskTitle || '').trim();
@@ -17110,6 +17231,150 @@ function ClientDashboard() {
 
     return Array.from(new Set(names.filter(Boolean)));
   }, [allWorkers, internalTechnicians, people]);
+  const doesPmBelongToCurrentUser = useCallback((schedule) => {
+    if (!schedule) return false;
+
+    const currentIds = Array.from(new Set([
+      currentUser?._id,
+      currentUser?.id,
+      currentUser?.userId,
+      currentUser?.email,
+    ].filter(Boolean).map((value) => String(value).trim().toLowerCase())));
+
+    const currentNames = Array.from(new Set([
+      currentUser?.name,
+      currentUser?.fullName,
+      currentUser?.username,
+      userName,
+      currentUser?.email,
+    ].filter(Boolean).map((value) => String(value).trim().toLowerCase())));
+
+    const matchesPerson = (value) => {
+      if (!value && value !== 0) return false;
+      if (Array.isArray(value)) return value.some(matchesPerson);
+      if (typeof value === 'object') {
+        return matchesPerson(value._id)
+          || matchesPerson(value.id)
+          || matchesPerson(value.userId)
+          || matchesPerson(value.email)
+          || matchesPerson(value.name)
+          || matchesPerson(value.fullName);
+      }
+
+      const normalized = String(value).trim().toLowerCase();
+      if (!normalized) return false;
+      return currentIds.includes(normalized) || currentNames.includes(normalized);
+    };
+
+    const assignedNames = getPmAssignedNames(schedule).map((name) => String(name).trim().toLowerCase());
+    return (
+      matchesPerson(schedule?.assignedTo)
+      || matchesPerson(schedule?.assignedToName)
+      || matchesPerson(schedule?.technician)
+      || matchesPerson(schedule?.employees)
+      || matchesPerson(Array.isArray(schedule?.assignees) ? schedule.assignees : [])
+      || matchesPerson(Array.isArray(schedule?.assetsRows) ? schedule.assetsRows.map((row) => row?.assignee || row?.assignedTo || row?.technicianId || row?.assigneeName) : [])
+      || assignedNames.some((name) => currentNames.includes(name))
+    );
+  }, [currentUser, getPmAssignedNames, userName]);
+  const canCurrentUserUpdatePmStatus = useCallback((schedule) => {
+    if (!schedule) return false;
+    const normalizedRole = String(currentUser?.role || currentUser?.accountType || '').trim().toLowerCase();
+    if (['admin', 'manager', 'client'].includes(normalizedRole)) {
+      return true;
+    }
+
+    const currentIds = Array.from(new Set([
+      currentUser?._id,
+      currentUser?.id,
+      currentUser?.userId,
+      currentUser?.email,
+    ].filter(Boolean).map((value) => String(value).trim().toLowerCase())));
+
+    const currentNames = Array.from(new Set([
+      currentUser?.name,
+      currentUser?.fullName,
+      currentUser?.username,
+      userName,
+      currentUser?.email,
+    ].filter(Boolean).map((value) => String(value).trim().toLowerCase())));
+
+    const matchesPerson = (value) => {
+      if (!value && value !== 0) return false;
+      if (Array.isArray(value)) return value.some(matchesPerson);
+      if (typeof value === 'object') {
+        return matchesPerson(value._id)
+          || matchesPerson(value.id)
+          || matchesPerson(value.userId)
+          || matchesPerson(value.email)
+          || matchesPerson(value.name)
+          || matchesPerson(value.fullName);
+      }
+
+      const normalized = String(value).trim().toLowerCase();
+      if (!normalized) return false;
+      return currentIds.includes(normalized) || currentNames.includes(normalized);
+    };
+
+    const assignedNames = getPmAssignedNames(schedule).map((name) => String(name).trim().toLowerCase());
+    return (
+      matchesPerson(schedule?.assignedTo)
+      || matchesPerson(schedule?.assignedToName)
+      || matchesPerson(schedule?.technician)
+      || matchesPerson(schedule?.employees)
+      || matchesPerson(Array.isArray(schedule?.assetsRows) ? schedule.assetsRows.map((row) => row?.assignee || row?.assignedTo || row?.technicianId || row?.assigneeName) : [])
+      || assignedNames.some((name) => currentNames.includes(name))
+    );
+  }, [currentUser, getPmAssignedNames, userName]);
+  const assignedPmTasks = React.useMemo(() => {
+    const seen = new Set();
+    return (maintenanceSchedules || []).flatMap((schedule) => {
+      const scheduleId = String(schedule?._id || schedule?.id || '');
+      if (!scheduleId || seen.has(scheduleId) || !doesPmBelongToCurrentUser(schedule)) return [];
+      seen.add(scheduleId);
+
+      const rawStatus = String(schedule?.status || '').toUpperCase();
+      const dueDate = schedule?.nextDate || schedule?.date || null;
+      const isCompleted = rawStatus.includes('COMPLETE');
+      const isInProgress = rawStatus.includes('IN PROGRESS') || rawStatus.includes('IN_PROGRESS');
+      const isOverdue = dueDate ? new Date(dueDate) < new Date() && !isCompleted : false;
+      const taskStatus = isCompleted ? 'completed' : isOverdue ? 'overdue' : isInProgress ? 'in-progress' : 'upcoming';
+
+      return [{
+        id: `assigned-pm-${scheduleId}`,
+        linkedIssueId: `pm-${scheduleId}`,
+        linkedIssueType: 'pm',
+        linkedScheduleId: scheduleId,
+        title: schedule?.name || schedule?.workOrderTitle || 'Assigned preventive maintenance',
+        description: schedule?.workOrderDescription || schedule?.description || 'Assigned preventive maintenance ready for you.',
+        dueDate,
+        priority: String(schedule?.priority || 'medium').toLowerCase(),
+        color: '#0EA5E9',
+        status: taskStatus,
+        sourceLabel: 'Preventive Maintenance',
+        assignedName: getPmAssignedNames(schedule).join(', '),
+        scheduleSnapshot: schedule,
+      }];
+    });
+  }, [doesPmBelongToCurrentUser, getPmAssignedNames, maintenanceSchedules]);
+  const taskCardItems = React.useMemo(() => {
+    const seen = new Set();
+    return [...dashboardTasks, ...assignedIssueTasks, ...assignedPmTasks].filter((task) => {
+      const key = String(task?.linkedIssueId || task?._id || task?.id || '');
+      if (!key) return true;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [assignedIssueTasks, assignedPmTasks, dashboardTasks]);
+  const getPmStatusTone = useCallback((statusValue) => {
+    const normalized = String(statusValue || 'Pending').trim().toUpperCase();
+    if (normalized.includes('COMPLETE')) return 'bg-emerald-50 text-emerald-700';
+    if (normalized.includes('PROGRESS')) return 'bg-amber-50 text-amber-700';
+    if (normalized.includes('OVERDUE')) return 'bg-rose-50 text-rose-700';
+    if (normalized.includes('PAUSE')) return 'bg-slate-100 text-slate-700';
+    return 'bg-blue-50 text-blue-700';
+  }, []);
 
   const getPmLocationLabel = useCallback((schedule) => {
     const assetIds = [
@@ -17364,6 +17629,32 @@ function ClientDashboard() {
       setShowSelectedScheduleMenu(false);
     } catch (err) {
       alert(err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Failed to update schedule.');
+    }
+  }, [selectedSchedule]);
+  const handleUpdatePmStatus = useCallback(async (schedule, nextStatus) => {
+    if (!schedule) return;
+    const scheduleId = schedule?._id || schedule?.id;
+    if (!scheduleId) return;
+
+    const requestPayload = {
+      ...schedule,
+      status: nextStatus,
+      paused: nextStatus === 'Paused',
+      completedAt: nextStatus === 'Completed' ? (schedule?.completedAt || new Date().toISOString()) : null,
+    };
+
+    try {
+      setPmStatusSavingId(String(scheduleId));
+      const response = await api.put(`/api/maintenance-schedules/${scheduleId}`, requestPayload);
+      const updatedSchedule = response?.data || requestPayload;
+      setMaintenanceSchedules((prev) => prev.map((entry) => String(entry?._id || entry?.id) === String(scheduleId) ? updatedSchedule : entry));
+      if (String(selectedSchedule?._id || selectedSchedule?.id) === String(scheduleId)) {
+        setSelectedSchedule(updatedSchedule);
+      }
+    } catch (err) {
+      alert(err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Failed to update PM status.');
+    } finally {
+      setPmStatusSavingId('');
     }
   }, [selectedSchedule]);
   const handleArchiveSelectedSchedule = useCallback(() => {
@@ -19053,7 +19344,7 @@ function ClientDashboard() {
             </div>
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{userName}</div>
-              <div style={{ fontSize: 11, color: '#9CA3AF', textTransform: 'capitalize' }}>{currentUser?.role || 'client'}</div>
+              <div style={{ fontSize: 11, color: '#9CA3AF', textTransform: 'capitalize' }}>{getDashboardRoleLabel(currentUser?.role, 'Administrator')}</div>
               <div style={{ fontSize: 11, color: '#6B7280', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {currentUser?.companyName || 'No company'}
               </div>
@@ -21738,6 +22029,31 @@ function ClientDashboard() {
                         <ChevronLeft className="h-5 w-5" />
                       </button>
                       <div className="text-2xl font-bold text-gray-900">{selectedSchedule.name || 'Preventive Maintenance'}</div>
+                      <div className="mt-2 flex flex-wrap items-center gap-3">
+                        <span className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${getPmStatusTone(selectedSchedule?.status || 'Pending')}`}>
+                          {selectedSchedule?.status || 'Pending'}
+                        </span>
+                        {canCurrentUserUpdatePmStatus(selectedSchedule) ? (
+                          <>
+                            <button
+                              type="button"
+                              disabled={pmStatusSavingId === String(selectedSchedule?._id || selectedSchedule?.id) || /progress/i.test(String(selectedSchedule?.status || ''))}
+                              onClick={() => handleUpdatePmStatus(selectedSchedule, 'In Progress')}
+                              className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              Mark In Progress
+                            </button>
+                            <button
+                              type="button"
+                              disabled={pmStatusSavingId === String(selectedSchedule?._id || selectedSchedule?.id) || /complete/i.test(String(selectedSchedule?.status || ''))}
+                              onClick={() => handleUpdatePmStatus(selectedSchedule, 'Completed')}
+                              className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              Mark Completed
+                            </button>
+                          </>
+                        ) : null}
+                      </div>
                     </div>
                     <div className="flex items-center gap-3">
                       <button
@@ -22482,9 +22798,11 @@ function ClientDashboard() {
                           <th className="px-4 py-4 text-left font-bold">Assets & Locations</th>
                           <th className="px-4 py-4 text-left font-bold">Category</th>
                           <th className="px-4 py-4 text-left font-bold">Priority</th>
+                          <th className="px-4 py-4 text-left font-bold">Status</th>
                           <th className="px-4 py-4 text-left font-bold">Paused</th>
                           <th className="px-4 py-4 text-left font-bold">Checklist</th>
                           <th className="px-4 py-4 text-left font-bold">Checklist ID</th>
+                          <th className="px-4 py-4 text-left font-bold">Action</th>
                           <th className="px-4 py-4 text-left font-bold">Date Created</th>
                         </tr>
                       </thead>
@@ -22496,8 +22814,18 @@ function ClientDashboard() {
                           const assetsCount = parseIdList(pm.assets).length || pm.assetsCount || pm.locationsCount || pm.assets?.length || 1;
                           const locationLabel = getPmLocationLabel(pm);
                           const createdAt = pm.createdAt ? new Date(pm.createdAt) : null;
-                          const imagePath = pm.photo || pm.image || pm.assetImage || pm.beforeImage || '';
+                          const imagePath =
+                            pm.photo ||
+                            pm.image ||
+                            pm.assetImage ||
+                            pm.beforeImage ||
+                            (Array.isArray(pm.attachments?.photos) ? pm.attachments.photos[0]?.url : '') ||
+                            (Array.isArray(pm.attachments?.files)
+                              ? (pm.attachments.files.find((file) => String(file?.mimeType || '').toLowerCase().startsWith('image/'))?.url || '')
+                              : '');
                           const imageUrl = imagePath ? getImageUrl(imagePath) : '';
+                          const statusLabel = String(pm.status || 'Pending').trim() || 'Pending';
+                          const canUpdatePmStatus = canCurrentUserUpdatePmStatus(pm);
                           const priorityClass = priority === 'HIGH'
                             ? 'bg-rose-50 text-rose-700'
                             : priority === 'MEDIUM'
@@ -22538,9 +22866,38 @@ function ClientDashboard() {
                                   {priority.charAt(0)}{priority.slice(1).toLowerCase()}
                                 </span>
                               </td>
+                              <td className="px-4 py-3 text-gray-700">
+                                <span className={`inline-flex w-fit rounded-lg px-3 py-1 text-sm font-medium ${getPmStatusTone(statusLabel)}`}>
+                                  {statusLabel}
+                                </span>
+                              </td>
                               <td className="px-4 py-3 text-gray-700">{pm.paused ? 'Yes' : 'No'}</td>
                               <td className="px-4 py-3 text-blue-600">{checklistLabel}</td>
                               <td className="px-4 py-3 text-gray-700">{checklistId}</td>
+                              <td className="px-4 py-3 text-gray-700">
+                                {canUpdatePmStatus ? (
+                                  <div className="flex flex-wrap gap-2" onClick={(event) => event.stopPropagation()}>
+                                    <button
+                                      type="button"
+                                      disabled={pmStatusSavingId === String(pm._id || pm.id) || /progress/i.test(statusLabel)}
+                                      onClick={() => handleUpdatePmStatus(pm, 'In Progress')}
+                                      className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                      In Progress
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={pmStatusSavingId === String(pm._id || pm.id) || /complete/i.test(statusLabel)}
+                                      onClick={() => handleUpdatePmStatus(pm, 'Completed')}
+                                      className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                      Completed
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <span className="text-xs text-gray-400">No action</span>
+                                )}
+                              </td>
                               <td className="px-4 py-3 text-gray-700">
                                 {createdAt && !Number.isNaN(createdAt.getTime())
                               ? `${createdAt.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' })} - ${createdAt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`
@@ -22564,7 +22921,11 @@ function ClientDashboard() {
             editingScheduleId={editingPmScheduleId}
             existingSchedule={editingSchedule}
             initialAssetRows={pmAssetRowsSeed}
-            onAddWorkOrderDetails={() => setShowWorkOrderDetails(true)}
+            onAddWorkOrderDetails={() => {
+              setWorkOrderDetailsMode('create-pm');
+              setEditingWorkOrderId('');
+              setShowWorkOrderDetails(true);
+            }}
             onAddCalendar={() => {
               setPmScheduleEditorMode('add');
               setShowCalendarSchedule(true);
@@ -22637,6 +22998,32 @@ function ClientDashboard() {
                 const updatedSchedule = response?.data || { ...selectedSchedule, ...requestPayload };
                 setSelectedSchedule(updatedSchedule);
                 await refreshSchedules();
+                setShowWorkOrderDetails(false);
+                setLaunchChecklistBuilderFromMain(false);
+                return;
+              }
+
+              if (workOrderDetailsMode === 'create-pm') {
+                setPmWorkOrder((prev) => ({
+                  ...prev,
+                  pmTitle: payload?.pmTitle || prev?.pmTitle || payload?.title || '',
+                  title: payload?.title || '',
+                  description: payload?.description || '',
+                  createNow: !!payload?.createNow,
+                  priority: payload?.priority || 'Medium',
+                  category: payload?.category || 'General',
+                  durationHours: payload?.durationHours || '',
+                  requiresSignature: !!payload?.requiresSignature,
+                  location: payload?.location || '',
+                  assetId: payload?.assetId || '',
+                  assetName: payload?.assetName || '',
+                  dueDate: payload?.dueDate || '',
+                  startDate: payload?.startDate || '',
+                  assignedTo: payload?.assignedTo || '',
+                  additionalResponsibleWorkers: payload?.additionalResponsibleWorkers || '',
+                  team: payload?.team || '',
+                  lineItems: Array.isArray(payload?.lineItems) ? payload.lineItems : [],
+                }));
                 setShowWorkOrderDetails(false);
                 setLaunchChecklistBuilderFromMain(false);
                 return;
@@ -23482,9 +23869,46 @@ function ClientDashboard() {
             <div className="flex flex-col gap-6">
               <SectionHeader
                 title="Material Requests"
-                count={materialRequests.length}
+                count={filteredMaterialRequests.length}
                 action={<Btn onClick={fetchMaterialRequests} variant="outline" size="sm">Refresh</Btn>}
               />
+              <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+                  <div className="flex-1">
+                    <input
+                      type="text"
+                      value={materialRequestSearchQuery}
+                      onChange={(e) => setMaterialRequestSearchQuery(e.target.value)}
+                      placeholder="Search request, requester, item, or ID"
+                      className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    />
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[220px_auto]">
+                    <select
+                      value={materialRequestStatusFilter}
+                      onChange={(e) => setMaterialRequestStatusFilter(e.target.value)}
+                      className="rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    >
+                      <option value="">All statuses</option>
+                      {materialRequestStatusOptions.map((status) => (
+                        <option key={status} value={status}>
+                          {status.replace(/_/g, ' ')}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMaterialRequestSearchQuery('');
+                        setMaterialRequestStatusFilter('');
+                      }}
+                      className="rounded-xl border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-600 transition hover:bg-gray-50"
+                    >
+                      Reset Filters
+                    </button>
+                  </div>
+                </div>
+              </div>
               <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
                 <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 18, padding: 22 }}>
                   <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginBottom: 18 }}>
@@ -23564,29 +23988,28 @@ function ClientDashboard() {
                   </div>
                 </div>
               </div>
-              {materialRequests.length === 0 ? (
+              {filteredMaterialRequests.length === 0 ? (
                 <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 14, padding: 60, textAlign: 'center' }}>
                   <div style={{ fontSize: 40, marginBottom: 16 }}>ðŸ“¦</div>
                   <div style={{ fontWeight: 700, fontSize: 18, color: '#111827' }}>No Material Requests Found</div>
-                  <p style={{ color: '#6B7280', fontSize: 14, marginTop: 4 }}>Any material requests forwarded to you for approval will appear here.</p>
+                  <p style={{ color: '#6B7280', fontSize: 14, marginTop: 4 }}>
+                    {materialRequests.length === 0
+                      ? 'Any material requests forwarded to you for approval will appear here.'
+                      : 'Try adjusting the procurement filters to see more requests.'}
+                  </p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {materialRequests.map((req, idx) => {
+                  {filteredMaterialRequests.map((req, idx) => {
                     const reqId = req.id || req._id;
                     const items = req.items || [];
                     const firstItem = items[0] || {};
                     const linkedPo = materialRequestPoStatusMap[String(reqId || '')] || null;
-                    const normalizedReqStatus = String(req.status || '').toUpperCase();
                     const normalizedPoStatus = String(linkedPo?.vendorResponse || linkedPo?.status || '').toUpperCase();
                     const vendorApprovedPo = normalizedPoStatus === 'APPROVED';
                     const vendorDeclinedPo = normalizedPoStatus === 'DECLINED';
                     const awaitingVendorApproval = !!linkedPo && !vendorApprovedPo && !vendorDeclinedPo;
-                    const effectiveStatus = awaitingVendorApproval
-                      ? 'WAITING_VENDOR_APPROVAL'
-                      : vendorDeclinedPo
-                        ? 'VENDOR_DECLINED'
-                        : normalizedReqStatus;
+                    const effectiveStatus = getMaterialRequestEffectiveStatus(req);
                     const isPending = effectiveStatus === 'FORWARDED' || effectiveStatus === 'PENDING';
                     const stockInfo = materialRequestStockInfo[String(reqId || '')] || { requiresPo: false, shortages: [], fulfilled: [] };
                     const primaryActionLabel = stockInfo.requiresPo ? 'Create PO' : 'Approve';
@@ -27681,6 +28104,8 @@ function ClientDashboard() {
                       const assetIds = parseIdList(schedule.assets);
                       const assetNames = assetIds.map(id => assets.find(a => String(a.id || a._id) === String(id))?.name || id).join(', ');
                       const isOverdue = schedule.nextDate && new Date(schedule.nextDate) < new Date() && !(schedule.status || '').toLowerCase().includes('complete');
+                      const scheduleStatusLabel = isOverdue ? 'Overdue' : (schedule.status || 'Scheduled');
+                      const canUpdateScheduleStatus = canCurrentUserUpdatePmStatus(schedule);
                       return {
                         key: sid,
                         onClick: () => {
@@ -27690,12 +28115,24 @@ function ClientDashboard() {
                         cells: [
                           <Td key="n"><span style={{ fontWeight: 600 }}>{schedule.name || 'Unnamed'}</span></Td>,
                           <Td key="t"><span style={{ background: schedule.routine ? '#ECFDF5' : '#EFF6FF', color: schedule.routine ? '#065F46' : '#1D4ED8', padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 600 }}>{schedule.routine ? 'Routine' : 'Preventive'}</span></Td>,
-                          <Td key="s"><StatusBadge status={isOverdue ? 'OVERDUE' : schedule.status || 'Scheduled'} /></Td>,
+                          <Td key="s"><StatusBadge status={scheduleStatusLabel} /></Td>,
                           <Td key="nd">{schedule.nextDate ? new Date(schedule.nextDate).toLocaleDateString() : 'TBD'}</Td>,
                           <Td key="f">{schedule.routine ? (schedule.frequency || 'daily') : '-'}</Td>,
                           <Td key="a"><span style={{ color: assetNames ? '#374151' : '#9CA3AF' }}>{assetNames || 'Unassigned'}</span></Td>,
                           <Td key="x">
                             <div style={{ display: 'flex', gap: 6 }}>
+                              {canUpdateScheduleStatus ? (
+                                <>
+                                  <Btn size="sm" variant="outline" onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleUpdatePmStatus(schedule, 'In Progress');
+                                  }}>In Progress</Btn>
+                                  <Btn size="sm" variant="outline" onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleUpdatePmStatus(schedule, 'Completed');
+                                  }}>Complete</Btn>
+                                </>
+                              ) : null}
                               <Btn size="sm" variant="outline" onClick={(e) => {
                                 e.stopPropagation();
                                 openEditPmDetails(schedule);
@@ -27753,7 +28190,17 @@ function ClientDashboard() {
 
           {/* â”€â”€ Meters â”€â”€ */}
           {activeTab === 'meters' && (
-            <ClientMetersTab people={people} teams={teams} assets={assets} properties={properties} internalTechnicians={internalTechnicians} currentUser={currentUser} />
+            <ClientMetersTab
+              people={people}
+              teams={teams}
+              assets={assets}
+              properties={properties}
+              internalTechnicians={internalTechnicians}
+              generalSettings={generalSettings}
+              dailyEmailSummarySettings={dailyEmailSummarySettings}
+              onSaveDailyEmailSummarySettings={saveDailyEmailSummarySettings}
+              currentUser={currentUser}
+            />
           )}
 
           {/* â”€â”€ Edge â”€â”€ */}
@@ -27887,7 +28334,7 @@ function ClientDashboard() {
                   </div>
                   <div>
                     <div className="text-[2rem] font-bold leading-none text-gray-900">{userName || currentUser?.name || 'User'}</div>
-                    <div className="mt-3 text-[1.1rem] font-semibold text-gray-900">{currentUser?.role || currentUser?.accountType || 'Administrator'}</div>
+                    <div className="mt-3 text-[1.1rem] font-semibold text-gray-900">{getDashboardRoleLabel(currentUser?.role || currentUser?.accountType, 'Administrator')}</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -28348,6 +28795,8 @@ function ClientDashboard() {
         onCreatePortal={createRequestPortal}
         generalSettings={generalSettings}
         onSaveGeneralSettings={saveGeneralSettings}
+        dailyEmailSummarySettings={dailyEmailSummarySettings}
+        onSaveDailyEmailSummarySettings={saveDailyEmailSummarySettings}
         automationWorkflows={automationWorkflows}
         onSaveAutomationWorkflows={saveAutomationSettings}
         roleRows={roleRows}
@@ -29700,6 +30149,9 @@ const ClientIntelligenceTab = ({
 const ClientPartsTab = () => {
   const [items, setItems] = React.useState([]);
   const [search, setSearch] = React.useState('');
+  const [statusFilter, setStatusFilter] = React.useState('');
+  const [categoryFilter, setCategoryFilter] = React.useState('');
+  const [locationFilter, setLocationFilter] = React.useState('');
   const fileRef = React.useRef(null);
   const partFileInputRef = React.useRef(null);
   const [showAddPart, setShowAddPart] = React.useState(false);
@@ -29793,7 +30245,41 @@ const ClientPartsTab = () => {
       }
     })();
   }, [selectedPart?._id, selectedPart?.id, selectedPart?.name]);
-  const filtered = items.filter(it => (it.name || it.partName || '').toLowerCase().includes(search.toLowerCase()));
+  const partStatusOptions = React.useMemo(
+    () => Array.from(new Set((items || []).map((item) => String(item?.status || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    [items]
+  );
+  const partCategoryOptions = React.useMemo(
+    () => Array.from(new Set((items || []).map((item) => String(item?.category || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    [items]
+  );
+  const partLocationOptions = React.useMemo(
+    () => Array.from(new Set((items || []).map((item) => String(item?.location || item?.warehouse || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    [items]
+  );
+  const filtered = React.useMemo(() => {
+    const query = String(search || '').trim().toLowerCase();
+    return (items || []).filter((it) => {
+      const status = String(it?.status || '').trim();
+      const category = String(it?.category || '').trim();
+      const location = String(it?.location || it?.warehouse || '').trim();
+      if (statusFilter && status !== statusFilter) return false;
+      if (categoryFilter && category !== categoryFilter) return false;
+      if (locationFilter && location !== locationFilter) return false;
+      if (!query) return true;
+      const haystack = [
+        it?.name,
+        it?.partName,
+        it?.partNumber,
+        category,
+        status,
+        location,
+        it?._id,
+        it?.id,
+      ].join(' ').toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [categoryFilter, items, locationFilter, search, statusFilter]);
   const openPartDetails = (part) => {
     setSelectedPart(part);
     setPartDetailTab('details');
@@ -30149,9 +30635,42 @@ const ClientPartsTab = () => {
           </div>
         </form>
       )}
-      <div className="relative max-w-xs">
-        <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" /></svg>
-        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search parts..." className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+      <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative min-w-[240px] flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search parts..."
+              className="h-11 w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-4 text-sm text-gray-700 outline-none focus:border-blue-500"
+            />
+          </div>
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="h-11 rounded-xl border border-gray-200 bg-white px-4 text-sm text-gray-700 outline-none focus:border-blue-500">
+            <option value="">All Statuses</option>
+            {partStatusOptions.map((status) => <option key={status} value={status}>{status.replace(/_/g, ' ')}</option>)}
+          </select>
+          <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className="h-11 rounded-xl border border-gray-200 bg-white px-4 text-sm text-gray-700 outline-none focus:border-blue-500">
+            <option value="">All Categories</option>
+            {partCategoryOptions.map((category) => <option key={category} value={category}>{category}</option>)}
+          </select>
+          <select value={locationFilter} onChange={(e) => setLocationFilter(e.target.value)} className="h-11 rounded-xl border border-gray-200 bg-white px-4 text-sm text-gray-700 outline-none focus:border-blue-500">
+            <option value="">All Locations</option>
+            {partLocationOptions.map((location) => <option key={location} value={location}>{location}</option>)}
+          </select>
+          <button
+            type="button"
+            onClick={() => {
+              setSearch('');
+              setStatusFilter('');
+              setCategoryFilter('');
+              setLocationFilter('');
+            }}
+            className="text-sm font-medium text-blue-600 hover:text-blue-700"
+          >
+            Reset Filters
+          </button>
+        </div>
       </div>
       <div className="glass-surface rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
@@ -30497,6 +31016,10 @@ const ClientPurchaseOrdersTab = () => {
   const [saving, setSaving] = React.useState(false);
   const [selectedPo, setSelectedPo] = React.useState(null);
   const [editingId, setEditingId] = React.useState(null);
+  const [poSearchQuery, setPoSearchQuery] = React.useState('');
+  const [poStatusFilter, setPoStatusFilter] = React.useState('');
+  const [poVendorFilter, setPoVendorFilter] = React.useState('');
+  const [poCategoryFilter, setPoCategoryFilter] = React.useState('');
   const [form, setForm] = React.useState({
     title: '',
     vendor: '',
@@ -30615,6 +31138,41 @@ const ClientPurchaseOrdersTab = () => {
     }
   };
 
+  const poStatusOptions = React.useMemo(
+    () => Array.from(new Set((orders || []).map((order) => String(order?.status || 'Pending').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    [orders]
+  );
+  const poVendorOptions = React.useMemo(
+    () => Array.from(new Set((orders || []).map((order) => String(order?.vendor?.name || order?.vendorDetails?.name || order?.vendor || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    [orders]
+  );
+  const poCategoryOptions = React.useMemo(
+    () => Array.from(new Set((orders || []).map((order) => String(order?.category || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    [orders]
+  );
+  const filteredOrders = React.useMemo(() => {
+    const query = String(poSearchQuery || '').trim().toLowerCase();
+    return (orders || []).filter((order) => {
+      const status = String(order?.status || 'Pending').trim();
+      const vendorName = String(order?.vendor?.name || order?.vendorDetails?.name || order?.vendor || '').trim();
+      const category = String(order?.category || '').trim();
+      if (poStatusFilter && status !== poStatusFilter) return false;
+      if (poVendorFilter && vendorName !== poVendorFilter) return false;
+      if (poCategoryFilter && category !== poCategoryFilter) return false;
+      if (!query) return true;
+      const haystack = [
+        order?.title,
+        order?.name,
+        order?.poNumber,
+        order?.number,
+        vendorName,
+        category,
+        status,
+      ].join(' ').toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [orders, poCategoryFilter, poSearchQuery, poStatusFilter, poVendorFilter]);
+
   const savePo = async (e) => {
     e.preventDefault();
     if (!form.title.trim()) { alert('Title required'); return; }
@@ -30682,6 +31240,43 @@ const ClientPurchaseOrdersTab = () => {
           <button onClick={exportCSV} className="px-3 py-2 glass-ghost rounded-xl text-sm font-semibold hover:bg-white/70">Export CSV</button>
         </div>
       </div>
+      <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative min-w-[240px] flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <input
+              value={poSearchQuery}
+              onChange={(e) => setPoSearchQuery(e.target.value)}
+              placeholder="Search purchase orders"
+              className="h-11 w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-4 text-sm text-gray-700 outline-none focus:border-blue-500"
+            />
+          </div>
+          <select value={poStatusFilter} onChange={(e) => setPoStatusFilter(e.target.value)} className="h-11 rounded-xl border border-gray-200 bg-white px-4 text-sm text-gray-700 outline-none focus:border-blue-500">
+            <option value="">All Statuses</option>
+            {poStatusOptions.map((status) => <option key={status} value={status}>{status}</option>)}
+          </select>
+          <select value={poVendorFilter} onChange={(e) => setPoVendorFilter(e.target.value)} className="h-11 rounded-xl border border-gray-200 bg-white px-4 text-sm text-gray-700 outline-none focus:border-blue-500">
+            <option value="">All Vendors</option>
+            {poVendorOptions.map((vendor) => <option key={vendor} value={vendor}>{vendor}</option>)}
+          </select>
+          <select value={poCategoryFilter} onChange={(e) => setPoCategoryFilter(e.target.value)} className="h-11 rounded-xl border border-gray-200 bg-white px-4 text-sm text-gray-700 outline-none focus:border-blue-500">
+            <option value="">All Categories</option>
+            {poCategoryOptions.map((category) => <option key={category} value={category}>{category}</option>)}
+          </select>
+          <button
+            type="button"
+            onClick={() => {
+              setPoSearchQuery('');
+              setPoStatusFilter('');
+              setPoVendorFilter('');
+              setPoCategoryFilter('');
+            }}
+            className="text-sm font-medium text-blue-600 hover:text-blue-700"
+          >
+            Reset Filters
+          </button>
+        </div>
+      </div>
       {showAdd && (
         <form onSubmit={savePo} className="glass-surface rounded-lg border border-white/10 p-4 grid grid-cols-2 md:grid-cols-3 gap-3">
           <div className="flex flex-col gap-1"><label className="text-xs font-semibold text-gray-600">Title</label><input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" required /></div>
@@ -30716,7 +31311,7 @@ const ClientPurchaseOrdersTab = () => {
           <table className="w-full text-left border-collapse">
             <thead className="bg-[#fcfcfd] border-b border-gray-100"><tr>{['Title', 'PO Number', '# Items', 'Total Cost', 'Vendor', 'Actions'].map(h => <th key={h} className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">{h}</th>)}</tr></thead>
             <tbody>
-              {orders.map((o, idx) => (
+              {filteredOrders.map((o, idx) => (
                 <tr key={o._id || o.id || `po-${idx}`} className={`border-b border-gray-50 hover:bg-gray-50/50 transition-colors cursor-pointer ${selectedPo && getPoRouteId(selectedPo) === getPoRouteId(o) ? 'bg-blue-50/60' : ''}`} onClick={() => { setSelectedPo(o); setShowDetails(true); }}>
                   <td className="py-4 px-4 text-sm font-bold text-gray-900">{o.title || o.name || 'PO'}</td>
                   <td className="py-4 px-4 text-sm font-mono text-gray-600">{o.poNumber || o.number || '—'}</td>
@@ -30726,7 +31321,7 @@ const ClientPurchaseOrdersTab = () => {
                   <td className="py-4 px-4 text-right"><button type="button" className="p-1.5 hover:bg-gray-100 rounded-lg" onClick={(e) => { e.stopPropagation(); setSelectedPo(o); setShowDetails(true); }}><svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg></button></td>
                 </tr>
               ))}
-              {orders.length === 0 && <tr><td colSpan="6" className="py-20 text-center text-gray-500">No purchase orders found</td></tr>}
+              {filteredOrders.length === 0 && <tr><td colSpan="6" className="py-20 text-center text-gray-500">No purchase orders found</td></tr>}
             </tbody>
           </table>
         </div>
@@ -31112,6 +31707,8 @@ const ClientVendorsTab = () => {
 const ClientContactsTab = ({ type = 'vendor' }) => {
   const [entries, setEntries] = useState([]);
   const fileRef = useRef(null);
+  const [contactSearchQuery, setContactSearchQuery] = useState('');
+  const [contactTypeFilter, setContactTypeFilter] = useState('');
   const [showAddEntry, setShowAddEntry] = useState(false);
   const [creatingEntry, setCreatingEntry] = useState(false);
   const [contactsConfirmDialog, setContactsConfirmDialog] = useState({
@@ -31175,11 +31772,44 @@ const ClientContactsTab = ({ type = 'vendor' }) => {
     };
   }, []);
 
-  const filteredEntries = (entries || []).filter((entry) => {
+  const contactTypeOptions = useMemo(
+    () => Array.from(new Set((entries || [])
+      .filter((entry) => {
+        const label = (entry.__typeLabel || entry.type || entry.role || '').toLowerCase();
+        if (type === 'vendor') return label.includes('vendor');
+        return label.includes('customer') || label.includes('client') || label.includes('requestor');
+      })
+      .map((entry) => String(entry?.type || entry?.__typeLabel || entry?.role || '').trim())
+      .filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    [entries, type]
+  );
+  const filteredEntries = useMemo(() => (entries || []).filter((entry) => {
     const label = (entry.__typeLabel || entry.type || entry.role || '').toLowerCase();
-    if (type === 'vendor') return label.includes('vendor');
-    return label.includes('customer') || label.includes('client') || label.includes('requestor');
-  });
+    const matchesBaseType = type === 'vendor'
+      ? label.includes('vendor')
+      : label.includes('customer') || label.includes('client') || label.includes('requestor');
+    if (!matchesBaseType) return false;
+    const entryType = String(entry?.type || entry?.__typeLabel || entry?.role || '').trim();
+    if (contactTypeFilter && entryType !== contactTypeFilter) return false;
+    const query = String(contactSearchQuery || '').trim().toLowerCase();
+    if (!query) return true;
+    const haystack = [
+      entry?.name,
+      entry?.company,
+      entry?.fullName,
+      entry?.contactName,
+      entry?.contact,
+      entry?.email,
+      entry?.phone,
+      entry?.phoneNumber,
+      entry?.address,
+      entry?.street,
+      entryType,
+      entry?._id,
+      entry?.id,
+    ].join(' ').toLowerCase();
+    return haystack.includes(query);
+  }), [contactSearchQuery, contactTypeFilter, entries, type]);
   const selection = useBulkSelection(filteredEntries, (entry) => entry._id || entry.id);
 
   const closeContactsConfirmDialog = useCallback(() => {
@@ -31428,6 +32058,34 @@ const ClientContactsTab = ({ type = 'vendor' }) => {
           </button>
           <button onClick={() => fileRef.current && fileRef.current.click()} className="px-3 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold">Import CSV</button>
           <input ref={fileRef} type="file" accept=".csv" onChange={onImport} className="hidden" />
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative min-w-[240px] flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <input
+              value={contactSearchQuery}
+              onChange={(e) => setContactSearchQuery(e.target.value)}
+              placeholder={`Search ${type === 'vendor' ? 'vendors' : 'customers'}`}
+              className="h-11 w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-4 text-sm text-gray-700 outline-none focus:border-blue-500"
+            />
+          </div>
+          <select value={contactTypeFilter} onChange={(e) => setContactTypeFilter(e.target.value)} className="h-11 rounded-xl border border-gray-200 bg-white px-4 text-sm text-gray-700 outline-none focus:border-blue-500">
+            <option value="">All Types</option>
+            {contactTypeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+          </select>
+          <button
+            type="button"
+            onClick={() => {
+              setContactSearchQuery('');
+              setContactTypeFilter('');
+            }}
+            className="text-sm font-medium text-blue-600 hover:text-blue-700"
+          >
+            Reset Filters
+          </button>
         </div>
       </div>
 
@@ -34317,7 +34975,7 @@ const ClientAnalyticsTab = ({
                   ].map((item) => (
                     <div key={item.label} className="rounded-xl border border-gray-100 bg-gray-50 p-4">
                       <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-gray-500">{item.label}</p>
-                      <p className={`mt-3 text-2xl font-black ${item.tone}`}>{item.value}</p>
+                      <p className={`mt-3 text-base md:text-lg font-black ${item.tone}`}>{item.value}</p>
                     </div>
                   ))}
                 </div>
@@ -36437,6 +37095,9 @@ const ClientMetersTab = ({
   assets: assetsProp = [],
   properties: propertiesProp = [],
   internalTechnicians: internalTechniciansProp = [],
+  generalSettings = DEFAULT_GENERAL_SETTINGS,
+  dailyEmailSummarySettings: dailyEmailSummarySettingsProp = DEFAULT_DAILY_EMAIL_SUMMARY_SETTINGS,
+  onSaveDailyEmailSummarySettings,
   currentUser = null,
 }) => {
   const meterCategoryOptions = ['Electricity', 'Water', 'Electrical Generator', 'Generator', 'Fuel', 'Gas', 'Solar', 'Utility', 'Submeter'];
@@ -36454,13 +37115,32 @@ const ClientMetersTab = ({
   const [readingRecordedAt, setReadingRecordedAt] = React.useState(() => new Date().toISOString().slice(0, 10));
   const [readingNote, setReadingNote] = React.useState('');
   const [dailySummarySettings, setDailySummarySettings] = React.useState({
-    adminDailySummary: true,
-    technicianDailySummary: true,
-    sendTime: '07:00',
+    ...DEFAULT_DAILY_EMAIL_SUMMARY_SETTINGS,
+    ...(dailyEmailSummarySettingsProp || {}),
   });
+  const dailySummarySaveTimerRef = React.useRef(null);
+  const skipNextDailySummarySaveRef = React.useRef(true);
+  const [dailySummarySaveState, setDailySummarySaveState] = React.useState('');
   const [locationFilter, setLocationFilter] = React.useState('');
   const [assetFilter, setAssetFilter] = React.useState('');
   const [categoryFilter, setCategoryFilter] = React.useState('');
+  const dailySummaryTimePresets = React.useMemo(() => ([
+    { label: '6:00 AM', value: '06:00' },
+    { label: '7:00 AM', value: '07:00' },
+    { label: '8:00 AM', value: '08:00' },
+    { label: '9:00 AM', value: '09:00' },
+    { label: '5:00 PM', value: '17:00' },
+  ]), []);
+  const dailySummaryTimeLabel = React.useMemo(() => {
+    const [hourText = '07', minuteText = '00'] = String(dailySummarySettings.sendTime || '07:00').split(':');
+    const previewDate = new Date();
+    previewDate.setHours(Number(hourText) || 7, Number(minuteText) || 0, 0, 0);
+    try {
+      return previewDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    } catch {
+      return dailySummarySettings.sendTime || '07:00';
+    }
+  }, [dailySummarySettings.sendTime]);
   const createEmptyMeter = () => ({
     name: '',
     type: 'Electricity',
@@ -36513,20 +37193,44 @@ const ClientMetersTab = ({
   }, [meters]);
   React.useEffect(() => { api.get('/api/meters').then(r => setMeters(r.data || [])).catch(() => setMeters([])); }, []);
   React.useEffect(() => {
-    if (typeof window === 'undefined') return;
-    try {
-      const saved = JSON.parse(window.localStorage.getItem('mms-daily-email-summary-settings') || '{}');
-      if (saved && typeof saved === 'object') {
-        setDailySummarySettings((prev) => ({ ...prev, ...saved }));
-      }
-    } catch {}
-  }, []);
+    setDailySummarySettings({
+      ...DEFAULT_DAILY_EMAIL_SUMMARY_SETTINGS,
+      ...(dailyEmailSummarySettingsProp || {}),
+    });
+    skipNextDailySummarySaveRef.current = true;
+  }, [dailyEmailSummarySettingsProp]);
   React.useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (skipNextDailySummarySaveRef.current) {
+      skipNextDailySummarySaveRef.current = false;
+      return;
+    }
+
+    if (typeof window === 'undefined') return undefined;
+
     try {
       window.localStorage.setItem('mms-daily-email-summary-settings', JSON.stringify(dailySummarySettings));
     } catch {}
-  }, [dailySummarySettings]);
+
+    if (dailySummarySaveTimerRef.current) {
+      window.clearTimeout(dailySummarySaveTimerRef.current);
+    }
+
+    setDailySummarySaveState('Saving...');
+    dailySummarySaveTimerRef.current = window.setTimeout(async () => {
+      try {
+        await onSaveDailyEmailSummarySettings?.(dailySummarySettings);
+        setDailySummarySaveState('Saved');
+      } catch {
+        setDailySummarySaveState('Could not save');
+      }
+    }, 500);
+
+    return () => {
+      if (dailySummarySaveTimerRef.current) {
+        window.clearTimeout(dailySummarySaveTimerRef.current);
+      }
+    };
+  }, [dailySummarySettings, onSaveDailyEmailSummarySettings]);
   React.useEffect(() => {
     if (!selectedMeterId) {
       setSelectedMeter(null);
@@ -37988,12 +38692,35 @@ const ClientMetersTab = ({
       <div className="px-8 py-6">
         <div className="mb-6 grid gap-6 xl:grid-cols-[1.2fr_1fr]">
           <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-            <div className="flex items-start justify-between gap-6">
-              <div>
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+              <div className="max-w-2xl">
                 <h3 className="text-[1.25rem] font-bold text-gray-900">Daily Email Summaries</h3>
                 <p className="mt-2 text-[0.95rem] text-gray-500">Administrators receive the company summary each day, and technicians receive their own daily work summary by email.</p>
+                <div className="mt-4 rounded-2xl border border-blue-100 bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-4">
+                  <div className="text-xs font-semibold uppercase tracking-[0.22em] text-blue-700">Delivery Time</div>
+                  <div className="mt-2 text-lg font-bold text-gray-900">{dailySummaryTimeLabel}</div>
+                  <div className="mt-1 text-sm text-gray-600">
+                    Daily reports will be sent for this company at {dailySummaryTimeLabel} based on {generalSettings?.timeZone || 'your company timezone'}.
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {dailySummaryTimePresets.map((preset) => (
+                      <button
+                        key={preset.value}
+                        type="button"
+                        onClick={() => setDailySummarySettings((prev) => ({ ...prev, sendTime: preset.value }))}
+                        className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                          dailySummarySettings.sendTime === preset.value
+                            ? 'border-blue-600 bg-blue-600 text-white'
+                            : 'border-gray-200 bg-white text-gray-700 hover:border-blue-300 hover:text-blue-700'
+                        }`}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
-              <div className="min-w-[150px]">
+              <div className="min-w-[180px] rounded-2xl border border-gray-200 bg-gray-50 p-4">
                 <label className="mb-2 block text-sm font-semibold text-gray-700">Send time</label>
                 <input
                   type="time"
@@ -38001,6 +38728,7 @@ const ClientMetersTab = ({
                   onChange={(e) => setDailySummarySettings((prev) => ({ ...prev, sendTime: e.target.value }))}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900"
                 />
+                <div className="mt-2 text-xs text-gray-500">Choose the exact time users should receive the daily report email.</div>
               </div>
             </div>
             <div className="mt-5 grid gap-3 md:grid-cols-2">
@@ -38027,6 +38755,7 @@ const ClientMetersTab = ({
               <div className="font-semibold text-gray-900">Summary content</div>
               <div className="mt-2">Admin email: overall meter status, current-month consumption, overdue utility readings, and company-wide activity.</div>
               <div className="mt-1">Technician email: assigned work orders, meter categories they own, and the readings or follow-ups due that day.</div>
+              <div className="mt-3 text-xs font-medium text-blue-700">{dailySummarySaveState || 'Saved to company settings'}</div>
             </div>
           </section>
           <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
@@ -40167,6 +40896,28 @@ function CreatePmModal({
       const nextDate = assetRows[0]?.startDate || new Date().toISOString();
       const resolvedPmTitle = workOrderDetails?.pmTitle || existingSchedule?.name || existingSchedule?.title || workOrderDetails?.title || 'Preventive Maintenance';
       const resolvedWorkOrderTitle = workOrderDetails?.title || existingSchedule?.workOrderTitle || existingSchedule?.title || resolvedPmTitle;
+      const rawAssignedTo = String(workOrderDetails?.assignedTo || existingSchedule?.assignedToName || existingSchedule?.assignedTo || '').trim();
+      const resolvedAssigneeEntry = assigneeOptions.find((person) => (
+        String(person?.id || '').trim() === rawAssignedTo
+        || String(person?.name || '').trim().toLowerCase() === rawAssignedTo.toLowerCase()
+      )) || null;
+      const resolvedAssigneeId = String(resolvedAssigneeEntry?.id || '').trim();
+      const resolvedAssigneeName = String(resolvedAssigneeEntry?.name || rawAssignedTo || '').trim();
+      const normalizedAssetRows = assetRows.map((row) => {
+        const rowAssignee = String(row?.assignee || '').trim();
+        const effectiveAssigneeId = rowAssignee || resolvedAssigneeId || '';
+        const effectiveAssigneeName = effectiveAssigneeId
+          ? (assigneeOptions.find((person) => String(person?.id || '').trim() === effectiveAssigneeId)?.name || resolvedAssigneeName || '')
+          : resolvedAssigneeName;
+        return {
+          ...row,
+          assignee: effectiveAssigneeId,
+          assignedTo: effectiveAssigneeId,
+          technicianId: effectiveAssigneeId,
+          assigneeName: effectiveAssigneeName,
+          assignedToName: effectiveAssigneeName,
+        };
+      });
       const payload = {
         name: resolvedPmTitle,
         workOrderTitle: resolvedWorkOrderTitle,
@@ -40178,11 +40929,22 @@ function CreatePmModal({
         createFirstWorkOrder: !!(workOrderDetails?.createNow || existingSchedule?.createFirstWorkOrder),
         tasks: pmTasks || [],
         checklist: checklist || [],
-        assetsRows: assetRows,
-        assetsCount: assetRows.length,
-        timezone: assetRows[0]?.timezone,
+        assetsRows: normalizedAssetRows,
+        assetsCount: normalizedAssetRows.length,
+        timezone: normalizedAssetRows[0]?.timezone,
+        assignedTo: resolvedAssigneeId || resolvedAssigneeName || undefined,
+        assignedToName: resolvedAssigneeName || undefined,
+        technicianUserId: resolvedAssigneeId || undefined,
+        assignees: resolvedAssigneeId || resolvedAssigneeName
+          ? [{
+              ...(resolvedAssigneeId ? { id: resolvedAssigneeId } : {}),
+              ...(resolvedAssigneeName ? { name: resolvedAssigneeName } : {}),
+            }]
+          : [],
+        employees: resolvedAssigneeId || resolvedAssigneeName || '',
         scheduleType: scheduleConfig?.scheduleType || 'calendar',
         calendarRule: scheduleConfig?.calendarRule || { every: 1, unit: 'day', time: '09:00', leadDays: 0 },
+        reminderLeadMinutes: Number(scheduleConfig?.reminderLeadMinutes || existingSchedule?.reminderLeadMinutes || 60),
         nextDate,
         routine: true,
         status: 'Pending',
@@ -40351,11 +41113,14 @@ function CreatePmModal({
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="font-bold text-gray-900">Due every {scheduleConfig.calendarRule.every} {scheduleConfig.calendarRule.unit}(s)</div>
-                    <div className="text-xs text-gray-600 mt-1">Created {scheduleConfig.calendarRule.leadDays} day(s) before due date at {scheduleConfig.calendarRule.time || '09:00'}</div>
+                    <div className="text-xs text-gray-600 mt-1">
+                      Created {scheduleConfig.calendarRule.leadDays} day(s) before due date at {scheduleConfig.calendarRule.time || '09:00'}
+                      {` • Email reminder ${Number(scheduleConfig?.reminderLeadMinutes || 60)} min before`}
+                    </div>
                   </div>
                   <div className="flex gap-2">
                     <button className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-100" type="button" onClick={onAddCalendar}>Edit</button>
-                    <button className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-100" type="button" onClick={() => setScheduleConfig?.({ scheduleType: null, calendarRule: null, meterRule: null, combinedRule: null })}>Remove</button>
+                    <button className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-100" type="button" onClick={() => setScheduleConfig?.({ scheduleType: null, calendarRule: null, meterRule: null, combinedRule: null, reminderLeadMinutes: 60 })}>Remove</button>
                   </div>
                 </div>
               </div>
@@ -40377,6 +41142,7 @@ function CreatePmModal({
                       calendarRule: schedule?.calendarRule || null,
                       meterRule: schedule?.meterRule || null,
                       combinedRule: schedule?.combinedRule || null,
+                      reminderLeadMinutes: Number(schedule?.reminderLeadMinutes || 60),
                     });
                     setShowExistingSchedulePicker(false);
                   }}
@@ -42235,7 +43001,7 @@ function WorkOrderDetailsModal({ open, onClose, onSave, mode = 'create', tasks =
                       </button>
                     </div>
                     <button onClick={closeChecklistBuilder} className="rounded-full p-2 hover:bg-gray-100">
-                      <X className="h-5 w-5 text-gray-500" />
+                      <X className="h-5 w-5 text-gray-500" />w
                     </button>
                   </div>
 
@@ -42395,10 +43161,18 @@ function WorkOrderDetailsModal({ open, onClose, onSave, mode = 'create', tasks =
 
 // --- Calendar Schedule Modal ---
 function CalendarScheduleModal({ open, onClose, scheduleConfig, setScheduleConfig, resetKey, mode = 'add' }) {
+  const REMINDER_PRESET_OPTIONS = [
+    { value: 15, label: '15 minutes before' },
+    { value: 30, label: '30 minutes before' },
+    { value: 60, label: '1 hour before' },
+    { value: 120, label: '2 hours before' },
+    { value: 1440, label: '1 day before' },
+  ];
   const [every, setEvery] = React.useState(scheduleConfig?.calendarRule?.every || 1);
   const [unit, setUnit] = React.useState(scheduleConfig?.calendarRule?.unit || 'day');
   const [time, setTime] = React.useState(scheduleConfig?.calendarRule?.time || '22:00');
   const [leadDays, setLeadDays] = React.useState(scheduleConfig?.calendarRule?.leadDays || 0);
+  const [reminderLeadMinutes, setReminderLeadMinutes] = React.useState(Number(scheduleConfig?.reminderLeadMinutes || 60));
   const [inactivePeriods, setInactivePeriods] = React.useState(Array.isArray(scheduleConfig?.calendarRule?.inactivePeriods) ? scheduleConfig.calendarRule.inactivePeriods : []);
 
   React.useEffect(() => {
@@ -42407,6 +43181,7 @@ function CalendarScheduleModal({ open, onClose, scheduleConfig, setScheduleConfi
     setUnit(scheduleConfig?.calendarRule?.unit || 'day');
     setTime(scheduleConfig?.calendarRule?.time || '22:00');
     setLeadDays(scheduleConfig?.calendarRule?.leadDays || 0);
+    setReminderLeadMinutes(Number(scheduleConfig?.reminderLeadMinutes || 60));
     setInactivePeriods(Array.isArray(scheduleConfig?.calendarRule?.inactivePeriods) ? scheduleConfig.calendarRule.inactivePeriods : []);
   }, [open, scheduleConfig, resetKey]);
 
@@ -42414,6 +43189,7 @@ function CalendarScheduleModal({ open, onClose, scheduleConfig, setScheduleConfi
     setScheduleConfig?.({
       scheduleType: 'calendar',
       calendarRule: { every: Number(every) || 1, unit, time, leadDays: Number(leadDays) || 0, inactivePeriods },
+      reminderLeadMinutes: Math.max(0, Number(reminderLeadMinutes) || 60),
     });
     onClose?.();
   };
@@ -42498,6 +43274,26 @@ function CalendarScheduleModal({ open, onClose, scheduleConfig, setScheduleConfi
                 <input type="time" className="w-40 border border-gray-300 rounded-lg px-3 py-2 text-sm" defaultValue="22:00" />
               </div>
             </div>
+          </div>
+
+          <div className="border-t border-gray-100 pt-4 space-y-2">
+            <label className="text-sm font-bold text-gray-800">Email Reminder</label>
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-gray-700">Send reminder</span>
+              <select
+                className="min-w-[220px] border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                value={reminderLeadMinutes}
+                onChange={(e) => setReminderLeadMinutes(e.target.value)}
+              >
+                {REMINDER_PRESET_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+                {!REMINDER_PRESET_OPTIONS.some((option) => Number(option.value) === Number(reminderLeadMinutes)) ? (
+                  <option value={reminderLeadMinutes}>{`${reminderLeadMinutes} minutes before (Custom)`}</option>
+                ) : null}
+              </select>
+            </div>
+            <p className="text-xs text-gray-500">The assigned PM person will get an email reminder before the due time.</p>
           </div>
 
           <div className="border-t border-gray-100 pt-4">

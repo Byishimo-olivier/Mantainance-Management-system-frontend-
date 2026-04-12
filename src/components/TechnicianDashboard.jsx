@@ -5,7 +5,7 @@ import { getImageUrl } from '../utils/imageUrl';
 import { useNavigate } from 'react-router-dom';
 import Header from "./Header";
 import { useTranslation } from "../i18n/LanguageContext";
-import { MessageSquare } from "lucide-react";
+import { MessageSquare, Search, ArrowUpDown, LayoutDashboard, SlidersHorizontal, MapPin, Flag, ChevronDown, MoreHorizontal, Image as ImageIcon } from "lucide-react";
 
 const isCompletedStatus = (status) => {
   const normalized = String(status || '').toUpperCase();
@@ -488,6 +488,8 @@ const TechnicianDashboard = () => {
   const [jobs, setJobs] = useState([]);
   const [techSchedules, setTechSchedules] = useState([]);
   const [materialRequests, setMaterialRequests] = useState([]);
+  const [companyAssets, setCompanyAssets] = useState([]);
+  const [companyLocations, setCompanyLocations] = useState([]);
   const [user, setUser] = useState({ name: "", id: "" });
   const [showAfterForm, setShowAfterForm] = useState({});
   const [showBeforeForm, setShowBeforeForm] = useState({});
@@ -497,8 +499,29 @@ const TechnicianDashboard = () => {
     title: "",
     description: "",
     quantity: 1,
-    urgency: "MEDIUM"
+    urgency: "MEDIUM",
+    linkedIssueId: "",
+    assetName: ""
   });
+  const [showPmForm, setShowPmForm] = useState(false);
+  const [selectedPmSchedule, setSelectedPmSchedule] = useState(null);
+  const [creatingPm, setCreatingPm] = useState(false);
+  const [pmFormData, setPmFormData] = useState({
+    name: "",
+    description: "",
+    category: "Preventive",
+    priority: "MEDIUM",
+    durationHours: "",
+    date: "",
+    time: "09:00",
+    location: "",
+    assetId: "",
+    assetName: "",
+    linkedIssueId: ""
+  });
+  const [pmSearchQuery, setPmSearchQuery] = useState('');
+  const [pmSortDirection, setPmSortDirection] = useState('desc');
+  const [schedulerSearchQuery, setSchedulerSearchQuery] = useState('');
   const [chatInput, setChatInput] = useState('');
   const [chatSending, setChatSending] = useState(false);
   const [privateNote, setPrivateNote] = useState('');
@@ -553,6 +576,60 @@ const TechnicianDashboard = () => {
     setShowMaterialRequestForm(!showMaterialRequestForm);
   };
 
+  const openMaterialRequestForJob = async (job) => {
+    if (!job) {
+      setShowMaterialRequestForm(true);
+      return;
+    }
+    const maybeAssigned = String(job?.assignedTo || '').trim();
+    const currentId = String(user?._id || user?.id || '').trim();
+    if (!maybeAssigned && currentId) {
+      const assignResult = await handleAssignIssueToSelf(job, { silent: true });
+      if (assignResult === false) return;
+    }
+    setMaterialRequestData({
+      title: job.assetName || job.asset?.name || job.title || "",
+      description: `Parts requested for work order: ${job.title || 'Work Order'}`,
+      quantity: 1,
+      urgency: String(job.priority || 'MEDIUM').toUpperCase(),
+      linkedIssueId: job._id || job.id || "",
+      assetName: job.assetName || job.asset?.name || ""
+    });
+    setSelectedJob(job);
+    setActiveSection('materials');
+    setShowMaterialRequestForm(true);
+  };
+
+  const openPmForJob = async (job) => {
+    if (!job) {
+      setShowPmForm(true);
+      return;
+    }
+    const maybeAssigned = String(job?.assignedTo || '').trim();
+    const currentId = String(user?._id || user?.id || '').trim();
+    if (!maybeAssigned && currentId) {
+      const assignResult = await handleAssignIssueToSelf(job, { silent: true });
+      if (assignResult === false) return;
+    }
+    const baseDate = new Date();
+    const pad = (value) => String(value).padStart(2, '0');
+    setPmFormData({
+      name: job.title || "",
+      description: job.description || "",
+      category: String(job.category || 'Preventive'),
+      priority: String(job.priority || 'MEDIUM').toUpperCase(),
+      date: `${baseDate.getFullYear()}-${pad(baseDate.getMonth() + 1)}-${pad(baseDate.getDate())}`,
+      time: "09:00",
+      location: job.location || "",
+      assetId: job.assetId || job.asset?._id || job.asset?.id || "",
+      assetName: job.assetName || job.asset?.name || "",
+      linkedIssueId: job._id || job.id || ""
+    });
+    setSelectedJob(job);
+    setActiveSection('pm');
+    setShowPmForm(true);
+  };
+
   const handleMaterialRequestChange = (e) => {
     const { name, value } = e.target;
     setMaterialRequestData(prev => ({
@@ -570,7 +647,10 @@ const TechnicianDashboard = () => {
         ...materialRequestData,
         technicianId: user._id || user.id,
         technicianName: user.name,
-        clientId: user._id || user.id
+        clientId: user._id || user.id,
+        issueId: materialRequestData.linkedIssueId || undefined,
+        workOrderId: materialRequestData.linkedIssueId || undefined,
+        assetName: materialRequestData.assetName || undefined
       };
 
       await api.post('/api/material-requests', requestData);
@@ -580,7 +660,9 @@ const TechnicianDashboard = () => {
         title: "",
         description: "",
         quantity: 1,
-        urgency: "MEDIUM"
+        urgency: "MEDIUM",
+        linkedIssueId: "",
+        assetName: ""
       });
       setShowMaterialRequestForm(false);
 
@@ -628,17 +710,12 @@ const TechnicianDashboard = () => {
   };
 
   const fetchAssignedIssues = () => {
-    const userStr = localStorage.getItem("user");
-    if (userStr) {
-      const u = JSON.parse(userStr);
-      // Authorization handled by interceptor
-      api.get(`/api/issues/assigned/${u._id || u.id}`)
-        .then(res => setJobs(res.data))
-        .catch(err => {
-          console.warn('Failed to fetch assigned issues:', err?.response?.data || err.message);
-          setJobs([]);
-        });
-    }
+    api.get('/api/issues')
+      .then(res => setJobs(Array.isArray(res.data) ? res.data : []))
+      .catch(err => {
+        console.warn('Failed to fetch technician issues:', err?.response?.data || err.message);
+        setJobs([]);
+      });
   };
 
   const fetchMaterialRequests = () => {
@@ -657,6 +734,46 @@ const TechnicianDashboard = () => {
 
   const [alerts, setAlerts] = useState([]);
   const [reminders, setReminders] = useState([]); // Keep for backward compatibility or refactor to use alerts
+
+  const canAssignIssueToSelf = (job) => {
+    if (!job) return false;
+    const currentId = String(user?._id || user?.id || '').trim();
+    if (!currentId) return false;
+    const directAssignee = String(job?.assignedTo || '').trim();
+    if (directAssignee && directAssignee === currentId) return false;
+    if (Array.isArray(job?.assignees) && job.assignees.some((entry) => {
+      const entryId = String(entry?.id || entry?._id || entry?.userId || entry || '').trim();
+      return entryId && entryId === currentId;
+    })) return false;
+    const status = getJobStatus(job);
+    return !isCompletedStatus(status);
+  };
+
+  const handleAssignIssueToSelf = async (job, options = {}) => {
+    if (!job) return false;
+    const currentId = String(user?._id || user?.id || '').trim();
+    if (!currentId) {
+      if (!options.silent) alert('Unable to find your technician account.');
+      return false;
+    }
+    try {
+      const id = job._id || job.id;
+      const res = await api.post(`/api/issues/${id}/assign`, { techId: currentId });
+      const updatedJob = res?.data || { ...job, assignedTo: currentId };
+      setJobs((prev) => prev.map((entry) => String(entry._id || entry.id) === String(id) ? updatedJob : entry));
+      setSelectedJob((prev) => prev && String(prev._id || prev.id) === String(id) ? updatedJob : prev);
+      if (!options.silent) {
+        alert('Issue assigned to you.');
+      }
+      return updatedJob;
+    } catch (err) {
+      console.error('Failed to assign issue to self', err);
+      if (!options.silent) {
+        alert(err?.response?.data?.error || err?.message || 'Failed to assign issue to yourself.');
+      }
+      return false;
+    }
+  };
 
   const getTimeRemaining = (targetDate) => {
     if (!targetDate) return null;
@@ -679,7 +796,8 @@ const TechnicianDashboard = () => {
     if (!userStr) return;
     try {
       const u = JSON.parse(userStr);
-      const res = await api.get(`/api/maintenance-schedules/technician/${u._id || u.id}`);
+      const techId = u?._id || u?.id || u?.userId || '';
+      const res = await api.get(`/api/maintenance-schedules/technician/${techId || 'me'}`);
       const schedules = res.data || [];
       setTechSchedules(Array.isArray(schedules) ? schedules : []);
 
@@ -875,6 +993,95 @@ const TechnicianDashboard = () => {
     }
   };
 
+  const handlePmFieldChange = (e) => {
+    const { name, value } = e.target;
+    setPmFormData((prev) => {
+      if (name === 'assetId') {
+        const selectedAsset = companyAssetOptions.find((asset) => String(asset.id) === String(value));
+        return {
+          ...prev,
+          assetId: value,
+          assetName: selectedAsset?.name || '',
+          location: prev.location || selectedAsset?.location || '',
+        };
+      }
+      if (name === 'location') {
+        const selectedLocation = companyLocationOptions.find((location) => String(location.name) === String(value) || String(location.id) === String(value));
+        return {
+          ...prev,
+          location: selectedLocation?.name || value,
+        };
+      }
+      return { ...prev, [name]: value };
+    });
+  };
+
+  const handleCreatePm = async (e) => {
+    e.preventDefault();
+    if (!pmFormData.name || !pmFormData.date || !pmFormData.time) {
+      alert('PM title, date, and time are required.');
+      return;
+    }
+    try {
+      setCreatingPm(true);
+      const currentId = String(user?._id || user?.id || '').trim();
+      const currentName = user?.name || user?.username || user?.email || 'Technician';
+      const payload = {
+        name: pmFormData.name,
+        description: pmFormData.description || pmFormData.name,
+        workOrderTitle: pmFormData.name,
+        workOrderDescription: pmFormData.description || pmFormData.name,
+        category: pmFormData.category || 'Preventive',
+        priority: pmFormData.priority || 'MEDIUM',
+        durationHours: pmFormData.durationHours ? Number(pmFormData.durationHours) : undefined,
+        status: 'Pending',
+        date: pmFormData.date,
+        time: pmFormData.time,
+        location: pmFormData.location || '',
+        assetId: pmFormData.assetId || '',
+        assetName: pmFormData.assetName || '',
+        assignedTo: currentId,
+        technicianUserId: currentId,
+        assignees: currentId ? [{ id: currentId, name: currentName, role: user?.role || 'technician' }] : [],
+        sourceIssueId: pmFormData.linkedIssueId || undefined,
+        workOrderId: pmFormData.linkedIssueId || undefined,
+        assetsRows: [{
+          id: `tech-pm-${Date.now()}`,
+          assetId: pmFormData.assetId || '',
+          asset: pmFormData.assetName || '',
+          location: pmFormData.location || '',
+          startDate: pmFormData.date,
+          timezone: '(UTC+02:00) Africa/Kigali',
+          assignee: currentId,
+          assignedTo: currentId,
+        }],
+      };
+      await api.post('/api/maintenance-schedules', payload);
+      setShowPmForm(false);
+      setPmFormData({
+        name: "",
+        description: "",
+        category: "Preventive",
+        priority: "MEDIUM",
+        durationHours: "",
+        date: "",
+        time: "09:00",
+        location: "",
+        assetId: "",
+        assetName: "",
+        linkedIssueId: ""
+      });
+      await fetchReminders();
+      setActiveSection('pm');
+      alert('PM created and assigned to you.');
+    } catch (err) {
+      console.error('Failed to create technician PM', err);
+      alert(err?.response?.data?.error || err?.message || 'Failed to create PM.');
+    } finally {
+      setCreatingPm(false);
+    }
+  };
+
   const updateMentionSuggestions = (value, cursorPosition) => {
     const context = getMentionContext(value, cursorPosition);
     setMentionContext(context);
@@ -996,6 +1203,37 @@ const TechnicianDashboard = () => {
     return () => {
       cancelled = true;
       clearInterval(interval);
+    };
+  }, [user]);
+
+  useEffect(() => {
+    const userId = user?._id || user?.id;
+    if (!userId) return;
+    let cancelled = false;
+
+    const fetchCompanyPmOptions = async () => {
+      try {
+        const [assetsRes, propertiesRes] = await Promise.allSettled([
+          api.get('/api/assets'),
+          api.get('/api/properties'),
+        ]);
+        if (cancelled) return;
+        const assets = assetsRes.status === 'fulfilled' && Array.isArray(assetsRes.value?.data) ? assetsRes.value.data : [];
+        const properties = propertiesRes.status === 'fulfilled' && Array.isArray(propertiesRes.value?.data) ? propertiesRes.value.data : [];
+        setCompanyAssets(assets);
+        setCompanyLocations(properties);
+      } catch (err) {
+        if (!cancelled) {
+          console.error('Failed to load technician company PM options', err);
+          setCompanyAssets([]);
+          setCompanyLocations([]);
+        }
+      }
+    };
+
+    fetchCompanyPmOptions();
+    return () => {
+      cancelled = true;
     };
   }, [user]);
 
@@ -1229,6 +1467,109 @@ const TechnicianDashboard = () => {
     Array.isArray(mentionNotifications) ? mentionNotifications : []
   ), [mentionNotifications]);
 
+  const companyAssetOptions = useMemo(
+    () => (Array.isArray(companyAssets) ? companyAssets : []).map((asset) => ({
+      id: String(asset?._id || asset?.id || ''),
+      name: asset?.name || asset?.title || asset?.assetName || 'Asset',
+      location: asset?.location || asset?.property?.name || asset?.propertyName || '',
+      propertyId: String(asset?.propertyId || asset?.property?._id || asset?.property?.id || ''),
+    })).filter((asset) => asset.id || asset.name),
+    [companyAssets]
+  );
+
+  const companyLocationOptions = useMemo(
+    () => Array.from(new Map((Array.isArray(companyLocations) ? companyLocations : []).map((property) => {
+      const id = String(property?._id || property?.id || property?.propertyId || '');
+      const name = property?.name || property?.title || property?.location || 'Location';
+      return [id || name, { id, name }];
+    })).values()),
+    [companyLocations]
+  );
+
+  const getPmPrimaryAssetLabel = (schedule) => (
+    schedule?.assetName
+    || schedule?.asset?.name
+    || schedule?.assetsRows?.[0]?.asset
+    || 'Not set'
+  );
+
+  const getPmPrimaryLocationLabel = (schedule) => (
+    schedule?.location
+    || schedule?.assetsRows?.[0]?.location
+    || 'Not set'
+  );
+
+  const formatPmDateTime = (value) => {
+    if (!value) return 'Not set';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return String(value);
+    return `${parsed.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' })} - ${parsed.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
+  };
+
+  const getPmAssignedLabel = (schedule) => {
+    if (schedule?.assignedToName) return schedule.assignedToName;
+    if (schedule?.technicianName) return schedule.technicianName;
+    if (Array.isArray(schedule?.assignees) && schedule.assignees.length > 0) {
+      return schedule.assignees.map((entry) => entry?.name || entry?.email || entry?.id).filter(Boolean).join(', ');
+    }
+    const rowAssignee = schedule?.assetsRows?.[0]?.assigneeName || schedule?.assetsRows?.[0]?.assignedToName || '';
+    return rowAssignee || 'Assigned to you';
+  };
+
+  const getPmStatusClass = (status) => {
+    const normalized = String(status || 'Pending').toUpperCase();
+    if (normalized.includes('COMPLETE')) return 'bg-emerald-50 text-emerald-700';
+    if (normalized.includes('PROGRESS')) return 'bg-amber-50 text-amber-700';
+    if (normalized.includes('OVERDUE')) return 'bg-rose-50 text-rose-700';
+    if (normalized.includes('PAUSE')) return 'bg-slate-100 text-slate-700';
+    return 'bg-blue-50 text-blue-700';
+  };
+
+  const filteredPmSchedules = useMemo(() => {
+    const query = String(pmSearchQuery || '').trim().toLowerCase();
+    const sorted = (Array.isArray(techSchedules) ? techSchedules : []).slice().sort((a, b) => {
+      const aDate = new Date(a?.createdAt || a?.date || a?.nextDate || 0).getTime();
+      const bDate = new Date(b?.createdAt || b?.date || b?.nextDate || 0).getTime();
+      return pmSortDirection === 'asc' ? aDate - bDate : bDate - aDate;
+    });
+    if (!query) return sorted;
+    return sorted.filter((schedule) => {
+      const haystack = [
+        schedule?.name,
+        schedule?.title,
+        schedule?.description,
+        schedule?.category,
+        schedule?.priority,
+        schedule?.status,
+        schedule?.assetName,
+        schedule?.asset?.name,
+        schedule?.location,
+        schedule?.assetsRows?.[0]?.asset,
+        schedule?.assetsRows?.[0]?.location,
+      ].join(' ').toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [pmSearchQuery, pmSortDirection, techSchedules]);
+
+  const filteredSchedulerSchedules = useMemo(() => {
+    const query = String(schedulerSearchQuery || '').trim().toLowerCase();
+    if (!query) return Array.isArray(techSchedules) ? techSchedules : [];
+    return (Array.isArray(techSchedules) ? techSchedules : []).filter((schedule) => {
+      const haystack = [
+        schedule?.name,
+        schedule?.title,
+        schedule?.category,
+        schedule?.status,
+        schedule?.assetName,
+        schedule?.asset?.name,
+        schedule?.location,
+        schedule?.assetsRows?.[0]?.asset,
+        schedule?.assetsRows?.[0]?.location,
+      ].join(' ').toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [schedulerSearchQuery, techSchedules]);
+
   const messageContacts = useMemo(() => {
     const byId = new Map();
     jobs.forEach((job) => {
@@ -1400,6 +1741,8 @@ const TechnicianDashboard = () => {
   const technicianNavItems = [
     { key: 'overview', label: 'Overview', description: 'Summary and activity' },
     { key: 'workOrders', label: 'Work Orders', description: 'Assigned and active work' },
+    { key: 'pm', label: 'Preventive Maintenance', description: 'My assigned PM records' },
+    { key: 'scheduler', label: 'Schedule', description: 'Upcoming PM schedule times' },
     { key: 'tasks', label: 'Tasks', description: 'Checklists and notes' },
     { key: 'messages', label: 'Messages', description: 'Private messages and mentions' },
     { key: 'materials', label: 'Materials', description: 'Requests and inventory needs' },
@@ -1550,6 +1893,16 @@ const TechnicianDashboard = () => {
               <span>New Material Request</span>
             </button>
             <button
+              onClick={() => {
+                setActiveSection('pm');
+                setShowPmForm(true);
+              }}
+              className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white/85 px-5 py-2.5 text-sm font-bold text-emerald-700 shadow-[0_10px_30px_rgba(16,185,129,0.14)] transition hover:-translate-y-0.5 hover:bg-emerald-50"
+            >
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-600 text-base leading-none text-white">+</span>
+              <span>Create PM</span>
+            </button>
+            <button
               onClick={handleLogout}
               className="px-5 py-2 glass-ghost text-slate-700 rounded-full font-semibold hover:bg-white/80 transition"
             >
@@ -1648,6 +2001,247 @@ const TechnicianDashboard = () => {
               </form>
             </div>
           </div>
+      )}
+
+      {showPmForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-md">
+          <div className="w-full max-w-5xl rounded-3xl border border-gray-200 bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">Create Preventive Maintenance</h2>
+                <p className="text-sm text-gray-500">Use the same PM-first structure as the client dashboard. This PM will be assigned to you automatically.</p>
+              </div>
+              <button
+                onClick={() => setShowPmForm(false)}
+                className="rounded-full p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+              >
+                ×
+              </button>
+            </div>
+            <form onSubmit={handleCreatePm} className="px-6 py-6">
+              <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
+                <section>
+                  <h3 className="text-lg font-bold text-gray-900">Work Order details</h3>
+                  <p className="mb-4 text-sm text-gray-600">Set the PM title and the work order information for this preventive maintenance item.</p>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="mb-1 block text-sm font-semibold text-gray-700">PM Title *</label>
+                      <input name="name" value={pmFormData.name} onChange={handlePmFieldChange} className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-blue-500" required />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-semibold text-gray-700">Description</label>
+                      <textarea name="description" value={pmFormData.description} onChange={handlePmFieldChange} rows="4" className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-blue-500" />
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div>
+                        <label className="mb-1 block text-sm font-semibold text-gray-700">Category</label>
+                        <input name="category" value={pmFormData.category} onChange={handlePmFieldChange} className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-blue-500" />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-sm font-semibold text-gray-700">Priority</label>
+                        <select name="priority" value={pmFormData.priority} onChange={handlePmFieldChange} className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-blue-500">
+                          <option value="LOW">Low</option>
+                          <option value="MEDIUM">Medium</option>
+                          <option value="HIGH">High</option>
+                          <option value="URGENT">Urgent</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-semibold text-gray-700">Duration (hours)</label>
+                      <input name="durationHours" value={pmFormData.durationHours} onChange={handlePmFieldChange} className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-blue-500" placeholder="1" />
+                    </div>
+                  </div>
+                </section>
+                <section>
+                  <h3 className="text-lg font-bold text-gray-900">Schedule</h3>
+                  <p className="mb-4 text-sm text-gray-600">Define when the PM is due and which asset/location it belongs to.</p>
+                  <div className="space-y-4">
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div>
+                        <label className="mb-1 block text-sm font-semibold text-gray-700">Date *</label>
+                        <input type="date" name="date" value={pmFormData.date} onChange={handlePmFieldChange} className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-blue-500" required />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-sm font-semibold text-gray-700">Time *</label>
+                        <input type="time" name="time" value={pmFormData.time} onChange={handlePmFieldChange} className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-blue-500" required />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-semibold text-gray-700">Location</label>
+                      <select name="location" value={pmFormData.location} onChange={handlePmFieldChange} className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-blue-500">
+                        <option value="">Select company location</option>
+                        {companyLocationOptions.map((location) => (
+                          <option key={location.id || location.name} value={location.name}>
+                            {location.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-semibold text-gray-700">Asset</label>
+                      <select name="assetId" value={pmFormData.assetId} onChange={handlePmFieldChange} className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-blue-500">
+                        <option value="">Select company asset</option>
+                        {companyAssetOptions.map((asset) => (
+                          <option key={asset.id || asset.name} value={asset.id}>
+                            {asset.name}{asset.location ? ` - ${asset.location}` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-4 text-sm text-blue-800">
+                      This PM will show in both the Preventive Maintenance and Schedule sections using the same PM record.
+                    </div>
+                  </div>
+                </section>
+              </div>
+              <div className="mt-8 flex gap-3">
+                <button type="submit" disabled={creatingPm} className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 disabled:opacity-60">
+                  {creatingPm ? 'Creating...' : 'Create PM'}
+                </button>
+                <button type="button" onClick={() => setShowPmForm(false)} className="rounded-xl border border-gray-200 px-5 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+                  {t("common.cancel")}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {selectedPmSchedule && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4 py-10">
+          <div className="w-full max-w-5xl rounded-3xl border border-gray-200 bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">{selectedPmSchedule.name || selectedPmSchedule.title || 'Preventive Maintenance'}</h2>
+                <p className="text-sm text-gray-500">{selectedPmSchedule.category || 'Preventive'} • {String(selectedPmSchedule.status || 'Pending').replace(/_/g, ' ')}</p>
+              </div>
+              <button type="button" onClick={() => setSelectedPmSchedule(null)} className="rounded-full p-2 text-gray-500 hover:bg-gray-100">x</button>
+            </div>
+            <div className="border-b border-gray-100 px-6 py-5">
+              <div className="grid gap-4 md:grid-cols-4">
+                <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-gray-500">Assigned To</p>
+                  <p className="mt-3 text-sm font-semibold text-gray-900">{getPmAssignedLabel(selectedPmSchedule)}</p>
+                </div>
+                <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-gray-500">Next Date</p>
+                  <p className="mt-3 text-sm font-semibold text-gray-900">{formatPmDateTime(selectedPmSchedule.nextDate || selectedPmSchedule.date)}</p>
+                </div>
+                <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-gray-500">Status</p>
+                  <div className="mt-3">
+                    <span className={`inline-flex rounded-lg px-3 py-1 text-sm font-semibold ${getPmStatusClass(selectedPmSchedule.status)}`}>
+                      {String(selectedPmSchedule.status || 'Pending').replace(/_/g, ' ')}
+                    </span>
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-gray-500">Checklist Items</p>
+                  <p className="mt-3 text-sm font-semibold text-gray-900">{Array.isArray(selectedPmSchedule.checklist) ? selectedPmSchedule.checklist.length : 0}</p>
+                </div>
+              </div>
+            </div>
+            <div className="grid gap-8 px-6 py-6 lg:grid-cols-[1.2fr_0.8fr]">
+              <div className="space-y-6">
+                <section className="rounded-2xl border border-gray-200 p-5">
+                  <h3 className="text-lg font-bold text-gray-900">Work Order details</h3>
+                  <div className="mt-4 grid gap-4 md:grid-cols-2">
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-[0.18em] text-gray-500">Work Order Title</p>
+                      <p className="mt-2 text-sm font-semibold text-gray-900">{selectedPmSchedule.workOrderTitle || selectedPmSchedule.name || 'Not set'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-[0.18em] text-gray-500">Priority</p>
+                      <p className="mt-2 text-sm font-semibold text-gray-900">{selectedPmSchedule.priority || 'Medium'}</p>
+                    </div>
+                    <div className="md:col-span-2">
+                      <p className="text-xs font-bold uppercase tracking-[0.18em] text-gray-500">Description</p>
+                      <p className="mt-2 text-sm text-gray-700">{selectedPmSchedule.workOrderDescription || selectedPmSchedule.description || 'No description provided.'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-[0.18em] text-gray-500">Duration</p>
+                      <p className="mt-2 text-sm font-semibold text-gray-900">{selectedPmSchedule.durationHours ? `${selectedPmSchedule.durationHours} hour(s)` : 'Not set'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-[0.18em] text-gray-500">Created</p>
+                      <p className="mt-2 text-sm font-semibold text-gray-900">{formatPmDateTime(selectedPmSchedule.createdAt)}</p>
+                    </div>
+                  </div>
+                </section>
+                <section className="rounded-2xl border border-gray-200 p-5">
+                  <h3 className="text-lg font-bold text-gray-900">Assets & Location</h3>
+                  <div className="mt-4 grid gap-4 md:grid-cols-2">
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-[0.18em] text-gray-500">Asset</p>
+                      <p className="mt-2 text-sm font-semibold text-gray-900">{getPmPrimaryAssetLabel(selectedPmSchedule)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-[0.18em] text-gray-500">Location</p>
+                      <p className="mt-2 text-sm font-semibold text-gray-900">{getPmPrimaryLocationLabel(selectedPmSchedule)}</p>
+                    </div>
+                  </div>
+                  {Array.isArray(selectedPmSchedule.assetsRows) && selectedPmSchedule.assetsRows.length > 0 ? (
+                    <div className="mt-4 overflow-hidden rounded-2xl border border-gray-200">
+                      <table className="w-full text-sm">
+                        <thead className="bg-gray-50 text-gray-600">
+                          <tr>
+                            <th className="px-4 py-3 text-left font-semibold">Asset</th>
+                            <th className="px-4 py-3 text-left font-semibold">Location</th>
+                            <th className="px-4 py-3 text-left font-semibold">Assigned</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {selectedPmSchedule.assetsRows.slice(0, 4).map((row, index) => (
+                            <tr key={row?.id || index}>
+                              <td className="px-4 py-3 text-gray-800">{row?.asset || row?.assetName || row?.assetId || 'Not set'}</td>
+                              <td className="px-4 py-3 text-gray-700">{row?.location || row?.locationName || row?.locationId || 'Not set'}</td>
+                              <td className="px-4 py-3 text-gray-700">{row?.assigneeName || row?.assignedToName || getPmAssignedLabel(selectedPmSchedule)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : null}
+                </section>
+              </div>
+              <div className="space-y-6">
+                <section className="rounded-2xl border border-gray-200 p-5">
+                  <h3 className="text-lg font-bold text-gray-900">Schedule</h3>
+                  <div className="mt-4 space-y-4">
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-[0.18em] text-gray-500">Next Date</p>
+                      <p className="mt-2 text-sm font-semibold text-gray-900">{formatPmDateTime(selectedPmSchedule.nextDate || selectedPmSchedule.date)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-[0.18em] text-gray-500">Created</p>
+                      <p className="mt-2 text-sm font-semibold text-gray-900">{formatPmDateTime(selectedPmSchedule.createdAt)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-[0.18em] text-gray-500">Checklist Items</p>
+                      <p className="mt-2 text-sm font-semibold text-gray-900">{Array.isArray(selectedPmSchedule.checklist) ? selectedPmSchedule.checklist.length : 0}</p>
+                    </div>
+                  </div>
+                </section>
+                <section className="rounded-2xl border border-gray-200 p-5">
+                  <h3 className="text-lg font-bold text-gray-900">Checklist Preview</h3>
+                  {Array.isArray(selectedPmSchedule.checklist) && selectedPmSchedule.checklist.length > 0 ? (
+                    <div className="mt-4 space-y-3">
+                      {selectedPmSchedule.checklist.slice(0, 5).map((item, index) => (
+                        <div key={item?.id || index} className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+                          <p className="text-sm font-semibold text-gray-900">{item?.text || item?.title || `Checklist item ${index + 1}`}</p>
+                          <p className="mt-1 text-xs text-gray-500">{item?.type || 'Status'}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="mt-4 text-sm text-gray-500">No checklist items attached to this PM.</p>
+                  )}
+                </section>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       <div className="mx-auto mt-6 grid max-w-[1600px] grid-cols-1 gap-6 xl:grid-cols-[300px_minmax(0,1fr)]">
@@ -2176,6 +2770,307 @@ const TechnicianDashboard = () => {
         </div>
       </div>
 
+      <div className={`${activeSection === 'pm' ? 'block' : 'hidden'} overflow-visible rounded-[24px] border border-gray-200 bg-white shadow-sm`}>
+        <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+          <h2 className="text-2xl font-bold text-gray-900">Preventive Maintenance</h2>
+          <div className="flex items-center gap-3">
+            <button className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700" onClick={() => setShowPmForm(true)}>Create PM</button>
+            <button type="button" className="rounded-lg p-2 text-gray-500 hover:bg-gray-100">
+              <MoreHorizontal className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between border-b border-gray-200 px-6 py-3">
+          <div className="text-sm font-semibold text-gray-900">{filteredPmSchedules.length} Results Returned</div>
+          <div className="flex items-center gap-4">
+            <button type="button" onClick={() => setPmSortDirection((prev) => (prev === 'desc' ? 'asc' : 'desc'))} className="flex items-center gap-2 text-sm font-medium text-gray-700">
+              <ArrowUpDown className="h-4 w-4" />
+              Sort: Date Created {pmSortDirection === 'desc' ? '(Newest)' : '(Oldest)'}
+            </button>
+            <button type="button" className="flex items-center gap-2 text-sm font-medium text-gray-700">
+              <LayoutDashboard className="h-4 w-4" />
+              Columns
+            </button>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <input
+                value={pmSearchQuery}
+                onChange={(e) => setPmSearchQuery(e.target.value)}
+                placeholder="Search"
+                className="h-10 w-72 rounded-lg border border-gray-200 bg-gray-50 pl-10 pr-4 text-sm text-gray-700 outline-none transition focus:border-blue-500"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="relative z-20 flex flex-wrap items-center gap-3 overflow-visible px-6 py-4">
+          <button type="button" className="inline-flex h-11 items-center gap-2 rounded-2xl border border-gray-300 bg-white px-4 text-[15px] font-medium text-gray-700 shadow-sm hover:bg-gray-50">
+            <SlidersHorizontal className="h-4 w-4" />
+            Filters
+          </button>
+          <button type="button" className="inline-flex h-11 items-center gap-2 rounded-2xl border border-gray-300 bg-white px-4 text-[15px] font-medium text-gray-700 shadow-sm hover:bg-gray-50">
+            <MapPin className="h-4 w-4" />
+            Location
+            <ChevronDown className="h-4 w-4" />
+          </button>
+          <button type="button" className="inline-flex h-11 items-center gap-2 rounded-2xl border border-gray-300 bg-white px-4 text-[15px] font-medium text-gray-700 shadow-sm hover:bg-gray-50">
+            <Flag className="h-4 w-4" />
+            Priority
+            <ChevronDown className="h-4 w-4" />
+          </button>
+          <button type="button" className="text-[15px] font-medium text-blue-600 hover:text-blue-700" onClick={() => setPmSearchQuery('')}>Reset Filters</button>
+          <button type="button" className="ml-auto text-[15px] font-medium text-gray-700 hover:text-gray-900">Save View</button>
+        </div>
+
+        {filteredPmSchedules.length === 0 ? (
+          <div className="glass-surface rounded-xl p-12 text-center">
+            <div className="text-xl font-bold text-gray-900 mb-2">No Preventive Maintenance</div>
+            <p className="text-gray-600">No preventive maintenance items match the current filters.</p>
+          </div>
+        ) : (
+          <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden mx-6 mb-6">
+            <div className="overflow-x-auto">
+              <table className="min-w-[1280px] w-full text-sm">
+                <thead className="bg-gray-50 border-b border-gray-200 text-gray-700">
+                  <tr>
+                    <th className="px-4 py-4 text-left w-10">
+                      <input type="checkbox" className="rounded border-gray-300" disabled />
+                    </th>
+                    <th className="px-4 py-4 text-left font-bold">Name</th>
+                    <th className="px-4 py-4 text-left font-bold">Image</th>
+                    <th className="px-4 py-4 text-left font-bold">Assets & Locations</th>
+                    <th className="px-4 py-4 text-left font-bold">Assigned To</th>
+                    <th className="px-4 py-4 text-left font-bold">Category</th>
+                    <th className="px-4 py-4 text-left font-bold">Priority</th>
+                    <th className="px-4 py-4 text-left font-bold">Status</th>
+                    <th className="px-4 py-4 text-left font-bold">Next Date</th>
+                    <th className="px-4 py-4 text-left font-bold">Paused</th>
+                    <th className="px-4 py-4 text-left font-bold">Checklist</th>
+                    <th className="px-4 py-4 text-left font-bold">Checklist ID</th>
+                    <th className="px-4 py-4 text-left font-bold">Action</th>
+                    <th className="px-4 py-4 text-left font-bold">Date Created</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {filteredPmSchedules.map((schedule) => {
+                    const priority = String(schedule.priority || 'MEDIUM').toUpperCase();
+                    const priorityClass = priority === 'HIGH'
+                      ? 'bg-rose-50 text-rose-700'
+                      : priority === 'MEDIUM'
+                        ? 'bg-amber-50 text-amber-700'
+                        : priority === 'LOW'
+                          ? 'bg-emerald-50 text-emerald-700'
+                          : 'bg-gray-100 text-gray-600';
+                    const imagePath =
+                      schedule.photo ||
+                      schedule.image ||
+                      (Array.isArray(schedule.attachments?.photos) ? schedule.attachments.photos[0]?.url : '');
+                    const imageUrl = imagePath ? getImageUrl(imagePath) : '';
+                    const createdAt = schedule.createdAt ? new Date(schedule.createdAt) : null;
+                    const locationLabel = getPmPrimaryLocationLabel(schedule);
+                    const assetsLabel = getPmPrimaryAssetLabel(schedule);
+                    const statusLabel = String(schedule.status || 'Scheduled');
+                    const assignedLabel = getPmAssignedLabel(schedule);
+                    const pausedLabel = schedule.paused ? 'Yes' : 'No';
+                    const checklistLabel = schedule.checklistName || schedule.checklist?.name || '-';
+                    const checklistId = schedule.checklistId || schedule.checklist?.id || schedule.checklist?.checklistId || '-';
+                    return (
+                      <tr key={schedule._id || schedule.id} className="hover:bg-gray-50/70">
+                        <td className="px-4 py-3">
+                          <input type="checkbox" className="rounded border-gray-300" disabled />
+                        </td>
+                        <td className="px-4 py-3 text-gray-900 font-medium">{schedule.name || schedule.title || 'Preventive Item'}</td>
+                        <td className="px-4 py-3">
+                          {imageUrl ? (
+                            <img src={imageUrl} alt={schedule.name || schedule.title || 'PM'} className="w-14 h-12 rounded object-cover border border-gray-200" />
+                          ) : (
+                            <div className="w-14 h-12 border border-gray-200 rounded bg-gray-50 flex items-center justify-center text-gray-300">
+                              <ImageIcon className="w-6 h-6" />
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-gray-700">
+                          <div className="flex items-center justify-between gap-3">
+                            <span>{assetsLabel}</span>
+                            <ChevronDown className="w-5 h-5 text-gray-700" />
+                          </div>
+                          <div className="text-xs text-gray-400">{locationLabel}</div>
+                        </td>
+                        <td className="px-4 py-3 text-gray-700">{assignedLabel}</td>
+                        <td className="px-4 py-3 text-gray-700">{schedule.category || schedule.type || 'Preventive'}</td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex rounded-lg px-3 py-1 text-sm font-medium ${priorityClass}`}>
+                            {priority.charAt(0)}{priority.slice(1).toLowerCase()}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-gray-700">
+                          <span className={`inline-flex w-fit rounded-lg px-3 py-1 text-sm font-medium ${getPmStatusClass(statusLabel)}`}>
+                            {statusLabel.replace(/_/g, ' ')}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-gray-700">{formatPmDateTime(schedule.nextDate || schedule.date)}</td>
+                        <td className="px-4 py-3 text-gray-700">{pausedLabel}</td>
+                        <td className="px-4 py-3 text-blue-600">{checklistLabel}</td>
+                        <td className="px-4 py-3 text-gray-700">{checklistId}</td>
+                        <td className="px-4 py-3 text-gray-700">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedPmSchedule(schedule)}
+                            className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-[11px] font-semibold text-blue-700 hover:bg-blue-100"
+                          >
+                            Open PM
+                          </button>
+                        </td>
+                        <td className="px-4 py-3 text-gray-700">
+                          {createdAt && !Number.isNaN(createdAt.getTime())
+                            ? `${createdAt.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' })} - ${createdAt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`
+                            : '-'}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className={`${activeSection === 'scheduler' ? 'block' : 'hidden'} overflow-visible rounded-[24px] border border-gray-200 bg-white shadow-sm`}>
+        <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+          <h2 className="text-2xl font-bold text-gray-900">Schedule</h2>
+          <div className="rounded-full border border-blue-100 bg-blue-50 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-blue-700">
+            PM Schedule View
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between border-b border-gray-200 px-6 py-3">
+          <div className="text-sm font-semibold text-gray-900">{filteredSchedulerSchedules.length} Results Returned</div>
+          <div className="flex items-center gap-4">
+            <button type="button" className="flex items-center gap-2 text-sm font-medium text-gray-700">
+              <ArrowUpDown className="h-4 w-4" />
+              Sort: Next Date
+            </button>
+            <button type="button" className="flex items-center gap-2 text-sm font-medium text-gray-700">
+              <LayoutDashboard className="h-4 w-4" />
+              Columns
+            </button>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <input
+                value={schedulerSearchQuery}
+                onChange={(e) => setSchedulerSearchQuery(e.target.value)}
+                placeholder="Search"
+                className="h-10 w-72 rounded-lg border border-gray-200 bg-gray-50 pl-10 pr-4 text-sm text-gray-700 outline-none transition focus:border-blue-500"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="relative z-20 flex flex-wrap items-center gap-3 overflow-visible px-6 py-4">
+          <button type="button" className="inline-flex h-11 items-center gap-2 rounded-2xl border border-gray-300 bg-white px-4 text-[15px] font-medium text-gray-700 shadow-sm hover:bg-gray-50">
+            <SlidersHorizontal className="h-4 w-4" />
+            Filters
+          </button>
+          <button type="button" className="inline-flex h-11 items-center gap-2 rounded-2xl border border-gray-300 bg-white px-4 text-[15px] font-medium text-gray-700 shadow-sm hover:bg-gray-50">
+            <MapPin className="h-4 w-4" />
+            Location
+            <ChevronDown className="h-4 w-4" />
+          </button>
+          <button type="button" className="text-[15px] font-medium text-blue-600 hover:text-blue-700" onClick={() => setSchedulerSearchQuery('')}>Reset Filters</button>
+          <button type="button" className="ml-auto text-[15px] font-medium text-gray-700 hover:text-gray-900">Save View</button>
+        </div>
+
+        {filteredSchedulerSchedules.length === 0 ? (
+          <div className="glass-surface rounded-xl p-12 text-center">
+            <div className="text-xl font-bold text-gray-900 mb-2">No PM schedules</div>
+            <p className="text-gray-600">Upcoming preventive maintenance dates will appear here.</p>
+          </div>
+        ) : (
+          <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden mx-6 mb-6">
+            <div className="overflow-x-auto">
+              <table className="min-w-[1280px] w-full text-sm">
+                <thead className="bg-gray-50 border-b border-gray-200 text-gray-700">
+                  <tr>
+                    <th className="px-4 py-4 text-left w-10">
+                      <input type="checkbox" className="rounded border-gray-300" disabled />
+                    </th>
+                    <th className="px-4 py-4 text-left font-bold">PM</th>
+                    <th className="px-4 py-4 text-left font-bold">Image</th>
+                    <th className="px-4 py-4 text-left font-bold">Assets & Locations</th>
+                    <th className="px-4 py-4 text-left font-bold">Assigned To</th>
+                    <th className="px-4 py-4 text-left font-bold">Next Date</th>
+                    <th className="px-4 py-4 text-left font-bold">Status</th>
+                    <th className="px-4 py-4 text-left font-bold">Created</th>
+                    <th className="px-4 py-4 text-left font-bold">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {filteredSchedulerSchedules.map((schedule) => {
+                    const imagePath =
+                      schedule.photo ||
+                      schedule.image ||
+                      (Array.isArray(schedule.attachments?.photos) ? schedule.attachments.photos[0]?.url : '');
+                    const imageUrl = imagePath ? getImageUrl(imagePath) : '';
+                    const locationLabel = getPmPrimaryLocationLabel(schedule);
+                    const assetsLabel = getPmPrimaryAssetLabel(schedule);
+                    const nextDate = schedule.nextDate ? new Date(schedule.nextDate) : null;
+                    const createdAt = schedule.createdAt ? new Date(schedule.createdAt) : null;
+                    const assignedLabel = getPmAssignedLabel(schedule);
+                    return (
+                      <tr key={`scheduler-${schedule._id || schedule.id}`} className="hover:bg-gray-50/70">
+                        <td className="px-4 py-3">
+                          <input type="checkbox" className="rounded border-gray-300" disabled />
+                        </td>
+                        <td className="px-4 py-3 text-gray-900 font-medium">{schedule.name || schedule.title || 'Maintenance schedule'}</td>
+                        <td className="px-4 py-3">
+                          {imageUrl ? (
+                            <img src={imageUrl} alt={schedule.name || schedule.title || 'PM'} className="w-14 h-12 rounded object-cover border border-gray-200" />
+                          ) : (
+                            <div className="w-14 h-12 border border-gray-200 rounded bg-gray-50 flex items-center justify-center text-gray-300">
+                              <ImageIcon className="w-6 h-6" />
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-gray-700">
+                          <div className="flex items-center justify-between gap-3">
+                            <span>{assetsLabel}</span>
+                            <ChevronDown className="w-5 h-5 text-gray-700" />
+                          </div>
+                          <div className="text-xs text-gray-400">{locationLabel}</div>
+                        </td>
+                        <td className="px-4 py-3 text-gray-700">{assignedLabel}</td>
+                        <td className="px-4 py-3 text-gray-700">
+                          {nextDate && !Number.isNaN(nextDate.getTime())
+                            ? `${nextDate.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' })} - ${nextDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`
+                            : 'Not set'}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-black uppercase ${getPmStatusClass(schedule.status)}`}>
+                            {String(schedule.status || 'Scheduled').replace(/_/g, ' ')}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-gray-700">{createdAt && !Number.isNaN(createdAt.getTime()) ? formatPmDateTime(createdAt) : '-'}</td>
+                        <td className="px-4 py-3 text-gray-700">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedPmSchedule(schedule)}
+                            className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100"
+                          >
+                            Open Details
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Main Content Grid */}
       <div className={`${['workOrders', 'materials', 'history'].includes(activeSection) ? 'grid' : 'hidden'} grid-cols-1 gap-8`}>
         {/* Left Side: Work Columns */}
@@ -2328,16 +3223,50 @@ const TechnicianDashboard = () => {
                               </span>
                             </td>
                             <td className="px-4 py-3 text-right">
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleViewJob(job);
-                                } }
-                                className="rounded-full border border-white/60 bg-white/80 px-3 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-white"
-                              >
-                                Open Details
-                              </button>
+                              <div className="flex justify-end gap-2">
+                                {canAssignIssueToSelf(job) && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleAssignIssueToSelf(job);
+                                    }}
+                                    className="rounded-full bg-blue-600 px-3 py-1.5 text-[11px] font-black uppercase tracking-wide text-white hover:bg-blue-700"
+                                  >
+                                    Assign to Me
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openMaterialRequestForJob(job);
+                                  }}
+                                  className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-[11px] font-semibold text-amber-700 hover:bg-amber-100"
+                                >
+                                  Request Part
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openPmForJob(job);
+                                  }}
+                                  className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100"
+                                >
+                                  Create PM
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleViewJob(job);
+                                  } }
+                                  className="rounded-full border border-white/60 bg-white/80 px-3 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-white"
+                                >
+                                  Open Details
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         ))}
@@ -2592,6 +3521,26 @@ const TechnicianDashboard = () => {
               </div>
 
               <div className="mb-5 flex flex-wrap gap-3 rounded-2xl border border-white/60 bg-white/55 p-4">
+                {canAssignIssueToSelf(selectedJob) && (
+                  <button
+                    onClick={() => handleAssignIssueToSelf(selectedJob)}
+                    className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-black uppercase tracking-wide text-white hover:bg-blue-700"
+                  >
+                    Assign to Me
+                  </button>
+                )}
+                <button
+                  onClick={() => openMaterialRequestForJob(selectedJob)}
+                  className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-black uppercase tracking-wide text-amber-700 hover:bg-amber-100"
+                >
+                  Request Part
+                </button>
+                <button
+                  onClick={() => openPmForJob(selectedJob)}
+                  className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-black uppercase tracking-wide text-emerald-700 hover:bg-emerald-100"
+                >
+                  Create PM
+                </button>
                 {canStartTimerForJob(selectedJob) && (
                   <button
                     onClick={() => handleStartTimer(selectedJob)}

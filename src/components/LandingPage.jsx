@@ -26,14 +26,6 @@ const products = [
     details: 'From smart scheduling to predictive recommendations, Intelligence helps you work faster and smarter without extra setup. Features AI-powered triage and automated incident root cause analysis.'
   },
   {
-    name: 'Studio',
-    label: 'Studio',
-    image: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&q=80',
-    icon: <Building2 className="w-5 h-5" />,
-    description: 'Custom app platform that lets anyone on your team build exactly the tools they need.',
-    details: 'Install from 30+ ready-made apps or build your own with no code. All running on your existing data, permissions, and security. No IT intervention required.'
-  },
-  {
     name: 'Safety',
     label: 'Safety',
     image: 'https://images.unsplash.com/photo-1504328345606-18bbc8c9d7d1?w=800&q=80',
@@ -48,14 +40,6 @@ const products = [
     icon: <Globe className="w-5 h-5" />,
     description: 'Vendor and contractor management integrated with your maintenance workflow.',
     details: 'Track contracts, performance, and communications all in one place. Streamline invoicing and external work order dispatching.'
-  },
-  {
-    name: 'Edge Sensors',
-    label: 'Edge Sensors',
-    image: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&q=80',
-    icon: <Zap className="w-5 h-5" />,
-    description: 'Wireless IoT sensors that monitor your assets 24/7 and automatically create work orders.',
-    details: 'Monitor temperature, vibration, and energy usage. Install in hours and start receiving predictive alerts before failures occur.'
   },
   {
     name: 'Lattice',
@@ -194,10 +178,8 @@ const LandingPage = () => {
   const productRoutes = {
     'CMMS': () => navigate('/product/cmms'),
     'FixNest Intelligence': () => navigate('/product/intelligence'),
-    'Studio': () => navigate('/product/studio'),
     'Safety': () => navigate('/product/safety'),
     'Providers': () => navigate('/product/providers'),
-    'Edge Sensors': () => navigate('/product/edge-sensors'),
     'Lattice': () => navigate('/product/lattice'),
     'Fleet': () => navigate('/product/fleet'),
     'Learn': () => navigate('/product/learn')
@@ -883,7 +865,6 @@ const LandingPage = () => {
           <div className="integration-visual">
             <div className="integration-node">CMMS</div>
             <div className="integration-node">Fleet</div>
-            <div className="integration-node">Edge Sensors</div>
             <div className="integration-node">Safety</div>
             <div className="integration-node">Learn</div>
             <div className="integration-node">Lattice</div>
