@@ -7,6 +7,7 @@ import { WorkOrderForm } from './WorkOrder';
 import SubscriptionPlan from './SubscriptionPlan';
 import SubscriptionManagement from './SubscriptionManagement';
 import CompanySubscriptionDashboard from './CompanySubscriptionDashboard';
+import TrialBanner from './TrialBanner';
 import { useCompanySubscription } from '../hooks/useCompanySubscription';
 import { useSubscription } from '../hooks/useSubscription';
 import { getImageUrl } from '../utils/imageUrl';
@@ -71,7 +72,12 @@ const DEFAULT_ASSET_SETTINGS = {
     { name: 'Notes', type: 'Multi-Line Text', source: 'Default', options: [] },
   ],
   operatingHours: [],
-  statuses: [],
+  statuses: [
+    { id: 'default-asset-active', name: 'Active', createdBy: '-', lastUpdated: null, isDefault: true },
+    { id: 'default-asset-inactive', name: 'Inactive', createdBy: '-', lastUpdated: null, isDefault: true },
+    { id: 'default-asset-maintenance', name: 'Under Maintenance', createdBy: '-', lastUpdated: null, isDefault: true },
+    { id: 'default-asset-retired', name: 'Retired', createdBy: '-', lastUpdated: null, isDefault: true },
+  ],
   checkInOut: {
     cascadingHierarchyEnabled: false,
   },
@@ -155,16 +161,33 @@ const DEFAULT_PURCHASE_ORDER_SETTINGS = {
     startCount: 1,
     prefix: '',
   },
-  categories: [],
+  categories: [
+    { id: 'default-po-supplies', name: 'Supplies', isDefault: true },
+    { id: 'default-po-equipment', name: 'Equipment', isDefault: true },
+    { id: 'default-po-services', name: 'Services', isDefault: true },
+    { id: 'default-po-maintenance', name: 'Maintenance', isDefault: true },
+    { id: 'default-po-emergency', name: 'Emergency', isDefault: true },
+  ],
   publicRequestPortal: {
     enabled: false,
   },
 };
 const DEFAULT_METER_SETTINGS = {
-  categories: [],
+  categories: [
+    { id: 'default-meter-electric', name: 'Electricity', isDefault: true },
+    { id: 'default-meter-water', name: 'Water', isDefault: true },
+    { id: 'default-meter-gas', name: 'Gas', isDefault: true },
+    { id: 'default-meter-fuel', name: 'Fuel', isDefault: true },
+    { id: 'default-meter-temperature', name: 'Temperature', isDefault: true },
+  ],
 };
 const DEFAULT_TAG_SETTINGS = {
-  items: [],
+  items: [
+    { id: 'default-tag-urgent', name: 'Urgent', model: 'Work Orders', isDefault: true },
+    { id: 'default-tag-blocked', name: 'Blocked', model: 'Work Orders', isDefault: true },
+    { id: 'default-tag-warranty', name: 'Warranty', model: 'Assets', isDefault: true },
+    { id: 'default-tag-critical', name: 'Critical', model: 'Assets', isDefault: true },
+  ],
 };
 const DEFAULT_API_SETTINGS = {
   version: '2022-09-14',
@@ -1172,6 +1195,27 @@ const BulkActionBar = ({ count, label, onDelete }) => {
 };
 
 const parseCsvText = (text) => {
+  if (!text) return [];
+  const lines = String(text).replace(/\r/g, '').split('\n');
+  return lines.filter(line => line.trim()).map(line => line.split(',').map(cell => cell.trim()));
+};
+
+const SAMPLE_WORK_ORDERS = [
+  { _id: 'sample-wo-1', title: 'Annual HVAC Maintenance', location: 'Building A - Roof', status: 'In Progress', priority: 'Medium', isSample: true },
+  { _id: 'sample-wo-2', title: 'Emergency Exit Light Inspection', location: 'All Floors', status: 'Open', priority: 'High', isSample: true },
+  { _id: 'sample-wo-3', title: 'Elevator Safety Check', location: 'Lobby', status: 'Complete', priority: 'Low', isSample: true },
+  { _id: 'sample-wo-4', title: 'Plumbing Leak Repair', location: 'Unit 402', status: 'Pending', priority: 'Medium', isSample: true },
+  { _id: 'sample-wo-5', title: 'Fire Extinguisher Recertification', location: 'Warehouse', status: 'Open', priority: 'High', isSample: true },
+];
+
+const SAMPLE_TASKS = [
+  { id: 'sample-task-1', title: 'Review quarterly budget', status: 'upcoming', color: '#3B82F6', sourceLabel: 'Management', isSample: true },
+  { id: 'sample-task-2', title: 'Prepare team weekly brief', status: 'in-progress', color: '#10B981', sourceLabel: 'Planning', isSample: true },
+  { id: 'sample-task-3', title: 'Safety meeting with vendors', status: 'upcoming', color: '#F59E0B', sourceLabel: 'Compliance', isSample: true },
+  { id: 'sample-task-4', title: 'Equipment audit overdue', status: 'overdue', color: '#EF4444', sourceLabel: 'Inventory', isSample: true },
+];
+
+const parseCSVText = (text) => {
   if (!text) return [];
   const lines = String(text).replace(/\r/g, '').split('\n').filter((line) => line.trim().length > 0);
   if (lines.length === 0) return [];
@@ -7498,6 +7542,10 @@ function ClientDashboard() {
   const [checklistLibraryIndustryFilter, setChecklistLibraryIndustryFilter] = useState('All');
   const [checklistLibraryUseCaseFilter, setChecklistLibraryUseCaseFilter] = useState('All');
   const [selectedChecklistLibraryTemplateId, setSelectedChecklistLibraryTemplateId] = useState('');
+  const [showCreateChecklistForm, setShowCreateChecklistForm] = useState(false);
+  const [creatingChecklistTemplate, setCreatingChecklistTemplate] = useState(null);
+  const [creatingChecklistForm, setCreatingChecklistForm] = useState({ name: '', description: '', tags: [], items: [] });
+  const [savingNewChecklistTemplate, setSavingNewChecklistTemplate] = useState(false);
   const [pmSchedule, setPmSchedule] = useState({
     scheduleType: null,
     calendarRule: null,
@@ -8211,6 +8259,53 @@ function ClientDashboard() {
       setSavingChecklistTemplate(false);
     }
   }, [checklistEditForm, editingChecklistTemplate, refreshChecklists]);
+
+  const openCreateChecklistForm = useCallback(() => {
+    setShowCreateChecklistForm(true);
+    setCreatingChecklistForm({
+      name: '',
+      description: '',
+      tags: [],
+      items: [{ id: `${Date.now()}-0`, text: '', type: 'Status', meter: '', required: false }],
+    });
+  }, []);
+
+  const saveNewChecklistTemplate = useCallback(async () => {
+    if (!String(creatingChecklistForm.name || '').trim()) {
+      alert('Checklist name is required');
+      return;
+    }
+    if (!Array.isArray(creatingChecklistForm.items) || creatingChecklistForm.items.filter((item) => String(item.text || '').trim()).length === 0) {
+      alert('Add at least one checklist item');
+      return;
+    }
+
+    setSavingNewChecklistTemplate(true);
+    try {
+      const response = await api.post('/api/checklists', {
+        name: creatingChecklistForm.name,
+        title: creatingChecklistForm.name,
+        description: creatingChecklistForm.description || '',
+        tags: Array.isArray(creatingChecklistForm.tags) ? creatingChecklistForm.tags : [],
+        items: creatingChecklistForm.items.map((item, index) => ({
+          id: item.id || `${Date.now()}-${index}`,
+          text: item.text || '',
+          type: item.type || 'Status',
+          meter: item.meter || '',
+          required: !!item.required,
+        })),
+      });
+      await refreshChecklists();
+      setShowCreateChecklistForm(false);
+      setCreatingChecklistForm({ name: '', description: '', tags: [], items: [] });
+      alert('Checklist created successfully!');
+    } catch (err) {
+      console.error('Failed to create checklist template', err);
+      alert(err?.response?.data?.error || err?.message || 'Failed to create checklist');
+    } finally {
+      setSavingNewChecklistTemplate(false);
+    }
+  }, [creatingChecklistForm, refreshChecklists]);
 
   const allWorkers = React.useMemo(() => {
     const onlyUsers = (people || []).filter(p => p.kind !== 'invite');
@@ -19598,6 +19693,7 @@ function ClientDashboard() {
           {/* â”€â”€ Dashboard â”€â”€ */}
           {activeTab === 'dashboard' && (
             <div>
+              <TrialBanner />
               {/* Welcome */}
               <div className="glass-surface responsive-card mb-6 text-gray-900 flex items-center justify-between overflow-hidden relative shadow-2xl border border-gray-200/70">
                 <div style={{ position: 'absolute', right: -30, top: -30, width: 180, height: 180, borderRadius: '50%', background: 'rgba(255,255,255,0.05)' }} />
@@ -19656,7 +19752,7 @@ function ClientDashboard() {
                     <Btn onClick={() => setActiveTab('workOrders')} variant="outline" className="!text-blue-700 !border-blue-200 !bg-white">Open List</Btn>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    {(combinedOverdue > 0 ? overdueOverviewItems : workOrders.slice(0, 5)).map((issue) => (
+                    {(combinedOverdue > 0 ? overdueOverviewItems : (workOrders.length > 0 ? workOrders.slice(0, 5) : SAMPLE_WORK_ORDERS.slice(0, 5))).map((issue) => (
                       <button
                         key={`dashboard-workorder-${issue._id || issue.id}`}
                         onClick={() => setModalData({ open: true, type: 'request', item: issue })}
@@ -19671,7 +19767,7 @@ function ClientDashboard() {
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
                           <div style={{ minWidth: 0 }}>
-                            <div style={{ fontSize: 14, fontWeight: 700, color: '#111827', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{issue.title || 'Untitled work order'}</div>
+                            <div style={{ fontSize: 14, fontWeight: 700, color: '#111827', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{issue.isSample && <span style={{fontSize: 10, background: '#E5E7EB', color: '#6B7280', padding: '2px 6px', borderRadius: 4, marginRight: 8}}>Sample</span>}{issue.title || 'Untitled work order'}</div>
                             <div style={{ fontSize: 12, color: '#6B7280', marginTop: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{issue.location || 'No location yet'}</div>
                           </div>
                           <span style={{
@@ -19784,9 +19880,9 @@ function ClientDashboard() {
                     <div style={{ textAlign: 'center', padding: '28px 16px', color: '#6B7280', fontSize: 14 }}>
                       Loading tasks...
                     </div>
-                  ) : taskCardItems.filter(task => task.status === activeTaskTab).length > 0 ? (
+                  ) : (taskCardItems.filter(task => task.status === activeTaskTab).length > 0 || (taskCardItems.length === 0 && SAMPLE_TASKS.some(t => t.status === activeTaskTab))) ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                      {taskCardItems.filter(task => task.status === activeTaskTab).map((task, index) => (
+                      {(taskCardItems.length > 0 ? taskCardItems : SAMPLE_TASKS).filter(task => task.status === activeTaskTab).map((task, index) => (
                         <div
                           key={task._id || task.id}
                           draggable={!task.linkedIssueId}
@@ -21712,10 +21808,7 @@ function ClientDashboard() {
                       </button>
                       <button
                         className="h-11 rounded-lg bg-blue-600 px-5 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700"
-                        onClick={() => {
-                          setLaunchChecklistBuilderFromMain(true);
-                          setShowWorkOrderDetails(true);
-                        }}
+                        onClick={openCreateChecklistForm}
                       >
                         Add Checklist
                       </button>
@@ -22003,6 +22096,133 @@ function ClientDashboard() {
                       <Btn variant="outline" onClick={() => setEditingChecklistTemplate(null)}>Cancel</Btn>
                       <Btn variant="primary" onClick={saveChecklistTemplateChanges} disabled={savingChecklistTemplate}>
                         {savingChecklistTemplate ? 'Saving...' : 'Save Changes'}
+                      </Btn>
+                    </div>
+                  </div>
+                  </div>
+                </div>
+              )}
+
+              {showCreateChecklistForm && (
+                <div className="fixed inset-0 z-[95] overflow-y-auto bg-black/60 backdrop-blur-sm p-4">
+                  <div className="flex min-h-full items-center justify-center">
+                  <div className="my-6 w-full max-w-4xl rounded-3xl border border-gray-200 bg-white shadow-2xl overflow-hidden">
+                    <div className="flex items-start justify-between border-b border-gray-100 px-6 py-5">
+                      <div>
+                        <h3 className="text-2xl font-bold text-gray-900">Create New Checklist</h3>
+                        <p className="mt-1 text-sm text-gray-500">Add checklist details and tasks.</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowCreateChecklistForm(false)}
+                        className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+
+                    <div className="max-h-[calc(100vh-220px)] overflow-y-auto px-6 py-6">
+                    <div className="space-y-5">
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div>
+                          <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-500">Checklist Name</label>
+                          <input
+                            className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none focus:border-blue-500"
+                            placeholder="Enter checklist name"
+                            value={creatingChecklistForm.name}
+                            onChange={(e) => setCreatingChecklistForm((prev) => ({ ...prev, name: e.target.value }))}
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-500">Tags</label>
+                          <input
+                            className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none focus:border-blue-500"
+                            value={(creatingChecklistForm.tags || []).join(', ')}
+                            onChange={(e) => setCreatingChecklistForm((prev) => ({ ...prev, tags: String(e.target.value || '').split(/[;,|]/).map((tag) => tag.trim()).filter(Boolean) }))}
+                            placeholder="Separate tags with commas"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-500">Description</label>
+                        <textarea
+                          className="min-h-[96px] w-full rounded-xl border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none focus:border-blue-500"
+                          placeholder="Enter checklist description"
+                          value={creatingChecklistForm.description}
+                          onChange={(e) => setCreatingChecklistForm((prev) => ({ ...prev, description: e.target.value }))}
+                        />
+                      </div>
+
+                      <div>
+                        <div className="mb-3 flex items-center justify-between">
+                          <label className="block text-xs font-bold uppercase tracking-wider text-gray-500">Checklist Items</label>
+                          <button
+                            type="button"
+                            className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-blue-600 hover:bg-blue-50"
+                            onClick={() => setCreatingChecklistForm((prev) => ({
+                              ...prev,
+                              items: [...(prev.items || []), { id: `${Date.now()}`, text: '', type: 'Status', meter: '', required: false }],
+                            }))}
+                          >
+                            Add Item
+                          </button>
+                        </div>
+
+                        <div className="space-y-3">
+                          {(creatingChecklistForm.items || []).map((item, index) => (
+                            <div key={item.id || index} className="grid gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-4 md:grid-cols-[1fr_180px_180px_auto]">
+                              <input
+                                className="rounded-xl border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none focus:border-blue-500"
+                                placeholder={`Item ${index + 1}`}
+                                value={item.text || ''}
+                                onChange={(e) => setCreatingChecklistForm((prev) => ({
+                                  ...prev,
+                                  items: prev.items.map((entry, itemIndex) => itemIndex === index ? { ...entry, text: e.target.value } : entry),
+                                }))}
+                              />
+                              <select
+                                className="rounded-xl border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none focus:border-blue-500"
+                                value={item.type || 'Status'}
+                                onChange={(e) => setCreatingChecklistForm((prev) => ({
+                                  ...prev,
+                                  items: prev.items.map((entry, itemIndex) => itemIndex === index ? { ...entry, type: e.target.value } : entry),
+                                }))}
+                              >
+                                {checklistTemplateTypeOptions.map((option) => (
+                                  <option key={option} value={option}>{option}</option>
+                                ))}
+                              </select>
+                              <input
+                                className="rounded-xl border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none focus:border-blue-500"
+                                placeholder="Meter name"
+                                value={item.meter || ''}
+                                onChange={(e) => setCreatingChecklistForm((prev) => ({
+                                  ...prev,
+                                  items: prev.items.map((entry, itemIndex) => itemIndex === index ? { ...entry, meter: e.target.value } : entry),
+                                }))}
+                              />
+                              <button
+                                type="button"
+                                className="rounded-xl border border-rose-200 px-4 py-3 text-sm font-semibold text-rose-600 hover:bg-rose-50"
+                                onClick={() => setCreatingChecklistForm((prev) => ({
+                                  ...prev,
+                                  items: prev.items.filter((_, itemIndex) => itemIndex !== index),
+                                }))}
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-3 border-t border-gray-100 bg-gray-50 px-6 py-4">
+                      <Btn variant="outline" onClick={() => setShowCreateChecklistForm(false)}>Cancel</Btn>
+                      <Btn variant="primary" onClick={saveNewChecklistTemplate} disabled={savingNewChecklistTemplate}>
+                        {savingNewChecklistTemplate ? 'Creating...' : 'Create Checklist'}
                       </Btn>
                     </div>
                   </div>

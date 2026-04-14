@@ -103,6 +103,10 @@ import RestaurantsSolution from './components/solutions/industries/RestaurantsSo
 import GymFitnessSolution from './components/solutions/industries/GymFitnessSolution';
 import HospitalitySolution from './components/solutions/industries/HospitalitySolution';
 
+// Trial Components
+import TrialCountdown from './components/TrialCountdown';
+import TrialExpiredModal from './components/TrialExpiredModal';
+
 const getHomeRouteForRole = (role) => {
   const normalizedRole = String(role || '').trim().toLowerCase();
   if (normalizedRole === 'superadmin' || normalizedRole === 'super-admin') return '/manager-dashboard';
@@ -150,6 +154,12 @@ function App() {
 
   return (
     <LanguageProvider>
+      {/* Trial Countdown - Shows for authenticated users in trial period */}
+      {auth && <TrialCountdown />}
+      
+      {/* Trial Expired Modal - Blocks access when trial ends */}
+      {auth && <TrialExpiredModal />}
+      
       <div className="glass-app glass-theme-blue">
         <Routes>
           <Route path="/" element={<LandingPage />} />

@@ -365,6 +365,56 @@ const subscriptionAPI = {
       throw error.response?.data || error.message;
     }
   },
+
+  /**
+   * TRIAL-RELATED API METHODS
+   */
+
+  // Get trial status for user's company
+  getTrialStatus: async () => {
+    try {
+      const response = await api.get(`${BASE}/trial/status`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  // Initialize free trial for new company
+  initializeFreeTrial: async (companyId) => {
+    try {
+      const response = await api.post(`${BASE}/trial/initialize`, {
+        companyId,
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  // Upgrade from trial to paid subscription
+  upgradeToPaid: async (companyId, plan, billingCycle = 'monthly') => {
+    try {
+      const response = await api.post(`${BASE}/trial/upgrade-to-paid`, {
+        companyId,
+        plan,
+        billingCycle,
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  // Check if user can access features
+  canAccessFeatures: async () => {
+    try {
+      const response = await api.get(`${BASE}/trial/can-access`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
 };
 
 export default subscriptionAPI;
