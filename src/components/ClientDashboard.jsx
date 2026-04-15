@@ -14384,6 +14384,31 @@ function ClientDashboard() {
     });
   }, [closeDashboardConfirmDialog, openDashboardConfirmDialog, refreshTeams]);
 
+  const handleDeletePerson = useCallback(async (id) => {
+    if (!id) return;
+    openDashboardConfirmDialog({
+      title: 'Delete Person?',
+      message: 'Deleting this person removes them permanently. This action cannot be undone.',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      tone: 'danger',
+      onConfirm: async () => {
+        try {
+          // Try deleting as technician first, then as user if that fails
+          try {
+            await api.delete(`/api/technicians/${id}`);
+          } catch (err) {
+            await api.delete(`/api/users/${id}`);
+          }
+          await refreshPeople();
+          closeDashboardConfirmDialog();
+        } catch (err) {
+          alert('Delete failed: ' + (err?.response?.data?.error || err?.response?.data?.message || err.message));
+        }
+      },
+    });
+  }, [closeDashboardConfirmDialog, openDashboardConfirmDialog, refreshPeople]);
+
   const fetchMaterialRequests = useCallback(async () => {
     try {
       const [materialRes, poRes] = await Promise.all([
@@ -27548,6 +27573,7 @@ function ClientDashboard() {
                                 {visiblePeopleDirectoryColumns.lastLogin && <th className="px-6 py-4 font-bold">Last Login</th>}
                                 {visiblePeopleDirectoryColumns.dateCreated && <th className="px-6 py-4 font-bold">Date Created</th>}
                                 {visiblePeopleDirectoryColumns.categories && <th className="px-6 py-4 font-bold">Categories</th>}
+                                <th className="px-6 py-4 font-bold"></th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
@@ -27581,10 +27607,15 @@ function ClientDashboard() {
                                     {visiblePeopleDirectoryColumns.lastLogin && <td className="px-6 py-5 text-[1.05rem] text-gray-900">{person.lastLoginAt || person.lastLogin ? new Date(person.lastLoginAt || person.lastLogin).toLocaleDateString() : '—'}</td>}
                                     {visiblePeopleDirectoryColumns.dateCreated && <td className="px-6 py-5 text-[1.05rem] text-gray-900">{person.createdAt ? new Date(person.createdAt).toLocaleDateString() : '—'}</td>}
                                     {visiblePeopleDirectoryColumns.categories && <td className="px-6 py-5 text-[1.05rem] text-gray-900">{categories}</td>}
+                                    <td className="px-6 py-5 text-right">
+                                      <button type="button" onClick={(event) => { event.stopPropagation(); handleDeletePerson(person._id || person.id); }} className="rounded-xl border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50">
+                                        Delete
+                                      </button>
+                                    </td>
                                   </tr>
                                 );
                               }) : (
-                                <tr><td colSpan="12" className="px-6 py-16 text-center text-sm text-gray-500">No people found.</td></tr>
+                                <tr><td colSpan="13" className="px-6 py-16 text-center text-sm text-gray-500">No people found.</td></tr>
                               )}
                             </tbody>
                           </table>
