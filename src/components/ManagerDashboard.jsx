@@ -5488,6 +5488,8 @@ const PeopleTab = ({ technicians = [], allIssues = [], teams = [], onRefresh }) 
   const [loading, setLoading] = useState(false);
   const [showAddPerson, setShowAddPerson] = useState(false);
   const [showAddTeam, setShowAddTeam] = useState(false);
+  const [showEditTeam, setShowEditTeam] = useState(false);
+  const [editingTeam, setEditingTeam] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [newPerson, setNewPerson] = useState({ name: '', email: '', phone: '', role: 'Technician', password: '', specialization: '' });
   const [newTeam, setNewTeam] = useState({ name: '', members: [] });
@@ -5602,6 +5604,33 @@ const PeopleTab = ({ technicians = [], allIssues = [], teams = [], onRefresh }) 
     } catch (err) {
       console.error('Failed to create team', err);
       alert('Failed to create team: ' + (err.response?.data?.error || err.message));
+    }
+  };
+
+  const handleEditTeam = (team) => {
+    setEditingTeam({
+      id: team._id || team.id,
+      name: team.name,
+      members: Array.isArray(team.members) ? team.members.map(m => typeof m === 'object' ? m.id || m._id : m) : []
+    });
+    setShowEditTeam(true);
+  };
+
+  const handleUpdateTeam = async (e) => {
+    e.preventDefault();
+    if (!editingTeam.name.trim()) return alert('Please enter a team name');
+    try {
+      await api.put(`/api/teams/${editingTeam.id}`, {
+        name: editingTeam.name,
+        members: editingTeam.members
+      });
+      setShowEditTeam(false);
+      setEditingTeam(null);
+      if (onRefresh) onRefresh();
+      alert('Team updated successfully');
+    } catch (err) {
+      console.error('Failed to update team', err);
+      alert('Failed to update team: ' + (err.response?.data?.error || err.message));
     }
   };
 
@@ -5739,9 +5768,22 @@ const PeopleTab = ({ technicians = [], allIssues = [], teams = [], onRefresh }) 
                       </div>
                     </td>
                     <td className="py-4 px-4 text-right">
-                      <button onClick={() => handleDeleteTeam(team._id || team.id)} className="p-1.5 hover:bg-gray-100 rounded-lg text-red-600">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        <button 
+                          onClick={() => handleEditTeam(team)}
+                          className="p-1.5 hover:bg-gray-100 rounded-lg text-blue-600"
+                          title="Edit Team"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteTeam(team._id || team.id)} 
+                          className="p-1.5 hover:bg-gray-100 rounded-lg text-red-600"
+                          title="Delete Team"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -5793,6 +5835,63 @@ const PeopleTab = ({ technicians = [], allIssues = [], teams = [], onRefresh }) 
             <div className="flex items-center justify-end gap-2 mt-6">
               <button type="button" onClick={() => setShowAddTeam(false)} className="px-4 py-2 border rounded-lg text-sm">Cancel</button>
               <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold">Create Team</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {showEditTeam && editingTeam && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <form onSubmit={handleUpdateTeam} className="bg-white rounded-2xl w-full max-w-lg p-6 shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-900">Edit Team</h3>
+              <button type="button" onClick={() => setShowEditTeam(false)} className="p-2 hover:bg-gray-100 rounded-lg">
+                <X className="w-4 h-4 text-gray-400" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Team Name</label>
+                <input
+                  className="w-full border border-gray-200 rounded-lg p-2.5 text-sm"
+                  placeholder="e.g. Civil Engineers, Plumbing, Electricians"
+                  value={editingTeam.name}
+                  onChange={e => setEditingTeam({ ...editingTeam, name: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Select Members (Technicians)</label>
+                <p className="text-xs text-gray-500 mb-2">Check/uncheck to add or remove technicians</p>
+                <div className="max-h-40 overflow-y-auto border border-gray-100 rounded-lg p-2 space-y-1">
+                  {technicians.length === 0 ? (
+                    <p className="text-sm text-gray-500 p-2">No technicians available</p>
+                  ) : (
+                    technicians.map(t => {
+                      const techId = t._id || t.id;
+                      return (
+                        <label key={techId} className="flex items-center gap-2 p-1.5 hover:bg-gray-50 rounded cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={editingTeam.members.includes(techId)}
+                            onChange={e => {
+                              if (e.target.checked) {
+                                setEditingTeam({ ...editingTeam, members: [...editingTeam.members, techId] });
+                              } else {
+                                setEditingTeam({ ...editingTeam, members: editingTeam.members.filter(m => m !== techId) });
+                              }
+                            }}
+                          />
+                          <span className="text-sm font-medium">{t.name}</span>
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 mt-6">
+              <button type="button" onClick={() => setShowEditTeam(false)} className="px-4 py-2 border rounded-lg text-sm">Cancel</button>
+              <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold">Update Team</button>
             </div>
           </form>
         </div>
