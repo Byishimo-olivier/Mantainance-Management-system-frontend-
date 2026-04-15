@@ -14384,7 +14384,7 @@ function ClientDashboard() {
     });
   }, [closeDashboardConfirmDialog, openDashboardConfirmDialog, refreshTeams]);
 
-  const handleDeletePerson = useCallback(async (id) => {
+  const handleRemovePerson = useCallback(async (id) => {
     if (!id) return;
     openDashboardConfirmDialog({
       title: 'Delete Person?',
@@ -27608,7 +27608,7 @@ function ClientDashboard() {
                                     {visiblePeopleDirectoryColumns.dateCreated && <td className="px-6 py-5 text-[1.05rem] text-gray-900">{person.createdAt ? new Date(person.createdAt).toLocaleDateString() : '—'}</td>}
                                     {visiblePeopleDirectoryColumns.categories && <td className="px-6 py-5 text-[1.05rem] text-gray-900">{categories}</td>}
                                     <td className="px-6 py-5 text-right">
-                                      <button type="button" onClick={(event) => { event.stopPropagation(); handleDeletePerson(person._id || person.id); }} className="rounded-xl border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50">
+                                      <button type="button" onClick={(event) => { event.stopPropagation(); handleRemovePerson(person._id || person.id); }} className="rounded-xl border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50">
                                         Delete
                                       </button>
                                     </td>
