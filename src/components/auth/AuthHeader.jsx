@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import companyLogo from '../../assets/company logo.jpeg';
 
 export default function AuthHeader() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -121,7 +122,7 @@ export default function AuthHeader() {
     <header className="auth-site-header">
       <div className="auth-nav">
         <Link to="/" className="auth-logo">
-          Fixnest
+          <img src={companyLogo} alt="Company Logo" className="auth-logo-img" />
         </Link>
 
         <nav className={`auth-nav-links ${isMobileMenuOpen ? 'mobile-open' : ''}`} aria-label="Primary">
@@ -132,13 +133,11 @@ export default function AuthHeader() {
                 <div className="mega-title">Products</div>
                 <div className="mega-chip-grid">
                   <button type="button" className="mega-chip" onClick={() => productNavigation['CMMS']()}>CMMS</button>
-                  <button type="button" className="mega-chip" onClick={() => productNavigation['Over']()}>Over</button>
-                  <button type="button" className="mega-chip" onClick={() => productNavigation['Learn']()}>Learn</button>
+                  <button type="button" className="mega-chip" onClick={() => productNavigation['Intelligence']()}>Intelligence</button>
                   <button type="button" className="mega-chip" onClick={() => productNavigation['Safety']()}>Safety</button>
                   <button type="button" className="mega-chip" onClick={() => productNavigation['Providers']()}>Providers</button>
-                  <button type="button" className="mega-chip" onClick={() => productNavigation['Lattice']()}>Lattice</button>
+                  <button type="button" className="mega-chip" onClick={() => productNavigation['Learn']()}>Learn</button>
                   <button type="button" className="mega-chip" onClick={() => productNavigation['Fleet']()}>Fleet</button>
-                  <button type="button" className="mega-chip" onClick={() => productNavigation['Intelligence']()}>Intelligence</button>
                 </div>
               </div>
               <div className="mega-divider" />

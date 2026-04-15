@@ -297,16 +297,26 @@ const LandingPage = () => {
       </section>
 
       <section className="landing-logos">
-        <div className="landing-logos-title">TRUSTED BY 4,000+ BUSINESSES</div>
-        {/* <div className="landing-logos-row">
-          <div className="logo-pill">Unilever</div>
-          <div className="logo-pill">Pepsi</div>
-          <div className="logo-pill">Chevron</div>
-          <div className="logo-pill">Caterpillar</div>
-          <div className="logo-pill">Shell</div>
-          <div className="logo-pill">Yamaha</div>
-          <div className="logo-pill">Stratasys</div>
-        </div> */}
+        <div className="landing-logos-title">TRUSTED BY 40+ BUSINESSES</div>
+        <div className="logos-slider-wrapper">
+          <div className="logos-slider">
+            <div className="logo-pill">FOHBOH STUDIO</div>
+            <div className="logo-pill">OVRENTALS</div>
+            <div className="logo-pill">Chevron</div>
+            <div className="logo-pill">Caterpillar</div>
+            <div className="logo-pill">Shell</div>
+            <div className="logo-pill">Yamaha</div>
+            <div className="logo-pill">Stratasys</div>
+            {/* Duplicate for seamless loop */}
+            <div className="logo-pill">FOHBOH STUDIO</div>
+            <div className="logo-pill">OVRENTALS</div>
+            <div className="logo-pill">Chevron</div>
+            <div className="logo-pill">Caterpillar</div>
+            <div className="logo-pill">Shell</div>
+            <div className="logo-pill">Yamaha</div>
+            <div className="logo-pill">Stratasys</div>
+          </div>
+        </div>
       </section>
 
       {/* The Problem Section */}
