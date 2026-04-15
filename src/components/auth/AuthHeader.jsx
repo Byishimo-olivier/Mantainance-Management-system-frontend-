@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 
 export default function AuthHeader() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
@@ -96,6 +97,11 @@ export default function AuthHeader() {
     };
   }, [isSearchOpen]);
 
+  useEffect(() => {
+    // Close mobile menu when location changes
+    setIsMobileMenuOpen(false);
+  }, [location]);
+
   const handleTeamClick = () => {
     if (location.pathname === '/') {
       // Already on landing page, scroll to team section
@@ -118,7 +124,7 @@ export default function AuthHeader() {
           Fixnest
         </Link>
 
-        <nav className="auth-nav-links" aria-label="Primary">
+        <nav className={`auth-nav-links ${isMobileMenuOpen ? 'mobile-open' : ''}`} aria-label="Primary">
           <details className="nav-details">
             <summary className="nav-trigger">Product</summary>
             <div className="mega-menu mega-menu--product">
@@ -326,6 +332,16 @@ export default function AuthHeader() {
         </nav>
 
         <div className="auth-nav-actions">
+          <button
+            type="button"
+            className={`mobile-menu-toggle ${isMobileMenuOpen ? 'active' : ''}`}
+            aria-label="Toggle mobile menu"
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          >
+            <span></span>
+            <span></span>
+            <span></span>
+          </button>
           <button
             type="button"
             className="nav-icon-btn nav-icon-btn--search"
