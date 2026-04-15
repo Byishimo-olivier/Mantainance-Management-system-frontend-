@@ -27883,12 +27883,17 @@ function ClientDashboard() {
                                       tone: 'danger',
                                       onConfirm: async () => {
                                         try {
-                                          await api.delete(`/api/users/${personId}`);
+                                          // Try deleting as technician first, then as user if that fails
+                                          try {
+                                            await api.delete(`/api/technicians/${personId}`);
+                                          } catch (err) {
+                                            await api.delete(`/api/users/${personId}`);
+                                          }
                                           await refreshPeople();
                                           closeDirectoryPersonDetails();
                                           closeDashboardConfirmDialog();
-                                        } catch {
-                                          alert('Delete failed');
+                                        } catch (err) {
+                                          alert('Delete failed: ' + (err?.response?.data?.error || err?.response?.data?.message || err.message));
                                         }
                                       },
                                     });
