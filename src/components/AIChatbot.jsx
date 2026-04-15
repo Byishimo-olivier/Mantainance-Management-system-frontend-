@@ -5,6 +5,20 @@ import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 
 const ASSISTANT_ACTION_STORAGE_KEY = 'mms_assistant_action';
+const CHATBOT_QUICK_PROMPTS = [
+    'What should we fix first?',
+    'Which property has the most incidents?',
+    'Show open work orders this week',
+    'List unassigned requests',
+    'Which technician resolves issues fastest?',
+    'Where are we breaching SLA most often?'
+];
+const CHATBOT_QUICK_ACTIONS = [
+    { label: 'Create Request', type: 'openRequestForm' },
+    { label: 'Create Work Order', type: 'openWorkOrderDetailsForm' },
+    { label: 'Create Preventive', type: 'openCreatePm' },
+    { label: 'Open Meters', type: 'openMetersTab' },
+];
 
 const parseMarkdownTableMessage = (content) => {
     const text = String(content || '');
@@ -305,6 +319,14 @@ const AIChatbot = () => {
                                                     </div>
                                                 </div>
                                             </div>
+                                            {Array.isArray(summary.recommendations) && summary.recommendations.length > 0 && (
+                                                <div className="mt-3 rounded-xl bg-amber-50 px-3 py-3">
+                                                    <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-amber-700">Top Recommendation</div>
+                                                    <div className="mt-2 text-sm font-medium text-slate-800">
+                                                        {summary.recommendations[0]}
+                                                    </div>
+                                                </div>
+                                            )}
                                             {Array.isArray(summary.suggestedQuestions) && summary.suggestedQuestions.length > 0 && (
                                                 <div className="mt-3 flex flex-wrap gap-2">
                                                     {summary.suggestedQuestions.slice(0, 4).map((prompt) => (
@@ -319,8 +341,37 @@ const AIChatbot = () => {
                                                     ))}
                                                 </div>
                                             )}
+                                            <div className="mt-3 flex flex-wrap gap-2">
+                                                {CHATBOT_QUICK_ACTIONS.map((action) => (
+                                                    <button
+                                                        key={action.type}
+                                                        type="button"
+                                                        onClick={() => performAssistantAction(action.type)}
+                                                        className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition"
+                                                    >
+                                                        {action.label}
+                                                    </button>
+                                                ))}
+                                            </div>
                                         </>
                                     )}
+                                </div>
+                            )}
+                            {!loadingSummary && !summary && (
+                                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                                    <div className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Quick Start</div>
+                                    <div className="mt-3 flex flex-wrap gap-2">
+                                        {CHATBOT_QUICK_PROMPTS.slice(0, 4).map((prompt) => (
+                                            <button
+                                                key={prompt}
+                                                type="button"
+                                                onClick={() => applyPrompt(prompt)}
+                                                className="rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition"
+                                            >
+                                                {prompt}
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
                             )}
                             {messages.map((msg, i) => {
@@ -425,24 +476,38 @@ const AIChatbot = () => {
                         </div>
 
                         {/* Input Area */}
-                        <form onSubmit={handleSend} className="p-4 bg-white border-t border-gray-100 flex gap-2">
-                            <input
-                                type="text"
-                                value={input}
-                                onChange={(e) => setInput(e.target.value)}
-                                placeholder="Type your message..."
-                                className="flex-1 bg-gray-50 border border-gray-200 rounded-2xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
-                            />
-                            <motion.button
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                                type="submit"
-                                disabled={!input.trim() || isTyping}
-                                className="bg-indigo-600 text-white p-2 rounded-xl shadow-lg shadow-indigo-200 disabled:opacity-50 disabled:grayscale transition-all"
-                            >
-                                <Send className="w-5 h-5" />
-                            </motion.button>
-                        </form>
+                        <div className="border-t border-gray-100 bg-white p-4">
+                            <div className="mb-3 flex flex-wrap gap-2">
+                                {CHATBOT_QUICK_PROMPTS.map((prompt) => (
+                                    <button
+                                        key={prompt}
+                                        type="button"
+                                        onClick={() => applyPrompt(prompt)}
+                                        className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 text-[11px] font-semibold text-gray-700 hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 transition"
+                                    >
+                                        {prompt}
+                                    </button>
+                                ))}
+                            </div>
+                            <form onSubmit={handleSend} className="flex gap-2">
+                                <input
+                                    type="text"
+                                    value={input}
+                                    onChange={(e) => setInput(e.target.value)}
+                                    placeholder="Ask about trends, priorities, hotspots, or what to create next..."
+                                    className="flex-1 bg-gray-50 border border-gray-200 rounded-2xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                                />
+                                <motion.button
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
+                                    type="submit"
+                                    disabled={!input.trim() || isTyping}
+                                    className="bg-indigo-600 text-white p-2 rounded-xl shadow-lg shadow-indigo-200 disabled:opacity-50 disabled:grayscale transition-all"
+                                >
+                                    <Send className="w-5 h-5" />
+                                </motion.button>
+                            </form>
+                        </div>
                     </motion.div>
                 )}
             </AnimatePresence>

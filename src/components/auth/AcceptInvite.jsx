@@ -65,6 +65,8 @@ export default function AcceptInvite() {
     !form.password ||
     form.password !== form.confirmPassword;
 
+  const passwordMismatch = form.password && form.confirmPassword && form.password !== form.confirmPassword;
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (submitDisabled) return;
@@ -122,6 +124,9 @@ export default function AcceptInvite() {
             required
             className="auth-input"
           />
+          {form.name === '' && form.phone && (
+            <div className="text-red-500 text-sm mt-1">Name is required</div>
+          )}
         </div>
 
         <div className="auth-field">
@@ -134,6 +139,9 @@ export default function AcceptInvite() {
             required
             className="auth-input"
           />
+          {form.phone === '' && form.name && (
+            <div className="text-red-500 text-sm mt-1">Phone is required</div>
+          )}
         </div>
 
         <div className="auth-field">
@@ -162,6 +170,9 @@ export default function AcceptInvite() {
             required
             className="auth-input"
           />
+          {passwordMismatch && (
+            <div className="text-red-500 text-sm mt-1">Passwords do not match</div>
+          )}
         </div>
 
         <button type="submit" className="auth-primary-btn" disabled={submitDisabled}>

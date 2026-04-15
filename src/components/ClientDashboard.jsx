@@ -8351,6 +8351,7 @@ function ClientDashboard() {
     const [formData, setFormData] = useState({
       title: item?.title || item?.name || '',
       description: item?.description || '',
+      closeoutNotes: item?.closeoutNotes || item?.closeoutNote || item?.closeout || '',
       category: item?.category || '',
       priority: item?.priority || 'MEDIUM',
       status: item?.status || '',
@@ -8376,6 +8377,8 @@ function ClientDashboard() {
     const [newLink, setNewLink] = useState({ title: '', url: '' });
     const [startingWorkOrder, setStartingWorkOrder] = useState(false);
     const [savingAssignee, setSavingAssignee] = useState(false);
+    const [savingCloseout, setSavingCloseout] = useState(false);
+    const [savedCloseoutNotes, setSavedCloseoutNotes] = useState(item?.closeoutNotes || item?.closeoutNote || item?.closeout || '');
     const [timerStartedAt, setTimerStartedAt] = useState(item?.fixTime || item?.startedAt || null);
     const [timerNow, setTimerNow] = useState(Date.now());
     const [linkRelation, setLinkRelation] = useState('relates to');
@@ -8506,6 +8509,7 @@ function ClientDashboard() {
         setFormData({
           title: item.title || item.name || '',
           description: item.description || '',
+          closeoutNotes: item?.closeoutNotes || item?.closeoutNote || item?.closeout || '',
           category: item.category || '',
           priority: item.priority || 'MEDIUM',
           status: item.status || '',
@@ -8521,6 +8525,7 @@ function ClientDashboard() {
           checklist: normalizeTaskArray(item.checklist || item.tasks || item.taskList),
           chat: Array.isArray(item.chat) ? item.chat : []
         });
+        setSavedCloseoutNotes(item?.closeoutNotes || item?.closeoutNote || item?.closeout || '');
         setTimerStartedAt(item.fixTime || item.startedAt || null);
       }
     }, [item]);
@@ -9415,7 +9420,7 @@ function ClientDashboard() {
     const timeDisplay = formatTimer(Math.max(laborSeconds, activeTimerSeconds));
     const assetStatus = item?.assetStatus || item?.operationalStatus || 'Operational';
     const priorityValue = formData.priority || item?.priority || 'Medium';
-    const closeoutNotes = item?.closeoutNotes || item?.closeoutNote || item?.closeout || 'N/A';
+    const closeoutNotes = String(formData.closeoutNotes || item?.closeoutNotes || item?.closeoutNote || item?.closeout || '').trim() || 'N/A';
     const createdBy = item?.createdByName || item?.createdBy?.name || item?.requestorName || item?.requestedBy || item?.userName || item?.name || 'N/A';
     const updatedBy = item?.updatedByName || item?.updatedBy?.name || item?.lastUpdatedBy || createdBy || 'N/A';
     const pmTrigger = item?.pmTrigger || item?.preventiveMaintenanceName || item?.scheduleName || item?.pmName || 'N/A';
@@ -10640,9 +10645,12 @@ function ClientDashboard() {
       try {
         setStartingWorkOrder(true);
         const startedAt = new Date().toISOString();
+        // Get the estimated duration from the work order (in hours)
+        const estimatedHours = Number(formData.durationHours || formData.estimatedTime || item?.durationHours || item?.estimatedTime || 0);
         await api.put(`/api/issues/${itemId}`, {
           status: 'IN PROGRESS',
-          fixTime: startedAt
+          fixTime: startedAt,
+          durationHours: estimatedHours
         });
         setFormData((prev) => ({
           ...prev,
@@ -10680,6 +10688,29 @@ function ClientDashboard() {
         alert(err?.response?.data?.error || err?.message || 'Failed to save primary assignee.');
       } finally {
         setSavingAssignee(false);
+      }
+    };
+
+    const handleSaveCloseout = async () => {
+      if (!isIssue || !itemId) return;
+      try {
+        setSavingCloseout(true);
+        const payload = {
+          closeoutNotes: formData.closeoutNotes || '',
+          closeoutNote: formData.closeoutNotes || '',
+          closeout: formData.closeoutNotes || ''
+        };
+        await api.put(`/api/issues/${itemId}`, payload);
+        setSavedCloseoutNotes(formData.closeoutNotes || '');
+        if (typeof onRefresh === 'function') {
+          await onRefresh();
+        }
+        logActivity('Saved closeout notes', workOrderTitle);
+        alert('Closeout notes saved.');
+      } catch (err) {
+        alert(err?.response?.data?.error || err?.message || 'Failed to save closeout notes.');
+      } finally {
+        setSavingCloseout(false);
       }
     };
 
@@ -10723,7 +10754,23 @@ function ClientDashboard() {
                           <AlertCircle className="pointer-events-none absolute left-4 top-1/2 h-6 w-6 -translate-y-1/2 text-gray-500" strokeWidth={1.8} />
                           <select
                             value={formData.status || 'OPEN'}
-                            onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
+                            onChange={async (e) => {
+                              const newStatus = e.target.value;
+                              setFormData(prev => ({ ...prev, status: newStatus }));
+                              // Save status change to backend
+                              if (itemId) {
+                                try {
+                                  await api.put(`/api/issues/${itemId}`, { status: newStatus });
+                                  if (typeof onRefresh === 'function') {
+                                    await onRefresh();
+                                  }
+                                } catch (err) {
+                                  console.error('Failed to update status:', err);
+                                  alert('Failed to update status');
+                                  setFormData(prev => ({ ...prev, status: item?.status || 'OPEN' }));
+                                }
+                              }
+                            }}
                             className="min-w-[198px] appearance-none rounded-md border border-gray-300 bg-white py-3 pl-14 pr-12 text-[15px] font-medium text-gray-800 shadow-sm"
                           >
                             <option value="OPEN">Open</option>
@@ -10983,7 +11030,7 @@ function ClientDashboard() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                           <div>
                             <div className="text-xs text-gray-500 font-semibold uppercase tracking-wider">Closeout Notes</div>
-                            <div className="mt-1 text-gray-800">{closeoutNotes}</div>
+                            <div className="mt-1 whitespace-pre-wrap text-gray-800">{closeoutNotes}</div>
                           </div>
                           <div>
                             <div className="text-xs text-gray-500 font-semibold uppercase tracking-wider">Category</div>
@@ -11049,6 +11096,99 @@ function ClientDashboard() {
                             <div className="text-xs text-gray-500 font-semibold uppercase tracking-wider">PM Trigger</div>
                             <div className="mt-1 text-gray-800">{pmTrigger}</div>
                           </div>
+                        </div>
+                      </div>
+
+                      <div className="border border-gray-200 rounded-xl p-6 bg-white">
+                        <div className="flex flex-wrap items-start justify-between gap-4">
+                          <div>
+                            <h4 className="text-lg font-bold text-gray-900">Closeout</h4>
+                            <p className="mt-1 text-sm text-gray-500">Add completion notes and upload finished-work images for this work order.</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleSaveCloseout}
+                            disabled={savingCloseout}
+                            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {savingCloseout ? 'Saving...' : 'Save Closeout'}
+                          </button>
+                        </div>
+
+                        <div className="mt-5">
+                          <label className="mb-2 block text-sm font-medium text-gray-800">Closeout Notes</label>
+                          <textarea
+                            rows={5}
+                            value={formData.closeoutNotes || ''}
+                            onChange={(e) => setFormData((prev) => ({ ...prev, closeoutNotes: e.target.value }))}
+                            placeholder="Describe what was completed, what you found, parts replaced, follow-up needed, and any handoff notes."
+                            className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm text-gray-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                          />
+                        </div>
+
+                        <div className="mt-5">
+                          <label className="mb-2 block text-sm font-medium text-gray-800">Saved Closeout Notes</label>
+                          <div className="min-h-[120px] rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700">
+                            {String(savedCloseoutNotes || '').trim() ? (
+                              <div className="whitespace-pre-wrap">{savedCloseoutNotes}</div>
+                            ) : (
+                              <div className="text-gray-500">No saved closeout notes yet.</div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="mt-5">
+                          <label className="mb-2 block text-sm font-medium text-gray-800">Closeout Images</label>
+                          <div
+                            onDragOver={(e) => e.preventDefault()}
+                            onDrop={handleImageDrop}
+                            className="rounded-xl border border-dashed border-gray-300 px-5 py-6 text-center text-sm text-gray-500"
+                          >
+                            <button
+                              type="button"
+                              onClick={() => imageInputRef.current?.click()}
+                              className="rounded-lg border border-gray-300 bg-white px-6 py-2 font-medium text-gray-800"
+                            >
+                              Upload Images
+                            </button>
+                            <span className="ml-3">or Drop Images</span>
+                            <input
+                              ref={imageInputRef}
+                              type="file"
+                              multiple
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => handleFileImport(e.target.files, 'image')}
+                            />
+                          </div>
+                          <p className="mt-2 text-xs text-gray-500">Images are uploaded to this work order immediately and will appear here once attached.</p>
+
+                          {requestUploadedImages.length > 0 ? (
+                            <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+                              {requestUploadedImages.map((imageEntry, index) => (
+                                <a
+                                  key={imageEntry.id || `closeout-image-${index}`}
+                                  href={imageEntry.url || '#'}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="overflow-hidden rounded-xl border border-gray-200 bg-gray-50"
+                                >
+                                  <img
+                                    src={imageEntry.url || ''}
+                                    alt={imageEntry.name || `Closeout image ${index + 1}`}
+                                    className="h-28 w-full object-cover"
+                                  />
+                                  <div className="truncate border-t border-gray-200 px-3 py-2 text-xs font-medium text-gray-700">
+                                    {imageEntry.name || `Image ${index + 1}`}
+                                  </div>
+                                </a>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-500">
+                              No closeout images uploaded yet.
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -19303,7 +19443,6 @@ function ClientDashboard() {
   const navItems = [
     { key: 'dashboard', label: t("manager.sidebar.dashboard"), icon: <Icon.Dashboard /> },
     { key: 'intelligence', label: t("manager.sidebar.intelligence"), icon: <Icon.Analytics /> },
-    { key: 'subscription', label: 'Subscription Plans', icon: <ShoppingCart />, group: 'billing' },
 
     { key: 'workOrders', label: t("manager.sidebar.workOrders"), icon: <Icon.Requests />, group: 'core' },
     { key: 'preventiveMaintenance', label: t("manager.sidebar.preventiveMaintenance"), icon: <Icon.Templates />, group: 'core' },
@@ -19326,6 +19465,7 @@ function ClientDashboard() {
     { key: 'purchaseOrders', label: t("manager.sidebar.purchaseOrders"), icon: <Icon.ShoppingCart />, group: 'procurement' },
     { key: 'vendors', label: 'Vendors', icon: <Icon.Vendors />, group: 'procurement' },
     { key: 'customers', label: 'Customers', icon: <Icon.Staff />, group: 'procurement' },
+    { key: 'subscription', label: 'Subscription Plans', icon: <ShoppingCart />, group: 'billingLast' },
   ];
 
   const handleSidebarTabNavigation = useCallback((nextTab) => {
@@ -19384,11 +19524,11 @@ function ClientDashboard() {
   }, [activeTab, currentUser?.companyName, fetchBranches]);
 
   const navSections = [
-    { key: 'billing', label: 'Billing' },
     { key: 'core', label: t("manager.sidebar.core") },
     { key: 'data', label: t("manager.sidebar.dataAnalytics") },
     { key: 'resources', label: t("manager.sidebar.resources") },
     { key: 'procurement', label: t("manager.sidebar.procurement") },
+    { key: 'billingLast', label: 'Billing' },
   ];
 
   return (
@@ -22871,6 +23011,9 @@ function ClientDashboard() {
                                       : 'bg-white text-gray-700';
                                   const priorityLabel = String(issue.priority || 'Medium');
                                   const issueImage = getImageUrl(issue.photo || issue.image || issue.beforeImage || '');
+                                  const issueStatus = String(issue?.status || '').toUpperCase();
+                                  const isNotCompleted = !(issueStatus.includes('COMPLETE') || issueStatus === 'CLOSED' || issueStatus === 'DONE' || issueStatus === 'RESOLVED');
+                                  const isOverdueSchedule = dueDate && dueDate < new Date() && isNotCompleted;
                                   return (
                                     <tr
                                       key={issue._id || issue.id}
@@ -22888,8 +23031,18 @@ function ClientDashboard() {
                                           </div>
                                         )}
                                       </td>
-                                      <td className="px-6 py-4 text-[15px] text-gray-900">
-                                        {dueDate ? `${dueDate.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' })} - ${dueDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}` : '-'}
+                                      <td className={`px-6 py-4 text-[15px] ${isOverdueSchedule ? 'text-rose-600' : 'text-gray-900'}`}>
+                                        <div className="flex items-center gap-2">
+                                          <span>{dueDate ? `${dueDate.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' })} - ${dueDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}` : '-'}</span>
+                                          {isOverdueSchedule && (
+                                            <div className="flex items-center gap-1 bg-rose-50 rounded-md px-2 py-1 text-xs whitespace-nowrap">
+                                              <AlertCircle className="w-3.5 h-3.5 text-rose-600 flex-shrink-0" />
+                                              <span className="text-rose-600 font-semibold">
+                                                {Math.ceil((new Date() - dueDate) / (1000 * 60 * 60 * 24))} days
+                                              </span>
+                                            </div>
+                                          )}
+                                        </div>
                                       </td>
                                       <td className="px-6 py-4">
                                         <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-[15px] font-medium ${statusColor}`}>
@@ -23178,6 +23331,10 @@ function ClientDashboard() {
             onClose={() => {
               setShowWorkOrderDetails(false);
               setLaunchChecklistBuilderFromMain(false);
+              // Refresh issues list after modal closes (in case status was changed internally)
+              setTimeout(() => {
+                fetchIssues();
+              }, 500);
             }}
             onSave={async (payload) => {
               if (workOrderDetailsMode === 'edit-pm' && editingWorkOrderId) {
@@ -23704,8 +23861,16 @@ function ClientDashboard() {
                                 <div className="text-sm font-medium text-gray-900">{getAssignedName(issue)}</div>
                               </td>
                               <td className="py-4 px-4">
-                                <div className={`text-sm font-medium ${isOverdue ? 'text-rose-600' : 'text-gray-900'}`}>
+                                <div className={`flex items-center gap-2 text-sm font-medium ${isOverdue ? 'text-rose-600' : 'text-gray-900'}`}>
                                   {due ? due.toLocaleDateString() : 'Not set'}
+                                  {isOverdue && (
+                                    <div className="flex items-center gap-1 bg-rose-50 rounded-md px-2 py-1 text-xs">
+                                      <AlertCircle className="w-3.5 h-3.5 text-rose-600 flex-shrink-0" />
+                                      <span className="text-rose-600 font-semibold">
+                                        {Math.ceil((new Date() - due) / (1000 * 60 * 60 * 24))} days
+                                      </span>
+                                    </div>
+                                  )}
                                 </div>
                               </td>
                               <td className="py-4 px-4">
@@ -29843,8 +30008,12 @@ const ClientIntelligenceTab = ({
   onOpenEdgeTab = null,
 }) => {
   const AI_CACHE_TTL_MS = 5 * 60 * 1000;
+  const SUMMARY_CACHE_KEY = 'client-intelligence-maintenance-summary-cache';
   const SENTIMENT_CACHE_KEY = 'client-intelligence-sentiment-cache';
   const RECOMMENDATIONS_CACHE_KEY = 'client-intelligence-recommendations-cache';
+  const [aiSummary, setAiSummary] = React.useState(null);
+  const [loadingSummary, setLoadingSummary] = React.useState(false);
+  const [summaryError, setSummaryError] = React.useState('');
   const [aiSentiment, setAiSentiment] = React.useState(null);
   const [aiRecommendations, setAiRecommendations] = React.useState([]);
   const [loadingSentiment, setLoadingSentiment] = React.useState(false);
@@ -29907,6 +30076,30 @@ const ClientIntelligenceTab = ({
     }
   }, []);
 
+  const refreshSummary = React.useCallback(async ({ force = false } = {}) => {
+    if (!force) {
+      const cached = loadCache(SUMMARY_CACHE_KEY);
+      if (cached) {
+        setAiSummary(cached);
+        setSummaryError('');
+        return;
+      }
+    }
+    try {
+      setLoadingSummary(true);
+      setSummaryError('');
+      const res = await api.get('/api/ai/maintenance-summary');
+      const next = res.data || null;
+      setAiSummary(next);
+      saveCache(SUMMARY_CACHE_KEY, next);
+    } catch (err) {
+      console.error('Failed to fetch AI maintenance summary', err);
+      setSummaryError(err?.response?.data?.message || err?.message || 'Maintenance summary unavailable');
+    } finally {
+      setLoadingSummary(false);
+    }
+  }, [loadCache, saveCache]);
+
   const refreshSentiment = React.useCallback(async ({ force = false } = {}) => {
     if (!force) {
       const cached = loadCache(SENTIMENT_CACHE_KEY);
@@ -29956,9 +30149,10 @@ const ClientIntelligenceTab = ({
   }, [loadCache, saveCache]);
 
   React.useEffect(() => {
+    refreshSummary();
     refreshSentiment();
     refreshRecommendations();
-  }, [refreshRecommendations, refreshSentiment]);
+  }, [refreshRecommendations, refreshSentiment, refreshSummary]);
 
   const submitTriage = async () => {
     if (!String(triageInput || '').trim()) return;
@@ -30031,6 +30225,27 @@ const ClientIntelligenceTab = ({
       ? 'bg-rose-100 text-rose-700'
       : 'bg-slate-100 text-slate-700';
 
+  const summaryMetrics = aiSummary?.metrics || {};
+  const suggestedQuestions = Array.isArray(aiSummary?.suggestedQuestions) ? aiSummary.suggestedQuestions : [];
+  const urgentIssues = Array.isArray(aiSummary?.highPriorityOpenIssues) ? aiSummary.highPriorityOpenIssues : [];
+  const recurringIssues = Array.isArray(aiSummary?.recurringIssues) ? aiSummary.recurringIssues : [];
+  const topProperties = Array.isArray(aiSummary?.topProperties) ? aiSummary.topProperties : [];
+  const technicianPerformance = Array.isArray(aiSummary?.technicianPerformance) ? aiSummary.technicianPerformance : [];
+
+  const recommendationAction = React.useCallback((text) => {
+    const normalized = String(text || '').toLowerCase();
+    if (normalized.includes('preventive')) {
+      return { label: 'Create Preventive', onClick: () => onOpenCreatePm?.() };
+    }
+    if (normalized.includes('technician')) {
+      return { label: 'Open Team', onClick: () => onOpenAddTechnician?.() };
+    }
+    if (normalized.includes('overdue') || normalized.includes('work order')) {
+      return { label: 'Open Work Orders', onClick: () => onOpenRequestsTab?.() };
+    }
+    return null;
+  }, [onOpenAddTechnician, onOpenCreatePm, onOpenRequestsTab]);
+
   return (
     <div className="space-y-6">
       <div className="glass-surface rounded-3xl border border-white/20 p-6 shadow-xl">
@@ -30051,6 +30266,138 @@ const ClientIntelligenceTab = ({
                 <div className="mt-1 text-2xl font-bold text-gray-900">{value}</div>
               </div>
             ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+        <div className="glass-surface rounded-3xl border border-white/20 p-6 shadow-xl">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">Maintenance Overview</h3>
+              <p className="text-sm text-gray-500">Live AI summary of workload, hotspots, and what needs attention first.</p>
+            </div>
+            <button type="button" onClick={() => refreshSummary({ force: true })} className="rounded-xl border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">Refresh</button>
+          </div>
+          <div className="mt-5">
+            {loadingSummary ? (
+              <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-4 py-10 text-center text-sm text-gray-500">Building maintenance overview...</div>
+            ) : summaryError ? (
+              <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700">{summaryError}</div>
+            ) : aiSummary ? (
+              <div className="space-y-5">
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  {[
+                    { label: 'Open Issues', value: summaryMetrics.openIssues ?? 0, tone: 'bg-amber-50 text-amber-700 border-amber-100' },
+                    { label: 'SLA Breaches', value: summaryMetrics.slaBreaches ?? 0, tone: 'bg-rose-50 text-rose-700 border-rose-100' },
+                    { label: 'Avg Resolution', value: summaryMetrics.avgResolutionHours ? `${summaryMetrics.avgResolutionHours}h` : '—', tone: 'bg-blue-50 text-blue-700 border-blue-100' },
+                    { label: 'Active Technicians', value: summaryMetrics.activeTechnicians ?? technicians.length, tone: 'bg-emerald-50 text-emerald-700 border-emerald-100' },
+                  ].map((card) => (
+                    <div key={card.label} className={`rounded-2xl border px-4 py-4 ${card.tone}`}>
+                      <div className="text-xs font-bold uppercase tracking-wider opacity-80">{card.label}</div>
+                      <div className="mt-2 text-2xl font-black">{card.value}</div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="grid gap-4 xl:grid-cols-3">
+                  <div className="rounded-2xl border border-gray-200 bg-white p-4">
+                    <div className="text-xs font-bold uppercase tracking-wider text-gray-400">Top Locations</div>
+                    <div className="mt-3 space-y-3">
+                      {topProperties.length > 0 ? topProperties.slice(0, 4).map((entry) => (
+                        <div key={`${entry.property}-${entry.incidentCount}`} className="flex items-center justify-between gap-3 rounded-xl bg-gray-50 px-3 py-3">
+                          <div className="min-w-0">
+                            <div className="truncate text-sm font-semibold text-gray-900">{entry.property || 'Unknown location'}</div>
+                            <div className="text-xs text-gray-500">Incident hotspot</div>
+                          </div>
+                          <div className="rounded-full bg-white px-2.5 py-1 text-xs font-bold text-gray-700">{entry.incidentCount}</div>
+                        </div>
+                      )) : (
+                        <div className="rounded-xl bg-gray-50 px-3 py-4 text-sm text-gray-500">No hotspot data yet.</div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-gray-200 bg-white p-4">
+                    <div className="text-xs font-bold uppercase tracking-wider text-gray-400">Recurring Patterns</div>
+                    <div className="mt-3 space-y-3">
+                      {recurringIssues.length > 0 ? recurringIssues.slice(0, 3).map((entry, index) => (
+                        <div key={`${entry.category}-${entry.property}-${index}`} className="rounded-xl bg-gray-50 px-3 py-3">
+                          <div className="text-sm font-semibold text-gray-900">{entry.category} at {entry.property}</div>
+                          <div className="mt-1 text-xs text-gray-500">{entry.count} repeated issues</div>
+                          <div className="mt-2 text-xs text-gray-700">{entry.prediction}</div>
+                        </div>
+                      )) : (
+                        <div className="rounded-xl bg-gray-50 px-3 py-4 text-sm text-gray-500">No recurring issue pattern detected yet.</div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-gray-200 bg-white p-4">
+                    <div className="text-xs font-bold uppercase tracking-wider text-gray-400">Fastest Resolution</div>
+                    <div className="mt-3 space-y-3">
+                      {technicianPerformance.length > 0 ? technicianPerformance.slice(0, 3).map((entry) => (
+                        <div key={`${entry.technicianId || entry.technicianName}`} className="flex items-center justify-between gap-3 rounded-xl bg-gray-50 px-3 py-3">
+                          <div className="min-w-0">
+                            <div className="truncate text-sm font-semibold text-gray-900">{entry.technicianName || 'Unknown technician'}</div>
+                            <div className="text-xs text-gray-500">{entry.completedCount || 0} completed / {entry.assignedCount || 0} assigned</div>
+                          </div>
+                          <div className="text-sm font-bold text-emerald-700">{entry.averageResolutionHours ? `${entry.averageResolutionHours}h` : '—'}</div>
+                        </div>
+                      )) : (
+                        <div className="rounded-xl bg-gray-50 px-3 py-4 text-sm text-gray-500">Not enough technician data yet.</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-4 py-10 text-center text-sm text-gray-500">No maintenance overview available yet.</div>
+            )}
+          </div>
+        </div>
+
+        <div className="glass-surface rounded-3xl border border-white/20 p-6 shadow-xl">
+          <h3 className="text-lg font-bold text-gray-900">Priority Queue</h3>
+          <p className="mt-1 text-sm text-gray-500">High-priority open work that AI would review first.</p>
+          <div className="mt-5 space-y-3">
+            {urgentIssues.length > 0 ? urgentIssues.map((issue) => (
+              <div key={issue.id || issue.title} className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-bold text-gray-900">{issue.title}</div>
+                    <div className="mt-1 text-xs text-gray-600">{issue.property || 'Unknown location'}</div>
+                  </div>
+                  <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-rose-700">{issue.priority || 'High'}</span>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                  <span className="rounded-full bg-white px-2.5 py-1 font-semibold text-gray-600">{issue.status || 'Open'}</span>
+                  <span className="rounded-full bg-white px-2.5 py-1 font-semibold text-gray-600">
+                    {issue.deadline ? `Due ${formatOpsDate(issue.deadline)}` : 'No deadline'}
+                  </span>
+                </div>
+              </div>
+            )) : (
+              <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-4 py-10 text-center text-sm text-gray-500">No urgent open issues detected.</div>
+            )}
+          </div>
+
+          <div className="mt-6 rounded-2xl border border-blue-100 bg-blue-50 p-4">
+            <div className="text-xs font-bold uppercase tracking-wider text-blue-700">Suggested Questions</div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {suggestedQuestions.length > 0 ? suggestedQuestions.slice(0, 5).map((prompt) => (
+                <button
+                  key={prompt}
+                  type="button"
+                  onClick={() => setChatInput(prompt)}
+                  className="rounded-full border border-blue-200 bg-white px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100"
+                >
+                  {prompt}
+                </button>
+              )) : (
+                <div className="text-sm text-blue-700">Ask Intelligence what to fix first, where failures repeat, or who is overloaded.</div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -30119,6 +30466,17 @@ const ClientIntelligenceTab = ({
                   <div className="text-[11px] font-bold uppercase tracking-wider text-blue-600">{rec.type || 'Recommendation'}</div>
                   <div className="mt-1 text-base font-bold text-gray-900">{rec.title || 'Untitled'}</div>
                   <p className="mt-2 text-sm leading-6 text-gray-600">{rec.content || ''}</p>
+                  {recommendationAction(rec.content || rec.title)?.label ? (
+                    <div className="mt-4">
+                      <button
+                        type="button"
+                        onClick={recommendationAction(rec.content || rec.title).onClick}
+                        className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100"
+                      >
+                        {recommendationAction(rec.content || rec.title).label}
+                      </button>
+                    </div>
+                  ) : null}
                 </div>
               ))
             ) : (
@@ -38910,106 +39268,6 @@ const ClientMetersTab = ({
         </div>
       )}
       <div className="px-8 py-6">
-        <div className="mb-6 grid gap-6 xl:grid-cols-[1.2fr_1fr]">
-          <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-            <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-              <div className="max-w-2xl">
-                <h3 className="text-[1.25rem] font-bold text-gray-900">Daily Email Summaries</h3>
-                <p className="mt-2 text-[0.95rem] text-gray-500">Administrators receive the company summary each day, and technicians receive their own daily work summary by email.</p>
-                <div className="mt-4 rounded-2xl border border-blue-100 bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-4">
-                  <div className="text-xs font-semibold uppercase tracking-[0.22em] text-blue-700">Delivery Time</div>
-                  <div className="mt-2 text-lg font-bold text-gray-900">{dailySummaryTimeLabel}</div>
-                  <div className="mt-1 text-sm text-gray-600">
-                    Daily reports will be sent for this company at {dailySummaryTimeLabel} based on {generalSettings?.timeZone || 'your company timezone'}.
-                  </div>
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {dailySummaryTimePresets.map((preset) => (
-                      <button
-                        key={preset.value}
-                        type="button"
-                        onClick={() => setDailySummarySettings((prev) => ({ ...prev, sendTime: preset.value }))}
-                        className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
-                          dailySummarySettings.sendTime === preset.value
-                            ? 'border-blue-600 bg-blue-600 text-white'
-                            : 'border-gray-200 bg-white text-gray-700 hover:border-blue-300 hover:text-blue-700'
-                        }`}
-                      >
-                        {preset.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              <div className="min-w-[180px] rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                <label className="mb-2 block text-sm font-semibold text-gray-700">Send time</label>
-                <input
-                  type="time"
-                  value={dailySummarySettings.sendTime}
-                  onChange={(e) => setDailySummarySettings((prev) => ({ ...prev, sendTime: e.target.value }))}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900"
-                />
-                <div className="mt-2 text-xs text-gray-500">Choose the exact time users should receive the daily report email.</div>
-              </div>
-            </div>
-            <div className="mt-5 grid gap-3 md:grid-cols-2">
-              <label className="flex items-center gap-3 rounded-xl border border-gray-200 p-4 text-sm text-gray-700">
-                <input
-                  type="checkbox"
-                  checked={!!dailySummarySettings.adminDailySummary}
-                  onChange={(e) => setDailySummarySettings((prev) => ({ ...prev, adminDailySummary: e.target.checked }))}
-                  className="h-4 w-4"
-                />
-                Send daily company summary to administrators
-              </label>
-              <label className="flex items-center gap-3 rounded-xl border border-gray-200 p-4 text-sm text-gray-700">
-                <input
-                  type="checkbox"
-                  checked={!!dailySummarySettings.technicianDailySummary}
-                  onChange={(e) => setDailySummarySettings((prev) => ({ ...prev, technicianDailySummary: e.target.checked }))}
-                  className="h-4 w-4"
-                />
-                Send daily assigned-work summary to technicians
-              </label>
-            </div>
-            <div className="mt-5 rounded-xl bg-blue-50 px-4 py-4 text-sm text-gray-700">
-              <div className="font-semibold text-gray-900">Summary content</div>
-              <div className="mt-2">Admin email: overall meter status, current-month consumption, overdue utility readings, and company-wide activity.</div>
-              <div className="mt-1">Technician email: assigned work orders, meter categories they own, and the readings or follow-ups due that day.</div>
-              <div className="mt-3 text-xs font-medium text-blue-700">{dailySummarySaveState || 'Saved to company settings'}</div>
-            </div>
-          </section>
-          <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-            <h3 className="text-[1.25rem] font-bold text-gray-900">Recipients Preview</h3>
-            <div className="mt-5 grid gap-5 md:grid-cols-2 xl:grid-cols-1">
-              <div>
-                <div className="mb-3 text-sm font-semibold text-gray-900">Administrators</div>
-                <div className="space-y-2">
-                  {dailySummarySettings.adminDailySummary && adminRecipients.length > 0 ? adminRecipients.map((recipient) => (
-                    <div key={`admin-summary-${recipient.email}`} className="rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-700">
-                      <div className="font-medium text-gray-900">{recipient.name}</div>
-                      <div className="text-gray-500">{recipient.email}</div>
-                    </div>
-                  )) : (
-                    <div className="rounded-lg bg-gray-50 px-3 py-3 text-sm text-gray-500">No administrator daily summary recipients enabled.</div>
-                  )}
-                </div>
-              </div>
-              <div>
-                <div className="mb-3 text-sm font-semibold text-gray-900">Technicians</div>
-                <div className="space-y-2">
-                  {dailySummarySettings.technicianDailySummary && technicianSummaryRecipients.length > 0 ? technicianSummaryRecipients.slice(0, 8).map((recipient) => (
-                    <div key={`tech-summary-${recipient.email}`} className="rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-700">
-                      <div className="font-medium text-gray-900">{recipient.name}</div>
-                      <div className="text-gray-500">{recipient.email}</div>
-                    </div>
-                  )) : (
-                    <div className="rounded-lg bg-gray-50 px-3 py-3 text-sm text-gray-500">No technician daily summary recipients enabled.</div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </section>
-        </div>
         <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
           <div className="overflow-x-auto">
             <table className="min-w-full border-collapse text-left">
@@ -41561,6 +41819,7 @@ function WorkOrderDetailsModal({ open, onClose, onSave, mode = 'create', tasks =
     description: '',
     allRequired: false,
   });
+  const [activeModalTab, setActiveModalTab] = React.useState('details');
 
   const addTask = () => setTasks?.((t) => [...t, { id: `task-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`, title: '', status: 'Open' }]);
   const updateTask = (id, key, value) => setTasks?.((t) => t.map(task => (task.id === id ? { ...task, [key]: value } : task)));
@@ -42042,6 +42301,7 @@ function WorkOrderDetailsModal({ open, onClose, onSave, mode = 'create', tasks =
   if (!open) return null;
 
   const modalContent = (
+    <>
     <div className="fixed inset-0 z-[60] flex items-start justify-center bg-black/40 overflow-auto py-6">
       <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-[1400px] mx-4">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
@@ -42050,8 +42310,42 @@ function WorkOrderDetailsModal({ open, onClose, onSave, mode = 'create', tasks =
             <X className="w-5 h-5 text-gray-500" />
           </button>
         </div>
+        <div className="flex items-center gap-0 px-6 border-b border-gray-100 bg-gray-50">
+          <button
+            onClick={() => setActiveModalTab('details')}
+            className={`px-6 py-3 text-sm font-semibold border-b-2 transition-colors ${
+              activeModalTab === 'details'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            Details
+          </button>
+          <button
+            onClick={() => setActiveModalTab('documents')}
+            className={`px-6 py-3 text-sm font-semibold border-b-2 transition-colors ${
+              activeModalTab === 'documents'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            📸 Photos & Documents
+          </button>
+          <button
+            onClick={() => setActiveModalTab('closeout')}
+            className={`px-6 py-3 text-sm font-semibold border-b-2 transition-colors ${
+              activeModalTab === 'closeout'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            📝 Closeout Notes
+          </button>
+        </div>
 
         <div className="max-h-[82vh] overflow-y-auto px-6 py-6 space-y-8">
+          {activeModalTab === 'details' && (
+            <>
           <section className="space-y-4 border-b border-gray-100 pb-8">
             <h3 className="text-[22px] font-bold text-gray-900">Work Order Details</h3>
             {mode === 'edit-pm' && (
@@ -42356,9 +42650,13 @@ function WorkOrderDetailsModal({ open, onClose, onSave, mode = 'create', tasks =
               </div>
             </div>
           </section>
-
+            </>
+          )}
+          
+          {activeModalTab === 'documents' && (
+            <>
           <div className="space-y-4">
-          <h3 className="text-[22px] font-bold text-gray-900">Documents & Reference</h3>
+          <h3 className="text-[22px] font-bold text-gray-900">📸 Photos & Documents</h3>
           <div className="space-y-2">
             <div className="text-sm font-bold text-gray-700">Photos</div>
             <input
@@ -42389,15 +42687,43 @@ function WorkOrderDetailsModal({ open, onClose, onSave, mode = 'create', tasks =
                 </button> or Drop Images
               </div>
               {imageFiles.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-3">
-                  {imageFiles.map((file, idx) => (
-                    <div key={`${file.name}-${idx}`} className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-700">
-                      <span className="max-w-[180px] truncate">{file.name}</span>
-                      <button type="button" className="text-rose-500 hover:text-rose-700" onClick={() => removeImageFile(idx)}>
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ))}
+                <div className="mt-4">
+                  <div className="text-xs font-semibold text-gray-600 mb-2">Uploaded Images ({imageFiles.length})</div>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {imageFiles.map((file, idx) => {
+                      const isFile = file instanceof File;
+                      const preview = isFile ? URL.createObjectURL(file) : (typeof file === 'string' ? file : null);
+                      return (
+                        <div key={`${file.name || file}-${idx}`} className="relative group">
+                          {preview && (
+                            <img 
+                              src={preview} 
+                              alt={`Upload ${idx}`}
+                              className="w-full h-32 object-cover rounded-lg border border-gray-200" 
+                            />
+                          )}
+                          {!preview && (
+                            <div className="w-full h-32 rounded-lg border border-gray-200 bg-gray-100 flex items-center justify-center">
+                              <ImageIcon className="w-8 h-8 text-gray-400" />
+                            </div>
+                          )}
+                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 rounded-lg transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                            <button 
+                              type="button" 
+                              onClick={() => removeImageFile(idx)}
+                              className="p-2 bg-rose-500 hover:bg-rose-600 rounded-full text-white"
+                              title="Remove image"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent rounded-b-lg px-2 py-1">
+                            <p className="text-xs text-white truncate font-medium">{isFile ? file.name : 'Image'}</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </div>
@@ -42444,6 +42770,8 @@ function WorkOrderDetailsModal({ open, onClose, onSave, mode = 'create', tasks =
             </div>
             <button className="text-sm font-semibold text-blue-700 hover:underline">Add from Saved Files</button>
           </div>
+            </>
+          )}
 
           <div className="space-y-4 border-t border-gray-100 pt-8">
             <div className="flex items-center justify-between">
@@ -42554,8 +42882,6 @@ function WorkOrderDetailsModal({ open, onClose, onSave, mode = 'create', tasks =
               </div>
             </div>
           </div>
-        </div>
-
         {/* Saved checklist selector */}
         <div className="mt-4 border border-gray-200 rounded-xl p-3 bg-gray-50">
           <div className="flex items-center justify-between mb-2">
@@ -42632,6 +42958,29 @@ function WorkOrderDetailsModal({ open, onClose, onSave, mode = 'create', tasks =
           </button>
         </div>
 
+          {activeModalTab === 'closeout' && (
+            <>
+        <section className="space-y-4">
+          <h3 className="text-[22px] font-bold text-gray-900">📝 Closeout Notes</h3>
+          <div className="space-y-1">
+            <label className="text-sm font-semibold text-gray-800">
+              Add notes to close out this work order
+            </label>
+            <textarea
+              className="w-full border border-gray-300 rounded-lg px-4 py-3 text-[15px] min-h-[120px] font-normal"
+              placeholder="Enter closeout notes, findings, completion details, or any remarks about this work order..."
+              value={workOrderDetails?.closeoutNotes || workOrderDetails?.closeoutNote || ''}
+              onChange={(e) => setWorkOrderDetails?.((w) => ({ ...w, closeoutNotes: e.target.value }))}
+            />
+            <div className="text-xs text-gray-500 mt-1">
+              These notes will be recorded with the work order completion
+            </div>
+          </div>
+        </section>
+            </>
+          )}
+        </div>
+
       <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100">
         <button onClick={onClose} className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50">Cancel</button>
         <button
@@ -42642,8 +42991,10 @@ function WorkOrderDetailsModal({ open, onClose, onSave, mode = 'create', tasks =
             {modalSaveLabel}
           </button>
         </div>
+      </div>
+    </div>
 
-        {editAddPartOpen && (
+      {editAddPartOpen && (
           <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4">
             <div className="w-full max-w-[1320px] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl">
               <div className="flex items-center justify-between px-8 py-5">
@@ -42775,7 +43126,6 @@ function WorkOrderDetailsModal({ open, onClose, onSave, mode = 'create', tasks =
             </div>
           </div>
         )}
-      </div>
 
       {showChecklistModal && (
         <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/50">
@@ -43369,7 +43719,7 @@ function WorkOrderDetailsModal({ open, onClose, onSave, mode = 'create', tasks =
           )}
         </div>
       )}
-    </div>
+    </>
   );
 
   if (typeof document !== 'undefined' && document.body) {

@@ -428,15 +428,15 @@ const LandingPage = () => {
               <h3 className="text-2xl font-bold text-slate-900 mb-6">Why Choose Fixnest</h3>
               <ul className="space-y-3">
                 {[
-                  '✅ Adapts to your specific operations',
-                  '✅ Scales with your growth',
-                  '✅ Mobile-first field execution',
-                  '✅ Real-time visibility and control',
-                  '✅ Integrated with your existing tools'
+                  'Adapts to your specific operations',
+                  'Scales with your growth',
+                  'Mobile-first field execution',
+                  'Real-time visibility and control',
+                  'Integrated with your existing tools'
                 ].map((item, idx) => (
                   <li key={idx} className="text-lg text-slate-700 flex items-center gap-3">
-                    <span className="text-green-600 text-xl">{item.split(' ')[0]}</span>
-                    {item.substring(3)}
+                    <span className="text-green-600 text-xl">✅</span>
+                    {item}
                   </li>
                 ))}
               </ul>
