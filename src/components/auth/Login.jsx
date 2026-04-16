@@ -6,7 +6,8 @@ import AuthHeader from './AuthHeader';
 
 const getHomeRouteForRole = (role) => {
   const normalizedRole = String(role || '').trim().toLowerCase();
-  if (normalizedRole === 'superadmin' || normalizedRole === 'super-admin') return '/manager-dashboard';
+  // Fixed: Changed 'super-admin' to 'superadmin' for consistency
+  if (normalizedRole === 'superadmin') return '/manager-dashboard';
   if (normalizedRole === 'admin' || normalizedRole === 'manager') return '/dashboard';
   if (normalizedRole === 'technician') return '/technician-dashboard';
   return '/dashboard';
@@ -29,14 +30,16 @@ export default function Login({ onLogin }) {
       const res = await api.post('/api/auth/login', { email, password });
       const data = res.data;
       if (res.status === 200) {
-        onLogin && onLogin(data.token, data.user);
+        if (onLogin && typeof onLogin === 'function') {
+          onLogin(data.token, data.user);
+        }
         navigate(getHomeRouteForRole(data.user?.role), { replace: true });
       } else {
         setError(data.error || 'Login failed');
       }
     } catch (err) {
-      console.error(err);
-      setError(err.response?.data?.error || 'Login failed');
+      console.error('Login error:', err);
+      setError(err.response?.data?.error || err.response?.data?.message || 'Login failed. Please check your credentials.');
     } finally {
       setIsSubmitting(false);
     }
@@ -48,12 +51,14 @@ export default function Login({ onLogin }) {
       <div className="video-background-container">
         <video autoPlay loop muted playsInline className="video-background">
           <source src={backgroundVideo} type="video/mp4" />
+          Your browser does not support the video tag.
         </video>
         <div className="video-overlay" />
       </div>
       <form
         onSubmit={handleSubmit}
         className="auth-card auth-card--narrow"
+        noValidate
       >
         <div className="auth-header auth-header--left">
           <h1 className="auth-title auth-title--left">Log In</h1>
@@ -95,11 +100,12 @@ export default function Login({ onLogin }) {
           type="submit"
           className="auth-primary-btn"
           disabled={isSubmitDisabled}
+          aria-busy={isSubmitting}
         >
           {isSubmitting ? 'Logging in...' : 'Log in'}
         </button>
 
-        {error && <div className="auth-error">{error}</div>}
+        {error && <div className="auth-error" role="alert">{error}</div>}
 
         <div className="auth-divider-with-text"><span>or</span></div>
 

@@ -1,261 +1,195 @@
-import React, { useState, useEffect, useRef } from "react";
-import { Bell, Check, ExternalLink, X } from "lucide-react";
-import api from "../api/axios";
-import { useLanguage, useTranslation } from "../i18n/LanguageContext";
+import React, { useState, useRef, useEffect } from "react";
+import { Search, ChevronDown, Menu, X } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 
 /**
- * Enhanced Header for Maintenance Management System
+ * Professional Navigation Header
  * Props:
- * - title: Main heading (string or JSX)
- * - subtitle: Context or status (string or JSX)
- * - right: Right-aligned content (JSX)
- * - user: { name, role } (optional, for dashboards)
- * - className: Extra classes
+ * - logo: Logo component or image
+ * - navigation: [{ label, href, submenu: [...] }]
+ * - onLogin: Callback for login action
+ * - onSignUp: Callback for signup action
+ * - user: Current user object (if logged in)
+ * - onLogout: Callback for logout
  */
-export default function Header({ title, subtitle, right, user, className = "", onNotificationNavigate }) {
-  const { language, setLanguage, languages } = useLanguage();
-  const { t } = useTranslation();
-  // Role label mapping
-  const roleMap = {
-    admin: "Admin",
-    manager: "Manager",
-    technician: "Technician",
-    client: "Client",
-    tenant: "Tenant",
-    user: "User",
-  };
-
-  const [notifications, setNotifications] = useState([]);
-  const [showNotifications, setShowNotifications] = useState(false);
+export default function Header({ 
+  logo, 
+  navigation = [], 
+  onLogin, 
+  onSignUp, 
+  user, 
+  onLogout,
+  className = "" 
+}) {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [openDropdown, setOpenDropdown] = useState(null);
+  const [searchOpen, setSearchOpen] = useState(false);
   const dropdownRef = useRef(null);
-  const knownNotificationIdsRef = useRef(new Set());
-  const browserPermissionRequestedRef = useRef(false);
-
-  const fetchNotifications = async () => {
-    try {
-      const res = await api.get("/api/notifications");
-      const nextNotifications = Array.isArray(res.data) ? res.data : [];
-
-      if (typeof window !== "undefined" && "Notification" in window) {
-        const shouldRequestPermission =
-          user &&
-          !browserPermissionRequestedRef.current &&
-          Notification.permission === "default";
-
-        if (shouldRequestPermission) {
-          browserPermissionRequestedRef.current = true;
-          Notification.requestPermission().catch(() => {});
-        }
-
-        const knownIds = knownNotificationIdsRef.current;
-        nextNotifications.forEach((notification) => {
-          const id = String(notification?.id || notification?._id || "");
-          if (!id) return;
-
-          const isKnown = knownIds.has(id);
-          if (!isKnown) {
-            knownIds.add(id);
-            if (Notification.permission === "granted" && !notification?.read) {
-              try {
-                const systemNotification = new Notification(notification.title || "New notification", {
-                  body: notification.message || "",
-                  tag: `mms-${id}`,
-                });
-                systemNotification.onclick = () => {
-                  window.focus();
-                  handleNotificationNavigate(notification);
-                  systemNotification.close();
-                };
-              } catch (_) {
-                /* ignore browser notification failures */
-              }
-            }
-          }
-        });
-      }
-
-      setNotifications(nextNotifications);
-    } catch (err) {
-      console.error("Failed to fetch notifications:", err);
-    }
-  };
-
-  useEffect(() => {
-    if (user) {
-      fetchNotifications();
-      // Poll for new notifications every 60 seconds
-      const interval = setInterval(fetchNotifications, 60000);
-      return () => clearInterval(interval);
-    }
-  }, [user]);
-
-  useEffect(() => {
-    if (!Array.isArray(notifications) || notifications.length === 0) return;
-    notifications.forEach((notification) => {
-      const id = String(notification?.id || notification?._id || "");
-      if (id) knownNotificationIdsRef.current.add(id);
-    });
-  }, [notifications]);
+  const navigate = useNavigate();
 
   useEffect(() => {
     function handleClickOutside(event) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setShowNotifications(false);
+        setOpenDropdown(null);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const markAsRead = async (id) => {
-    try {
-      await api.patch(`/api/notifications/${id}/read`);
-      setNotifications(notifications.map(n => n.id === id ? { ...n, read: true } : n));
-    } catch (err) {
-      console.error("Failed to mark notification as read:", err);
-    }
+  const handleLogout = () => {
+    if (onLogout) onLogout();
+    navigate("/");
   };
 
-  const markAllRead = async () => {
-    try {
-      await api.patch("/api/notifications/read-all");
-      setNotifications(notifications.map(n => ({ ...n, read: true })));
-    } catch (err) {
-      console.error("Failed to mark all as read:", err);
-    }
-  };
-
-  const handleNotificationNavigate = async (notification) => {
-    if (!notification) return;
-    if (!notification.read) {
-      await markAsRead(notification.id);
-    }
-    if (typeof onNotificationNavigate === "function") {
-      const handled = onNotificationNavigate(notification);
-      if (handled) {
-        setShowNotifications(false);
-        return;
-      }
-    }
-    if (notification.link) {
-      window.location.href = notification.link;
-    }
-    setShowNotifications(false);
-  };
-
-  const unreadCount = notifications.filter(n => !n.read).length;
   return (
-    <header className={`flex flex-col xs:flex-row xs:items-center xs:justify-between responsive-gap responsive-container mb-4 xs:mb-6 ${className}`}>
-      <div className="flex items-center gap-2 xs:gap-3">
-        {/* System Icon */}
-        <span className="bg-indigo-600 rounded-lg xs:rounded-xl p-1.5 xs:p-2 flex items-center justify-center">
-          <svg width="24" height="24" className="xs:w-[32px] xs:h-[32px]" viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="6" fill="#6366f1" /><rect x="6" y="6" width="12" height="6" rx="2" fill="#a5b4fc" /></svg>
-        </span>
-        
-      </div>
-      <div className="flex-1 flex flex-col xs:flex-row xs:items-center xs:justify-between responsive-gap mt-2 xs:mt-0">
-        <div>
-          <h2 className="responsive-heading-md text-gray-900 tracking-tight leading-tight">{title}</h2>
-          {subtitle && <div className="responsive-text-sm text-gray-500 mt-1">{subtitle}</div>}
-        </div>
-        {right && <div className="mt-2 xs:mt-0 flex items-center gap-2 xs:gap-4">
-          {user && (
-            <div className="relative" ref={dropdownRef}>
-              <button
-                onClick={() => setShowNotifications(!showNotifications)}
-                className="p-1.5 xs:p-2.5 glass-ghost rounded-lg xs:rounded-xl hover:bg-white/70 transition-all relative group"
-              >
-                <Bell className={`responsive-icon-sm ${unreadCount > 0 ? "text-indigo-600" : "text-gray-500"}`} />
-                {unreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 w-4 xs:w-5 h-4 xs:h-5 bg-red-500 text-white text-[8px] xs:text-[10px] font-bold rounded-full flex items-center justify-center border border-xs:border-2 border-white animate-in zoom-in duration-300">
-                    {unreadCount > 9 ? "9+" : unreadCount}
-                  </span>
-                )}
-              </button>
+    <header className={`sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-200/40 ${className}`}>
+      <div className="responsive-container py-3 xs:py-4 md:py-5">
+        <div className="flex items-center justify-between gap-4 xs:gap-6 md:gap-8">
+          
+          {/* Logo */}
+          <Link to="/" className="flex items-center gap-2 flex-shrink-0">
+            {logo ? (
+              logo
+            ) : (
+              <div className="flex items-center justify-center w-8 xs:w-10 h-8 xs:h-10 bg-gradient-to-br from-indigo-600 to-indigo-700 rounded-lg">
+                <svg className="w-5 xs:w-6 h-5 xs:h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
+                </svg>
+              </div>
+            )}
+            <span className="hidden xs:inline font-bold text-gray-900 text-sm md:text-base">FIXNEST</span>
+          </Link>
 
-              {showNotifications && (
-                <div className="absolute right-0 mt-3 w-72 xs:w-80 glass-surface-strong rounded-lg xs:rounded-2xl overflow-hidden z-[100] animate-in slide-in-from-top-2 duration-300">
-                  <div className="p-3 xs:p-4 bg-white/60 border-b border-white/40 flex items-center justify-between backdrop-blur">
-                    <h3 className="font-bold text-gray-900 text-sm xs:text-base">{t("header.notifications")}</h3>
-                    {unreadCount > 0 && (
-                      <button
-                        onClick={markAllRead}
-                        className="text-[10px] xs:text-xs font-semibold text-indigo-600 hover:text-indigo-700"
+          {/* Desktop Navigation */}
+          <nav className="hidden md:flex items-center gap-1 lg:gap-2 flex-1 justify-center">
+            {navigation.map((item, idx) => (
+              <div key={idx} className="relative group">
+                <button
+                  onClick={() => setOpenDropdown(openDropdown === idx ? null : idx)}
+                  className="px-3 lg:px-4 py-2 text-sm lg:text-base font-medium text-gray-700 hover:text-indigo-600 transition-colors flex items-center gap-1 group"
+                >
+                  {item.label}
+                  {item.submenu && (
+                    <ChevronDown className="w-3.5 h-3.5 lg:w-4 lg:h-4 transition-transform group-hover:rotate-180" />
+                  )}
+                </button>
+
+                {item.submenu && openDropdown === idx && (
+                  <div className="absolute top-full left-0 mt-0 w-48 bg-white border border-gray-200 rounded-lg shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200" ref={dropdownRef}>
+                    {item.submenu.map((subitem, sidx) => (
+                      <Link
+                        key={sidx}
+                        to={subitem.href}
+                        className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 transition-colors border-b border-gray-100 last:border-b-0"
                       >
-                        {t("header.markAllRead")}
-                      </button>
-                    )}
+                        {subitem.label}
+                      </Link>
+                    ))}
                   </div>
+                )}
+              </div>
+            ))}
+          </nav>
 
-                  <div className="max-h-[400px] overflow-y-auto">
-                    {notifications.length > 0 ? (
-                      <div className="divide-y divide-white/40">
-                        {notifications.map((n) => (
-                          <div
-                            key={n.id}
-                            className={`p-2.5 xs:p-4 hover:bg-white/60 transition-colors relative group text-xs xs:text-sm ${!n.read ? "bg-blue-50/40" : ""}`}
-                          >
-                            <div className="flex justify-between items-start gap-2">
-                              <div>
-                                <p className={`text-xs xs:text-sm font-bold ${!n.read ? "text-indigo-900" : "text-gray-900"}`}>{n.title}</p>
-                                <p className="text-[10px] xs:text-xs text-gray-600 mt-1 line-clamp-2">{n.message}</p>
-                                <p className="text-[8px] xs:text-[10px] text-gray-400 mt-2">{new Date(n.createdAt).toLocaleString()}</p>
-                              </div>
-                              {!n.read && (
-                                <button
-                                  onClick={() => markAsRead(n.id)}
-                                  className="p-1 hover:bg-white rounded-md border border-transparent hover:border-gray-200"
-                                  title="Mark as read"
-                                >
-                                  <Check className="w-3 xs:w-3.5 h-3 xs:h-3.5 text-indigo-600" />
-                                </button>
-                              )}
-                            </div>
-                            {(n.link || typeof onNotificationNavigate === "function") && (
-                              <button
-                                type="button"
-                                className="mt-2 xs:mt-3 flex items-center gap-1 xs:gap-1.5 text-[8px] xs:text-[10px] font-bold text-indigo-600 hover:text-indigo-700 uppercase tracking-wider"
-                                onClick={() => handleNotificationNavigate(n)}
-                              >
-                                View Details <ExternalLink className="w-2.5 xs:w-3 h-2.5 xs:h-3" />
-                              </button>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="p-6 xs:p-8 text-center">
-                        <div className="w-10 xs:w-12 h-10 xs:h-12 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-2 xs:mb-3">
-                          <Bell className="w-5 xs:w-6 h-5 xs:h-6 text-gray-300" />
-                        </div>
-                        <p className="text-xs xs:text-sm text-gray-500">{t("header.noNotifications")}</p>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="p-2 xs:p-3 bg-white/60 border-t border-white/40 text-center backdrop-blur">
-                    <span className="text-[8px] xs:text-[10px] font-bold text-gray-400 uppercase tracking-widest">{t("header.endOfAlerts")}</span>
-                  </div>
-                </div>
-              )}
+          {/* Right Section */}
+          <div className="flex items-center gap-2 xs:gap-3 md:gap-4">
+            {/* Search */}
+            <div className="hidden sm:flex items-center">
+              <button
+                onClick={() => setSearchOpen(!searchOpen)}
+                className="p-2 text-gray-500 hover:text-indigo-600 transition-colors"
+              >
+                <Search className="w-5 h-5" />
+              </button>
             </div>
-          )}
-          <div className="flex items-center gap-1 xs:gap-2">
-            <span className="text-[9px] xs:text-[11px] font-semibold text-gray-500 hidden xs:block">{t("language.label")}</span>
-            <select
-              value={language}
-              onChange={(e) => setLanguage(e.target.value)}
-              className="text-[9px] xs:text-[11px] glass-input rounded-md xs:rounded-lg px-1.5 xs:px-2 py-0.5 xs:py-1 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-300/60"
+
+            {/* Auth or User Menu */}
+            {!user ? (
+              <>
+                <button
+                  onClick={onLogin}
+                  className="hidden xs:block px-3 xs:px-4 py-1.5 xs:py-2 text-xs xs:text-sm font-medium text-gray-700 hover:text-indigo-600 transition-colors"
+                >
+                  Log in
+                </button>
+                <button
+                  onClick={onSignUp}
+                  className="px-4 xs:px-6 py-1.5 xs:py-2 xs:py-2.5 text-xs xs:text-sm font-bold text-white bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 rounded-full transition-all hover:shadow-lg hover:shadow-blue-200"
+                >
+                  Start Free Trial
+                </button>
+              </>
+            ) : (
+              <div className="flex items-center gap-2 xs:gap-3">
+                <span className="hidden xs:inline text-xs xs:text-sm text-gray-700 font-medium px-2">{user.name}</span>
+                <button
+                  onClick={handleLogout}
+                  className="px-3 xs:px-4 py-1.5 xs:py-2 text-xs xs:text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  Logout
+                </button>
+              </div>
+            )}
+
+            {/* Mobile Menu Button */}
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="md:hidden p-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
             >
-              {languages.map((lang) => (
-                <option key={lang.code} value={lang.code}>
-                  {lang.label}
-                </option>
-              ))}
-            </select>
+              {mobileMenuOpen ? (
+                <X className="w-5 h-5" />
+              ) : (
+                <Menu className="w-5 h-5" />
+              )}
+            </button>
           </div>
-          {right}
-        </div>}
+        </div>
+
+        {/* Mobile Navigation */}
+        {mobileMenuOpen && (
+          <nav className="md:hidden mt-4 pb-4 border-t border-gray-200 pt-4 space-y-1 animate-in fade-in slide-in-from-top-2 duration-200">
+            {navigation.map((item, idx) => (
+              <div key={idx}>
+                <button
+                  onClick={() => setOpenDropdown(openDropdown === idx ? null : idx)}
+                  className="w-full text-left px-4 py-2.5 text-sm font-medium text-gray-700 hover:text-indigo-600 hover:bg-gray-50 rounded-lg transition-colors flex items-center justify-between"
+                >
+                  {item.label}
+                  {item.submenu && (
+                    <ChevronDown className={`w-4 h-4 transition-transform ${openDropdown === idx ? "rotate-180" : ""}`} />
+                  )}
+                </button>
+                {item.submenu && openDropdown === idx && (
+                  <div className="pl-4 space-y-1 mt-1">
+                    {item.submenu.map((subitem, sidx) => (
+                      <Link
+                        key={sidx}
+                        to={subitem.href}
+                        className="block px-4 py-2 text-xs text-gray-600 hover:text-indigo-600 hover:bg-gray-50 rounded-lg transition-colors"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        {subitem.label}
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </nav>
+        )}
+
+        {/* Search Bar (Mobile & Desktop) */}
+        {searchOpen && (
+          <div className="mt-3 pb-3 animate-in fade-in slide-in-from-top-2 duration-200">
+            <input
+              type="text"
+              placeholder="Search..."
+              className="w-full px-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100"
+              autoFocus
+            />
+          </div>
+        )}
       </div>
     </header>
   );

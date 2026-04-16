@@ -12,7 +12,7 @@ import { useCompanySubscription } from '../hooks/useCompanySubscription';
 import { useSubscription } from '../hooks/useSubscription';
 import { getImageUrl } from '../utils/imageUrl';
 import { useLanguage, useTranslation } from "../i18n/LanguageContext";
-import { Clock, Calendar, CheckCircle, ClipboardCheck, X, Bell, Download, Package, ShoppingCart, Gauge, Plus, Search, Eye, MapPin, AlertCircle, Repeat, Edit, ChevronLeft, ChevronRight, ChevronDown, SlidersHorizontal, Flag, MoreHorizontal, MoreVertical, Trash2, Image as ImageIcon, Tag, Paperclip, MessageSquare, Send, Navigation, DollarSign, Bookmark, Link2, FileText, Copy, Archive, ArrowUpDown, ArrowRight, ArrowLeft, LayoutDashboard, Settings, Users, RotateCcw, Zap, Globe, Activity, QrCode, GripVertical, Info } from 'lucide-react';
+import { Clock, Calendar, CheckCircle, ClipboardCheck, X, Bell, Download, Package, ShoppingCart, Gauge, Plus, Search, Eye, MapPin, AlertCircle, Repeat, Edit, Pencil, ChevronLeft, ChevronRight, ChevronDown, SlidersHorizontal, Flag, MoreHorizontal, MoreVertical, Trash2, Image as ImageIcon, Tag, Paperclip, MessageSquare, Send, Navigation, DollarSign, Bookmark, Link2, FileText, Copy, Archive, ArrowUpDown, ArrowRight, ArrowLeft, LayoutDashboard, Settings, Users, RotateCcw, Zap, Globe, Activity, QrCode, GripVertical, Info } from 'lucide-react';
 
 const ASSISTANT_ACTION_STORAGE_KEY = 'mms_assistant_action';
 const REQUEST_FORM_SETTINGS_STORAGE_KEY = 'mms_request_form_settings';
@@ -1178,18 +1178,36 @@ const useBulkSelection = (items, getId) => {
   return { selectedIds, allSelected, toggleAll, toggleOne, clear };
 };
 
-const BulkActionBar = ({ count, label, onDelete }) => {
+const BulkActionBar = ({ count, label, onDelete, onEdit, editDisabled = false, editLabel = 'Edit' }) => {
   if (!count) return null;
   return (
-    <div className="mb-4 flex items-center justify-between bg-rose-50 border border-rose-200 rounded-lg px-4 py-2 text-sm font-semibold text-rose-700">
+    <div className="mb-4 flex items-center justify-between rounded-lg border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700">
       <span>{count} {label} selected</span>
-      <button
-        onClick={onDelete}
-        className="flex items-center gap-2 px-3 py-1.5 bg-rose-600 text-white rounded-lg text-xs font-bold hover:bg-rose-700"
-      >
-        <Trash2 className="w-3.5 h-3.5" />
-        Delete
-      </button>
+      <div className="flex items-center gap-2">
+        {typeof onEdit === 'function' ? (
+          <button
+            type="button"
+            onClick={onEdit}
+            disabled={editDisabled}
+            className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-bold ${
+              editDisabled
+                ? 'cursor-not-allowed bg-gray-200 text-gray-500'
+                : 'bg-white text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50'
+            }`}
+          >
+            <Pencil className="h-3.5 w-3.5" />
+            {editLabel}
+          </button>
+        ) : null}
+        <button
+          type="button"
+          onClick={onDelete}
+          className="flex items-center gap-2 rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-rose-700"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+          Delete
+        </button>
+      </div>
     </div>
   );
 };
@@ -5989,8 +6007,8 @@ function Table({ heads, rows, empty = 'No data found.' }) {
   );
 }
 
-const Td = ({ children, mono }) => (
-  <td className={`py-4 px-6 text-sm text-gray-800 ${mono ? 'font-mono' : ''}`}>{children ?? '—'}</td>
+const Td = ({ children, mono, className = '', ...props }) => (
+  <td {...props} className={`py-4 px-6 text-sm text-gray-800 ${mono ? 'font-mono' : ''} ${className}`.trim()}>{children ?? '—'}</td>
 );
 
 // â”€â”€ Input / Select â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -7774,6 +7792,7 @@ function ClientDashboard() {
 
   const openEditWorkOrderDetails = useCallback((issue) => {
     if (!issue) return;
+    setActiveTab('preventiveMaintenance');
     setWorkOrderDetailsMode('edit');
     setEditingWorkOrderId(issue?.id || issue?._id || '');
 
@@ -15023,12 +15042,18 @@ function ClientDashboard() {
     }));
   }, []);
 
-  const moveCard = useCallback((fromIndex, toIndex) => {
-    const newOrder = [...dashboardCardOrder];
-    const [removed] = newOrder.splice(fromIndex, 1);
-    newOrder.splice(toIndex, 0, removed);
-    setDashboardCardOrder(newOrder);
-  }, [dashboardCardOrder]);
+  const moveCard = useCallback((fromCardId, toCardId) => {
+    if (!fromCardId || !toCardId || fromCardId === toCardId) return;
+    setDashboardCardOrder((prev) => {
+      const nextOrder = [...prev];
+      const fromIndex = nextOrder.indexOf(fromCardId);
+      const toIndex = nextOrder.indexOf(toCardId);
+      if (fromIndex === -1 || toIndex === -1 || fromIndex === toIndex) return prev;
+      const [removed] = nextOrder.splice(fromIndex, 1);
+      nextOrder.splice(toIndex, 0, removed);
+      return nextOrder;
+    });
+  }, []);
 
   const moveTask = useCallback((fromIndex, toIndex) => {
     const tasksInTab = dashboardTasks.filter(task => task.status === activeTaskTab);
@@ -15430,36 +15455,48 @@ function ClientDashboard() {
     }
   };
 
-  const DashboardCardWrapper = ({ cardId, children, title, onRemove }) => {
+  const DashboardCardWrapper = ({ cardId, children, title }) => {
     const index = dashboardCardOrder.indexOf(cardId);
     const isVisible = visibleDashboardCards[cardId];
+    const isDragging = draggingCard === cardId;
 
     if (!isVisible) return null;
 
     return (
       <div 
         draggable
-        onDragStart={() => setDraggingCard(index)}
-        onDragOver={(e) => e.preventDefault()}
-        onDrop={() => {
-          if (draggingCard !== null && draggingCard !== index) {
-            moveCard(draggingCard, index);
-            setDraggingCard(null);
+        onDragStart={(e) => {
+          setDraggingCard(cardId);
+          if (e.dataTransfer) {
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', cardId);
           }
         }}
+        onDragOver={(e) => e.preventDefault()}
+        onDragEnter={(e) => {
+          e.preventDefault();
+          if (draggingCard && draggingCard !== cardId) {
+            moveCard(draggingCard, cardId);
+          }
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDraggingCard(null);
+        }}
+        onDragEnd={() => setDraggingCard(null)}
         className="group relative"
+        style={{
+          order: index === -1 ? 999 : index,
+          opacity: isDragging ? 0.75 : 1,
+          transform: isDragging ? 'scale(0.99)' : 'scale(1)',
+          transition: 'opacity 0.15s ease, transform 0.15s ease'
+        }}
       >
-        <div className="absolute -top-2 -right-2 z-10 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="absolute -top-2 -right-2 z-10 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
           <button
-            onClick={() => toggleCardVisibility(cardId)}
-            className="p-1.5 rounded-lg bg-red-500 text-white hover:bg-red-600 shadow-lg"
-            title="Remove card"
-          >
-            <X className="w-4 h-4" />
-          </button>
-          <button
+            type="button"
             className="p-1.5 rounded-lg bg-blue-500 text-white hover:bg-blue-600 shadow-lg cursor-grab active:cursor-grabbing"
-            title="Drag to reorder"
+            title={`Drag ${title || 'card'} to reorder`}
           >
             <GripVertical className="w-4 h-4" />
           </button>
@@ -17018,6 +17055,7 @@ function ClientDashboard() {
     selectedRequestLocations,
     selectedRequestStatuses,
   ]);
+  const requestBulkSelection = useBulkSelection(filteredRequests, (request) => request?._id || request?.id);
   const workOrders = allIssues.filter(issue => isApprovedWorkOrder(issue));
   const workOrderStatusOptions = ['OPEN', 'IN PROGRESS', 'ON HOLD', 'COMPLETED'];
   const workOrderPriorityOptions = ['HIGH', 'MEDIUM', 'LOW', 'NONE'];
@@ -17094,6 +17132,8 @@ function ClientDashboard() {
     workOrderSearchQuery,
     workOrders,
   ]);
+  const workOrderBulkSelection = useBulkSelection(filteredClientWorkOrders, (issue) => issue?._id || issue?.id);
+  const preventiveBulkSelection = useBulkSelection(maintenanceSchedules, (schedule) => schedule?._id || schedule?.id);
   const overdueOverviewItems = React.useMemo(() => (
     workOrders
       .filter((issue) => {
@@ -17151,6 +17191,104 @@ function ClientDashboard() {
     workOrderSearchQuery,
     workOrderSortDirection,
   ]);
+  const handleEditSelectedRequests = useCallback(() => {
+    if (requestBulkSelection.selectedIds.length !== 1) return;
+    const target = filteredRequests.find((request) => (
+      requestBulkSelection.selectedIds.includes(String(request?._id || request?.id || ''))
+    ));
+    if (!target) return;
+    setModalData({ open: true, type: 'request', item: target });
+  }, [filteredRequests, requestBulkSelection.selectedIds]);
+  const handleDeleteSelectedRequests = useCallback(() => {
+    const selectedIds = requestBulkSelection.selectedIds;
+    if (!selectedIds.length) return;
+    openDashboardConfirmDialog({
+      title: selectedIds.length === 1 ? 'Delete Request?' : 'Delete Requests?',
+      message: selectedIds.length === 1
+        ? 'Deleting this request permanently removes it. This action cannot be undone.'
+        : `Deleting ${selectedIds.length} requests permanently removes them. This action cannot be undone.`,
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      tone: 'danger',
+      onConfirm: async () => {
+        try {
+          await Promise.all(selectedIds.map((id) => api.delete(`/api/issues/${id}`)));
+          setIssues((prev) => prev.filter((issue) => !selectedIds.includes(String(issue?._id || issue?.id || ''))));
+          setAllIssues((prev) => prev.filter((issue) => !selectedIds.includes(String(issue?._id || issue?.id || ''))));
+          requestBulkSelection.clear();
+          closeDashboardConfirmDialog();
+        } catch (err) {
+          alert(err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Failed to delete selected requests.');
+        }
+      },
+    });
+  }, [closeDashboardConfirmDialog, openDashboardConfirmDialog, requestBulkSelection]);
+  const handleEditSelectedWorkOrders = useCallback(() => {
+    if (workOrderBulkSelection.selectedIds.length !== 1) return;
+    const target = filteredClientWorkOrders.find((issue) => (
+      workOrderBulkSelection.selectedIds.includes(String(issue?._id || issue?.id || ''))
+    ));
+    if (!target) return;
+    openEditWorkOrderDetails(target);
+  }, [filteredClientWorkOrders, openEditWorkOrderDetails, workOrderBulkSelection.selectedIds]);
+  const handleDeleteSelectedWorkOrders = useCallback(() => {
+    const selectedIds = workOrderBulkSelection.selectedIds;
+    if (!selectedIds.length) return;
+    openDashboardConfirmDialog({
+      title: selectedIds.length === 1 ? 'Delete Work Order?' : 'Delete Work Orders?',
+      message: selectedIds.length === 1
+        ? 'Deleting this work order permanently removes it. This action cannot be undone.'
+        : `Deleting ${selectedIds.length} work orders permanently removes them. This action cannot be undone.`,
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      tone: 'danger',
+      onConfirm: async () => {
+        try {
+          await Promise.all(selectedIds.map((id) => api.delete(`/api/issues/${id}`)));
+          setIssues((prev) => prev.filter((issue) => !selectedIds.includes(String(issue?._id || issue?.id || ''))));
+          setAllIssues((prev) => prev.filter((issue) => !selectedIds.includes(String(issue?._id || issue?.id || ''))));
+          workOrderBulkSelection.clear();
+          closeDashboardConfirmDialog();
+        } catch (err) {
+          alert(err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Failed to delete selected work orders.');
+        }
+      },
+    });
+  }, [closeDashboardConfirmDialog, openDashboardConfirmDialog, workOrderBulkSelection]);
+  const handleEditSelectedPreventive = useCallback(() => {
+    if (preventiveBulkSelection.selectedIds.length !== 1) return;
+    const target = maintenanceSchedules.find((schedule) => (
+      preventiveBulkSelection.selectedIds.includes(String(schedule?._id || schedule?.id || ''))
+    ));
+    if (!target) return;
+    openEditPmDetails(target);
+  }, [maintenanceSchedules, openEditPmDetails, preventiveBulkSelection.selectedIds]);
+  const handleDeleteSelectedPreventive = useCallback(() => {
+    const selectedIds = preventiveBulkSelection.selectedIds;
+    if (!selectedIds.length) return;
+    openDashboardConfirmDialog({
+      title: selectedIds.length === 1 ? 'Delete Schedule?' : 'Delete Schedules?',
+      message: selectedIds.length === 1
+        ? 'Deleting this schedule removes it permanently. This action cannot be undone.'
+        : `Deleting ${selectedIds.length} schedules removes them permanently. This action cannot be undone.`,
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      tone: 'danger',
+      onConfirm: async () => {
+        try {
+          await Promise.all(selectedIds.map((id) => api.delete(`/api/maintenance-schedules/${id}`)));
+          setMaintenanceSchedules((prev) => prev.filter((schedule) => !selectedIds.includes(String(schedule?._id || schedule?.id || ''))));
+          if (selectedSchedule && selectedIds.includes(String(selectedSchedule?._id || selectedSchedule?.id || ''))) {
+            setSelectedSchedule(null);
+          }
+          preventiveBulkSelection.clear();
+          closeDashboardConfirmDialog();
+        } catch (err) {
+          alert(err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Failed to delete selected schedules.');
+        }
+      },
+    });
+  }, [closeDashboardConfirmDialog, openDashboardConfirmDialog, preventiveBulkSelection, selectedSchedule]);
   const schedulerWorkOrders = React.useMemo(() => {
     const seen = new Set();
     return [...pendingRequests, ...workOrders].filter((issue) => {
@@ -19557,13 +19695,13 @@ function ClientDashboard() {
   ];
 
   return (
-    <div className="glass-theme-blue min-h-screen text-slate-900 overflow-hidden relative" style={{ fontFamily: "'DM Sans', 'Segoe UI', system-ui, sans-serif" }}>
+    <div className="glass-theme-blue relative h-screen overflow-hidden text-slate-900" style={{ fontFamily: "'DM Sans', 'Segoe UI', system-ui, sans-serif" }}>
       <div className="video-background-container">
         <video autoPlay loop muted playsInline className="video-background text-transparent">
           <source src={backgroundVideo} type="video/mp4" />
         </video>
       </div>
-      <div className="relative z-10 flex min-h-screen">
+      <div className="relative z-10 flex h-screen overflow-hidden">
         {/* Mobile Backdrop */}
         {isMobileMenuOpen && (
           <div 
@@ -19573,7 +19711,7 @@ function ClientDashboard() {
         )}
 
       {/* â”€â”€ Sidebar â”€â”€ */}
-      <aside className={`glass-surface-strong border-r border-white/20 flex flex-col fixed inset-y-0 left-0 z-50 h-screen overflow-y-auto shrink-0 transition-transform duration-300 md:sticky md:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`} style={{ width: 236 }}>
+      <aside className={`glass-surface-strong fixed inset-y-0 left-0 z-50 flex h-screen shrink-0 flex-col overflow-hidden border-r border-white/20 transition-transform duration-300 md:sticky md:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`} style={{ width: 236 }}>
         <div style={{ padding: '16px', borderBottom: '1px solid rgba(255,255,255,0.12)' }}>
           <div className="flex items-center justify-between gap-4">
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -19630,7 +19768,8 @@ function ClientDashboard() {
         </div>
 
         {/* Nav */}
-        <nav style={{ flex: 1, padding: '12px 10px' }}>
+        <div className="custom-scrollbar flex-1 overflow-y-auto" style={{ padding: '12px 10px' }}>
+          <nav>
           {navItems.filter(n => !n.group).map(({ key, label, icon }) => (
             <NavItem key={key} label={label} icon={icon} active={activeTab === key} onClick={() => handleSidebarTabNavigation(key)} />
           ))}
@@ -19644,7 +19783,8 @@ function ClientDashboard() {
               ))}
             </div>
           ))}
-        </nav>
+          </nav>
+        </div>
 
         {!subscriptionVisibilityLoading && !hasPaidSubscription && (
           <div style={{ padding: '0 12px 12px' }}>
@@ -19718,7 +19858,7 @@ function ClientDashboard() {
       </aside>
 
       {/* â”€â”€ Main â”€â”€ */}
-      <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+      <main className="flex min-w-0 flex-1 flex-col h-screen overflow-hidden">
 
         {/* Top bar */}
         <header className="glass-surface border-b border-white/20 px-3 xs:px-4 sm:px-6 md:px-7 h-[60px] flex items-center justify-between sticky top-0 z-30">
@@ -19961,7 +20101,7 @@ function ClientDashboard() {
                 </div>
                 </DashboardCardWrapper>
 
-                <DashboardCardWrapper cardId="notepad" title="Private Notepad">
+                <DashboardCardWrapper cardId="tasks" title="My Tasks">
 
                 <div className="glass-surface rounded-2xl border border-gray-200/70 p-6 shadow-xl">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
@@ -20288,6 +20428,9 @@ function ClientDashboard() {
                   )}
                 </div>
 
+                </DashboardCardWrapper>
+
+                <DashboardCardWrapper cardId="notepad" title="Private Notepad">
                 <div className="glass-surface rounded-2xl border border-gray-200/70 p-6 shadow-xl">
                   <div style={{ marginBottom: 16 }}>
                     <div style={{ fontSize: 20, fontWeight: 800, color: '#111827' }}>Private Notepad</div>
@@ -23835,10 +23978,27 @@ function ClientDashboard() {
                 </div>
               ) : (
                 <div className="glass-surface rounded-xl overflow-hidden shadow-2xl border border-gray-200">
+                  <div className="px-4 pt-4">
+                    <BulkActionBar
+                      count={workOrderBulkSelection.selectedIds.length}
+                      label={workOrderBulkSelection.selectedIds.length === 1 ? 'work order' : 'work orders'}
+                      onEdit={handleEditSelectedWorkOrders}
+                      editDisabled={workOrderBulkSelection.selectedIds.length !== 1}
+                      onDelete={handleDeleteSelectedWorkOrders}
+                    />
+                  </div>
                   <div className="overflow-x-auto">
                     <table className="min-w-[1000px] w-full text-left border-collapse text-sm">
                       <thead className="bg-gray-50 border-b border-gray-200 text-[11px] uppercase tracking-wider text-gray-600">
                         <tr>
+                          <th className="py-3 px-4 w-12">
+                            <input
+                              type="checkbox"
+                              checked={workOrderBulkSelection.allSelected}
+                              onChange={(e) => workOrderBulkSelection.toggleAll(e.target.checked)}
+                              className="h-5 w-5 rounded border-gray-300"
+                            />
+                          </th>
                           <th className="py-3 px-4">Title</th>
                           <th className="py-3 px-4">Image</th>
                           <th className="py-3 px-4">Status</th>
@@ -23862,6 +24022,14 @@ function ClientDashboard() {
                               onClick={() => setModalData({ open: true, type: 'issue', item: issue })}
                               className="border-b border-gray-100 hover:bg-gradient-to-r hover:from-blue-50/50 hover:to-indigo-50/50 transition-colors cursor-pointer"
                             >
+                              <td className="py-4 px-4" onClick={(e) => e.stopPropagation()}>
+                                <input
+                                  type="checkbox"
+                                  checked={workOrderBulkSelection.selectedIds.includes(String(issue._id || issue.id))}
+                                  onChange={() => workOrderBulkSelection.toggleOne(issue._id || issue.id)}
+                                  className="h-5 w-5 rounded border-gray-300"
+                                />
+                              </td>
                               <td className="py-4 px-4">
                                 <div className="font-medium text-gray-900">{issue.title || 'Untitled'}</div>
                                 <div className="text-sm text-gray-600 truncate max-w-xs">{issue.description || 'No description provided.'}</div>
@@ -24149,11 +24317,27 @@ function ClientDashboard() {
                 </div>
               ) : (
                 <div className="overflow-hidden rounded-2xl border border-gray-200">
+                  <div className="px-4 pt-4">
+                    <BulkActionBar
+                      count={requestBulkSelection.selectedIds.length}
+                      label={requestBulkSelection.selectedIds.length === 1 ? 'request' : 'requests'}
+                      onEdit={handleEditSelectedRequests}
+                      editDisabled={requestBulkSelection.selectedIds.length !== 1}
+                      onDelete={handleDeleteSelectedRequests}
+                    />
+                  </div>
                   <div className="overflow-x-auto">
                     <table className="min-w-[1200px] w-full text-left border-collapse text-sm">
                       <thead className="border-b border-gray-200 bg-white text-[11px] uppercase tracking-wider text-gray-600">
                         <tr>
-                          <th className="py-4 px-3"><input type="checkbox" className="h-6 w-6 rounded border-gray-300" /></th>
+                          <th className="py-4 px-3">
+                            <input
+                              type="checkbox"
+                              checked={requestBulkSelection.allSelected}
+                              onChange={(e) => requestBulkSelection.toggleAll(e.target.checked)}
+                              className="h-6 w-6 rounded border-gray-300"
+                            />
+                          </th>
                           <th className="py-3 px-3">Title</th>
                           <th className="py-3 px-3">Image</th>
                           <th className="py-3 px-3">Asset</th>
@@ -24208,7 +24392,12 @@ function ClientDashboard() {
                               className="hover:bg-gray-50 transition-all cursor-pointer group/row"
                             >
                               <td className="py-3 px-3" onClick={(e) => e.stopPropagation()}>
-                                <input type="checkbox" className="h-6 w-6 rounded border-gray-300" />
+                                <input
+                                  type="checkbox"
+                                  checked={requestBulkSelection.selectedIds.includes(String(reqId))}
+                                  onChange={() => requestBulkSelection.toggleOne(reqId)}
+                                  className="h-6 w-6 rounded border-gray-300"
+                                />
                               </td>
                               <td className="py-3 px-3">
                                 <div className="font-semibold text-gray-800 line-clamp-1" title={title}>{title}</div>
@@ -28519,7 +28708,30 @@ function ClientDashboard() {
                   <SectionHeader title={t("client.sections.scheduledMaintenance")} count={maintenanceSchedules.length}
                     action={<Btn onClick={() => setShowScheduleForm(true)} variant="outline" size="sm"><Icon.Plus /> New Schedule</Btn>} />
 
-                  <Table heads={['Name', 'Type', 'Status', 'Next Date', 'Frequency', 'Assets', 'Actions']} empty="No maintenance schedules. Create one above."
+                  <BulkActionBar
+                    count={preventiveBulkSelection.selectedIds.length}
+                    label={preventiveBulkSelection.selectedIds.length === 1 ? 'schedule' : 'schedules'}
+                    onEdit={handleEditSelectedPreventive}
+                    editDisabled={preventiveBulkSelection.selectedIds.length !== 1}
+                    onDelete={handleDeleteSelectedPreventive}
+                  />
+
+                  <Table heads={[
+                    <input
+                      key="select-all-schedules"
+                      type="checkbox"
+                      checked={preventiveBulkSelection.allSelected}
+                      onChange={(e) => preventiveBulkSelection.toggleAll(e.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300"
+                    />,
+                    'Name',
+                    'Type',
+                    'Status',
+                    'Next Date',
+                    'Frequency',
+                    'Assets',
+                    'Actions',
+                  ]} empty="No maintenance schedules. Create one above."
                     rows={maintenanceSchedules.map(schedule => {
                       const sid = schedule.id || schedule._id;
                       const assetIds = parseIdList(schedule.assets);
@@ -28534,6 +28746,14 @@ function ClientDashboard() {
                           setScheduleDetailTab('assets');
                         },
                         cells: [
+                          <Td key="select" onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="checkbox"
+                              checked={preventiveBulkSelection.selectedIds.includes(String(sid))}
+                              onChange={() => preventiveBulkSelection.toggleOne(sid)}
+                              className="h-4 w-4 rounded border-gray-300"
+                            />
+                          </Td>,
                           <Td key="n"><span style={{ fontWeight: 600 }}>{schedule.name || 'Unnamed'}</span></Td>,
                           <Td key="t"><span style={{ background: schedule.routine ? '#ECFDF5' : '#EFF6FF', color: schedule.routine ? '#065F46' : '#1D4ED8', padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 600 }}>{schedule.routine ? 'Routine' : 'Preventive'}</span></Td>,
                           <Td key="s"><StatusBadge status={scheduleStatusLabel} /></Td>,
