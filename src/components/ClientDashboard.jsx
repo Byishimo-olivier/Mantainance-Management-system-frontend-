@@ -23355,31 +23355,35 @@ function ClientDashboard() {
               ) : (
                 <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
                   <div className="overflow-x-auto">
-                    <table className="min-w-[1280px] w-full text-sm">
+                    <table className="min-w-[1780px] w-full text-sm">
                       <thead className="bg-gray-50 border-b border-gray-200 text-gray-700">
                         <tr>
                           <th className="px-4 py-4 text-left w-10"><input type="checkbox" className="rounded border-gray-300" /></th>
                           <th className="px-4 py-4 text-left font-bold">Name</th>
+                          <th className="px-4 py-4 text-left font-bold">ID</th>
+                          <th className="px-4 py-4 text-left font-bold">Workorder</th>
+                          <th className="px-4 py-4 text-left font-bold">Title</th>
+                          <th className="px-4 py-4 text-left font-bold">Work Order Description</th>
                           <th className="px-4 py-4 text-left font-bold">Image</th>
                           <th className="px-4 py-4 text-left font-bold">Assets & Locations</th>
                           <th className="px-4 py-4 text-left font-bold">Category</th>
                           <th className="px-4 py-4 text-left font-bold">Priority</th>
-                          <th className="px-4 py-4 text-left font-bold">Status</th>
                           <th className="px-4 py-4 text-left font-bold">Paused</th>
                           <th className="px-4 py-4 text-left font-bold">Checklist</th>
-                          <th className="px-4 py-4 text-left font-bold">Checklist ID</th>
-                          <th className="px-4 py-4 text-left font-bold">Action</th>
-                          <th className="px-4 py-4 text-left font-bold">Date Created</th>
+                          <th className="px-4 py-4 text-left font-bold">Created Date</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
                         {filteredMaintenanceSchedules.map((pm, idx) => {
                           const priority = String(pm.priority || 'NONE').toUpperCase();
                           const checklistLabel = getPmChecklistLabel(pm);
-                          const checklistId = getPmChecklistId(pm);
                           const assetsCount = parseIdList(pm.assets).length || pm.assetsCount || pm.locationsCount || pm.assets?.length || 1;
                           const locationLabel = getPmLocationLabel(pm);
                           const createdAt = pm.createdAt ? new Date(pm.createdAt) : null;
+                          const scheduleId = String(pm._id || pm.id || '—');
+                          const workOrderRef = pm.workOrderNumber || pm.workOrderId || pm.workOrder?.id || pm.workOrder?._id || '—';
+                          const workOrderTitle = pm.workOrderTitle || pm.title || pm.name || '—';
+                          const workOrderDescription = pm.workOrderDescription || pm.description || '—';
                           const imagePath =
                             pm.photo ||
                             pm.image ||
@@ -23390,8 +23394,6 @@ function ClientDashboard() {
                               ? (pm.attachments.files.find((file) => String(file?.mimeType || '').toLowerCase().startsWith('image/'))?.url || '')
                               : '');
                           const imageUrl = imagePath ? getImageUrl(imagePath) : '';
-                          const statusLabel = String(pm.status || 'Pending').trim() || 'Pending';
-                          const canUpdatePmStatus = canCurrentUserUpdatePmStatus(pm);
                           const priorityClass = priority === 'HIGH'
                             ? 'bg-rose-50 text-rose-700'
                             : priority === 'MEDIUM'
@@ -23410,6 +23412,14 @@ function ClientDashboard() {
                             >
                               <td className="px-4 py-3"><input type="checkbox" className="rounded border-gray-300" /></td>
                               <td className="px-4 py-3 text-gray-900 font-medium">{pm.name || pm.title || 'Preventive Item'}</td>
+                              <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{scheduleId}</td>
+                              <td className="px-4 py-3 text-gray-700 whitespace-nowrap">{workOrderRef}</td>
+                              <td className="px-4 py-3 text-gray-900 font-medium">{workOrderTitle}</td>
+                              <td className="px-4 py-3 text-gray-700 whitespace-nowrap">
+                                <div className="max-w-[320px] truncate" title={workOrderDescription}>
+                                  {workOrderDescription}
+                                </div>
+                              </td>
                               <td className="px-4 py-3">
                                 {imageUrl ? (
                                   <img src={imageUrl} alt={pm.name || pm.title || 'PM'} className="w-14 h-12 rounded object-cover border border-gray-200" />
@@ -23432,38 +23442,8 @@ function ClientDashboard() {
                                   {priority.charAt(0)}{priority.slice(1).toLowerCase()}
                                 </span>
                               </td>
-                              <td className="px-4 py-3 text-gray-700">
-                                <span className={`inline-flex w-fit rounded-lg px-3 py-1 text-sm font-medium ${getPmStatusTone(statusLabel)}`}>
-                                  {statusLabel}
-                                </span>
-                              </td>
                               <td className="px-4 py-3 text-gray-700">{pm.paused ? 'Yes' : 'No'}</td>
                               <td className="px-4 py-3 text-blue-600">{checklistLabel}</td>
-                              <td className="px-4 py-3 text-gray-700">{checklistId}</td>
-                              <td className="px-4 py-3 text-gray-700">
-                                {canUpdatePmStatus ? (
-                                  <div className="flex flex-wrap gap-2" onClick={(event) => event.stopPropagation()}>
-                                    <button
-                                      type="button"
-                                      disabled={pmStatusSavingId === String(pm._id || pm.id) || /progress/i.test(statusLabel)}
-                                      onClick={() => handleUpdatePmStatus(pm, 'In Progress')}
-                                      className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
-                                    >
-                                      In Progress
-                                    </button>
-                                    <button
-                                      type="button"
-                                      disabled={pmStatusSavingId === String(pm._id || pm.id) || /complete/i.test(statusLabel)}
-                                      onClick={() => handleUpdatePmStatus(pm, 'Completed')}
-                                      className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
-                                    >
-                                      Completed
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <span className="text-xs text-gray-400">No action</span>
-                                )}
-                              </td>
                               <td className="px-4 py-3 text-gray-700">
                                 {createdAt && !Number.isNaN(createdAt.getTime())
                               ? `${createdAt.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' })} - ${createdAt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`
