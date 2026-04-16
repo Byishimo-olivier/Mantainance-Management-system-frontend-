@@ -48,6 +48,7 @@ const DEFAULT_GENERAL_SETTINGS = {
 const DEFAULT_DAILY_EMAIL_SUMMARY_SETTINGS = {
   adminDailySummary: true,
   technicianDailySummary: true,
+  clientDailySummary: true,
   sendTime: '07:00',
 };
 const DEFAULT_ASSET_SETTINGS = {
@@ -1518,6 +1519,7 @@ const RequestFormSettingsModal = ({
   const [editingPortalId, setEditingPortalId] = useState('');
   const [generalForm, setGeneralForm] = useState(DEFAULT_GENERAL_SETTINGS);
   const [dailyEmailSummaryForm, setDailyEmailSummaryForm] = useState(DEFAULT_DAILY_EMAIL_SUMMARY_SETTINGS);
+  const [generalSectionSaving, setGeneralSectionSaving] = useState(false);
   const [workflowSaving, setWorkflowSaving] = useState(false);
   const [showWorkflowModal, setShowWorkflowModal] = useState(false);
   const [workflows, setWorkflows] = useState([]);
@@ -1651,6 +1653,22 @@ const RequestFormSettingsModal = ({
   useEffect(() => {
     setDailyEmailSummaryForm({ ...DEFAULT_DAILY_EMAIL_SUMMARY_SETTINGS, ...(dailyEmailSummarySettings || {}) });
   }, [dailyEmailSummarySettings]);
+
+  const handleSaveGeneralSection = useCallback(async () => {
+    try {
+      setGeneralSectionSaving(true);
+      await onSaveGeneralSettings?.(generalForm);
+      const savedDailySummary = await onSaveDailyEmailSummarySettings?.(dailyEmailSummaryForm);
+      if (savedDailySummary) {
+        setDailyEmailSummaryForm({
+          ...DEFAULT_DAILY_EMAIL_SUMMARY_SETTINGS,
+          ...savedDailySummary,
+        });
+      }
+    } finally {
+      setGeneralSectionSaving(false);
+    }
+  }, [dailyEmailSummaryForm, generalForm, onSaveDailyEmailSummarySettings, onSaveGeneralSettings]);
 
   useEffect(() => {
     setWorkflows(Array.isArray(automationWorkflows) ? automationWorkflows : []);
@@ -3109,7 +3127,7 @@ const RequestFormSettingsModal = ({
                         <div className="max-w-xl">
                           <div className="text-[16px] font-bold text-gray-900">Daily Report Delivery</div>
                           <p className="mt-2 text-[14px] leading-6 text-gray-600">
-                            Choose what time administrators and technicians should receive their company daily report email.
+                            Choose what time administrators, technicians, and clients should receive their company daily report email.
                           </p>
                         </div>
                         <div className="min-w-[180px]">
@@ -3122,7 +3140,7 @@ const RequestFormSettingsModal = ({
                           />
                         </div>
                       </div>
-                      <div className="mt-4 grid gap-3 md:grid-cols-2">
+                      <div className="mt-4 grid gap-3 md:grid-cols-3">
                         <label className="flex items-center gap-3 rounded-xl border border-white bg-white/80 p-4 text-sm text-gray-700">
                           <input
                             type="checkbox"
@@ -3140,6 +3158,15 @@ const RequestFormSettingsModal = ({
                             className="h-4 w-4"
                           />
                           Send assigned-work summary to technicians
+                        </label>
+                        <label className="flex items-center gap-3 rounded-xl border border-white bg-white/80 p-4 text-sm text-gray-700">
+                          <input
+                            type="checkbox"
+                            checked={!!dailyEmailSummaryForm.clientDailySummary}
+                            onChange={(e) => setDailyEmailSummaryForm((prev) => ({ ...prev, clientDailySummary: e.target.checked }))}
+                            className="h-4 w-4"
+                          />
+                          Send company summary to clients
                         </label>
                       </div>
                     </div>
@@ -4570,13 +4597,11 @@ const RequestFormSettingsModal = ({
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    onSaveGeneralSettings?.(generalForm);
-                    onSaveDailyEmailSummarySettings?.(dailyEmailSummaryForm);
-                  }}
-                  className="rounded-md bg-blue-600 px-5 py-2.5 text-[15px] font-semibold text-white hover:bg-blue-700"
+                  onClick={handleSaveGeneralSection}
+                  disabled={generalSectionSaving}
+                  className="rounded-md bg-blue-600 px-5 py-2.5 text-[15px] font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300"
                 >
-                  Save
+                  {generalSectionSaving ? 'Saving...' : 'Save'}
                 </button>
               </div>
             ) : null}
