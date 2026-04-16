@@ -501,8 +501,7 @@ const createEmptyPropertyForm = () => ({
   name: '',
   type: '',
   address: '',
-  beds: '',
-  baths: '',
+  Bathroom: '',
   area: '',
   floors: '',
   blocks: '',
@@ -13488,21 +13487,22 @@ function ClientDashboard() {
       setPropertyForm(createEmptyPropertyForm());
       return;
     }
-    const named = Array.isArray(property.blocks) || (property.blocks && Number.isNaN(parseInt(String(property.blocks), 10)));
-    setEditingProperty(property);
-    setPropertyFiles(null);
-    setPropertyUseNamedBlocks(!!named);
-    setPropertyForm({
-      ...createEmptyPropertyForm(),
-      name: property.name || '',
-      type: property.type || '',
-      address: property.address || '',
-      beds: property.beds || '',
-      baths: property.baths || '',
-      area: property.area || '',
+      const normalizedBlocks = Array.isArray(property.blocks)
+        ? property.blocks.map((item) => String(item).trim()).filter(Boolean).join(', ')
+        : String(property.blocks || '').trim();
+      setEditingProperty(property);
+      setPropertyFiles(null);
+      setPropertyUseNamedBlocks(true);
+      setPropertyForm({
+        ...createEmptyPropertyForm(),
+        name: property.name || '',
+        type: property.type || '',
+        address: property.address || '',
+        Bathroom: property.Bathroom || '',
+        area: property.area || '',
       floors: property.floors || '',
-      blocks: !named ? (property.blocks || '') : '',
-      namedBlocks: named ? (Array.isArray(property.blocks) ? property.blocks : String(property.blocks).split(/[;,|]/).map((item) => item.trim()).filter(Boolean)) : [],
+      blocks: normalizedBlocks,
+      namedBlocks: normalizedBlocks ? normalizedBlocks.split(/[;,|]/).map((item) => item.trim()).filter(Boolean) : [],
       rooms: property.rooms || '',
       roomNames: Array.isArray(property.roomNames) ? property.roomNames : (property.roomNames ? String(property.roomNames).split(/[;,|]/).map((item) => item.trim()).filter(Boolean) : []),
       latitude: property.latitude ?? '',
@@ -25091,10 +25091,10 @@ function ClientDashboard() {
                       const userId = getCurrentUserId();
                       const payload = {
                         ...propertyForm,
-                        beds: propertyForm.beds ? +propertyForm.beds : undefined,
-                        baths: propertyForm.baths ? +propertyForm.baths : undefined,
+
+                        Bathroom: propertyForm.Bathroom ? +propertyForm.Bathroom : undefined,
                         area: propertyForm.area ? +propertyForm.area : undefined,
-                        floors: propertyForm.floors ? +propertyForm.floors : undefined,
+                        floors: propertyForm.floors ? String(propertyForm.floors).trim() : undefined,
                         rooms: propertyForm.rooms ? +propertyForm.rooms : undefined,
                         assignedWorkers: Array.isArray(propertyForm.assignedWorkers) ? propertyForm.assignedWorkers : [],
                         assignedTeam: propertyForm.assignedTeam || '',
@@ -25104,13 +25104,8 @@ function ClientDashboard() {
                         clientId: userId,
                         userId
                       };
-                      if (propertyUseNamedBlocks) {
-                        payload.blocks = (propertyForm.namedBlocks || []).join(',');
-                        payload.blocksModifiable = true;
-                      } else {
-                        payload.blocks = propertyForm.blocks ? +propertyForm.blocks : undefined;
-                        payload.blocksModifiable = false;
-                      }
+                      payload.blocks = propertyForm.blocks ? String(propertyForm.blocks).trim() : undefined;
+                      payload.blocksModifiable = true;
                       if (propertyForm.roomNames && Array.isArray(propertyForm.roomNames)) payload.roomNames = propertyForm.roomNames.join(',');
                       const eid = editingProperty._id || editingProperty.id;
                       if (eid) {
@@ -25138,7 +25133,7 @@ function ClientDashboard() {
                     <div className="mx-auto max-w-[560px] px-6 py-10">
                       <div className="mb-8 text-[2rem] font-bold text-gray-900">Location Information</div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(1, minmax(0, 1fr))', gap: 20 }}>
-                      {[['Location Name', 'name', 'text', true], ['Type', 'type', 'text', true], ['Address', 'address', 'text', true], ['Beds', 'beds', 'number'], ['Baths', 'baths', 'number'], ['Area (sqft)', 'area', 'number'], ['Floors', 'floors', 'number'], ['Blocks', 'blocks', 'number'], ['Rooms', 'rooms', 'number']].map(([ph, field, type, req]) => (
+                      {[['Location Name', 'name', 'text', true], ['Type', 'type', 'text', true], ['Address', 'address', 'text', true], ['Bathroom', 'Bathroom', 'number'], ['Area (sqft)', 'area', 'number'], ['Floor Name(s)', 'floors', 'text'], ['Block Name(s)', 'blocks', 'text'], ['Rooms', 'rooms', 'number']].map(([ph, field, type, req]) => (
                         <div key={field}>
                           <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{ph}</label>
                           <Input placeholder={ph} type={type} value={propertyForm[field]} onChange={e => setPropertyForm(f => ({ ...f, [field]: e.target.value }))} required={req} />
@@ -25393,11 +25388,10 @@ function ClientDashboard() {
                             ['Location Name', propertyForm.name || '—'],
                             ['Type', propertyForm.type || '—'],
                             ['Address', propertyForm.address || '—'],
-                            ['Beds', propertyForm.beds || '—'],
-                            ['Baths', propertyForm.baths || '—'],
+                            ['Bathroom', propertyForm.Bathroom || '—'],
                             ['Area (sqft)', propertyForm.area || '—'],
-                            ['Floors', propertyForm.floors || '—'],
-                            ['Blocks', propertyForm.blocks || '—'],
+                            ['Floor Name(s)', propertyForm.floors || '—'],
+                            ['Block Name(s)', propertyForm.blocks || '—'],
                             ['Rooms', propertyForm.rooms || '—'],
                             ['Room Names', (propertyForm.roomNames || []).join(', ') || '—'],
                             ['Photos', propertyFiles?.length ? `${propertyFiles.length} selected` : '0'],
