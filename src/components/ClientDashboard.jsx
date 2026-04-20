@@ -12,7 +12,7 @@ import { useCompanySubscription } from '../hooks/useCompanySubscription';
 import { useSubscription } from '../hooks/useSubscription';
 import { getImageUrl } from '../utils/imageUrl';
 import { useLanguage, useTranslation } from "../i18n/LanguageContext";
-import { Clock, Calendar, CheckCircle, ClipboardCheck, X, Bell, Download, Package, ShoppingCart, Gauge, Plus, Search, Eye, MapPin, AlertCircle, Repeat, Edit, Pencil, ChevronLeft, ChevronRight, ChevronDown, SlidersHorizontal, Flag, MoreHorizontal, MoreVertical, Trash2, Image as ImageIcon, Tag, Paperclip, MessageSquare, Send, Navigation, DollarSign, Bookmark, Link2, FileText, Copy, Archive, ArrowUpDown, ArrowRight, ArrowLeft, LayoutDashboard, Settings, Users, RotateCcw, Zap, Globe, Activity, QrCode, GripVertical, Info } from 'lucide-react';
+import { Clock, Calendar, CheckCircle, ClipboardCheck, X, Bell, Download, Package, ShoppingCart, Gauge, Plus, Search, Eye, MapPin, AlertCircle, Repeat, Edit, Pencil, ChevronLeft, ChevronRight, ChevronDown, SlidersHorizontal, Flag, MoreHorizontal, MoreVertical, Trash2, Image as ImageIcon, Tag, Paperclip, MessageSquare, Send, Navigation, DollarSign, Bookmark, Link2, FileText, Copy, Archive, ArrowUpDown, ArrowRight, ArrowLeft, LayoutDashboard, Settings, Users, RotateCcw, Zap, Globe, Activity, QrCode, GripVertical, Info, Box } from 'lucide-react';
 
 const ASSISTANT_ACTION_STORAGE_KEY = 'mms_assistant_action';
 const REQUEST_FORM_SETTINGS_STORAGE_KEY = 'mms_request_form_settings';
@@ -23361,14 +23361,14 @@ function ClientDashboard() {
                           <th className="px-4 py-4 text-left w-10"><input type="checkbox" className="rounded border-gray-300" /></th>
                           <th className="px-4 py-4 text-left font-bold">Name</th>
                           <th className="px-4 py-4 text-left font-bold">ID</th>
-                          <th className="px-4 py-4 text-left font-bold">Workorder</th>
+                          <th className="px-4 py-4 text-left font-bold">Work Order</th>
                           <th className="px-4 py-4 text-left font-bold">Title</th>
                           <th className="px-4 py-4 text-left font-bold">Work Order Description</th>
                           <th className="px-4 py-4 text-left font-bold">Image</th>
                           <th className="px-4 py-4 text-left font-bold">Assets & Locations</th>
                           <th className="px-4 py-4 text-left font-bold">Category</th>
                           <th className="px-4 py-4 text-left font-bold">Priority</th>
-                          <th className="px-4 py-4 text-left font-bold">Paused</th>
+                          <th className="px-4 py-4 text-left font-bold">Pause</th>
                           <th className="px-4 py-4 text-left font-bold">Checklist</th>
                           <th className="px-4 py-4 text-left font-bold">Created Date</th>
                         </tr>
@@ -28808,7 +28808,11 @@ function ClientDashboard() {
           )}
           {/* â”€â”€ Parts & Inventory â”€â”€ */}
           {activeTab === 'parts' && (
-            <ClientPartsTab />
+            <ClientPartsTab
+              properties={properties}
+              branches={branches}
+              people={people}
+            />
           )}
 
           {/* â”€â”€ Purchase Orders â”€â”€ */}
@@ -30979,28 +30983,8 @@ const ClientIntelligenceTab = ({
 };
 
 
-const ClientPartsTab = () => {
-  const [items, setItems] = React.useState([]);
-  const [search, setSearch] = React.useState('');
-  const [statusFilter, setStatusFilter] = React.useState('');
-  const [categoryFilter, setCategoryFilter] = React.useState('');
-  const [locationFilter, setLocationFilter] = React.useState('');
-  const fileRef = React.useRef(null);
-  const partFileInputRef = React.useRef(null);
-  const [showAddPart, setShowAddPart] = React.useState(false);
-  const [savingPart, setSavingPart] = React.useState(false);
-  const [selectedPart, setSelectedPart] = React.useState(null);
-  const [partDetailOpen, setPartDetailOpen] = React.useState(false);
-  const [partDetailTab, setPartDetailTab] = React.useState('details');
-  const [relatedIssues, setRelatedIssues] = React.useState([]);
-  const [relatedAssets, setRelatedAssets] = React.useState([]);
-  const [partFiles, setPartFiles] = React.useState([]);
-  const [partEditMode, setPartEditMode] = React.useState(false);
-  const [partEditSaving, setPartEditSaving] = React.useState(false);
-  const [partAdjustSaving, setPartAdjustSaving] = React.useState(false);
-  const [partEditForm, setPartEditForm] = React.useState(null);
-  const [partAdjustmentForm, setPartAdjustmentForm] = React.useState({ quantity: 1, reason: '' });
-  const [newPart, setNewPart] = React.useState({
+const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
+  const createEmptyPart = () => ({
     name: '',
     partNumber: '',
     category: '',
@@ -31017,12 +31001,193 @@ const ClientPartsTab = () => {
     critical: false,
     inventoryLines: [{ location: '', area: '', minQty: '', maxQty: '', availQty: '', cost: '', barcode: '' }]
   });
-  React.useEffect(() => {
-    (async () => {
-      try { const res = await api.get('/api/parts'); setItems(res.data || []); }
-      catch { setItems([]); }
-    })();
+  const createEmptySet = () => ({ name: '', description: '', location: '', status: 'ACTIVE', tags: [], notes: '', partIds: [] });
+  const createEmptyCycleCount = () => ({
+    name: '',
+    description: '',
+    location: '',
+    locationId: '',
+    locationType: '',
+    status: 'SCHEDULED',
+    frequency: 'MONTHLY',
+    scheduledDate: '',
+    lastCountDate: '',
+    assignedTo: '',
+    tags: [],
+    notes: '',
+  });
+  const formatLabel = (value) => String(value || '').replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+  const formatDateCell = (value) => {
+    if (!value) return '—';
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString();
+  };
+  const getTagList = (entry) => Array.isArray(entry?.tags) ? entry.tags.filter(Boolean) : [];
+  const getStatusBadgeClasses = (value) => {
+    const normalized = String(value || '').toUpperCase();
+    if (normalized.includes('OUT')) return 'border border-rose-100 bg-rose-50 text-rose-700';
+    if (normalized.includes('LOW') || normalized.includes('PROGRESS')) return 'border border-amber-100 bg-amber-50 text-amber-700';
+    if (normalized.includes('COMPLETE') || normalized.includes('ACTIVE') || normalized.includes('STOCK_IN') || normalized.includes('SCHEDULED')) return 'border border-emerald-100 bg-emerald-50 text-emerald-700';
+    return 'border border-slate-200 bg-slate-100 text-slate-700';
+  };
+  const getFilterButtonClasses = (active) => `inline-flex h-11 items-center gap-2 rounded-xl border px-4 text-sm font-medium transition ${
+    active ? 'border-blue-200 bg-blue-50 text-blue-700 shadow-sm' : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+  }`;
+
+  const [items, setItems] = React.useState([]);
+  const [inventorySets, setInventorySets] = React.useState([]);
+  const [cycleCounts, setCycleCounts] = React.useState([]);
+  const [inventoryAssets, setInventoryAssets] = React.useState([]);
+  const [search, setSearch] = React.useState('');
+  const [statusFilter, setStatusFilter] = React.useState('');
+  const [locationFilter, setLocationFilter] = React.useState('');
+  const [tagFilter, setTagFilter] = React.useState('');
+  const [sortField, setSortField] = React.useState('incomingDesc');
+  const [activeInventoryTab, setActiveInventoryTab] = React.useState('parts');
+  const fileRef = React.useRef(null);
+  const partFileInputRef = React.useRef(null);
+  const [showAddPart, setShowAddPart] = React.useState(false);
+  const [showAddSet, setShowAddSet] = React.useState(false);
+  const [showAddCycleCount, setShowAddCycleCount] = React.useState(false);
+  const [savingPart, setSavingPart] = React.useState(false);
+  const [savingSet, setSavingSet] = React.useState(false);
+  const [savingCycleCount, setSavingCycleCount] = React.useState(false);
+  const [selectedPart, setSelectedPart] = React.useState(null);
+  const [partDetailOpen, setPartDetailOpen] = React.useState(false);
+  const [partDetailTab, setPartDetailTab] = React.useState('details');
+  const [relatedIssues, setRelatedIssues] = React.useState([]);
+  const [relatedAssets, setRelatedAssets] = React.useState([]);
+  const [partFiles, setPartFiles] = React.useState([]);
+  const [partEditMode, setPartEditMode] = React.useState(false);
+  const [partEditSaving, setPartEditSaving] = React.useState(false);
+  const [partAdjustSaving, setPartAdjustSaving] = React.useState(false);
+  const [partEditForm, setPartEditForm] = React.useState(null);
+  const [partAdjustmentForm, setPartAdjustmentForm] = React.useState({ quantity: 1, reason: '' });
+  const [newPart, setNewPart] = React.useState(createEmptyPart());
+  const [newSet, setNewSet] = React.useState(createEmptySet());
+  const [newCycleCount, setNewCycleCount] = React.useState(createEmptyCycleCount());
+  const [showPartSelector, setShowPartSelector] = React.useState(false);
+  const [setPartsSearch, setSetPartsSearch] = React.useState('');
+  const [cycleCountLocationSearch, setCycleCountLocationSearch] = React.useState('');
+  const [cycleCountAssignedSearch, setCycleCountAssignedSearch] = React.useState('');
+  const [cycleCountLocationOpen, setCycleCountLocationOpen] = React.useState(false);
+  const [cycleCountAssignedOpen, setCycleCountAssignedOpen] = React.useState(false);
+  const [users, setUsers] = React.useState([]);
+
+  const loadInventoryData = React.useCallback(async () => {
+    try {
+      const [partsRes, setsRes, cycleCountsRes, usersRes, assetsRes] = await Promise.all([
+        api.get('/api/parts'),
+        api.get('/api/inventory-sets'),
+        api.get('/api/cycle-counts'),
+        api.get('/api/users').catch(() => ({ data: [] })),
+        api.get('/api/assets').catch(() => ({ data: [] })),
+      ]);
+      setItems(Array.isArray(partsRes?.data) ? partsRes.data : []);
+      setInventorySets(Array.isArray(setsRes?.data) ? setsRes.data : []);
+      setCycleCounts(Array.isArray(cycleCountsRes?.data) ? cycleCountsRes.data : []);
+      setUsers(Array.isArray(usersRes?.data) ? usersRes.data : []);
+      setInventoryAssets(Array.isArray(assetsRes?.data) ? assetsRes.data : []);
+    } catch (error) {
+      console.error('Failed to load parts and inventory data', error);
+      setItems([]);
+      setInventorySets([]);
+      setCycleCounts([]);
+      setUsers([]);
+      setInventoryAssets([]);
+    }
   }, []);
+
+  React.useEffect(() => {
+    loadInventoryData();
+  }, [loadInventoryData]);
+
+  const addPartToSet = (partId) => {
+    setNewSet((prev) => ({
+      ...prev,
+      partIds: Array.from(new Set([...(prev.partIds || []), partId]))
+    }));
+  };
+
+  const removePartFromSet = (partId) => {
+    setNewSet((prev) => ({
+      ...prev,
+      partIds: (prev.partIds || []).filter((id) => id !== partId)
+    }));
+  };
+
+  const getSelectedParts = () => {
+    if (!Array.isArray(newSet.partIds) || newSet.partIds.length === 0) return [];
+    return items.filter((item) => newSet.partIds.includes(item._id || item.id));
+  };
+
+  const filterableSetParts = React.useMemo(() => {
+    const query = String(setPartsSearch || '').trim().toLowerCase();
+    const availableParts = items.filter((part) => !newSet.partIds?.includes(part._id || part.id));
+    if (!query) return availableParts;
+    return availableParts.filter((part) => {
+      const searchableText = [part.name, part.partNumber, part.category, part.location].join(' ').toLowerCase();
+      return searchableText.includes(query);
+    });
+  }, [items, newSet.partIds, setPartsSearch]);
+
+  const filteredCycleCountLocations = React.useMemo(() => {
+    const query = String(cycleCountLocationSearch || '').trim().toLowerCase();
+    
+    // Combine properties and branches as location options (like in Asset form)
+    const locationOptions = [
+      ...(properties || []).map(p => ({
+        id: p.id || p._id,
+        name: p.name || p.propertyName || '',
+        type: 'property'
+      })),
+      ...(branches || []).map(b => ({
+        id: b.id || b._id,
+        name: b.branchName || b.name || '',
+        type: 'branch'
+      }))
+    ].filter(loc => loc.name && loc.name.trim());
+
+    if (!query) return locationOptions;
+    return locationOptions.filter(loc => loc.name.toLowerCase().includes(query));
+  }, [properties, branches, cycleCountLocationSearch]);
+
+  const filteredCycleCountUsers = React.useMemo(() => {
+    const query = String(cycleCountAssignedSearch || '').trim().toLowerCase();
+    const availableUsers = Array.isArray(users) && users.length > 0
+      ? users
+      : (people || []).filter((person) => person?.kind !== 'invite');
+    
+    // Get current user's company
+    let userCompanyName = '';
+    try {
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      userCompanyName = String(user?.companyName || '').trim().toLowerCase();
+    } catch (err) {
+      console.error('Failed to get user company', err);
+    }
+
+    // Filter users by company
+    const companyUsers = availableUsers.filter((u) => {
+      if (!u || !(u.name || u.email)) return false;
+      const uCompany = String(u?.companyName || '').trim().toLowerCase();
+      return !userCompanyName || uCompany === userCompanyName;
+    });
+
+    const userOptions = companyUsers
+      .map((u) => ({
+        id: u._id || u.id,
+        name: u.name || u.email || '',
+        email: u.email || '',
+        role: u.role || ''
+      }))
+      .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    
+    if (!query) return userOptions;
+    return userOptions.filter((user) => 
+      (user.name.toLowerCase().includes(query) || user.email.toLowerCase().includes(query))
+    );
+  }, [users, people, cycleCountAssignedSearch]);
   React.useEffect(() => {
     if (!selectedPart?._id && !selectedPart?.id) return;
     const partId = selectedPart._id || selectedPart.id;
@@ -31037,7 +31202,10 @@ const ClientPartsTab = () => {
           api.get(`/api/parts/${partId}`),
         ]);
         const freshPart = freshPartRes?.data || selectedPart;
-        setSelectedPart(freshPart);
+        // Only update if the data actually changed
+        if (JSON.stringify(freshPart) !== JSON.stringify(selectedPart)) {
+          setSelectedPart(freshPart);
+        }
         setPartEditForm({
           name: freshPart.name || '',
           partNumber: freshPart.partNumber || '',
@@ -31082,37 +31250,125 @@ const ClientPartsTab = () => {
     () => Array.from(new Set((items || []).map((item) => String(item?.status || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
     [items]
   );
-  const partCategoryOptions = React.useMemo(
-    () => Array.from(new Set((items || []).map((item) => String(item?.category || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
-    [items]
+  const setStatusOptions = React.useMemo(
+    () => Array.from(new Set((inventorySets || []).map((item) => String(item?.status || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    [inventorySets]
   );
-  const partLocationOptions = React.useMemo(
-    () => Array.from(new Set((items || []).map((item) => String(item?.location || item?.warehouse || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
-    [items]
+  const cycleCountStatusOptions = React.useMemo(
+    () => Array.from(new Set((cycleCounts || []).map((item) => String(item?.status || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    [cycleCounts]
   );
-  const filtered = React.useMemo(() => {
+  const inventoryLocationOptions = React.useMemo(
+    () => {
+      // Get current user's company
+      let userCompanyName = '';
+      try {
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        userCompanyName = String(user?.companyName || '').trim().toLowerCase();
+      } catch (err) {
+        console.error('Failed to get user company', err);
+      }
+
+      if (!userCompanyName) {
+        return [];
+      }
+
+      // Filter all items by company STRICTLY
+      const companyParts = (items || []).filter((item) => {
+        const itemCompany = String(item?.companyName || '').trim().toLowerCase();
+        const itemLocation = String(item?.location || item?.warehouse || '').trim();
+        return itemCompany === userCompanyName && itemLocation.length > 0;
+      });
+
+      const companySets = (inventorySets || []).filter((item) => {
+        const itemCompany = String(item?.companyName || '').trim().toLowerCase();
+        const itemLocation = String(item?.location || '').trim();
+        return itemCompany === userCompanyName && itemLocation.length > 0;
+      });
+
+      const companyCounts = (cycleCounts || []).filter((item) => {
+        const itemCompany = String(item?.companyName || '').trim().toLowerCase();
+        const itemLocation = String(item?.location || '').trim();
+        return itemCompany === userCompanyName && itemLocation.length > 0;
+      });
+
+      return Array.from(new Set([
+        ...companyParts.map((item) => String(item?.location || item?.warehouse || '').trim()),
+        ...companySets.map((item) => String(item?.location || '').trim()),
+        ...companyCounts.map((item) => String(item?.location || '').trim()),
+      ].filter((loc) => loc && loc.length > 0))).sort((a, b) => a.localeCompare(b));
+    },
+    [cycleCounts, inventorySets, items]
+  );
+  const inventoryTagOptions = React.useMemo(
+    () => Array.from(new Set([
+      ...(items || []).flatMap((item) => getTagList(item)),
+      ...(inventorySets || []).flatMap((item) => getTagList(item)),
+      ...(cycleCounts || []).flatMap((item) => getTagList(item)),
+    ])).sort((a, b) => a.localeCompare(b)),
+    [cycleCounts, inventorySets, items]
+  );
+  const filteredParts = React.useMemo(() => {
     const query = String(search || '').trim().toLowerCase();
-    return (items || []).filter((it) => {
+    const next = (items || []).filter((it) => {
       const status = String(it?.status || '').trim();
-      const category = String(it?.category || '').trim();
       const location = String(it?.location || it?.warehouse || '').trim();
       if (statusFilter && status !== statusFilter) return false;
-      if (categoryFilter && category !== categoryFilter) return false;
       if (locationFilter && location !== locationFilter) return false;
+      if (tagFilter && !getTagList(it).includes(tagFilter)) return false;
       if (!query) return true;
       const haystack = [
         it?.name,
         it?.partName,
         it?.partNumber,
-        category,
+        it?.category,
         status,
         location,
+        getTagList(it).join(' '),
         it?._id,
         it?.id,
       ].join(' ').toLowerCase();
       return haystack.includes(query);
     });
-  }, [categoryFilter, items, locationFilter, search, statusFilter]);
+    return next.sort((left, right) => {
+      if (sortField === 'availableDesc') return Number(right?.available || 0) - Number(left?.available || 0);
+      if (sortField === 'onHandDesc') return Number(right?.onHand || 0) - Number(left?.onHand || 0);
+      if (sortField === 'statusAsc') return String(left?.status || '').localeCompare(String(right?.status || ''));
+      if (sortField === 'nameAsc') return String(left?.name || '').localeCompare(String(right?.name || ''));
+      return Number(right?.incoming || 0) - Number(left?.incoming || 0);
+    });
+  }, [items, locationFilter, search, sortField, statusFilter, tagFilter]);
+  const filteredSets = React.useMemo(() => {
+    const query = String(search || '').trim().toLowerCase();
+    return (inventorySets || []).filter((entry) => {
+      const status = String(entry?.status || '').trim();
+      const location = String(entry?.location || '').trim();
+      if (statusFilter && status !== statusFilter) return false;
+      if (locationFilter && location !== locationFilter) return false;
+      if (tagFilter && !getTagList(entry).includes(tagFilter)) return false;
+      if (!query) return true;
+      return [entry?.name, entry?.description, entry?.location, entry?.notes, getTagList(entry).join(' ')].join(' ').toLowerCase().includes(query);
+    });
+  }, [inventorySets, locationFilter, search, statusFilter, tagFilter]);
+  const filteredCycleCounts = React.useMemo(() => {
+    const query = String(search || '').trim().toLowerCase();
+    return (cycleCounts || []).filter((entry) => {
+      const status = String(entry?.status || '').trim();
+      const location = String(entry?.location || '').trim();
+      if (statusFilter && status !== statusFilter) return false;
+      if (locationFilter && location !== locationFilter) return false;
+      if (tagFilter && !getTagList(entry).includes(tagFilter)) return false;
+      if (!query) return true;
+      return [entry?.name, entry?.description, entry?.location, entry?.frequency, entry?.assignedTo, getTagList(entry).join(' ')].join(' ').toLowerCase().includes(query);
+    });
+  }, [cycleCounts, locationFilter, search, statusFilter, tagFilter]);
+  const activeRows = activeInventoryTab === 'parts' ? filteredParts : activeInventoryTab === 'sets' ? filteredSets : filteredCycleCounts;
+  const activeStatusOptions = activeInventoryTab === 'parts' ? partStatusOptions : activeInventoryTab === 'sets' ? setStatusOptions : cycleCountStatusOptions;
+  const activeSummaryLabel = activeInventoryTab === 'parts' ? 'parts' : activeInventoryTab === 'sets' ? 'sets' : 'cycle counts';
+  const filtered = filteredParts;
+  const categoryFilter = '';
+  const setCategoryFilter = () => {};
+  const partCategoryOptions = [];
   const openPartDetails = (part) => {
     setSelectedPart(part);
     setPartDetailTab('details');
@@ -31185,11 +31441,15 @@ const ClientPartsTab = () => {
     }
   };
   const exportCSV = () => {
-    if (!filtered.length) return;
-    const keys = ['name', 'status', 'available', 'allocated', 'onHand', 'incoming', 'location'];
-    const rows = filtered.map(it => ({ name: it.name || it.partName || '', status: it.status || '', available: it.available || it.availableQty || it.quantity || 0, allocated: it.allocated || 0, onHand: it.onHand || 0, incoming: it.incoming || 0, location: it.location || it.warehouse || '' }));
+    if (!activeRows.length) return;
+    const rows = activeInventoryTab === 'parts'
+      ? activeRows.map((it) => ({ name: it.name || it.partName || '', status: it.status || '', available: it.available || it.availableQty || it.quantity || 0, allocated: it.allocated || 0, onHand: it.onHand || 0, incoming: it.incoming || 0, location: it.location || it.warehouse || '', tags: getTagList(it).join(' | ') }))
+      : activeInventoryTab === 'sets'
+        ? activeRows.map((it) => ({ name: it.name || '', status: it.status || '', location: it.location || '', tags: getTagList(it).join(' | '), notes: it.notes || it.description || '', updatedAt: formatDateCell(it.updatedAt) }))
+        : activeRows.map((it) => ({ name: it.name || '', status: it.status || '', frequency: it.frequency || '', scheduledDate: formatDateCell(it.scheduledDate), lastCountDate: formatDateCell(it.lastCountDate), assignedTo: it.assignedTo || '', location: it.location || '' }));
+    const keys = Object.keys(rows[0] || {});
     const csv = [keys.join(',')].concat(rows.map(r => keys.map(k => `"${String(r[k] ?? '').replace(/"/g, '""')}"`).join(','))).join('\n');
-    const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(new Blob([csv], { type: 'text/csv' })), download: 'parts.csv' }); a.click();
+    const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(new Blob([csv], { type: 'text/csv' })), download: `${activeInventoryTab}.csv` }); a.click();
   };
 
   const parseCsv = (text) => {
@@ -31212,13 +31472,14 @@ const ClientPartsTab = () => {
         const rows = parseCsv(reader.result || '');
         const payload = rows.map(r => ({
           name: r.name || r.part || r.partname || '',
-          status: r.status || 'AVAILABLE',
+          status: r.status || 'STOCK_IN',
           available: Number(r.available || r.availableqty || r.quantity || 0),
           allocated: Number(r.allocated || r.allocatedqty || 0),
           onHand: Number(r.onhand || r.on_hand || 0),
           incoming: Number(r.incoming || r.incomingqty || 0),
           location: r.location || r.warehouse || '',
-          barcode: r.barcode || ''
+          barcode: r.barcode || '',
+          tags: String(r.tags || '').split(',').map((item) => item.trim()).filter(Boolean)
         })).filter(p => p.name);
         if (!payload.length) {
           alert('No valid rows found in CSV.');
@@ -31226,7 +31487,6 @@ const ClientPartsTab = () => {
         }
         const res = await api.post('/api/parts/bulk', { items: payload });
         setItems(prev => [...(res.data || []), ...(prev || [])]);
-        alert(`Imported ${payload.length} parts`);
       } catch (err) {
         console.error('Import failed', err);
         alert('Failed to import parts: ' + (err.response?.data?.error || err.message));
@@ -31243,42 +31503,9 @@ const ClientPartsTab = () => {
     }
     setSavingPart(true);
     try {
-      const payload = {
-        name: newPart.name,
-        status: newPart.status,
-        available: newPart.available,
-        allocated: newPart.allocated,
-        onHand: newPart.onHand,
-        incoming: newPart.incoming,
-        location: newPart.location,
-        barcode: newPart.barcode,
-        partNumber: newPart.partNumber,
-        category: newPart.category,
-        tags: newPart.tags,
-        description: newPart.description,
-        nonStock: newPart.nonStock,
-        critical: newPart.critical,
-        inventoryLines: newPart.inventoryLines
-      };
-      const res = await api.post('/api/parts', payload);
+      const res = await api.post('/api/parts', newPart);
       setItems(prev => [res.data, ...(prev || [])]);
-      setNewPart({
-        name: '',
-        partNumber: '',
-        category: '',
-        tags: [],
-        description: '',
-        status: 'AVAILABLE',
-        available: 0,
-        allocated: 0,
-        onHand: 0,
-        incoming: 0,
-        location: '',
-        barcode: '',
-        nonStock: false,
-        critical: false,
-        inventoryLines: [{ location: '', area: '', minQty: '', maxQty: '', availQty: '', cost: '', barcode: '' }]
-      });
+      setNewPart(createEmptyPart());
       setShowAddPart(false);
     } catch (err) {
       alert(err.response?.data?.error || err.message);
@@ -31286,20 +31513,121 @@ const ClientPartsTab = () => {
       setSavingPart(false);
     }
   };
+  const saveSet = async (e) => {
+    e.preventDefault();
+    if (!newSet.name.trim()) return alert('Set name is required');
+    setSavingSet(true);
+    try {
+      const payload = {
+        ...newSet,
+        partIds: Array.isArray(newSet.partIds) ? newSet.partIds : []
+      };
+      const res = await api.post('/api/inventory-sets', payload);
+      setInventorySets((prev) => [res.data, ...(prev || [])]);
+      setNewSet(createEmptySet());
+      setShowAddSet(false);
+      setSetPartsSearch('');
+    } catch (err) {
+      alert(err?.response?.data?.error || err?.message || 'Failed to create set');
+    } finally {
+      setSavingSet(false);
+    }
+  };
+  const saveCycleCount = async (e) => {
+    e.preventDefault();
+    if (!newCycleCount.name.trim()) return alert('Cycle count name is required');
+    setSavingCycleCount(true);
+    try {
+      const res = await api.post('/api/cycle-counts', newCycleCount);
+      setCycleCounts((prev) => [res.data, ...(prev || [])]);
+      setNewCycleCount(createEmptyCycleCount());
+      setShowAddCycleCount(false);
+      setCycleCountLocationSearch('');
+      setCycleCountAssignedSearch('');
+      setCycleCountLocationOpen(false);
+      setCycleCountAssignedOpen(false);
+    } catch (err) {
+      alert(err?.response?.data?.error || err?.message || 'Failed to create cycle count');
+    } finally {
+      setSavingCycleCount(false);
+    }
+  };
+  const resetFilters = () => {
+    setSearch('');
+    setStatusFilter('');
+    setLocationFilter('');
+    setTagFilter('');
+    setSortField('incomingDesc');
+  };
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold text-gray-900">Parts &amp; Inventory</h2>
-          <p className="text-sm text-gray-500 mt-0.5">Manage parts, stock levels and locations</p>
+          <p className="text-sm text-gray-500 mt-0.5">Manage parts, sets, cycle counts, and stock tables</p>
         </div>
         <div className="flex items-center gap-3">
           <button onClick={exportCSV} className="px-3 py-2 glass-ghost rounded-xl text-sm font-semibold hover:bg-white/70">Export CSV</button>
-          <button onClick={() => fileRef.current?.click()} className="px-3 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold">Import</button>
-          <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={e => handleImport(e.target.files?.[0])} />
-          <button onClick={() => setShowAddPart(s => !s)} className="px-3 py-2 bg-white border rounded-xl text-sm font-semibold hover:bg-gray-50">
-            {showAddPart ? 'Close' : 'Add Part'}
+          {activeInventoryTab === 'parts' && (
+            <>
+              <button onClick={() => fileRef.current?.click()} className="px-3 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold">Import</button>
+              <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={e => handleImport(e.target.files?.[0])} />
+            </>
+          )}
+          <button
+            onClick={() => {
+              if (activeInventoryTab === 'parts') {
+                setShowAddPart((s) => !s);
+                setShowAddSet(false);
+                setShowAddCycleCount(false);
+              } else if (activeInventoryTab === 'sets') {
+                setShowAddSet((s) => !s);
+                setShowAddPart(false);
+                setShowAddCycleCount(false);
+              } else {
+                setShowAddCycleCount((s) => !s);
+                setShowAddPart(false);
+                setShowAddSet(false);
+              }
+            }}
+            className="px-3 py-2 bg-white border rounded-xl text-sm font-semibold hover:bg-gray-50"
+          >
+            {activeInventoryTab === 'parts' ? (showAddPart ? 'Close' : 'Add Part') : activeInventoryTab === 'sets' ? (showAddSet ? 'Close' : 'Add Set') : (showAddCycleCount ? 'Close' : 'Add Cycle Count')}
+          </button>
+        </div>
+      </div>
+      <div className="rounded-2xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center gap-2">
+            {[
+              ['parts', 'Parts', Package],
+              ['sets', 'Sets', Box],
+              ['cycleCounts', 'Cycle Counts', ClipboardCheck],
+            ].map(([key, label, Icon]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => {
+                  setActiveInventoryTab(key);
+                  setShowAddPart(false);
+                  setShowAddSet(false);
+                  setShowAddCycleCount(false);
+                  setStatusFilter('');
+                }}
+                className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition ${
+                  activeInventoryTab === key ? 'bg-blue-50 text-blue-700 shadow-sm' : 'text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                <Icon className="h-4 w-4" />
+                {label}
+              </button>
+            ))}
+          </div>
+          <button type="button" className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700">
+            <LayoutDashboard className="h-4 w-4" />
+            Table
+            <ChevronDown className="h-4 w-4" />
           </button>
         </div>
       </div>
@@ -31468,37 +31796,417 @@ const ClientPartsTab = () => {
           </div>
         </form>
       )}
+      {showAddSet && (
+        <form onSubmit={saveSet} className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <div className="text-lg font-bold text-gray-900">New Set</div>
+              <div className="text-xs text-gray-500">Bundle related parts for repeatable stocking workflows</div>
+            </div>
+            <button type="submit" disabled={savingSet} className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
+              {savingSet ? 'Saving...' : 'Create Set'}
+            </button>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-500">Set Name</label>
+              <input value={newSet.name} onChange={(e) => setNewSet((prev) => ({ ...prev, name: e.target.value }))} className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-blue-500" />
+            </div>
+            <div>
+              <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-500">Location</label>
+              <input value={newSet.location} onChange={(e) => setNewSet((prev) => ({ ...prev, location: e.target.value }))} className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-blue-500" />
+            </div>
+            <div>
+              <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-500">Status</label>
+              <select value={newSet.status} onChange={(e) => setNewSet((prev) => ({ ...prev, status: e.target.value }))} className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-blue-500">
+                <option value="ACTIVE">Active</option>
+                <option value="DRAFT">Draft</option>
+                <option value="ARCHIVED">Archived</option>
+              </select>
+            </div>
+            <div>
+              <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-500">Tags</label>
+              <input value={newSet.tags.join(', ')} onChange={(e) => setNewSet((prev) => ({ ...prev, tags: e.target.value.split(',').map((item) => item.trim()).filter(Boolean) }))} className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-blue-500" placeholder="Critical, Truck Stock" />
+            </div>
+            <div className="md:col-span-2">
+              <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-500">Description</label>
+              <textarea value={newSet.description} onChange={(e) => setNewSet((prev) => ({ ...prev, description: e.target.value }))} className="min-h-[96px] w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-blue-500" />
+            </div>
+          </div>
+          <div className="mt-6 border-t border-gray-200 pt-6">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold text-gray-900">Parts in Set</h3>
+                <p className="text-xs text-gray-500">Selected {getSelectedParts().length} part(s)</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPartSelector(!showPartSelector)}
+                className="rounded-lg bg-blue-100 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-200"
+              >
+                {showPartSelector ? 'Close' : 'Add Parts'}
+              </button>
+            </div>
+            {showPartSelector && (
+              <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-4">
+                <input
+                  type="text"
+                  placeholder="Search parts by name, number, category..."
+                  value={setPartsSearch}
+                  onChange={(e) => setSetPartsSearch(e.target.value)}
+                  className="mb-3 w-full rounded-lg border border-blue-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                />
+                <div className="max-h-[250px] overflow-y-auto rounded-lg border border-gray-200 bg-white">
+                  {filterableSetParts.length === 0 ? (
+                    <div className="px-4 py-6 text-center text-sm text-gray-500">
+                      {items.length === 0 ? 'No parts available' : 'No matching parts'}
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-gray-200">
+                      {filterableSetParts.map((part) => (
+                        <div
+                          key={part._id || part.id}
+                          className="flex items-center justify-between px-4 py-3 hover:bg-gray-50"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-gray-900 truncate">{part.name}</div>
+                            <div className="text-xs text-gray-500">
+                              {part.partNumber && `${part.partNumber} • `}
+                              Available: {part.available || 0} • Location: {part.location || 'N/A'}
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => addPartToSet(part._id || part.id)}
+                            className="ml-2 rounded-lg bg-green-100 px-3 py-1 text-xs font-semibold text-green-700 hover:bg-green-200"
+                          >
+                            Add
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            <div className="space-y-2">
+              {getSelectedParts().length === 0 ? (
+                <div className="rounded-lg border-2 border-dashed border-gray-300 px-4 py-6 text-center">
+                  <p className="text-sm text-gray-500">No parts selected yet</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-200 rounded-lg border border-gray-200">
+                  {getSelectedParts().map((part) => (
+                    <div
+                      key={part._id || part.id}
+                      className="flex items-center justify-between px-4 py-3"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-gray-900">{part.name}</div>
+                        <div className="text-xs text-gray-500">
+                          {part.partNumber} • Available: {part.available} • {part.location}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removePartFromSet(part._id || part.id)}
+                        className="ml-2 rounded-lg bg-red-100 px-3 py-1 text-xs font-semibold text-red-700 hover:bg-red-200"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </form>
+      )}
+      {showAddCycleCount && (
+        <form onSubmit={saveCycleCount} className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <div className="text-lg font-bold text-gray-900">New Cycle Count</div>
+              <div className="text-xs text-gray-500">Track recurring stock verification by location and assignee</div>
+            </div>
+            <button type="submit" disabled={savingCycleCount} className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
+              {savingCycleCount ? 'Saving...' : 'Create Cycle Count'}
+            </button>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <div>
+              <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-500">Name</label>
+              <input value={newCycleCount.name} onChange={(e) => setNewCycleCount((prev) => ({ ...prev, name: e.target.value }))} className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-blue-500" placeholder="Cycle count name" />
+            </div>
+            
+            <div>
+              <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-500">Location</label>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setCycleCountLocationOpen(!cycleCountLocationOpen)}
+                  className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm text-left outline-none focus:border-blue-500 bg-white hover:bg-gray-50 flex items-center justify-between"
+                >
+                  <span className={newCycleCount.location ? 'text-gray-900' : 'text-gray-500'}>
+                    {newCycleCount.location || 'Select location...'}
+                  </span>
+                  <ChevronDown className="h-4 w-4 text-gray-400" />
+                </button>
+                {cycleCountLocationOpen && (
+                  <div className="absolute top-full left-0 right-0 z-50 mt-2 rounded-xl border border-gray-200 bg-white shadow-lg">
+                    <input
+                      type="text"
+                      placeholder="Search locations..."
+                      value={cycleCountLocationSearch}
+                      onChange={(e) => setCycleCountLocationSearch(e.target.value)}
+                      className="w-full border-b border-gray-200 px-4 py-2 text-sm outline-none focus:bg-gray-50"
+                    />
+                    <div className="max-h-[200px] overflow-y-auto">
+                      {filteredCycleCountLocations.length === 0 ? (
+                        <div className="px-4 py-6 text-center text-sm text-gray-500">No locations found</div>
+                      ) : (
+                        filteredCycleCountLocations.map((location) => (
+                          <button
+                            key={`${location.type}-${location.id}`}
+                            type="button"
+                            onClick={() => {
+                              setNewCycleCount((prev) => ({ ...prev, location: location.name, locationId: location.id, locationType: location.type }));
+                              setCycleCountLocationOpen(false);
+                              setCycleCountLocationSearch('');
+                            }}
+                            className="w-full px-4 py-2 text-left text-sm hover:bg-blue-50 border-b border-gray-100 last:border-b-0"
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-gray-400 uppercase">{location.type}</span>
+                              <span>{location.name}</span>
+                            </div>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-500">Assigned To</label>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setCycleCountAssignedOpen(!cycleCountAssignedOpen)}
+                  className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm text-left outline-none focus:border-blue-500 bg-white hover:bg-gray-50 flex items-center justify-between"
+                >
+                  <span className={newCycleCount.assignedTo ? 'text-gray-900' : 'text-gray-500'}>
+                    {newCycleCount.assignedTo || 'Select user...'}
+                  </span>
+                  <ChevronDown className="h-4 w-4 text-gray-400" />
+                </button>
+                {cycleCountAssignedOpen && (
+                  <div className="absolute top-full left-0 right-0 z-50 mt-2 rounded-xl border border-gray-200 bg-white shadow-lg">
+                    <input
+                      type="text"
+                      placeholder="Search users..."
+                      value={cycleCountAssignedSearch}
+                      onChange={(e) => setCycleCountAssignedSearch(e.target.value)}
+                      className="w-full border-b border-gray-200 px-4 py-2 text-sm outline-none focus:bg-gray-50"
+                    />
+                    <div className="max-h-[200px] overflow-y-auto">
+                      {filteredCycleCountUsers.length === 0 ? (
+                        <div className="px-4 py-6 text-center text-sm text-gray-500">No users found</div>
+                      ) : (
+                        filteredCycleCountUsers.map((user) => (
+                          <button
+                            key={user.id}
+                            type="button"
+                            onClick={() => {
+                              setNewCycleCount((prev) => ({ ...prev, assignedTo: user.name }));
+                              setCycleCountAssignedOpen(false);
+                              setCycleCountAssignedSearch('');
+                            }}
+                            className="w-full px-4 py-2 text-left text-sm hover:bg-blue-50 border-b border-gray-100 last:border-b-0"
+                          >
+                            <div className="font-medium text-gray-900">{user.name}</div>
+                            <div className="text-xs text-gray-500">{user.email} • {user.role}</div>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-500">Status</label>
+              <select value={newCycleCount.status} onChange={(e) => setNewCycleCount((prev) => ({ ...prev, status: e.target.value }))} className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-blue-500">
+                <option value="SCHEDULED">Scheduled</option>
+                <option value="IN_PROGRESS">In Progress</option>
+                <option value="COMPLETED">Completed</option>
+              </select>
+            </div>
+            <div>
+              <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-500">Frequency</label>
+              <select value={newCycleCount.frequency} onChange={(e) => setNewCycleCount((prev) => ({ ...prev, frequency: e.target.value }))} className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-blue-500">
+                <option value="WEEKLY">Weekly</option>
+                <option value="MONTHLY">Monthly</option>
+                <option value="QUARTERLY">Quarterly</option>
+                <option value="YEARLY">Yearly</option>
+              </select>
+            </div>
+            <div>
+              <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-500">Scheduled Date</label>
+              <input type="date" value={newCycleCount.scheduledDate} onChange={(e) => setNewCycleCount((prev) => ({ ...prev, scheduledDate: e.target.value }))} className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-blue-500" />
+            </div>
+            <div>
+              <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-500">Last Count Date</label>
+              <input type="date" value={newCycleCount.lastCountDate} onChange={(e) => setNewCycleCount((prev) => ({ ...prev, lastCountDate: e.target.value }))} className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-blue-500" />
+            </div>
+          </div>
+        </form>
+      )}
+      {activeInventoryTab !== 'parts' && (
+        <>
+          <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+            <div className="mb-3 flex items-center justify-between gap-4">
+              <div className="text-sm font-semibold text-gray-700">{activeRows.length} {activeSummaryLabel} returned</div>
+              <button type="button" onClick={loadInventoryData} className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                <Repeat className="h-4 w-4" />
+                Refresh
+              </button>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="relative min-w-[240px] flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <input
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder={`Search ${activeSummaryLabel}...`}
+                  className="h-11 w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-4 text-sm text-gray-700 outline-none focus:border-blue-500"
+                />
+              </div>
+              <button type="button" className={getFilterButtonClasses(Boolean(statusFilter))}>
+                <SlidersHorizontal className="h-4 w-4" />
+                Status: {statusFilter ? formatLabel(statusFilter) : 'All'}
+                <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="bg-transparent outline-none">
+                  <option value="">All</option>
+                  {activeStatusOptions.map((status) => <option key={status} value={status}>{formatLabel(status)}</option>)}
+                </select>
+              </button>
+              <button type="button" className={getFilterButtonClasses(Boolean(locationFilter))}>
+                Location
+                <select value={locationFilter} onChange={(e) => setLocationFilter(e.target.value)} className="bg-transparent outline-none">
+                  <option value="">All</option>
+                  {inventoryLocationOptions.map((location) => <option key={location} value={location}>{location}</option>)}
+                </select>
+              </button>
+              <button type="button" className={getFilterButtonClasses(Boolean(tagFilter))}>
+                Tags
+                <select value={tagFilter} onChange={(e) => setTagFilter(e.target.value)} className="bg-transparent outline-none">
+                  <option value="">All</option>
+                  {inventoryTagOptions.map((tag) => <option key={tag} value={tag}>{tag}</option>)}
+                </select>
+              </button>
+              <button type="button" onClick={resetFilters} className="text-sm font-medium text-blue-600 hover:text-blue-700">Reset Filters</button>
+            </div>
+          </div>
+          <div className="glass-surface rounded-lg overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead className="bg-[#fcfcfd] border-b border-gray-100">
+                  {activeInventoryTab === 'sets' && <tr>{['Name', 'Status', 'Location', 'Tags', 'Notes', 'Updated'].map(h => <th key={h} className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">{h}</th>)}</tr>}
+                  {activeInventoryTab === 'cycleCounts' && <tr>{['Name', 'Status', 'Frequency', 'Scheduled', 'Last Count', 'Assigned To', 'Location'].map(h => <th key={h} className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">{h}</th>)}</tr>}
+                </thead>
+                <tbody>
+                  {activeInventoryTab === 'sets' && filteredSets.map((it, idx) => (
+                    <tr key={it._id || it.id || `set-${idx}`} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+                      <td className="py-4 px-4 text-sm font-bold text-gray-900">{it.name || 'Unnamed Set'}</td>
+                      <td className="py-4 px-4 text-sm text-gray-600"><span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getStatusBadgeClasses(it.status)}`}>{formatLabel(it.status || 'Unknown')}</span></td>
+                      <td className="py-4 px-4 text-sm text-gray-600">{it.location || '—'}</td>
+                      <td className="py-4 px-4 text-sm text-gray-600">{getTagList(it).length ? getTagList(it).join(', ') : '—'}</td>
+                      <td className="py-4 px-4 text-sm text-gray-600">{it.notes || it.description || '—'}</td>
+                      <td className="py-4 px-4 text-sm text-gray-600">{formatDateCell(it.updatedAt)}</td>
+                    </tr>
+                  ))}
+                  {activeInventoryTab === 'cycleCounts' && filteredCycleCounts.map((it, idx) => (
+                    <tr key={it._id || it.id || `cycle-${idx}`} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+                      <td className="py-4 px-4 text-sm font-bold text-gray-900">{it.name || 'Unnamed Cycle Count'}</td>
+                      <td className="py-4 px-4 text-sm text-gray-600"><span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getStatusBadgeClasses(it.status)}`}>{formatLabel(it.status || 'Unknown')}</span></td>
+                      <td className="py-4 px-4 text-sm text-gray-600">{formatLabel(it.frequency || '—')}</td>
+                      <td className="py-4 px-4 text-sm text-gray-600">{formatDateCell(it.scheduledDate)}</td>
+                      <td className="py-4 px-4 text-sm text-gray-600">{formatDateCell(it.lastCountDate)}</td>
+                      <td className="py-4 px-4 text-sm text-gray-600">{it.assignedTo || '—'}</td>
+                      <td className="py-4 px-4 text-sm text-gray-600">{it.location || '—'}</td>
+                    </tr>
+                  ))}
+                  {activeRows.length === 0 && <tr><td colSpan={activeInventoryTab === 'sets' ? 6 : 7} className="py-20 text-center text-gray-500">No {activeSummaryLabel} found</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
+      {activeInventoryTab === 'parts' && (
+      <>
       <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+        <div className="mb-3 flex items-center justify-between gap-4">
+          <div className="text-sm font-semibold text-gray-700">{activeRows.length} {activeSummaryLabel} returned</div>
+          <div className="flex items-center gap-3 text-sm text-gray-600">
+            <button type="button" onClick={loadInventoryData} className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 font-medium hover:bg-gray-50">
+              <Repeat className="h-4 w-4" />
+              Refresh
+            </button>
+            <div className="font-semibold">Sort: {sortField === 'incomingDesc' ? 'Incoming Qty' : sortField === 'availableDesc' ? 'Available Qty' : sortField === 'onHandDesc' ? 'On Hand Qty' : sortField === 'statusAsc' ? 'Status' : 'Name'}</div>
+          </div>
+        </div>
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative min-w-[240px] flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Search parts..."
+              placeholder={`Search ${activeSummaryLabel}...`}
               className="h-11 w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-4 text-sm text-gray-700 outline-none focus:border-blue-500"
             />
           </div>
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="h-11 rounded-xl border border-gray-200 bg-white px-4 text-sm text-gray-700 outline-none focus:border-blue-500">
-            <option value="">All Statuses</option>
-            {partStatusOptions.map((status) => <option key={status} value={status}>{status.replace(/_/g, ' ')}</option>)}
-          </select>
-          <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className="h-11 rounded-xl border border-gray-200 bg-white px-4 text-sm text-gray-700 outline-none focus:border-blue-500">
-            <option value="">All Categories</option>
-            {partCategoryOptions.map((category) => <option key={category} value={category}>{category}</option>)}
-          </select>
-          <select value={locationFilter} onChange={(e) => setLocationFilter(e.target.value)} className="h-11 rounded-xl border border-gray-200 bg-white px-4 text-sm text-gray-700 outline-none focus:border-blue-500">
-            <option value="">All Locations</option>
-            {partLocationOptions.map((location) => <option key={location} value={location}>{location}</option>)}
-          </select>
+          <button type="button" className={getFilterButtonClasses(Boolean(statusFilter))}>
+            <SlidersHorizontal className="h-4 w-4" />
+            Status: {statusFilter ? formatLabel(statusFilter) : 'All'}
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="bg-transparent outline-none">
+              <option value="">All</option>
+              {activeStatusOptions.map((status) => <option key={status} value={status}>{formatLabel(status)}</option>)}
+            </select>
+          </button>
+          {activeInventoryTab === 'parts' && (
+            <button type="button" className={getFilterButtonClasses(sortField !== 'incomingDesc')}>
+              <SlidersHorizontal className="h-4 w-4" />
+              {sortField === 'incomingDesc' ? 'Incoming Qty' : sortField === 'availableDesc' ? 'Available Qty' : sortField === 'onHandDesc' ? 'On Hand Qty' : sortField === 'statusAsc' ? 'Status' : 'Name'}
+              <select value={sortField} onChange={(e) => setSortField(e.target.value)} className="bg-transparent outline-none">
+                <option value="incomingDesc">Incoming Qty</option>
+                <option value="availableDesc">Available Qty</option>
+                <option value="onHandDesc">On Hand Qty</option>
+                <option value="statusAsc">Status</option>
+                <option value="nameAsc">Name</option>
+              </select>
+            </button>
+          )}
+          <button type="button" className={getFilterButtonClasses(Boolean(locationFilter))}>
+            Location
+            <select value={locationFilter} onChange={(e) => setLocationFilter(e.target.value)} className="bg-transparent outline-none">
+              <option value="">All</option>
+              {inventoryLocationOptions.map((location) => <option key={location} value={location}>{location}</option>)}
+            </select>
+          </button>
+          <button type="button" className={getFilterButtonClasses(Boolean(tagFilter))}>
+            Tags
+            <select value={tagFilter} onChange={(e) => setTagFilter(e.target.value)} className="bg-transparent outline-none">
+              <option value="">All</option>
+              {inventoryTagOptions.map((tag) => <option key={tag} value={tag}>{tag}</option>)}
+            </select>
+          </button>
           <button
             type="button"
-            onClick={() => {
-              setSearch('');
-              setStatusFilter('');
-              setCategoryFilter('');
-              setLocationFilter('');
-            }}
+            onClick={resetFilters}
             className="text-sm font-medium text-blue-600 hover:text-blue-700"
           >
             Reset Filters
@@ -31531,6 +32239,8 @@ const ClientPartsTab = () => {
           </table>
         </div>
       </div>
+      </>
+      )}
 
       {partDetailOpen && selectedPart && (
         <div className="fixed inset-0 z-[95] overflow-y-auto bg-black/60 backdrop-blur-sm p-4">
