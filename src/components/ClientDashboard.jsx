@@ -98,6 +98,18 @@ const DEFAULT_PARTS_INVENTORY_SETTINGS = {
     { name: 'Supplier', type: 'Single Line Text', source: 'Default', options: [] },
   ],
 };
+const PART_CATEGORY_OPTIONS = [
+  'Electrical',
+  'Mechanical',
+  'Plumbing',
+  'HVAC',
+  'Safety',
+  'Hardware',
+  'Supplies',
+  'Tools',
+  'Consumables',
+  'General',
+];
 const DEFAULT_WORK_ORDER_SETTINGS = {
   general: {
     includeLaborCostsInTotalCost: true,
@@ -31131,26 +31143,27 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
     });
   }, [items, newSet.partIds, setPartsSearch]);
 
-  const filteredCycleCountLocations = React.useMemo(() => {
-    const query = String(cycleCountLocationSearch || '').trim().toLowerCase();
-    
-    // Combine properties and branches as location options (like in Asset form)
-    const locationOptions = [
-      ...(properties || []).map(p => ({
+  const locationOptions = React.useMemo(
+    () => [
+      ...(properties || []).map((p) => ({
         id: p.id || p._id,
         name: p.name || p.propertyName || '',
-        type: 'property'
+        type: 'property',
       })),
-      ...(branches || []).map(b => ({
+      ...(branches || []).map((b) => ({
         id: b.id || b._id,
         name: b.branchName || b.name || '',
-        type: 'branch'
-      }))
-    ].filter(loc => loc.name && loc.name.trim());
+        type: 'branch',
+      })),
+    ].filter((loc) => loc.name && loc.name.trim()),
+    [properties, branches]
+  );
 
+  const filteredCycleCountLocations = React.useMemo(() => {
+    const query = String(cycleCountLocationSearch || '').trim().toLowerCase();
     if (!query) return locationOptions;
-    return locationOptions.filter(loc => loc.name.toLowerCase().includes(query));
-  }, [properties, branches, cycleCountLocationSearch]);
+    return locationOptions.filter((loc) => loc.name.toLowerCase().includes(query));
+  }, [locationOptions, cycleCountLocationSearch]);
 
   const filteredCycleCountUsers = React.useMemo(() => {
     const query = String(cycleCountAssignedSearch || '').trim().toLowerCase();
@@ -31273,7 +31286,6 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
         return [];
       }
 
-      // Filter all items by company STRICTLY
       const companyParts = (items || []).filter((item) => {
         const itemCompany = String(item?.companyName || '').trim().toLowerCase();
         const itemLocation = String(item?.location || item?.warehouse || '').trim();
@@ -31300,6 +31312,10 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
     },
     [cycleCounts, inventorySets, items]
   );
+  const companyLocationOptions = React.useMemo(
+    () => Array.from(new Set(locationOptions.map((location) => String(location?.name || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    [locationOptions]
+  );
   const inventoryTagOptions = React.useMemo(
     () => Array.from(new Set([
       ...(items || []).flatMap((item) => getTagList(item)),
@@ -31308,6 +31324,7 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
     ])).sort((a, b) => a.localeCompare(b)),
     [cycleCounts, inventorySets, items]
   );
+  const partCategoryOptions = React.useMemo(() => PART_CATEGORY_OPTIONS, []);
   const filteredParts = React.useMemo(() => {
     const query = String(search || '').trim().toLowerCase();
     const next = (items || []).filter((it) => {
@@ -31366,9 +31383,6 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
   const activeStatusOptions = activeInventoryTab === 'parts' ? partStatusOptions : activeInventoryTab === 'sets' ? setStatusOptions : cycleCountStatusOptions;
   const activeSummaryLabel = activeInventoryTab === 'parts' ? 'parts' : activeInventoryTab === 'sets' ? 'sets' : 'cycle counts';
   const filtered = filteredParts;
-  const categoryFilter = '';
-  const setCategoryFilter = () => {};
-  const partCategoryOptions = [];
   const openPartDetails = (part) => {
     setSelectedPart(part);
     setPartDetailTab('details');
@@ -31665,18 +31679,31 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             {[
               ['Part Name *', 'name', 'text', true],
-              ['Part Number *', 'partNumber', 'text', true],
-              ['Category', 'category', 'text', false],
+              ['Part Number', 'partNumber', 'text', false],
+              ['Category', 'category', 'select-category', false],
             ].map(([label, field, type, req]) => (
               <div key={field} className="flex flex-col gap-1">
                 <label className="text-xs font-semibold text-gray-600">{label}</label>
-                <input
-                  type={type}
-                  value={newPart[field]}
-                  onChange={e => setNewPart(p => ({ ...p, [field]: e.target.value }))}
-                  className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
-                  required={req}
-                />
+                {type === 'select-category' ? (
+                  <select
+                    value={newPart.category}
+                    onChange={e => setNewPart(p => ({ ...p, category: e.target.value }))}
+                    className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white"
+                  >
+                    <option value="">Select category</option>
+                    {partCategoryOptions.map((category) => (
+                      <option key={category} value={category}>{category}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type={type}
+                    value={newPart[field]}
+                    onChange={e => setNewPart(p => ({ ...p, [field]: e.target.value }))}
+                    className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                    required={req}
+                  />
+                )}
               </div>
             ))}
             <div className="md:col-span-3 flex flex-col gap-1">
@@ -31705,7 +31732,7 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
               ['Allocated Qty', 'allocated', 'number'],
               ['On Hand Qty', 'onHand', 'number'],
               ['Incoming Qty', 'incoming', 'number'],
-              ['Location', 'location', 'text'],
+              ['Location', 'location', 'select-location'],
               ['Barcode', 'barcode', 'text'],
             ].map(([label, field, type]) => (
               <div key={field} className="flex flex-col gap-1">
@@ -31719,6 +31746,17 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
                     <option value="STOCK_IN">Stock In</option>
                     <option value="STOCK_OUT">Stock Out</option>
                     <option value="LOW_STOCK">Low Stock</option>
+                  </select>
+                ) : type === 'select-location' ? (
+                  <select
+                    value={newPart.location}
+                    onChange={e => setNewPart(p => ({ ...p, location: e.target.value }))}
+                    className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white"
+                  >
+                    <option value="">Select company location</option>
+                    {companyLocationOptions.map((location) => (
+                      <option key={location} value={location}>{location}</option>
+                    ))}
                   </select>
                 ) : (
                   <input
@@ -31769,15 +31807,32 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
                     <tr key={idx} className="border-t">
                       {['location', 'area', 'minQty', 'maxQty', 'availQty', 'cost', 'barcode'].map(field => (
                         <td key={field} className="px-3 py-1">
-                          <input
-                            value={line[field]}
-                            onChange={e => setNewPart(p => {
-                              const next = [...p.inventoryLines];
-                              next[idx] = { ...next[idx], [field]: e.target.value };
-                              return { ...p, inventoryLines: next };
-                            })}
-                            className="w-full px-2 py-1 border border-gray-200 rounded"
-                          />
+                          {field === 'location' ? (
+                            <select
+                              value={line[field]}
+                              onChange={e => setNewPart(p => {
+                                const next = [...p.inventoryLines];
+                                next[idx] = { ...next[idx], [field]: e.target.value };
+                                return { ...p, inventoryLines: next };
+                              })}
+                              className="w-full px-2 py-1 border border-gray-200 rounded bg-white"
+                            >
+                              <option value="">Select location</option>
+                              {companyLocationOptions.map((location) => (
+                                <option key={location} value={location}>{location}</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <input
+                              value={line[field]}
+                              onChange={e => setNewPart(p => {
+                                const next = [...p.inventoryLines];
+                                next[idx] = { ...next[idx], [field]: e.target.value };
+                                return { ...p, inventoryLines: next };
+                              })}
+                              className="w-full px-2 py-1 border border-gray-200 rounded"
+                            />
+                          )}
                         </td>
                       ))}
                       <td className="px-2 py-1 text-right">
@@ -32291,7 +32346,6 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
                             {[
                               ['Part Name', 'name'],
                               ['Part Number', 'partNumber'],
-                              ['Category', 'category'],
                               ['Location', 'location'],
                               ['Barcode', 'barcode'],
                               ['Status', 'status'],
@@ -32305,6 +32359,19 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
                                 />
                               </div>
                             ))}
+                            <div>
+                              <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-500">Category</label>
+                              <select
+                                className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-blue-500 bg-white"
+                                value={partEditForm.category || ''}
+                                onChange={(e) => setPartEditForm((prev) => ({ ...prev, category: e.target.value }))}
+                              >
+                                <option value="">Select category</option>
+                                {partCategoryOptions.map((category) => (
+                                  <option key={category} value={category}>{category}</option>
+                                ))}
+                              </select>
+                            </div>
                           </div>
                           <div>
                             <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-500">Description</label>
