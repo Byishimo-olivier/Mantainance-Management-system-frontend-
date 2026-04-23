@@ -6471,7 +6471,8 @@ function CreateTeamModal({ open, onClose, people = [], onCreate, busy = false })
 }
 
 // â”€â”€ Sidebar nav item â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-function NavItem({ label, icon, active, onClick, danger }) {
+function NavItem({ label, icon, active, onClick, danger, badge }) {
+  const badgeLabel = typeof badge === 'number' && badge > 99 ? '99+' : badge;
   return (
     <button
       onClick={onClick}
@@ -6489,6 +6490,16 @@ function NavItem({ label, icon, active, onClick, danger }) {
       <span className="min-w-0 flex-1 whitespace-normal break-words text-sm font-bold leading-6 tracking-tight">
         {label}
       </span>
+      {badge !== undefined && badge !== null && (
+        <span
+          className={`ml-2 shrink-0 rounded-full px-2 py-0.5 text-[11px] font-black leading-5 ${active
+            ? 'bg-white text-blue-700'
+            : 'bg-white/15 text-white/90 group-hover:bg-white/20'}`
+          }
+        >
+          {badgeLabel}
+        </span>
+      )}
     </button>
   );
 }
@@ -7356,6 +7367,7 @@ function ClientDashboard() {
   const [assignLoading, setAssignLoading] = useState({});
   const [statusCounts, setStatusCounts] = useState({ Open: 0, Pending: 0, 'In Progress': 0, Completed: 0, Overdue: 0 });
   const [maintenanceCounts, setMaintenanceCounts] = useState({ Preventive: 0, Routine: 0, Open: 0, Pending: 0, 'In Progress': 0, Completed: 0, Overdue: 0 });
+  const [purchaseOrderCount, setPurchaseOrderCount] = useState(0);
   const [statusChartHover, setStatusChartHover] = useState(null);
   const [userName, setUserName] = useState('');
   const [currentUser, setCurrentUser] = useState(null);
@@ -7444,6 +7456,16 @@ function ClientDashboard() {
   const [materialRequests, setMaterialRequests] = useState([]);
   const [materialRequestPoStatusMap, setMaterialRequestPoStatusMap] = useState({});
   const [materialRequestStockInfo, setMaterialRequestStockInfo] = useState({});
+  const [showCreateMaterialRequestModal, setShowCreateMaterialRequestModal] = useState(false);
+  const [materialRequestForm, setMaterialRequestForm] = useState({
+    title: '',
+    description: '',
+    quantity: 1,
+    urgency: 'MEDIUM',
+    linkedIssueId: '',
+    assetName: '',
+  });
+  const [materialRequestSubmitBusy, setMaterialRequestSubmitBusy] = useState(false);
   const [materialRequestAdjustModal, setMaterialRequestAdjustModal] = useState({
     open: false,
     requestId: '',
@@ -8382,7 +8404,7 @@ function ClientDashboard() {
   }, [allWorkers, internalTechnicians]);
 
   // New Detail Modal Implementation (manager parity)
-  const DetailsModal = useCallback(function DetailsModal({ open, type, item, onClose, getAssignedTechName, onRefresh, technicians = [], teams = [], workOrders = [], people = [], contacts = [], assets = [], properties = [], checklistLibrary = [], onPrivateMessage, onEditWorkOrder }) {
+  const DetailsModal = useCallback(function DetailsModal({ open, type, item, onClose, getAssignedTechName, onRefresh, onRefreshApprovalResources, technicians = [], teams = [], workOrders = [], people = [], contacts = [], assets = [], properties = [], checklistLibrary = [], onPrivateMessage, onEditWorkOrder }) {
     const normalizeTaskArray = (value) => {
       if (!value) return [];
       if (Array.isArray(value)) return value;
@@ -8403,26 +8425,72 @@ function ClientDashboard() {
       }
       return [];
     };
+    const getRequestLocationValue = (source) => {
+      if (!source || typeof source !== 'object') return '';
+      return source.location || source.address || source.propertyName || source.property?.name || '';
+    };
+    const getRequestAssetValue = (source) => {
+      if (!source || typeof source !== 'object') return '';
+      return source.assetName || source.asset?.name || source.asset?.title || source.assetTitle || '';
+    };
+    const getRequestAssignedWorkerValue = (source) => {
+      if (!source || typeof source !== 'object') return '';
+      return (
+        extractId(source.assignedTo)
+        || extractId(source.primaryWorker)
+        || extractId(source.assignedWorker)
+        || source.assignedTo
+        || source.assignedToName
+        || source.primaryWorker?.name
+        || source.assignedWorker?.name
+        || source.technicianName
+        || source.assignee
+        || ''
+      );
+    };
+    const getRequestAdditionalWorkersValue = (source) => {
+      if (!source || typeof source !== 'object') return '';
+      return source.additionalResponsibleWorkers || source.additionalWorkers || source.secondaryWorkers || '';
+    };
+    const getRequestTeamValue = (source) => {
+      if (!source || typeof source !== 'object') return '';
+      const rawTeam = source.team || source.assignedTeam || source.teamName || '';
+      if (!rawTeam) return '';
+      if (typeof rawTeam === 'object') {
+        return rawTeam.name || rawTeam.title || rawTeam._id || rawTeam.id || '';
+      }
+      return rawTeam;
+    };
+    const getRequestChecklistTemplateValue = (source) => {
+      if (!source || typeof source !== 'object') return '';
+      return source.checklistTemplateId || source.checklistTemplate?._id || source.checklistTemplate?.id || '';
+    };
+    const buildDetailsFormData = (source) => ({
+      title: source?.title || source?.name || '',
+      description: source?.description || '',
+      closeoutNotes: source?.closeoutNotes || source?.closeoutNote || source?.closeout || '',
+      category: source?.category || '',
+      priority: source?.priority || 'MEDIUM',
+      status: source?.status || '',
+      location: getRequestLocationValue(source),
+      assetName: getRequestAssetValue(source),
+      assignedTo: getRequestAssignedWorkerValue(source),
+      additionalResponsibleWorkers: getRequestAdditionalWorkersValue(source),
+      team: getRequestTeamValue(source),
+      checklistTemplateId: getRequestChecklistTemplateValue(source),
+      estimatedTime: source?.estimatedTime || '',
+      signature: Boolean(source?.signature),
+      startDate: source?.startDate ? new Date(source.startDate).toISOString().split('T')[0] : '',
+      frequency: source?.frequency || source?.interval || '',
+      fixDeadline: source?.fixDeadline ? new Date(source.fixDeadline).toISOString().split('T')[0] : '',
+      checklist: normalizeTaskArray(source?.checklist || source?.tasks || source?.taskList),
+      chat: Array.isArray(source?.chat) ? source.chat : []
+    });
     const [formData, setFormData] = useState({
-      title: item?.title || item?.name || '',
-      description: item?.description || '',
-      closeoutNotes: item?.closeoutNotes || item?.closeoutNote || item?.closeout || '',
-      category: item?.category || '',
-      priority: item?.priority || 'MEDIUM',
-      status: item?.status || '',
-      location: item?.location || item?.address || '',
-      assetName: item?.assetName || '',
-      assignedTo: extractId(item?.assignedTo) || item?.assignedTo || '',
-      additionalResponsibleWorkers: item?.additionalResponsibleWorkers || '',
-      team: item?.team || '',
-      estimatedTime: item?.estimatedTime || '',
-      startDate: item?.startDate ? new Date(item.startDate).toISOString().split('T')[0] : '',
-      frequency: item?.frequency || item?.interval || '',
-      fixDeadline: item?.fixDeadline ? new Date(item.fixDeadline).toISOString().split('T')[0] : '',
-      checklist: normalizeTaskArray(item?.checklist || item?.tasks || item?.taskList),
-      chat: Array.isArray(item?.chat) ? item.chat : []
+      ...buildDetailsFormData(item)
     });
     const [activeTab, setActiveTab] = useState('overview');
+    const [additionalWorkersDropdownOpen, setAdditionalWorkersDropdownOpen] = useState(false);
     const [chatInput, setChatInput] = useState('');
     const [chatAttachmentFiles, setChatAttachmentFiles] = useState([]);
     const [mentionCandidates, setMentionCandidates] = useState([]);
@@ -8453,6 +8521,7 @@ function ClientDashboard() {
       onConfirm: null,
     });
     const chatAttachmentInputRef = useRef(null);
+    const additionalWorkersDropdownRef = useRef(null);
     const [providerEnabled, setProviderEnabled] = useState(false);
     const [providerPortalUrl, setProviderPortalUrl] = useState('');
     const [isBookmarked, setIsBookmarked] = useState(Boolean(item?.bookmarked || item?.saved || item?.isBookmarked));
@@ -8561,25 +8630,7 @@ function ClientDashboard() {
 
     useEffect(() => {
       if (item) {
-        setFormData({
-          title: item.title || item.name || '',
-          description: item.description || '',
-          closeoutNotes: item?.closeoutNotes || item?.closeoutNote || item?.closeout || '',
-          category: item.category || '',
-          priority: item.priority || 'MEDIUM',
-          status: item.status || '',
-          location: item.location || item.address || '',
-          assetName: item.assetName || '',
-          assignedTo: extractId(item.assignedTo) || item.assignedTo || '',
-          additionalResponsibleWorkers: item.additionalResponsibleWorkers || '',
-          team: item.team || '',
-          estimatedTime: item.estimatedTime || '',
-          startDate: item.startDate ? new Date(item.startDate).toISOString().split('T')[0] : '',
-          frequency: item.frequency || item.interval || '',
-          fixDeadline: item.fixDeadline ? new Date(item.fixDeadline).toISOString().split('T')[0] : '',
-          checklist: normalizeTaskArray(item.checklist || item.tasks || item.taskList),
-          chat: Array.isArray(item.chat) ? item.chat : []
-        });
+        setFormData(buildDetailsFormData(item));
         setSavedCloseoutNotes(item?.closeoutNotes || item?.closeoutNote || item?.closeout || '');
         setTimerStartedAt(item.fixTime || item.startedAt || null);
       }
@@ -8643,6 +8694,15 @@ function ClientDashboard() {
         setActiveTab('overview');
       }
     }, [open, itemId]);
+
+    // Ensure teams and technicians are loaded when opening a request modal
+    useEffect(() => {
+      const workersMissing = !Array.isArray(technicians) || technicians.length === 0;
+      const teamsMissing = !Array.isArray(teams) || teams.length === 0;
+      const shouldRefreshApprovalResources = open && isRequest && (workersMissing || teamsMissing);
+      if (!shouldRefreshApprovalResources || typeof onRefreshApprovalResources !== 'function') return;
+      onRefreshApprovalResources();
+    }, [open, isRequest, technicians, teams, onRefreshApprovalResources]);
 
     useEffect(() => {
       if (!itemId) return;
@@ -8893,21 +8953,11 @@ function ClientDashboard() {
     const isRequestReadOnly = !canEdit;
     const requestLockClass = isRequestReadOnly ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : '';
     const requestFieldClass = `w-full border border-gray-300 rounded-lg p-2.5 text-sm ${requestLockClass}`;
-    const [requestOpenDropdown, setRequestOpenDropdown] = useState(null);
-    const [requestDropdownSearch, setRequestDropdownSearch] = useState({
-      priority: '',
-      category: '',
-      location: '',
-      asset: '',
-      assignedTo: '',
-      additionalWorkers: '',
-      team: '',
-      checklist: '',
-    });
-    const requestDropdownRef = useRef(null);
     const selectableWorkers = React.useMemo(() => {
       const pool = Array.isArray(technicians) ? technicians : [];
-      const fallbackPeople = Array.isArray(people) ? people : [];
+      const fallbackPeople = Array.isArray(people)
+        ? people.filter((person) => person?.kind !== 'invite')
+        : [];
       return dedupeById(
         [...pool, ...fallbackPeople].filter(Boolean),
         (worker) => worker?._id || worker?.id || worker?.userId || worker?.email || worker?.phone || worker?.name
@@ -8972,6 +9022,14 @@ function ClientDashboard() {
         label: asset?.name || asset?.title || 'Asset',
         keywords: [asset?.location, asset?.property?.name, asset?.propertyName, asset?.serialNumber, asset?.tag].filter(Boolean).join(' '),
         rawValue: asset?.name || asset?.title || '',
+        aliases: [
+          asset?._id,
+          asset?.id,
+          asset?.name,
+          asset?.title,
+          asset?.serialNumber,
+          asset?.tag
+        ].filter(Boolean),
       })),
       [requestAssetOptions]
     );
@@ -8981,17 +9039,38 @@ function ClientDashboard() {
         label: worker?.name || worker?.fullName || worker?.email || 'Worker',
         keywords: [worker?.email, worker?.phone, worker?.role].filter(Boolean).join(' '),
         worker,
+        aliases: [
+          worker?._id,
+          worker?.id,
+          worker?.userId,
+          worker?.email,
+          worker?.phone,
+          worker?.name,
+          worker?.fullName
+        ].filter(Boolean),
       })),
       [selectableWorkers]
     );
     const requestAdditionalWorkerOptions = React.useMemo(
-      () => requestWorkerDropdownOptions.filter((workerOption) => String(workerOption.value) !== String(formData.assignedTo || '')),
+      () => requestWorkerDropdownOptions.filter((workerOption) => {
+        const currentAssignee = typeof formData.assignedTo === 'object'
+          ? (extractId(formData.assignedTo) || formData.assignedTo?.name || formData.assignedTo?.email || '')
+          : String(formData.assignedTo || '').trim();
+        const candidates = [workerOption?.value, ...(Array.isArray(workerOption?.aliases) ? workerOption.aliases : [])]
+          .filter(Boolean)
+          .map((entry) => String(entry).trim().toLowerCase());
+        return !currentAssignee || !candidates.includes(String(currentAssignee).trim().toLowerCase());
+      }),
       [formData.assignedTo, requestWorkerDropdownOptions]
     );
     const requestTeamDropdownOptions = React.useMemo(
       () => (Array.isArray(teams) ? teams : []).map((team, index) => ({
         value: String(team?.name || team?.title || team?._id || team?.id || `team-${index}`),
         label: team?.name || team?.title || 'Team',
+        keywords: Array.isArray(team?.members)
+          ? team.members.map((member) => member?.name || member?.fullName || member?.email || member).filter(Boolean).join(' ')
+          : '',
+        aliases: [team?.name, team?.title, team?._id, team?.id].filter(Boolean),
       })),
       [teams]
     );
@@ -9001,9 +9080,44 @@ function ClientDashboard() {
         label: tpl?.name || tpl?.title || 'Checklist',
         keywords: [tpl?.description, Array.isArray(tpl?.tags) ? tpl.tags.join(' ') : ''].filter(Boolean).join(' '),
         template: tpl,
+        aliases: [tpl?.id, tpl?._id, tpl?.name, tpl?.title].filter(Boolean),
       })),
       [checklistTemplateOptions]
     );
+    const normalizeDropdownCandidate = useCallback((candidate) => {
+      if (candidate === undefined || candidate === null) return '';
+      if (typeof candidate === 'object') {
+        return String(
+          extractId(candidate)
+          || candidate?.value
+          || candidate?.rawValue
+          || candidate?.name
+          || candidate?.fullName
+          || candidate?.label
+          || candidate?.title
+          || candidate?.email
+          || ''
+        ).trim();
+      }
+      return String(candidate).trim();
+    }, []);
+    const getDropdownOptionMatchValues = useCallback((option) => {
+      return Array.from(new Set([
+        option?.value,
+        option?.rawValue,
+        option?.label,
+        ...(Array.isArray(option?.aliases) ? option.aliases : [])
+      ].map((entry) => normalizeDropdownCandidate(entry)).filter(Boolean)));
+    }, [normalizeDropdownCandidate]);
+    const optionMatchesDropdownValue = useCallback((option, candidate) => {
+      const needle = normalizeDropdownCandidate(candidate).toLowerCase();
+      if (!needle) return false;
+      return getDropdownOptionMatchValues(option).some((entry) => entry.toLowerCase() === needle);
+    }, [getDropdownOptionMatchValues, normalizeDropdownCandidate]);
+    const resolveDropdownValue = useCallback((currentValue, options = []) => {
+      const match = (Array.isArray(options) ? options : []).find((option) => optionMatchesDropdownValue(option, currentValue));
+      return match?.value || normalizeDropdownCandidate(currentValue);
+    }, [normalizeDropdownCandidate, optionMatchesDropdownValue]);
     const findWorkerRecord = useCallback((value) => {
       if (!value) return null;
       const normalizedValue = typeof value === 'object'
@@ -9054,13 +9168,17 @@ function ClientDashboard() {
     }, [findWorkerRecord]);
     const selectedTeamMembers = React.useMemo(() => {
       const selectedTeam = Array.isArray(teams)
-        ? teams.find((team) => String(team?.name || team?.title || team?._id || team?.id || '') === String(formData.team || ''))
+        ? teams.find((team) => optionMatchesDropdownValue({
+          value: String(team?.name || team?.title || team?._id || team?.id || ''),
+          label: team?.name || team?.title || 'Team',
+          aliases: [team?.name, team?.title, team?._id, team?.id].filter(Boolean),
+        }, formData.team))
         : null;
       const members = Array.isArray(selectedTeam?.members) ? selectedTeam.members : [];
       return members
         .map((member) => normalizeWorkerSelection(member))
         .filter(Boolean);
-    }, [formData.team, normalizeWorkerSelection, teams]);
+    }, [formData.team, normalizeWorkerSelection, optionMatchesDropdownValue, teams]);
     const normalizedAdditionalWorkers = React.useMemo(() => {
       const raw = formData.additionalResponsibleWorkers;
       if (!raw) return [];
@@ -9083,16 +9201,60 @@ function ClientDashboard() {
       }
       return [normalizeWorkerSelection(raw)].filter(Boolean);
     }, [formData.additionalResponsibleWorkers, normalizeWorkerSelection]);
-    const updateRequestDropdownValue = useCallback((key, value) => {
-      setRequestDropdownSearch((prev) => ({ ...prev, [key]: value }));
-    }, []);
+    const additionalWorkerSelectionValues = React.useMemo(
+      () => normalizedAdditionalWorkers.map((worker) => String(worker.id || worker.email || worker.name || '')).filter(Boolean),
+      [normalizedAdditionalWorkers]
+    );
+    const additionalWorkerSummaryLabel = React.useMemo(() => {
+      if (normalizedAdditionalWorkers.length === 0) return 'Select Additional Workers';
+      return normalizedAdditionalWorkers
+        .map((worker) => worker.name || worker.email || worker.id || 'Worker')
+        .filter(Boolean)
+        .join(', ');
+    }, [normalizedAdditionalWorkers]);
     const getRequestOptionLabel = useCallback((options, currentValue, placeholder, fallbackValue = '') => {
       const normalizedCurrentValue = String(currentValue ?? '').trim();
       if (!normalizedCurrentValue) return placeholder;
-      const match = options.find((option) => String(option.value) === normalizedCurrentValue || String(option.rawValue || '') === normalizedCurrentValue);
+      const match = options.find((option) => optionMatchesDropdownValue(option, normalizedCurrentValue));
       if (match?.label) return match.label;
       return fallbackValue || normalizedCurrentValue || placeholder;
-    }, []);
+    }, [optionMatchesDropdownValue]);
+    useEffect(() => {
+      if (!additionalWorkersDropdownOpen) return undefined;
+      const handlePointerDown = (event) => {
+        if (additionalWorkersDropdownRef.current && !additionalWorkersDropdownRef.current.contains(event.target)) {
+          setAdditionalWorkersDropdownOpen(false);
+        }
+      };
+      document.addEventListener('mousedown', handlePointerDown);
+      return () => document.removeEventListener('mousedown', handlePointerDown);
+    }, [additionalWorkersDropdownOpen]);
+    useEffect(() => {
+      if (isRequestReadOnly) {
+        setAdditionalWorkersDropdownOpen(false);
+      }
+    }, [isRequestReadOnly]);
+    useEffect(() => {
+      if (!open) return;
+      setFormData((prev) => {
+        const nextAssignedTo = resolveDropdownValue(prev.assignedTo, requestWorkerDropdownOptions);
+        const nextTeam = resolveDropdownValue(prev.team, requestTeamDropdownOptions);
+        const nextChecklistTemplateId = resolveDropdownValue(prev.checklistTemplateId, requestChecklistDropdownOptions);
+        if (
+          nextAssignedTo === prev.assignedTo
+          && nextTeam === prev.team
+          && nextChecklistTemplateId === (prev.checklistTemplateId || '')
+        ) {
+          return prev;
+        }
+        return {
+          ...prev,
+          assignedTo: nextAssignedTo,
+          team: nextTeam,
+          checklistTemplateId: nextChecklistTemplateId,
+        };
+      });
+    }, [open, requestChecklistDropdownOptions, requestTeamDropdownOptions, requestWorkerDropdownOptions, resolveDropdownValue]);
     const SearchableRequestDropdown = ({
       dropdownKey,
       placeholder,
@@ -9104,11 +9266,21 @@ function ClientDashboard() {
       emptyLabel = 'No matches found.',
       fallbackLabel = '',
     }) => {
-      const searchValue = requestDropdownSearch[dropdownKey] || '';
+      const [openDropdown, setOpenDropdown] = useState(false);
+      const [searchValue, setSearchValue] = useState('');
+      const containerRef = useRef(null);
+      const menuRef = useRef(null);
+      const [menuStyle, setMenuStyle] = useState({
+        top: 0,
+        left: 0,
+        width: 0,
+        maxHeight: 260,
+        placement: 'bottom',
+      });
       const normalizedSearch = String(searchValue).trim().toLowerCase();
       const normalizedValues = multiple
-        ? (Array.isArray(value) ? value.map((entry) => String(entry)) : [])
-        : [String(value ?? '')];
+        ? (Array.isArray(value) ? value.map((entry) => normalizeDropdownCandidate(entry)).filter(Boolean) : [])
+        : [normalizeDropdownCandidate(value)];
       const filteredOptions = options.filter((option) => {
         if (!normalizedSearch) return true;
         const haystack = [option?.label, option?.value, option?.keywords].filter(Boolean).join(' ').toLowerCase();
@@ -9118,42 +9290,109 @@ function ClientDashboard() {
         ? (() => {
           if (!normalizedValues.length) return placeholder;
           const selectedLabels = normalizedValues.map((entry) => {
-            const match = options.find((option) => String(option.value) === String(entry));
+            const match = options.find((option) => optionMatchesDropdownValue(option, entry));
             return match?.label || String(entry);
           }).filter(Boolean);
           return selectedLabels.length ? selectedLabels.join(', ') : placeholder;
         })()
         : getRequestOptionLabel(options, value, placeholder, fallbackLabel);
+      const updateMenuPosition = useCallback(() => {
+        if (typeof window === 'undefined') return;
+        const triggerEl = containerRef.current?.querySelector('[data-request-dropdown-trigger="true"]');
+        const rect = triggerEl?.getBoundingClientRect?.();
+        if (!rect) return;
+        const viewportHeight = window.innerHeight || 0;
+        const spaceBelow = Math.max(0, viewportHeight - rect.bottom - 16);
+        const spaceAbove = Math.max(0, rect.top - 16);
+        const placement = spaceBelow < 220 && spaceAbove > spaceBelow ? 'top' : 'bottom';
+        const maxHeight = Math.max(160, Math.min(320, placement === 'top' ? spaceAbove - 24 : spaceBelow - 24));
+        setMenuStyle({
+          top: placement === 'top' ? rect.top - 8 : rect.bottom + 8,
+          left: rect.left,
+          width: rect.width,
+          maxHeight,
+          placement,
+        });
+      }, []);
+
+      useEffect(() => {
+        if (!openDropdown || disabled) return undefined;
+        const handlePointerDown = (event) => {
+          if ((containerRef.current && containerRef.current.contains(event.target)) || (menuRef.current && menuRef.current.contains(event.target))) return;
+          setOpenDropdown(false);
+        };
+        const handleViewportChange = () => updateMenuPosition();
+        document.addEventListener('mousedown', handlePointerDown);
+        window.addEventListener('resize', handleViewportChange);
+        window.addEventListener('scroll', handleViewportChange, true);
+        window.requestAnimationFrame(updateMenuPosition);
+        return () => {
+          document.removeEventListener('mousedown', handlePointerDown);
+          window.removeEventListener('resize', handleViewportChange);
+          window.removeEventListener('scroll', handleViewportChange, true);
+        };
+      }, [disabled, openDropdown, updateMenuPosition]);
+
+      useEffect(() => {
+        if (disabled && openDropdown) {
+          setOpenDropdown(false);
+        }
+      }, [disabled, openDropdown]);
+
+      useEffect(() => {
+        if (!openDropdown) {
+          setSearchValue('');
+        }
+      }, [openDropdown]);
 
       return (
-        <div className="relative" ref={requestOpenDropdown === dropdownKey ? requestDropdownRef : null}>
+        <div className="relative" ref={containerRef}>
           <button
             type="button"
             onClick={() => {
               if (disabled) return;
-              setRequestOpenDropdown((prev) => prev === dropdownKey ? null : dropdownKey);
+              setOpenDropdown((prev) => {
+                const nextValue = !prev;
+                if (nextValue) {
+                  window.requestAnimationFrame(updateMenuPosition);
+                }
+                return nextValue;
+              });
             }}
             disabled={disabled}
+            data-request-dropdown-trigger="true"
             className={`${requestFieldClass} flex items-center justify-between gap-3 text-left ${disabled ? '' : 'bg-white'}`}
           >
             <span className={`truncate ${normalizedValues.filter(Boolean).length ? 'text-gray-900' : 'text-gray-500'}`}>{buttonLabel}</span>
-            <ChevronDown className={`h-4 w-4 shrink-0 text-gray-500 transition-transform ${requestOpenDropdown === dropdownKey ? 'rotate-180' : ''}`} />
+            <ChevronDown className={`h-4 w-4 shrink-0 text-gray-500 transition-transform ${openDropdown ? 'rotate-180' : ''}`} />
           </button>
-          {requestOpenDropdown === dropdownKey && !disabled && (
-            <div className="absolute left-0 right-0 z-30 mt-2 rounded-xl border border-gray-200 bg-white shadow-xl">
+          {openDropdown && !disabled && typeof document !== 'undefined' && createPortal(
+            <div
+              ref={menuRef}
+              className={`fixed z-[1800] rounded-xl border border-gray-200 bg-white shadow-xl ${menuStyle.placement === 'top' ? '-translate-y-full' : ''}`}
+              style={{
+                top: `${menuStyle.top}px`,
+                left: `${menuStyle.left}px`,
+                width: `${menuStyle.width}px`,
+              }}
+            >
               <div className="border-b border-gray-100 p-3">
                 <input
+                  autoFocus
                   value={searchValue}
-                  onChange={(e) => updateRequestDropdownValue(dropdownKey, e.target.value)}
+                  onChange={(e) => setSearchValue(e.target.value)}
                   placeholder={`Search ${placeholder.toLowerCase()}...`}
                   className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-500"
                 />
               </div>
-              <div className="max-h-60 overflow-y-auto py-2">
+              <div
+                className="overflow-y-auto py-2"
+                style={{ maxHeight: `${Math.max(120, menuStyle.maxHeight - 72)}px` }}
+              >
                 {filteredOptions.length === 0 ? (
                   <div className="px-3 py-2 text-sm text-gray-500">{emptyLabel}</div>
                 ) : filteredOptions.map((option) => {
-                  const isSelected = normalizedValues.includes(String(option.value));
+                  const isSelected = normalizedValues.some((entry) => optionMatchesDropdownValue(option, entry));
                   return (
                     <button
                       key={`${dropdownKey}-${option.value}`}
@@ -9161,13 +9400,13 @@ function ClientDashboard() {
                       onClick={() => {
                         if (multiple) {
                           const nextValues = isSelected
-                            ? normalizedValues.filter((entry) => entry !== String(option.value))
+                            ? normalizedValues.filter((entry) => !optionMatchesDropdownValue(option, entry))
                             : [...normalizedValues.filter(Boolean), String(option.value)];
                           onChange(nextValues);
                           return;
                         }
                         onChange(option.value, option);
-                        setRequestOpenDropdown(null);
+                        setOpenDropdown(false);
                       }}
                       className={`flex w-full items-center gap-3 px-3 py-2 text-left text-sm transition ${isSelected ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'}`}
                     >
@@ -9181,21 +9420,13 @@ function ClientDashboard() {
                   );
                 })}
               </div>
-            </div>
+            </div>,
+            document.body
           )}
         </div>
       );
     };
-    useEffect(() => {
-      if (!requestOpenDropdown) return undefined;
-      const handlePointerDown = (event) => {
-        if (requestDropdownRef.current && !requestDropdownRef.current.contains(event.target)) {
-          setRequestOpenDropdown(null);
-        }
-      };
-      document.addEventListener('mousedown', handlePointerDown);
-      return () => document.removeEventListener('mousedown', handlePointerDown);
-    }, [requestOpenDropdown]);
+    
     const approvalSecondaryWorkers = React.useMemo(() => {
       const primaryWorker = normalizeWorkerSelection(formData.assignedTo);
       const primaryKey = String(primaryWorker?.id || primaryWorker?.email || primaryWorker?.name || '').trim().toLowerCase();
@@ -10989,7 +11220,7 @@ function ClientDashboard() {
               </div>
             )}
 
-            <div className="p-6 overflow-y-auto flex-1 space-y-5">
+            <div className="p-6 overflow-y-auto overflow-x-visible flex-1 space-y-5">
               {showTabs && (
                 isIssue ? (
                   <div className="-mx-6 -mt-6 mb-2 flex items-center gap-8 border-b border-gray-200 px-6">
@@ -11300,14 +11531,17 @@ function ClientDashboard() {
 
                         <div>
                           <label className="block text-sm text-gray-800 mb-2">Priority</label>
-                          <SearchableRequestDropdown
-                            dropdownKey="priority"
-                            placeholder="Select Priority"
-                            options={requestPriorityOptions}
-                            value={formData.priority}
-                            onChange={(nextValue) => setFormData({ ...formData, priority: nextValue })}
+                          <select
+                            value={formData.priority || ''}
+                            onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
                             disabled={isRequestReadOnly}
-                          />
+                            className={`${requestFieldClass} bg-white`}
+                          >
+                            <option value="">Select Priority</option>
+                            {requestPriorityOptions.map((option) => (
+                              <option key={option.value} value={option.value}>{option.label}</option>
+                            ))}
+                          </select>
                         </div>
 
                         <div>
@@ -11376,51 +11610,62 @@ function ClientDashboard() {
 
                         <div>
                           <label className="block text-sm text-gray-800 mb-2">Category</label>
-                          <SearchableRequestDropdown
-                            dropdownKey="category"
-                            placeholder="Select Category"
-                            options={requestCategoryOptions}
-                            value={formData.category}
-                            onChange={(nextValue) => setFormData({ ...formData, category: nextValue })}
+                          <select
+                            value={formData.category || ''}
+                            onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                             disabled={isRequestReadOnly}
-                          />
+                            className={`${requestFieldClass} bg-white`}
+                          >
+                            <option value="">Select Category</option>
+                            {requestCategoryOptions.map((option) => (
+                              <option key={option.value} value={option.value}>{option.label}</option>
+                            ))}
+                          </select>
                         </div>
 
                         <div>
                           <label className="block text-sm text-gray-800 mb-2">Location</label>
-                          <SearchableRequestDropdown
-                            dropdownKey="location"
-                            placeholder="Select Location"
-                            options={requestLocationDropdownOptions}
-                            value={formData.location}
-                            onChange={(nextValue) => setFormData({ ...formData, location: nextValue, assetName: '' })}
+                          <select
+                            value={formData.location || ''}
+                            onChange={(e) => setFormData({ ...formData, location: e.target.value, assetName: '' })}
                             disabled={isRequestReadOnly}
-                          />
+                            className={`${requestFieldClass} bg-white`}
+                          >
+                            <option value="">Select Location</option>
+                            {requestLocationDropdownOptions.map((option) => (
+                              <option key={option.value} value={option.value}>{option.label}</option>
+                            ))}
+                          </select>
                         </div>
 
                         <div>
                           <label className="block text-sm text-gray-800 mb-2">Asset</label>
-                          <SearchableRequestDropdown
-                            dropdownKey="asset"
-                            placeholder="Select Asset"
-                            options={requestAssetDropdownOptions}
-                            value={formData.assetName}
-                            fallbackLabel={formData.assetName || ''}
-                            onChange={(_, option) => setFormData({ ...formData, assetName: option?.rawValue || option?.label || '' })}
+                          <select
+                            value={resolveDropdownValue(formData.assetName, requestAssetDropdownOptions)}
+                            onChange={(e) => {
+                              const option = requestAssetDropdownOptions.find((entry) => String(entry.value) === String(e.target.value));
+                              setFormData({ ...formData, assetName: option?.rawValue || option?.label || '' });
+                            }}
                             disabled={isRequestReadOnly}
-                          />
+                            className={`${requestFieldClass} bg-white`}
+                          >
+                            <option value="">Select Asset</option>
+                            {requestAssetDropdownOptions.map((option) => (
+                              <option key={option.value} value={option.value}>{option.label}</option>
+                            ))}
+                          </select>
                         </div>
 
                         <div>
                           <label className="block text-sm text-gray-800 mb-2">Primary Worker</label>
-                          <SearchableRequestDropdown
-                            dropdownKey="assignedTo"
-                            placeholder="Select Worker"
-                            options={requestWorkerDropdownOptions}
-                            value={formData.assignedTo}
-                            onChange={(nextValue) => {
-                              const nextPrimary = String(nextValue || '');
-                              const nextAdditionalWorkers = normalizedAdditionalWorkers.filter((worker) => String(worker.id || worker.email || worker.name || '') !== nextPrimary);
+                          <select
+                            value={resolveDropdownValue(formData.assignedTo, requestWorkerDropdownOptions)}
+                            onChange={(e) => {
+                              const nextPrimary = String(e.target.value || '');
+                              const nextAdditionalWorkers = normalizedAdditionalWorkers.filter((worker) => {
+                                const workerKey = String(worker.id || worker.email || worker.name || '');
+                                return workerKey !== nextPrimary;
+                              });
                               setFormData({
                                 ...formData,
                                 assignedTo: nextPrimary,
@@ -11428,64 +11673,113 @@ function ClientDashboard() {
                               });
                             }}
                             disabled={isRequestReadOnly}
-                          />
+                            className={`${requestFieldClass} bg-white`}
+                          >
+                            <option value="">Select Worker</option>
+                            {requestWorkerDropdownOptions.map((option) => (
+                              <option key={option.value} value={option.value}>{option.label}</option>
+                            ))}
+                          </select>
                         </div>
 
                         <div>
                           <label className="block text-sm text-gray-800 mb-2">Additional Workers</label>
-                          <SearchableRequestDropdown
-                            dropdownKey="additionalWorkers"
-                            placeholder="Select Additional Workers"
-                            options={requestAdditionalWorkerOptions}
-                            value={normalizedAdditionalWorkers.map((worker) => String(worker.id || worker.email || worker.name || ''))}
-                            onChange={(nextValues) => {
-                              const selectedWorkers = nextValues
-                                .map((selectedValue) => requestAdditionalWorkerOptions.find((workerOption) => String(workerOption.value) === String(selectedValue))?.worker)
-                                .filter(Boolean)
-                                .map((worker) => ({
-                                  id: String(worker._id || worker.id || worker.userId || ''),
-                                  name: worker.name || worker.fullName || worker.email || 'Worker',
-                                  email: worker.email || '',
-                                  phone: worker.phone || '',
-                                  role: worker.role || ''
-                                }));
-                              setFormData({ ...formData, additionalResponsibleWorkers: selectedWorkers });
-                            }}
-                            multiple
-                            disabled={isRequestReadOnly}
-                          />
-                          <div className="mt-2 text-xs text-gray-500">Search and pick one or more additional workers.</div>
+                          <div className="relative" ref={additionalWorkersDropdownRef}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (isRequestReadOnly) return;
+                                setAdditionalWorkersDropdownOpen((prev) => !prev);
+                              }}
+                              disabled={isRequestReadOnly}
+                              className={`${requestFieldClass} flex items-center justify-between gap-3 text-left bg-white`}
+                            >
+                              <span className={`truncate ${additionalWorkerSelectionValues.length ? 'text-gray-900' : 'text-gray-500'}`}>
+                                {additionalWorkerSummaryLabel}
+                              </span>
+                              <ChevronDown className={`h-4 w-4 shrink-0 text-gray-500 transition-transform ${additionalWorkersDropdownOpen ? 'rotate-180' : ''}`} />
+                            </button>
+                            {additionalWorkersDropdownOpen && !isRequestReadOnly && (
+                              <div className="absolute left-0 right-0 z-40 mt-2 rounded-xl border border-gray-200 bg-white shadow-xl">
+                                <div className="max-h-60 overflow-y-auto py-2">
+                                  {requestAdditionalWorkerOptions.length === 0 ? (
+                                    <div className="px-3 py-2 text-sm text-gray-500">No additional workers available.</div>
+                                  ) : requestAdditionalWorkerOptions.map((option) => {
+                                    const isSelected = additionalWorkerSelectionValues.includes(String(option.value));
+                                    return (
+                                      <label
+                                        key={option.value}
+                                        className={`flex cursor-pointer items-center gap-3 px-3 py-2 text-sm ${isSelected ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'}`}
+                                      >
+                                        <input
+                                          type="checkbox"
+                                          checked={isSelected}
+                                          onChange={(e) => {
+                                            const nextValues = e.target.checked
+                                              ? [...additionalWorkerSelectionValues, String(option.value)]
+                                              : additionalWorkerSelectionValues.filter((value) => value !== String(option.value));
+                                            const selectedWorkers = nextValues
+                                              .map((selectedValue) => requestAdditionalWorkerOptions.find((workerOption) => String(workerOption.value) === String(selectedValue))?.worker)
+                                              .filter(Boolean)
+                                              .map((worker) => ({
+                                                id: String(worker._id || worker.id || worker.userId || ''),
+                                                name: worker.name || worker.fullName || worker.email || 'Worker',
+                                                email: worker.email || '',
+                                                phone: worker.phone || '',
+                                                role: worker.role || ''
+                                              }));
+                                            setFormData({ ...formData, additionalResponsibleWorkers: selectedWorkers });
+                                          }}
+                                          className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                        />
+                                        <span className="truncate">{option.label}</span>
+                                      </label>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          <div className="mt-2 text-xs text-gray-500">Pick one or more additional workers from the dropdown.</div>
                         </div>
 
                         <div>
                           <label className="block text-sm text-gray-800 mb-2">Team</label>
-                          <SearchableRequestDropdown
-                            dropdownKey="team"
-                            placeholder="Select Team"
-                            options={requestTeamDropdownOptions}
-                            value={formData.team}
-                            onChange={(nextValue) => setFormData({ ...formData, team: nextValue })}
+                          <select
+                            value={resolveDropdownValue(formData.team, requestTeamDropdownOptions)}
+                            onChange={(e) => setFormData({ ...formData, team: e.target.value })}
                             disabled={isRequestReadOnly}
-                          />
+                            className={`${requestFieldClass} bg-white`}
+                          >
+                            <option value="">Select Team</option>
+                            {requestTeamDropdownOptions.map((option) => (
+                              <option key={option.value} value={option.value}>{option.label}</option>
+                            ))}
+                          </select>
                         </div>
 
-                        <div>
+        <div>
                           <label className="block text-sm text-gray-800 mb-2">Checklists</label>
-                          <SearchableRequestDropdown
-                            dropdownKey="checklist"
-                            placeholder="Select Checklist"
-                            options={requestChecklistDropdownOptions}
-                            value={formData.checklistTemplateId || ''}
-                            onChange={(nextValue, option) => {
+                          <select
+                            value={resolveDropdownValue(formData.checklistTemplateId || '', requestChecklistDropdownOptions)}
+                            onChange={(e) => {
+                              const nextValue = e.target.value;
+                              const option = requestChecklistDropdownOptions.find((entry) => String(entry.value) === String(nextValue));
                               const selected = option?.template || checklistTemplateOptions.find((tpl) => String(tpl.id || tpl._id) === String(nextValue));
                               setFormData({
                                 ...formData,
                                 checklistTemplateId: nextValue,
-                                checklist: selected?.items || formData.checklist,
+                                checklist: normalizeTaskArray(selected?.items || selected?.checklist || selected?.tasks || formData.checklist),
                               });
                             }}
                             disabled={isRequestReadOnly}
-                          />
+                            className={`${requestFieldClass} bg-white`}
+                          >
+                            <option value="">Select Checklist</option>
+                            {requestChecklistDropdownOptions.map((option) => (
+                              <option key={option.value} value={option.value}>{option.label}</option>
+                            ))}
+                          </select>
                         </div>
 
                         <div>
@@ -13386,10 +13680,16 @@ function ClientDashboard() {
     };
 
     loadSideData();
-    const interval = setInterval(loadSideData, 30000);
+    const handleVisibilityRefresh = () => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      loadSideData();
+    };
+    if (typeof window !== 'undefined') window.addEventListener('focus', handleVisibilityRefresh);
+    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', handleVisibilityRefresh);
     return () => {
       cancelled = true;
-      clearInterval(interval);
+      if (typeof window !== 'undefined') window.removeEventListener('focus', handleVisibilityRefresh);
+      if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', handleVisibilityRefresh);
     };
   }, [currentUser]);
 
@@ -14243,9 +14543,18 @@ function ClientDashboard() {
 
   // Keep issues fresh for client progress tracking
   useEffect(() => {
-    fetchIssues();
-    const interval = setInterval(() => fetchIssues(), 30000);
-    return () => clearInterval(interval);
+    const refreshIssues = () => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      fetchIssues();
+    };
+
+    refreshIssues();
+    if (typeof window !== 'undefined') window.addEventListener('focus', refreshIssues);
+    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', refreshIssues);
+    return () => {
+      if (typeof window !== 'undefined') window.removeEventListener('focus', refreshIssues);
+      if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', refreshIssues);
+    };
   }, [fetchIssues]);
 
   // Listen for technician updates dispatched as custom events
@@ -14264,14 +14573,91 @@ function ClientDashboard() {
     return () => window.removeEventListener('issueStatusUpdated', handler);
   }, []);
 
-  const refreshSchedules = useCallback(async () => {
+  const refreshMaintenanceSummary = useCallback(async (context = {}) => {
     try {
       const r = await api.get('/api/maintenance-schedules');
-      setMaintenanceSchedules(r.data || []);
+      const schedulesData = Array.isArray(r.data) ? r.data : [];
+      const user = context.user || getCurrentUser();
+      const userId = user?.id || user?._id || null;
+      const propertyIds = (context.propertyIds || propertiesRef.current.map((property) => property?._id || property?.id))
+        .filter(Boolean)
+        .map(String);
+      const assetIds = (context.assetIds || assetsRef.current.map((asset) => asset?._id || asset?.id))
+        .filter(Boolean)
+        .map(String);
+      const scopedSchedules = isRestrictedRole(user?.role, user?.companyName)
+        ? filterSchedulesForUser(schedulesData, userId, propertyIds, assetIds, user?.companyName)
+        : schedulesData;
+      const now = new Date();
+      const cutoff = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+      const counts = { Preventive: 0, Routine: 0, Open: 0, Pending: 0, 'In Progress': 0, Completed: 0, Overdue: 0 };
+
+      scopedSchedules.forEach((schedule) => {
+        if (!schedule) return;
+        schedule.routine ? counts.Routine++ : counts.Preventive++;
+        const statusText = String(schedule.status || '').toLowerCase();
+        if (statusText === 'open' || statusText.startsWith('open ')) counts.Open++;
+        else if (statusText.includes('pending')) counts.Pending++;
+        else if (statusText.includes('progress')) counts['In Progress']++;
+        else if (statusText.includes('complete')) counts.Completed++;
+        if (schedule.nextDate && new Date(schedule.nextDate) < now && !statusText.includes('complete')) counts.Overdue++;
+      });
+
+      setMaintenanceSchedules(scopedSchedules);
+      setMaintenanceCounts(counts);
+      setReminders(scopedSchedules.filter((schedule) => {
+        if (!schedule?.routine || !schedule?.nextDate) return false;
+        const statusText = String(schedule.status || '').toLowerCase();
+        if (statusText.includes('complete') || statusText.includes('archived') || statusText.includes('pause')) return false;
+        const nextDate = new Date(schedule.nextDate);
+        if (Number.isNaN(nextDate.getTime()) || nextDate > cutoff) return false;
+        return !schedule.lastReminder || new Date(schedule.lastReminder) < nextDate;
+      }));
     } catch {
-      // Handle error silently
+      setMaintenanceSchedules([]);
+      setMaintenanceCounts({ Preventive: 0, Routine: 0, Open: 0, Pending: 0, 'In Progress': 0, Completed: 0, Overdue: 0 });
+      setReminders([]);
+    }
+  }, [filterSchedulesForUser, getCurrentUser, isRestrictedRole]);
+
+  const refreshPurchaseOrderCount = useCallback(async () => {
+    try {
+      const response = await api.get('/api/purchase-orders');
+      setPurchaseOrderCount(Array.isArray(response.data) ? response.data.length : 0);
+    } catch {
+      setPurchaseOrderCount(0);
     }
   }, []);
+
+  useEffect(() => {
+    const refreshMaintenance = () => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      refreshMaintenanceSummary();
+    };
+
+    refreshMaintenance();
+    if (typeof window !== 'undefined') window.addEventListener('focus', refreshMaintenance);
+    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', refreshMaintenance);
+    return () => {
+      if (typeof window !== 'undefined') window.removeEventListener('focus', refreshMaintenance);
+      if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', refreshMaintenance);
+    };
+  }, [refreshMaintenanceSummary]);
+
+  useEffect(() => {
+    const refreshPurchaseOrders = () => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      refreshPurchaseOrderCount();
+    };
+
+    refreshPurchaseOrders();
+    if (typeof window !== 'undefined') window.addEventListener('focus', refreshPurchaseOrders);
+    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', refreshPurchaseOrders);
+    return () => {
+      if (typeof window !== 'undefined') window.removeEventListener('focus', refreshPurchaseOrders);
+      if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', refreshPurchaseOrders);
+    };
+  }, [refreshPurchaseOrderCount]);
 
   const refreshPeople = useCallback(async () => {
     setLoading(l => ({ ...l, people: true }));
@@ -14350,18 +14736,23 @@ function ClientDashboard() {
     }
   }, []);
 
+  const refreshRequestApprovalResources = useCallback(async () => {
+    await Promise.allSettled([
+      refreshPeople(),
+      refreshTeams(),
+    ]);
+  }, [refreshPeople, refreshTeams]);
+
   useEffect(() => {
     if (activeTab === 'internalTechnicians') {
-      refreshPeople();
-      refreshTeams();
+      refreshRequestApprovalResources();
       return;
     }
 
-    // Needed for approving requests (team assignment dropdown)
     if (activeTab === 'requests') {
-      refreshTeams();
+      refreshRequestApprovalResources();
     }
-  }, [activeTab, refreshPeople, refreshTeams]);
+  }, [activeTab, refreshRequestApprovalResources]);
 
   useEffect(() => {
     refreshContactPeople();
@@ -14503,7 +14894,23 @@ function ClientDashboard() {
         const stored = localStorage.getItem('user');
         if (stored) {
           userObj = JSON.parse(stored);
-          setCurrentUser(userObj);
+          setCurrentUser((prev) => {
+            const prevKey = [
+              prev?.id || prev?._id || '',
+              prev?.name || '',
+              prev?.email || '',
+              prev?.companyName || '',
+              prev?.role || '',
+            ].join('|');
+            const nextKey = [
+              userObj?.id || userObj?._id || '',
+              userObj?.name || '',
+              userObj?.email || '',
+              userObj?.companyName || '',
+              userObj?.role || '',
+            ].join('|');
+            return prevKey === nextKey ? prev : userObj;
+          });
           setUserName(userObj.name || userObj.email || 'User');
         }
       } catch (e) {
@@ -14587,48 +14994,18 @@ function ClientDashboard() {
       // All registered users (for worker selection)
       await refreshPeople();
 
-      // Schedules
-      try {
-        const r = await api.get('/api/maintenance-schedules');
-        const scopedSchedules = isRestricted
-          ? filterSchedulesForUser(r.data || [], userId, scopedPropertyIds, scopedAssetIds, userObj?.companyName)
-          : (r.data || []);
-        setMaintenanceSchedules(scopedSchedules);
-        const now = new Date();
-        const cutoff = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-        setReminders(scopedSchedules.filter((s) => {
-          if (!s?.routine || !s?.nextDate) return false;
-          const statusText = String(s.status || '').toLowerCase();
-          if (statusText.includes('complete') || statusText.includes('archived') || statusText.includes('pause')) return false;
-          const nextDate = new Date(s.nextDate);
-          if (Number.isNaN(nextDate.getTime()) || nextDate > cutoff) return false;
-          return !s.lastReminder || new Date(s.lastReminder) < nextDate;
-        }));
-        const counts = { Preventive: 0, Routine: 0, Open: 0, Pending: 0, 'In Progress': 0, Completed: 0, Overdue: 0 };
-        scopedSchedules.forEach(s => {
-          if (!s) return;
-          s.routine ? counts.Routine++ : counts.Preventive++;
-          const st = (s.status || '').toLowerCase();
-          if (st === 'open' || st.startsWith('open ')) counts.Open++;
-          else if (st.includes('pending')) counts.Pending++;
-          else if (st.includes('progress')) counts['In Progress']++;
-          else if (st.includes('complete')) counts.Completed++;
-          if (s.nextDate && new Date(s.nextDate) < now && !st.includes('complete')) counts.Overdue++;
-        });
-        setMaintenanceCounts(counts);
-      } catch {
-        // Handle error silently
-      }
+      await refreshMaintenanceSummary({ user: userObj, propertyIds: scopedPropertyIds, assetIds: scopedAssetIds });
 
       // Issues
       await fetchIssues({ user: userObj, propertyIds: scopedPropertyIds, assetIds: scopedAssetIds });
 
       // Material Requests
       await fetchMaterialRequests();
+      await refreshPurchaseOrderCount();
     };
 
     fetchData();
-  }, [fetchIssues, fetchMaterialRequests, filterAssetsForUser, filterPropertiesForUser, filterSchedulesForUser, filterTechsForUser, isRestrictedRole, refreshPeople]);
+  }, [fetchIssues, fetchMaterialRequests, filterAssetsForUser, filterPropertiesForUser, filterTechsForUser, isRestrictedRole, refreshMaintenanceSummary, refreshPeople, refreshPurchaseOrderCount]);
 
   // Issue actions
   const approveIssue = useCallback(async (id) => {
@@ -14703,21 +15080,21 @@ function ClientDashboard() {
     try {
       await api.post(`/api/maintenance-schedules/${id}/dismiss`, { userId: getCurrentUserId() });
       setReminders(r => r.filter(x => (x._id || x.id) !== id));
-      refreshSchedules();
+      refreshMaintenanceSummary();
     } catch {
       // Handle error silently
     }
-  }, [getCurrentUserId, refreshSchedules]);
+  }, [getCurrentUserId, refreshMaintenanceSummary]);
 
   const snoozeOne = useCallback(async (id) => {
     try {
       await api.post(`/api/maintenance-schedules/${id}/snooze`, { minutes: 60, userId: getCurrentUserId() });
       setReminders(r => r.filter(x => (x._id || x.id) !== id));
-      refreshSchedules();
+      refreshMaintenanceSummary();
     } catch {
       // Handle error silently
     }
-  }, [getCurrentUserId, refreshSchedules]);
+  }, [getCurrentUserId, refreshMaintenanceSummary]);
 
   const dismissAll = useCallback(async () => {
     for (const s of reminders) {
@@ -17094,6 +17471,74 @@ function ClientDashboard() {
   ]);
   const requestBulkSelection = useBulkSelection(filteredRequests, (request) => request?._id || request?.id);
   const workOrders = allIssues.filter(issue => isApprovedWorkOrder(issue));
+  const navBadgeCounts = React.useMemo(() => ({
+    workOrders: workOrders.length,
+    preventiveMaintenance: maintenanceSchedules.length,
+    requests: pendingRequests.length,
+    materialRequests: materialRequests.length,
+    purchaseOrders: purchaseOrderCount,
+  }), [maintenanceSchedules.length, materialRequests.length, pendingRequests.length, purchaseOrderCount, workOrders.length]);
+  const resetMaterialRequestForm = useCallback(() => {
+    setMaterialRequestForm({
+      title: '',
+      description: '',
+      quantity: 1,
+      urgency: 'MEDIUM',
+      linkedIssueId: '',
+      assetName: '',
+    });
+  }, []);
+  const handleClientMaterialRequestChange = useCallback((event) => {
+    const { name, value } = event.target;
+    setMaterialRequestForm((prev) => ({
+      ...prev,
+      [name]: name === 'quantity' ? Math.max(1, parseInt(value, 10) || 1) : value,
+    }));
+  }, []);
+  const handleClientMaterialRequestSubmit = useCallback(async (event) => {
+    event.preventDefault();
+    const trimmedTitle = String(materialRequestForm.title || '').trim();
+    const trimmedDescription = String(materialRequestForm.description || '').trim();
+    const trimmedAssetName = String(materialRequestForm.assetName || '').trim();
+    const currentUserId = currentUser?._id || currentUser?.id;
+    const currentUserName = currentUser?.name || userName || currentUser?.email || 'Client';
+
+    if (!trimmedTitle || !trimmedDescription) {
+      alert('Enter a material title and description.');
+      return;
+    }
+    if (!currentUserId) {
+      alert('Unable to identify the current user for this material request.');
+      return;
+    }
+
+    try {
+      setMaterialRequestSubmitBusy(true);
+      await api.post('/api/material-requests', {
+        title: trimmedTitle,
+        description: trimmedDescription,
+        quantity: Math.max(1, Number(materialRequestForm.quantity) || 1),
+        urgency: materialRequestForm.urgency || 'MEDIUM',
+        linkedIssueId: materialRequestForm.linkedIssueId || undefined,
+        issueId: materialRequestForm.linkedIssueId || undefined,
+        workOrderId: materialRequestForm.linkedIssueId || undefined,
+        assetName: trimmedAssetName || undefined,
+        technicianId: currentUserId,
+        technicianName: currentUserName,
+        clientId: currentUserId,
+      });
+      await fetchMaterialRequests();
+      resetMaterialRequestForm();
+      setShowCreateMaterialRequestModal(false);
+      setActiveTab('materialRequests');
+      alert('Material request submitted successfully.');
+    } catch (error) {
+      console.error('Failed to submit client material request', error);
+      alert(error?.response?.data?.error || error?.response?.data?.message || error?.message || 'Failed to submit material request.');
+    } finally {
+      setMaterialRequestSubmitBusy(false);
+    }
+  }, [currentUser?._id, currentUser?.email, currentUser?.id, currentUser?.name, fetchMaterialRequests, materialRequestForm, resetMaterialRequestForm, userName]);
   const workOrderStatusOptions = ['OPEN', 'IN PROGRESS', 'ON HOLD', 'COMPLETED'];
   const workOrderPriorityOptions = ['HIGH', 'MEDIUM', 'LOW', 'NONE'];
   const workOrderLocationOptions = React.useMemo(
@@ -17228,14 +17673,24 @@ function ClientDashboard() {
     workOrderSearchQuery,
     workOrderSortDirection,
   ]);
+
+  // Handle opening request modal with teams preloaded
+  const handleOpenRequestModal = useCallback(async (request) => {
+    // Ensure teams are loaded before opening request modal
+    if (!Array.isArray(teams) || teams.length === 0) {
+      await refreshTeams();
+    }
+    setModalData({ open: true, type: 'request', item: request });
+  }, [teams, refreshTeams]);
+
   const handleEditSelectedRequests = useCallback(() => {
     if (requestBulkSelection.selectedIds.length !== 1) return;
     const target = filteredRequests.find((request) => (
       requestBulkSelection.selectedIds.includes(String(request?._id || request?.id || ''))
     ));
     if (!target) return;
-    setModalData({ open: true, type: 'request', item: target });
-  }, [filteredRequests, requestBulkSelection.selectedIds]);
+    handleOpenRequestModal(target);
+  }, [filteredRequests, requestBulkSelection.selectedIds, handleOpenRequestModal]);
   const handleDeleteSelectedRequests = useCallback(() => {
     const selectedIds = requestBulkSelection.selectedIds;
     if (!selectedIds.length) return;
@@ -19689,6 +20144,7 @@ function ClientDashboard() {
     setShowRequestSettingsModal(false);
     setShowRequestActionsMenu(false);
     setShowRequestSortMenu(false);
+    setShowCreateMaterialRequestModal(false);
 
     // Reset Property (Location) Details
     setPropertyModalOpen(false);
@@ -19808,7 +20264,7 @@ function ClientDashboard() {
         <div className="custom-scrollbar flex-1 overflow-y-auto" style={{ padding: '12px 10px' }}>
           <nav>
           {navItems.filter(n => !n.group).map(({ key, label, icon }) => (
-            <NavItem key={key} label={label} icon={icon} active={activeTab === key} onClick={() => handleSidebarTabNavigation(key)} />
+            <NavItem key={key} label={label} icon={icon} badge={navBadgeCounts[key]} active={activeTab === key} onClick={() => handleSidebarTabNavigation(key)} />
           ))}
           {navSections.map(section => (
             <div key={section.key}>
@@ -19816,7 +20272,7 @@ function ClientDashboard() {
                 {section.label}
               </div>
               {navItems.filter(n => n.group === section.key).map(({ key, label, icon }) => (
-                <NavItem key={key} label={label} icon={icon} active={activeTab === key} onClick={() => handleSidebarTabNavigation(key)} />
+                <NavItem key={key} label={label} icon={icon} badge={navBadgeCounts[key]} active={activeTab === key} onClick={() => handleSidebarTabNavigation(key)} />
               ))}
             </div>
           ))}
@@ -20032,7 +20488,6 @@ function ClientDashboard() {
         {/* Content */}
         <div className="flex-1 responsive-padding overflow-y-auto">
 
-          {/* â”€â”€ Dashboard â”€â”€ */}
           {activeTab === 'dashboard' && (
             <div>
               <TrialBanner />
@@ -20097,7 +20552,7 @@ function ClientDashboard() {
                     {(combinedOverdue > 0 ? overdueOverviewItems : (workOrders.length > 0 ? workOrders.slice(0, 5) : SAMPLE_WORK_ORDERS.slice(0, 5))).map((issue) => (
                       <button
                         key={`dashboard-workorder-${issue._id || issue.id}`}
-                        onClick={() => setModalData({ open: true, type: 'request', item: issue })}
+                        onClick={() => handleOpenRequestModal(issue)}
                         style={{
                           border: issue.overdue || String(issue.status || '').toUpperCase() === 'OVERDUE' ? '1px solid #fecdd3' : '1px solid #E5E7EB',
                           background: issue.overdue || String(issue.status || '').toUpperCase() === 'OVERDUE' ? '#fff1f2' : 'rgba(255,255,255,0.7)',
@@ -23497,7 +23952,7 @@ function ClientDashboard() {
               setShowCombinedSchedule(true);
             }}
             onCreated={async () => {
-              await refreshSchedules();
+              await refreshMaintenanceSummary();
               setShowCreatePm(false);
             }}
             pmTasks={pmTasks}
@@ -23559,7 +24014,7 @@ function ClientDashboard() {
                 const response = await api.put(`/api/maintenance-schedules/${editingWorkOrderId}`, requestPayload);
                 const updatedSchedule = response?.data || { ...selectedSchedule, ...requestPayload };
                 setSelectedSchedule(updatedSchedule);
-                await refreshSchedules();
+                await refreshMaintenanceSummary();
                 setShowWorkOrderDetails(false);
                 setLaunchChecklistBuilderFromMain(false);
                 return;
@@ -24405,7 +24860,7 @@ function ClientDashboard() {
                           return (
                             <tr
                               key={reqId}
-                              onClick={() => setModalData({ open: true, type: 'request', item: request })}
+                              onClick={() => handleOpenRequestModal(request)}
                               className="hover:bg-gray-50 transition-all cursor-pointer group/row"
                             >
                               <td className="py-3 px-3" onClick={(e) => e.stopPropagation()}>
@@ -24486,7 +24941,20 @@ function ClientDashboard() {
               <SectionHeader
                 title="Material Requests"
                 count={filteredMaterialRequests.length}
-                action={<Btn onClick={fetchMaterialRequests} variant="outline" size="sm">Refresh</Btn>}
+                action={
+                  <div className="flex items-center gap-2">
+                    <Btn
+                      onClick={() => {
+                        resetMaterialRequestForm();
+                        setShowCreateMaterialRequestModal(true);
+                      }}
+                      size="sm"
+                    >
+                      New Request
+                    </Btn>
+                    <Btn onClick={fetchMaterialRequests} variant="outline" size="sm">Refresh</Btn>
+                  </div>
+                }
               />
               <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
@@ -24613,6 +25081,16 @@ function ClientDashboard() {
                       ? 'Any material requests forwarded to you for approval will appear here.'
                       : 'Try adjusting the procurement filters to see more requests.'}
                   </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      resetMaterialRequestForm();
+                      setShowCreateMaterialRequestModal(true);
+                    }}
+                    className="mt-5 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700"
+                  >
+                    Create Material Request
+                  </button>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -24718,6 +25196,152 @@ function ClientDashboard() {
           )}
 
           {/* â”€â”€ Subscription â”€â”€ */}
+          {showCreateMaterialRequestModal && (
+            <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-4">
+              <div className="w-full max-w-2xl rounded-2xl border border-gray-200 bg-white shadow-2xl">
+                <div className="flex items-center justify-between border-b border-gray-100 px-8 py-6">
+                  <div>
+                    <h3 className="text-[28px] font-bold tracking-tight text-gray-900">Create Material Request</h3>
+                    <p className="mt-1 text-sm text-gray-500">Clients can submit materials here and review them from this same page.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowCreateMaterialRequestModal(false);
+                      resetMaterialRequestForm();
+                    }}
+                    className="p-1 text-gray-700 hover:text-gray-900"
+                  >
+                    <X className="h-8 w-8" strokeWidth={1.75} />
+                  </button>
+                </div>
+                <form onSubmit={handleClientMaterialRequestSubmit} className="px-8 py-6">
+                  <div className="grid gap-5">
+                    <div>
+                      <label className="mb-2 block text-sm font-semibold text-gray-700">Material Title</label>
+                      <input
+                        type="text"
+                        name="title"
+                        value={materialRequestForm.title}
+                        onChange={handleClientMaterialRequestChange}
+                        placeholder="e.g. Paint, valves, filters"
+                        className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-2 block text-sm font-semibold text-gray-700">Description</label>
+                      <textarea
+                        name="description"
+                        value={materialRequestForm.description}
+                        onChange={handleClientMaterialRequestChange}
+                        rows="4"
+                        placeholder="Describe what is needed and why."
+                        className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                        required
+                      />
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div>
+                        <label className="mb-2 block text-sm font-semibold text-gray-700">Quantity</label>
+                        <input
+                          type="number"
+                          name="quantity"
+                          min="1"
+                          value={materialRequestForm.quantity}
+                          onChange={handleClientMaterialRequestChange}
+                          className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-2 block text-sm font-semibold text-gray-700">Urgency</label>
+                        <select
+                          name="urgency"
+                          value={materialRequestForm.urgency}
+                          onChange={handleClientMaterialRequestChange}
+                          className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                        >
+                          <option value="LOW">Low</option>
+                          <option value="MEDIUM">Medium</option>
+                          <option value="HIGH">High</option>
+                          <option value="URGENT">Urgent</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div>
+                        <label className="mb-2 block text-sm font-semibold text-gray-700">Linked Work Order</label>
+                        <select
+                          name="linkedIssueId"
+                          value={materialRequestForm.linkedIssueId}
+                          onChange={(event) => {
+                            const nextIssueId = event.target.value;
+                            const matchedIssue = workOrders.find((issue) => String(issue?._id || issue?.id || '') === String(nextIssueId));
+                            setMaterialRequestForm((prev) => ({
+                              ...prev,
+                              linkedIssueId: nextIssueId,
+                              assetName: matchedIssue?.assetName || matchedIssue?.asset?.name || prev.assetName,
+                            }));
+                          }}
+                          className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                        >
+                          <option value="">None</option>
+                          {workOrders.map((issue) => {
+                            const issueId = issue?._id || issue?.id;
+                            return (
+                              <option key={issueId} value={issueId}>
+                                {issue?.title || issue?.name || `Work Order ${issueId}`}
+                              </option>
+                            );
+                          })}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="mb-2 block text-sm font-semibold text-gray-700">Asset</label>
+                        <select
+                          name="assetName"
+                          value={materialRequestForm.assetName}
+                          onChange={handleClientMaterialRequestChange}
+                          className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                        >
+                          <option value="">None</option>
+                          {assets.map((asset) => {
+                            const assetName = asset?.name || asset?.title || asset?.assetName || '';
+                            if (!assetName) return null;
+                            return (
+                              <option key={asset?._id || asset?.id || assetName} value={assetName}>
+                                {assetName}
+                              </option>
+                            );
+                          })}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-8 flex items-center justify-end gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowCreateMaterialRequestModal(false);
+                        resetMaterialRequestForm();
+                      }}
+                      className="rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={materialRequestSubmitBusy}
+                      className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {materialRequestSubmitBusy ? 'Submitting...' : 'Submit Request'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
           {materialRequestAdjustModal.open && (
             <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-4">
               <div className="w-full max-w-[860px] rounded-2xl border border-gray-200 bg-white shadow-2xl">
@@ -28458,7 +29082,7 @@ function ClientDashboard() {
                     assets={assets}
                     initialData={editingSchedule}
                     onSuccess={async () => {
-                      await refreshSchedules();
+                      await refreshMaintenanceSummary();
                       setShowScheduleForm(false);
                       setEditingSchedule(null);
                     }}
@@ -29610,6 +30234,7 @@ function ClientDashboard() {
         onClose={() => setModalData({ open: false, type: '', item: null })}
         getAssignedTechName={getAssignedName}
         onRefresh={fetchIssues}
+        onRefreshApprovalResources={refreshRequestApprovalResources}
         technicians={modalTechnicians}
         teams={teams}
         workOrders={workOrders}
@@ -33936,6 +34561,12 @@ const ClientAnalyticsTab = ({
   const [analyticsMeters, setAnalyticsMeters] = useState([]);
   const [analyticsPurchaseOrders, setAnalyticsPurchaseOrders] = useState([]);
   const [analyticsUsers, setAnalyticsUsers] = useState([]);
+  const analyticsChartRefs = useRef({});
+
+  const setAnalyticsChartRef = React.useCallback((key) => (node) => {
+    if (node) analyticsChartRefs.current[key] = node;
+    else delete analyticsChartRefs.current[key];
+  }, []);
 
   React.useEffect(() => {
     let mounted = true;
@@ -35459,6 +36090,15 @@ const ClientAnalyticsTab = ({
     : customDashboards.find((dashboard) => dashboard.id === selectedDashboardView) || null;
   const isCustomDashboardView = Boolean(selectedCustomDashboard);
   const dateRanges = ['Last 7 Days', 'Last 30 Days', 'Last 90 Days', 'Last 12 Months', 'All Time', 'Custom Range'];
+  const formatPdfDate = React.useCallback((value) => (
+    new Date(value).toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    })
+  ), []);
 
   const metricCards = [
     { label: 'Created', value: statusCounts.total, tone: 'border-blue-200 bg-blue-50 text-blue-700' },
@@ -35466,6 +36106,14 @@ const ClientAnalyticsTab = ({
     { label: 'Pending', value: statusCounts.pending, tone: 'border-amber-200 bg-amber-50 text-amber-700' },
     { label: 'Overdue', value: statusCounts.overdue, tone: 'border-rose-200 bg-rose-50 text-rose-700' },
   ];
+  const completionTrendRows = React.useMemo(
+    () => labels.map((label, index) => ({
+      period: label,
+      created: createdSeries[index] || 0,
+      completed: completedSeries[index] || 0,
+    })),
+    [labels, createdSeries, completedSeries]
+  );
   const workOrderStatusBars = [
     { key: 'completed', label: 'Completed', value: statusCounts.completed || 0, color: '#10b981' },
     { key: 'in-progress', label: 'In Progress', value: statusCounts.inProgress || 0, color: '#3b82f6' },
@@ -35473,6 +36121,419 @@ const ClientAnalyticsTab = ({
     { key: 'overdue', label: 'Overdue', value: statusCounts.overdue || 0, color: '#ef4444' },
   ];
   const workOrderStatusBarMax = Math.max(1, ...workOrderStatusBars.map((item) => item.value || 0));
+  const responseTrendRows = React.useMemo(
+    () => labels.map((label, index) => ({
+      period: label,
+      avgResponseHours: responseStats.series[index] || 0,
+    })),
+    [labels, responseStats.series]
+  );
+  const cycleTrendRows = React.useMemo(
+    () => labels.map((label, index) => ({
+      period: label,
+      avgCycleHours: cycleStats.series[index] || 0,
+    })),
+    [labels, cycleStats.series]
+  );
+  const costTrendRows = React.useMemo(
+    () => labels.map((label, index) => ({
+      period: label,
+      total: costSummary.weeklyTotals[index]?.all || 0,
+      preventive: costSummary.weeklyTotals[index]?.preventive || 0,
+      reactive: costSummary.weeklyTotals[index]?.reactive || 0,
+    })),
+    [labels, costSummary.weeklyTotals]
+  );
+  const assetUtilizationTrendRows = React.useMemo(
+    () => labels.map((label, index) => ({
+      period: label,
+      utilization: assetAnalytics.utilizationSeries[index] || 0,
+    })),
+    [labels, assetAnalytics.utilizationSeries]
+  );
+  const assetDowntimeTrendRows = React.useMemo(
+    () => labels.map((label, index) => ({
+      period: label,
+      events: assetAnalytics.downtimeEventSeries[index] || 0,
+    })),
+    [labels, assetAnalytics.downtimeEventSeries]
+  );
+  const analyticsReportCharts = React.useMemo(() => ({
+    'team-performance': [
+      { key: 'team-completion-rate', title: 'Work Order Completion Rate' },
+      { key: 'team-preventive-reactive', title: 'Preventive vs Reactive Mix' },
+      { key: 'team-response-time', title: 'Work Order Request Response Time' },
+      { key: 'team-cycle-time', title: 'Work Order Cycle Time' },
+    ],
+    'cost-of-maintenance': [
+      { key: 'cost-spend-trend', title: 'Maintenance Spend Trend' },
+      { key: 'cost-driver-breakdown', title: 'Cost Drivers' },
+      { key: 'cost-mix-summary', title: 'Cost Mix' },
+    ],
+    'asset-downtime': [
+      { key: 'asset-utilization-breakdown', title: 'Utilization Breakdown' },
+      { key: 'asset-utilization-over-time', title: 'Utilization Over Time' },
+      { key: 'asset-downtime-history', title: 'Downtime Event History' },
+    ],
+  }), []);
+
+  const captureAnalyticsCharts = React.useCallback(async (chartsToCapture = []) => {
+    if (!chartsToCapture.length) return [];
+    try {
+      const html2canvasModule = await import('html2canvas');
+      const html2canvas = html2canvasModule.default || html2canvasModule;
+      const captures = [];
+      for (const chart of chartsToCapture) {
+        const node = analyticsChartRefs.current[chart.key];
+        if (!node) continue;
+        const canvas = await html2canvas(node, {
+          scale: 2,
+          useCORS: true,
+          backgroundColor: '#ffffff',
+          logging: false,
+        });
+        captures.push({
+          ...chart,
+          imageData: canvas.toDataURL('image/png'),
+          width: canvas.width,
+          height: canvas.height,
+        });
+      }
+      return captures;
+    } catch (error) {
+      console.error('Failed to capture analytics charts:', error);
+      return [];
+    }
+  }, []);
+
+  const downloadAnalyticsBlob = React.useCallback((filename, blob) => {
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  }, []);
+
+  const escapeCsvValue = React.useCallback((value) => {
+    const normalized = value === null || value === undefined ? '' : String(value);
+    return `"${normalized.replace(/"/g, '""')}"`;
+  }, []);
+
+  const escapeHtml = React.useCallback((value) => String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;'), []);
+
+  const buildAnalyticsReportDefinition = React.useCallback(() => {
+    const generatedAt = formatPdfDate(new Date());
+    const fileStem = `fixnest-${subTab}-report-${new Date().toISOString().split('T')[0]}`;
+    const appliedFilters = [
+      `Dashboard: ${activeDashboardLabel}`,
+      `Date range: ${dateRange}`,
+      ...(dateRange === 'Custom Range' && customRange.start && customRange.end
+        ? [`Custom window: ${customRange.start} to ${customRange.end}`]
+        : []),
+      ...(subTab === 'cost-of-maintenance'
+        ? [
+          `Cost type: ${costTypeFilter === 'all' ? 'All cost types' : costTypeFilter}`,
+          `Category focus: ${categoryFilter === 'all' ? 'All categories' : categoryFilter}`,
+        ]
+        : []),
+      `Viewer time zone: ${formatTimeZoneLabel(viewerTimeZone)}`,
+      'Access scope: Client analytics dashboard',
+    ];
+
+    const makeSectionRows = (columns, rows) => rows.map((row) => Object.fromEntries(
+      columns.map((column) => [
+        column.label,
+        column.render ? column.render(row) : (row[column.key] ?? 'N/A'),
+      ])
+    ));
+
+    if (subTab === 'team-performance') {
+      const topTechnician = technicianLeaderboard[0];
+      const topLocation = topCompletedLocations[0];
+      const summaryMetrics = [
+        { label: 'Created Work Orders', value: statusCounts.total },
+        { label: 'Completed Work Orders', value: statusCounts.completed },
+        { label: 'Completion Rate', value: `${completionRate}%` },
+        { label: 'Average Response Time', value: `${formatMetricNumber(responseStats.avg, 1)} hrs` },
+        { label: 'Average Cycle Time', value: `${formatMetricNumber(cycleStats.avg, 1)} hrs` },
+        { label: 'Preventive Share', value: `${preventiveShare}%` },
+      ];
+      const detailSections = [
+        {
+          title: 'Completion Trend',
+          columns: [
+            { key: 'period', label: 'Period' },
+            { key: 'created', label: 'Created' },
+            { key: 'completed', label: 'Completed' },
+          ],
+          rows: completionTrendRows,
+        },
+        {
+          title: 'Response and Cycle Trends',
+          columns: [
+            { key: 'period', label: 'Period' },
+            { key: 'avgResponseHours', label: 'Response (hrs)', render: (row) => formatMetricNumber(row.avgResponseHours, 1) },
+            { key: 'avgCycleHours', label: 'Cycle (hrs)', render: (row) => formatMetricNumber(cycleTrendRows.find((entry) => entry.period === row.period)?.avgCycleHours || 0, 1) },
+          ],
+          rows: responseTrendRows,
+        },
+        {
+          title: 'Top Technicians',
+          columns: [
+            { key: 'name', label: 'Technician' },
+            { key: 'count', label: 'Completed Work Orders' },
+          ],
+          rows: technicianLeaderboard,
+        },
+        {
+          title: 'Top Locations',
+          columns: [
+            { key: 'label', label: 'Location' },
+            { key: 'value', label: 'Completed Work Orders' },
+          ],
+          rows: topCompletedLocations,
+        },
+      ];
+      return {
+        reportTitle: 'Team Performance Report',
+        reportSubtitle: 'Live operational performance report generated from the analytics dashboard.',
+        fileStem,
+        generatedAt,
+        appliedFilters,
+        accessScope: 'Client analytics dashboard',
+        summaryMetrics,
+        insights: [
+          `Completion rate is ${completionRate}% for the selected period.`,
+          topTechnician ? `${topTechnician.name} leads technician completion with ${topTechnician.count} completed work orders.` : 'No technician completion activity is available yet.',
+          topLocation ? `${topLocation.label} is the most active completed-work-order location.` : 'Location performance data is still limited in the selected range.',
+        ],
+        chartSections: analyticsReportCharts['team-performance'],
+        detailSections,
+        workbookSections: detailSections.map((section) => ({
+          name: section.title,
+          rows: makeSectionRows(section.columns, section.rows),
+        })),
+      };
+    }
+
+    if (subTab === 'cost-of-maintenance') {
+      const leadingAsset = costSummary.byAsset[0];
+      const reactiveShare = costSummary.total ? Math.round((costSummary.reactive / costSummary.total) * 100) : 0;
+      const detailSections = [
+        {
+          title: 'Spend Trend',
+          columns: [
+            { key: 'period', label: 'Period' },
+            { key: 'total', label: 'Total Spend', render: (row) => formatCost(row.total) },
+            { key: 'preventive', label: 'Preventive Spend', render: (row) => formatCost(row.preventive) },
+            { key: 'reactive', label: 'Reactive Spend', render: (row) => formatCost(row.reactive) },
+          ],
+          rows: costTrendRows,
+        },
+        {
+          title: 'Top Assets by Spend',
+          columns: [
+            { key: 'label', label: 'Asset' },
+            { key: 'value', label: 'Spend', render: (row) => formatCost(row.value) },
+          ],
+          rows: costSummary.byAsset,
+        },
+        {
+          title: 'Top Categories by Spend',
+          columns: [
+            { key: 'label', label: 'Category' },
+            { key: 'value', label: 'Spend', render: (row) => formatCost(row.value) },
+          ],
+          rows: costSummary.byCategory,
+        },
+        {
+          title: 'Top Locations by Spend',
+          columns: [
+            { key: 'label', label: 'Location' },
+            { key: 'value', label: 'Spend', render: (row) => formatCost(row.value) },
+          ],
+          rows: costSummary.byLocation,
+        },
+      ];
+      return {
+        reportTitle: 'Cost of Maintenance Report',
+        reportSubtitle: 'Professional cost summary with trend visuals, totals, and spend drivers.',
+        fileStem,
+        generatedAt,
+        appliedFilters,
+        accessScope: 'Client analytics dashboard',
+        summaryMetrics: [
+          { label: 'Total Maintenance Spend', value: formatCost(costSummary.total) },
+          { label: 'Reactive Spend', value: formatCost(costSummary.reactive) },
+          { label: 'Preventive Spend', value: formatCost(costSummary.preventive) },
+          { label: 'Average Work Order Cost', value: formatCost(costSummary.average) },
+          { label: 'Labor Cost', value: formatCost(costSummary.labor) },
+          { label: 'Parts Cost', value: formatCost(costSummary.parts) },
+        ],
+        insights: [
+          `Reactive maintenance accounts for ${reactiveShare}% of the tracked spend.`,
+          leadingAsset ? `${leadingAsset.label} is the highest cost driver in the current range.` : 'No cost-driving asset is available yet.',
+          `The report includes ${costSummary.workOrderCount} costed work orders from live system data.`,
+        ],
+        chartSections: analyticsReportCharts['cost-of-maintenance'],
+        detailSections,
+        workbookSections: detailSections.map((section) => ({
+          name: section.title,
+          rows: makeSectionRows(section.columns, section.rows),
+        })),
+      };
+    }
+
+    if (subTab === 'asset-downtime') {
+      const highestDowntimeAsset = assetAnalytics.tableRows[0];
+      const detailSections = [
+        {
+          title: 'Downtime by Asset',
+          columns: [
+            { key: 'name', label: 'Asset' },
+            { key: 'location', label: 'Location' },
+            { key: 'downtimeHours', label: 'Downtime Hours', render: (row) => formatMetricNumber(row.downtimeHours, 2) },
+            { key: 'downtimeEvents', label: 'Events' },
+            { key: 'utilization', label: 'Utilization', render: (row) => `${formatMetricNumber(row.utilization, 1)}%` },
+          ],
+          rows: assetAnalytics.tableRows,
+        },
+        {
+          title: 'Utilization Trend',
+          columns: [
+            { key: 'period', label: 'Period' },
+            { key: 'utilization', label: 'Utilization', render: (row) => `${formatMetricNumber(row.utilization, 1)}%` },
+          ],
+          rows: assetUtilizationTrendRows,
+        },
+        {
+          title: 'Downtime Event Trend',
+          columns: [
+            { key: 'period', label: 'Period' },
+            { key: 'events', label: 'Downtime Events' },
+          ],
+          rows: assetDowntimeTrendRows,
+        },
+        {
+          title: 'Utilization by Location',
+          columns: [
+            { key: 'label', label: 'Location' },
+            { key: 'utilization', label: 'Utilization', render: (row) => `${formatMetricNumber(row.utilization, 1)}%` },
+            { key: 'total', label: 'Assets' },
+          ],
+          rows: assetAnalytics.utilizationByLocation,
+        },
+      ];
+      return {
+        reportTitle: 'Asset Downtime and Utilization Report',
+        reportSubtitle: 'Operational reliability report with downtime ranking, trends, and utilization patterns.',
+        fileStem,
+        generatedAt,
+        appliedFilters,
+        accessScope: 'Client analytics dashboard',
+        summaryMetrics: [
+          { label: 'Tracked Assets', value: assetAnalytics.summary.totalAssets },
+          { label: 'Utilization', value: `${formatMetricNumber(assetAnalytics.summary.utilization, 1)}%` },
+          { label: 'Operational Assets', value: assetAnalytics.summary.operationalCount },
+          { label: 'Not Operational', value: assetAnalytics.summary.notOperationalCount },
+          { label: 'Downtime Events', value: assetAnalytics.downtimeEventSeries.reduce((sum, value) => sum + value, 0) },
+          { label: 'Reported Assets', value: assetAnalytics.tableRows.length },
+        ],
+        insights: [
+          `Average fleet utilization is ${formatMetricNumber(assetAnalytics.summary.utilization, 1)}% in the selected period.`,
+          highestDowntimeAsset ? `${highestDowntimeAsset.name} has the highest downtime footprint in the ranking.` : 'No downtime-heavy asset is available yet.',
+          `${assetAnalytics.summary.operationalCount} assets are currently operational versus ${assetAnalytics.summary.notOperationalCount} not operational.`,
+        ],
+        chartSections: analyticsReportCharts['asset-downtime'],
+        detailSections,
+        workbookSections: detailSections.map((section) => ({
+          name: section.title,
+          rows: makeSectionRows(section.columns, section.rows),
+        })),
+      };
+    }
+
+    const fallbackSections = [
+      {
+        title: 'Dashboard Summary',
+        columns: [
+          { key: 'label', label: 'Metric' },
+          { key: 'value', label: 'Value' },
+        ],
+        rows: [
+          { label: 'Created Work Orders', value: statusCounts.total },
+          { label: 'Assets', value: assets.length },
+          { label: 'Requests Submitted', value: requestAnalytics.submitted },
+          { label: 'Users Tracked', value: userAnalytics.rows.length },
+        ],
+      },
+    ];
+    return {
+      reportTitle: `${activeDashboardLabel} Report`,
+      reportSubtitle: 'Automated analytics export generated from the current dashboard view.',
+      fileStem,
+      generatedAt,
+      appliedFilters,
+      accessScope: 'Client analytics dashboard',
+      summaryMetrics: [
+        { label: 'Created Work Orders', value: statusCounts.total },
+        { label: 'Tracked Assets', value: assets.length },
+        { label: 'Tracked Users', value: userAnalytics.rows.length },
+        { label: 'Requests Submitted', value: requestAnalytics.submitted },
+      ],
+      insights: [
+        'This export reflects the live dashboard state at the moment of generation.',
+        'Detailed structured exports are optimized for the primary analytics dashboards.',
+      ],
+      chartSections: [],
+      detailSections: fallbackSections,
+      workbookSections: fallbackSections.map((section) => ({
+        name: section.title,
+        rows: makeSectionRows(section.columns, section.rows),
+      })),
+    };
+  }, [
+    activeDashboardLabel,
+    analyticsReportCharts,
+    assetAnalytics,
+    assetDowntimeTrendRows,
+    assetUtilizationTrendRows,
+    assets.length,
+    categoryFilter,
+    completionRate,
+    completionTrendRows,
+    costSummary,
+    costTrendRows,
+    costTypeFilter,
+    customRange.end,
+    customRange.start,
+    cycleStats.avg,
+    cycleTrendRows,
+    dateRange,
+    formatCost,
+    formatMetricNumber,
+    formatPdfDate,
+    requestAnalytics.submitted,
+    responseStats.avg,
+    responseTrendRows,
+    statusCounts.completed,
+    statusCounts.total,
+    subTab,
+    technicianLeaderboard,
+    topCompletedLocations,
+    totalPreventive,
+    totalReactive,
+    userAnalytics.rows.length,
+    viewerTimeZone,
+  ]);
 
   const loadAnalyticsPreferences = React.useCallback(async () => {
     try {
@@ -35585,9 +36646,258 @@ const ClientAnalyticsTab = ({
     setShowFilters(true);
   };
 
-  const handleDownloadAnalytics = () => {
-    window.print();
-    setShowMoreActionsMenu(false);
+  const handleDownloadAnalytics = async () => {
+    try {
+      const { jsPDF } = await import('jspdf');
+      const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const marginX = 44;
+      const contentWidth = pageWidth - marginX * 2;
+      let y = 44;
+
+      const ensureSpace = (needed = 24) => {
+        if (y + needed <= pageHeight - 44) return;
+        doc.addPage();
+        y = 44;
+      };
+
+      const addHeader = (title, subtitle) => {
+        doc.setFillColor(15, 23, 42);
+        doc.roundedRect(marginX, y, contentWidth, 76, 14, 14, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(24);
+        doc.text(title, marginX + 22, y + 30);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        doc.text(subtitle, marginX + 22, y + 52);
+        y += 94;
+        doc.setTextColor(17, 24, 39);
+      };
+
+      const addSectionTitle = (title, subtitle = '') => {
+        ensureSpace(subtitle ? 42 : 28);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(15);
+        doc.setTextColor(17, 24, 39);
+        doc.text(title, marginX, y);
+        y += 16;
+        if (subtitle) {
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(10);
+          doc.setTextColor(107, 114, 128);
+          doc.text(subtitle, marginX, y);
+          y += 16;
+        }
+      };
+
+      const addMetricGrid = (items) => {
+        const columns = 2;
+        const gap = 12;
+        const cardWidth = (contentWidth - gap) / columns;
+        const cardHeight = 54;
+        items.forEach((item, index) => {
+          if (index % columns === 0) ensureSpace(cardHeight + 10);
+          const column = index % columns;
+          const row = Math.floor(index / columns);
+          const x = marginX + (column * (cardWidth + gap));
+          const rowY = y + (row * (cardHeight + gap));
+          doc.setFillColor(248, 250, 252);
+          doc.setDrawColor(226, 232, 240);
+          doc.roundedRect(x, rowY, cardWidth, cardHeight, 10, 10, 'FD');
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(9);
+          doc.setTextColor(107, 114, 128);
+          doc.text(String(item.label || '').toUpperCase(), x + 14, rowY + 16);
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(15);
+          doc.setTextColor(17, 24, 39);
+          doc.text(String(item.value ?? '—'), x + 14, rowY + 38);
+        });
+        y += (Math.ceil(items.length / columns) * (cardHeight + gap));
+      };
+
+      const addSimpleTable = (columns, rows) => {
+        const columnWidth = contentWidth / Math.max(1, columns.length);
+        const headerHeight = 22;
+        const rowHeight = 18;
+        ensureSpace(headerHeight + rowHeight + 16);
+        doc.setFillColor(241, 245, 249);
+        doc.setDrawColor(226, 232, 240);
+        doc.roundedRect(marginX, y, contentWidth, headerHeight, 8, 8, 'FD');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8);
+        doc.setTextColor(71, 85, 105);
+        columns.forEach((column, index) => {
+          doc.text(column.label, marginX + 10 + (index * columnWidth), y + 14);
+        });
+        y += headerHeight;
+        rows.forEach((row, rowIndex) => {
+          ensureSpace(rowHeight + 8);
+          if (rowIndex % 2 === 0) {
+            doc.setFillColor(250, 250, 250);
+            doc.rect(marginX, y, contentWidth, rowHeight, 'F');
+          }
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(9);
+          doc.setTextColor(31, 41, 55);
+          columns.forEach((column, index) => {
+            const rawValue = column.render ? column.render(row) : row[column.key];
+            const text = String(rawValue ?? '—');
+            doc.text(text.length > 26 ? `${text.slice(0, 26)}…` : text, marginX + 10 + (index * columnWidth), y + 12);
+          });
+          y += rowHeight;
+        });
+        y += 14;
+      };
+
+      const reportTimestamp = formatPdfDate(new Date());
+      const executiveSummary = {
+        'team-performance': [
+          { label: 'Created', value: statusCounts.total },
+          { label: 'Completed', value: statusCounts.completed },
+          { label: 'Avg Response', value: `${formatMetricNumber(responseStats.avg, 1)}h` },
+          { label: 'Avg Cycle', value: `${formatMetricNumber(cycleStats.avg, 1)}h` },
+        ],
+        'cost-of-maintenance': [
+          { label: 'Total Spend', value: formatCost(costSummary.total) },
+          { label: 'Preventive', value: formatCost(costSummary.preventive) },
+          { label: 'Reactive', value: formatCost(costSummary.reactive) },
+          { label: 'Avg Work Order Cost', value: formatCost(costSummary.average) },
+        ],
+        'asset-downtime': [
+          { label: 'Tracked Assets', value: assetAnalytics.summary.totalAssets },
+          { label: 'Utilization', value: `${formatMetricNumber(assetAnalytics.summary.utilization, 1)}%` },
+          { label: 'Operational', value: assetAnalytics.summary.operationalCount },
+          { label: 'Not Operational', value: assetAnalytics.summary.notOperationalCount },
+        ],
+      };
+
+      addHeader('Fixnest Analytics Report', `${activeDashboardLabel} | Generated ${reportTimestamp}`);
+      addSectionTitle('Report Scope', `View: ${activeDashboardLabel} | Date Range: ${dateRange} | Time Zone: ${viewerTimeZone}`);
+      addMetricGrid(executiveSummary[subTab] || [
+        { label: 'Created', value: statusCounts.total },
+        { label: 'Assets', value: assets.length },
+        { label: 'Users', value: userAnalytics.rows.length },
+        { label: 'Requests', value: requestAnalytics.submitted },
+      ]);
+
+      if (subTab === 'team-performance') {
+        addSectionTitle('Completion Trend', 'Period-by-period created and completed work orders.');
+        addSimpleTable(
+          [
+            { key: 'period', label: 'Period' },
+            { key: 'created', label: 'Created' },
+            { key: 'completed', label: 'Completed' },
+          ],
+          completionTrendRows
+        );
+        addSectionTitle('Top Technicians', 'Ranked by completed work orders.');
+        addSimpleTable(
+          [
+            { key: 'name', label: 'Technician' },
+            { key: 'count', label: 'Completed' },
+          ],
+          technicianLeaderboard
+        );
+        addSectionTitle('Response and Cycle Times', 'Average hours by reporting period.');
+        addSimpleTable(
+          [
+            { key: 'period', label: 'Period' },
+            { key: 'avgResponseHours', label: 'Response (hrs)', render: (row) => formatMetricNumber(row.avgResponseHours, 1) },
+            { key: 'avgCycleHours', label: 'Cycle (hrs)', render: (row) => formatMetricNumber(cycleTrendRows.find((entry) => entry.period === row.period)?.avgCycleHours || 0, 1) },
+          ],
+          responseTrendRows
+        );
+      } else if (subTab === 'cost-of-maintenance') {
+        addSectionTitle('Spend Trend', 'Detailed maintenance spend by period and work type.');
+        addSimpleTable(
+          [
+            { key: 'period', label: 'Period' },
+            { key: 'total', label: 'Total', render: (row) => formatCost(row.total) },
+            { key: 'preventive', label: 'Preventive', render: (row) => formatCost(row.preventive) },
+            { key: 'reactive', label: 'Reactive', render: (row) => formatCost(row.reactive) },
+          ],
+          costTrendRows
+        );
+        addSectionTitle('Top Cost Drivers', 'Most expensive assets, categories, and locations.');
+        addSimpleTable(
+          [
+            { key: 'label', label: 'Asset' },
+            { key: 'value', label: 'Cost', render: (row) => formatCost(row.value) },
+          ],
+          costSummary.byAsset
+        );
+        addSimpleTable(
+          [
+            { key: 'label', label: 'Category' },
+            { key: 'value', label: 'Cost', render: (row) => formatCost(row.value) },
+          ],
+          costSummary.byCategory
+        );
+        addSimpleTable(
+          [
+            { key: 'label', label: 'Location' },
+            { key: 'value', label: 'Cost', render: (row) => formatCost(row.value) },
+          ],
+          costSummary.byLocation
+        );
+      } else if (subTab === 'asset-downtime') {
+        addSectionTitle('Highest Downtime Assets', 'Assets ranked by downtime hours and utilization.');
+        addSimpleTable(
+          [
+            { key: 'name', label: 'Asset' },
+            { key: 'location', label: 'Location' },
+            { key: 'downtimeHours', label: 'Downtime Hrs', render: (row) => formatMetricNumber(row.downtimeHours, 2) },
+            { key: 'downtimeEvents', label: 'Events' },
+            { key: 'utilization', label: 'Utilization', render: (row) => `${formatMetricNumber(row.utilization, 1)}%` },
+          ],
+          assetAnalytics.tableRows
+        );
+        addSectionTitle('Utilization Trend', 'Period-by-period utilization and downtime activity.');
+        addSimpleTable(
+          [
+            { key: 'period', label: 'Period' },
+            { key: 'utilization', label: 'Utilization', render: (row) => `${formatMetricNumber(row.utilization, 1)}%` },
+            { key: 'events', label: 'Downtime Events', render: (row) => assetDowntimeTrendRows.find((entry) => entry.period === row.period)?.events || 0 },
+          ],
+          assetUtilizationTrendRows
+        );
+        addSectionTitle('Utilization by Location', 'Average utilization for top locations in the selected range.');
+        addSimpleTable(
+          [
+            { key: 'label', label: 'Location' },
+            { key: 'utilization', label: 'Utilization', render: (row) => `${formatMetricNumber(row.utilization, 1)}%` },
+            { key: 'total', label: 'Assets' },
+          ],
+          assetAnalytics.utilizationByLocation
+        );
+      } else {
+        addSectionTitle('Dashboard Summary', 'Structured export is currently optimized for the primary analytics dashboards.');
+        addSimpleTable(
+          [
+            { key: 'label', label: 'Metric' },
+            { key: 'value', label: 'Value' },
+          ],
+          [
+            { label: 'Created Work Orders', value: statusCounts.total },
+            { label: 'Assets', value: assets.length },
+            { label: 'Requests Submitted', value: requestAnalytics.submitted },
+            { label: 'Users Tracked', value: userAnalytics.rows.length },
+          ]
+        );
+      }
+
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(9);
+      doc.setTextColor(107, 114, 128);
+      doc.text('Generated from Fixnest Analytics using live dashboard metrics and structured tabular analytics data.', marginX, pageHeight - 28);
+      doc.save(`fixnest-analytics-${String(subTab || 'report').replace(/[^a-z0-9]+/gi, '-').toLowerCase()}-${new Date().toISOString().slice(0, 10)}.pdf`);
+      setShowMoreActionsMenu(false);
+    } catch (error) {
+      alert(error?.message || 'Failed to generate analytics report.');
+    }
   };
 
   React.useEffect(() => {
@@ -36199,6 +37509,15 @@ const ClientAnalyticsTab = ({
                   <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-blue-500 inline-block rounded" />Created</span>
                   <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-emerald-500 inline-block rounded" />Completed</span>
                 </div>
+                {renderAnalyticsDetailTable(
+                  'Completion Trend Details',
+                  [
+                    { key: 'period', label: 'Period' },
+                    { key: 'created', label: 'Created' },
+                    { key: 'completed', label: 'Completed' },
+                  ],
+                  completionTrendRows
+                )}
               </div>
 
               <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
@@ -36319,6 +37638,14 @@ const ClientAnalyticsTab = ({
                     ))}
                   </svg>
                 </div>
+                {renderAnalyticsDetailTable(
+                  'Response Time Details',
+                  [
+                    { key: 'period', label: 'Period' },
+                    { key: 'avgResponseHours', label: 'Avg Response (hrs)', render: (row) => formatMetricNumber(row.avgResponseHours, 1) },
+                  ],
+                  responseTrendRows
+                )}
               </div>
 
               <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
@@ -36352,6 +37679,14 @@ const ClientAnalyticsTab = ({
                     ))}
                   </svg>
                 </div>
+                {renderAnalyticsDetailTable(
+                  'Cycle Time Details',
+                  [
+                    { key: 'period', label: 'Period' },
+                    { key: 'avgCycleHours', label: 'Avg Cycle (hrs)', render: (row) => formatMetricNumber(row.avgCycleHours, 1) },
+                  ],
+                  cycleTrendRows
+                )}
               </div>
             </div>
 
@@ -36484,6 +37819,16 @@ const ClientAnalyticsTab = ({
                   <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-blue-600 inline-block rounded" />Preventive</span>
                   <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-teal-600 inline-block rounded" />Reactive</span>
                 </div>
+                {renderAnalyticsDetailTable(
+                  'Spend Trend Details',
+                  [
+                    { key: 'period', label: 'Period' },
+                    { key: 'total', label: 'Total', render: (row) => formatCost(row.total) },
+                    { key: 'preventive', label: 'Preventive', render: (row) => formatCost(row.preventive) },
+                    { key: 'reactive', label: 'Reactive', render: (row) => formatCost(row.reactive) },
+                  ],
+                  costTrendRows
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -36768,6 +38113,14 @@ const ClientAnalyticsTab = ({
                     ))}
                   </svg>
                 </div>
+                {renderAnalyticsDetailTable(
+                  'Utilization Trend Details',
+                  [
+                    { key: 'period', label: 'Period' },
+                    { key: 'utilization', label: 'Utilization', render: (row) => `${formatMetricNumber(row.utilization, 1)}%` },
+                  ],
+                  assetUtilizationTrendRows
+                )}
               </div>
 
               <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
@@ -36792,6 +38145,14 @@ const ClientAnalyticsTab = ({
                     ))}
                   </svg>
                 </div>
+                {renderAnalyticsDetailTable(
+                  'Downtime Event Details',
+                  [
+                    { key: 'period', label: 'Period' },
+                    { key: 'events', label: 'Downtime Events' },
+                  ],
+                  assetDowntimeTrendRows
+                )}
               </div>
             </div>
           </div>
