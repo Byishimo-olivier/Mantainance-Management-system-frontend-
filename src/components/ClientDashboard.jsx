@@ -19551,7 +19551,12 @@ function ClientDashboard() {
       headerClassName: 'min-w-[120px]',
       cellClassName: 'min-w-[120px]',
       render: (asset) => {
-        const assetImage = asset?.image || asset?.imageUrl || asset?.photo || (Array.isArray(asset?.images) ? asset.images[0] : '');
+        const assetImage =
+          asset?.image ||
+          asset?.imageUrl ||
+          asset?.photo ||
+          (Array.isArray(asset?.photos) ? asset.photos[0] : '') ||
+          (Array.isArray(asset?.images) ? (asset.images[0]?.url || asset.images[0]) : '');
         return assetImage ? (
           <img src={getImageUrl(assetImage)} alt={asset?.name || 'Asset'} className="h-12 w-12 rounded border border-gray-200 object-cover" />
         ) : (

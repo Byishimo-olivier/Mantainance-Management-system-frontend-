@@ -5,8 +5,17 @@
  */
 export function getImageUrl(path) {
     if (!path || path === 'null' || path === 'undefined') return null;
+    const value = String(path).trim();
     // Already a full URL
-    if (path.startsWith('http')) return path;
+    if (
+        value.startsWith('http') ||
+        value.startsWith('//') ||
+        value.startsWith('data:') ||
+        value.startsWith('blob:') ||
+        value.startsWith('file:')
+    ) {
+        return value;
+    }
     // Prefer explicit VITE_API_URL configured at build time
     let base = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
     // Fallback to a runtime-provided global or current origin (best-effort)
@@ -15,6 +24,6 @@ export function getImageUrl(path) {
         else if (typeof window !== 'undefined' && window.location && window.location.origin) base = String(window.location.origin).replace(/\/$/, '');
     }
     // If still empty, return the raw path (browser will resolve relative to current origin)
-    if (!base) return path;
-    return `${base}${path.startsWith('/') ? '' : '/'}${path}`;
+    if (!base) return value;
+    return `${base}${value.startsWith('/') ? '' : '/'}${value}`;
 }

@@ -8,6 +8,13 @@ import subscriptionAPI from '../api/subscription';
 import api from '../api/axios';
 import ThierryImage from '../assets/Thierry.jpeg';
 import OlivierImage from '../assets/Byishimo.jpeg';
+import DashboardScreenshot from '../assets/Dashboard.png';
+import RequestScreenshot from '../assets/Request.png';
+import AssetScreenshot from '../assets/Asset55.png';
+import AnalyticsScreenshot from '../assets/analytics.png';
+import PMScreenshot from '../assets/PM.png';
+import WorkOrderScreenshot from '../assets/Workorder4.png';
+import ScheduleScreenshot from '../assets/schedule3.png';
 
 const products = [
   {
@@ -151,6 +158,73 @@ const planMetadata = {
   }
 };
 
+const platformScreenshots = [
+  {
+    eyebrow: 'Asset Management',
+    title: 'Know every asset, everywhere',
+    description: 'Track every asset from onboarding to retirement. Organize lifecycle details, ownership, categories, and images in one clean workspace.',
+    bullets: [
+      'Full lifecycle visibility in one place',
+      'Custom asset records with photos and details',
+      'Fast filtering by category, location, and status',
+      'Simple view for client demos and operations reviews',
+    ],
+    linkLabel: 'Learn more about Asset Management',
+    linkHref: '/feature/asset-management',
+    image: AssetScreenshot,
+    accent: '#1d4ed8',
+    reverse: false,
+  },
+  {
+    eyebrow: 'Work Orders',
+    title: 'From request to resolution, nothing gets lost',
+    description: 'Create work orders in seconds with clear assignment, approval, attachments, and progress tracking so every team knows the next step.',
+    bullets: [
+      'Guided request-to-work-order process',
+      'Assignment, approvals, and comments in one flow',
+      'Attachments, notes, and history on every job',
+      'Cleaner collaboration between clients and internal teams',
+    ],
+    linkLabel: 'Learn more about Work Orders',
+    linkHref: '/feature/work-orders',
+    image: WorkOrderScreenshot,
+    accent: '#7c3aed',
+    reverse: true,
+  },
+  {
+    eyebrow: 'Preventive Maintenance',
+    title: 'Plan ahead instead of reacting late',
+    description: 'Automate routine maintenance schedules and keep teams aligned on upcoming service before downtime disrupts the operation.',
+    bullets: [
+      'Recurring PM scheduling built into the platform',
+      'Track upcoming tasks before they become emergencies',
+      'Support checklists, procedures, and recurring standards',
+      'Show clients a clear reliability plan, not just repairs',
+    ],
+    linkLabel: 'Learn more about Preventive Maintenance',
+    linkHref: '/feature/preventive-maintenance',
+    image: ScheduleScreenshot,
+    accent: '#0f766e',
+    reverse: false,
+  },
+  {
+    eyebrow: 'Analytics & Reports',
+    title: 'Turn operational activity into clear decisions',
+    description: 'Present live charts, KPI trends, and exportable reports that help clients understand value, cost, and performance at a glance.',
+    bullets: [
+      'Visual dashboards for quick executive review',
+      'Professional reporting for meetings and client updates',
+      'Track trends, workload, and performance over time',
+      'Move from raw maintenance data to business insight',
+    ],
+    linkLabel: 'Learn more about Analytics',
+    linkHref: '/feature/analytics-reporting',
+    image: AnalyticsScreenshot,
+    accent: '#ea580c',
+    reverse: true,
+  },
+];
+
 const LandingPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -276,23 +350,84 @@ const LandingPage = () => {
           </div>
         </div>
         <div className="landing-hero-media">
-          <div className="hero-photo group">
+          <div className="hero-photo group" style={{ background: 'linear-gradient(145deg, #0f172a 0%, #1e293b 100%)', padding: '18px' }}>
             <img 
-              src="https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=1200&q=80" 
-              alt="Industrial Maintenance" 
-              className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+              src={DashboardScreenshot}
+              alt="Fixnest dashboard overview"
+              className="w-full h-full rounded-[24px] object-cover object-top transition-transform duration-700 group-hover:scale-[1.02]"
             />
             <div className="absolute inset-0 bg-gradient-to-tr from-slate-900/40 to-transparent" />
-            <div className="hero-card hero-card--task">
-              <div className="hero-card-title">Seasonal Electrical Connection Audit</div>
+            <div className="hero-card hero-card--task" style={{ width: '240px', padding: '10px', background: 'rgba(255,255,255,0.97)' }}>
+              <img
+                src={RequestScreenshot}
+                alt="Request workflow preview"
+                className="h-28 w-full rounded-2xl object-cover"
+              />
+              <div className="hero-card-title" style={{ marginTop: '10px' }}>Request to Approval Flow</div>
               <div className="hero-card-meta">Open · 1 hour</div>
             </div>
-            <div className="hero-card hero-card--metrics">
-              <div className="hero-card-title">Completion Rate</div>
-              <div className="hero-card-metric">84% Completed</div>
-              <div className="hero-card-graph" />
+            <div className="hero-card hero-card--metrics" style={{ width: '240px', padding: '10px', background: 'rgba(15,23,42,0.92)', color: '#fff' }}>
+              <img
+                src={AnalyticsScreenshot}
+                alt="Analytics preview"
+                className="h-28 w-full rounded-2xl object-cover"
+              />
+              <div className="hero-card-title" style={{ marginTop: '10px', color: '#cbd5e1' }}>Analytics Snapshot</div>
+              <div className="hero-card-metric">Live charts and export-ready reports</div>
             </div>
           </div>
+        </div>
+      </section>
+
+      <section className="landing-section" style={{ backgroundColor: '#fff', padding: '24px 24px 84px' }}>
+        <div className="max-w-7xl mx-auto">
+          {platformScreenshots.map((screen, index) => (
+            <div
+              key={screen.title}
+              className={`grid items-center gap-14 py-16 lg:grid-cols-[1fr_1.08fr] ${index !== 0 ? 'border-t border-slate-200' : ''}`}
+            >
+              <div className={screen.reverse ? 'lg:order-2 max-w-[620px]' : 'max-w-[620px]'}>
+                <div
+                  className="inline-flex items-center text-sm font-semibold tracking-normal"
+                  style={{ color: screen.accent }}
+                >
+                  {screen.eyebrow}
+                </div>
+                <h2 className="mt-4 text-4xl font-bold leading-[1.06] tracking-tight text-slate-950 md:text-[3.5rem]">
+                  {screen.title}
+                </h2>
+                <p className="mt-6 max-w-2xl text-[1.15rem] leading-10 text-slate-600">
+                  {screen.description}
+                </p>
+                <div className="mt-9 space-y-5">
+                  {screen.bullets.map((bullet) => (
+                    <div key={bullet} className="flex items-start gap-3 text-[1.02rem] text-slate-900">
+                      <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" style={{ color: screen.accent }} />
+                      <span>{bullet}</span>
+                    </div>
+                  ))}
+                </div>
+                <a
+                  href={screen.linkHref}
+                  className="mt-10 inline-flex items-center gap-3 text-[1.05rem] font-semibold"
+                  style={{ color: screen.accent }}
+                >
+                  {screen.linkLabel}
+                  <ArrowRight className="h-5 w-5" />
+                </a>
+              </div>
+
+              <div className={screen.reverse ? 'lg:order-1' : ''}>
+                <div className="rounded-[28px] border border-slate-200 bg-white p-3 shadow-[0_24px_64px_rgba(15,23,42,0.10)]">
+                  <img
+                    src={screen.image}
+                    alt={screen.title}
+                    className="w-full rounded-[22px] object-cover object-top"
+                  />
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </section>
 
