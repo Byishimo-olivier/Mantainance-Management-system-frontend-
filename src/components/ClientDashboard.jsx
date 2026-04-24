@@ -10,6 +10,7 @@ import SubscriptionManagement from './SubscriptionManagement';
 import CompanySubscriptionDashboard from './CompanySubscriptionDashboard';
 import TrialBanner from './TrialBanner';
 import { useCompanySubscription } from '../hooks/useCompanySubscription';
+import useTrialStatus from '../hooks/useTrialStatus';
 import { useSubscription } from '../hooks/useSubscription';
 import { getImageUrl } from '../utils/imageUrl';
 import { useLanguage, useTranslation } from "../i18n/LanguageContext";
@@ -1142,6 +1143,48 @@ const getWorkOrderDisplayStatus = (issue) => {
   return raw || 'OPEN';
 };
 
+const getRequestDisplayState = (request) => {
+  const rawRequestStatus = String(request?.status || '').toUpperCase().replace(/_/g, ' ').trim();
+  const hasWorkOrderReference = Boolean(
+    request?.approved
+    || request?.workOrderId
+    || request?.workOrderNumber
+    || request?.workOrderNo
+    || request?.workOrderRef
+    || request?.workOrderCode
+    || request?.workOrder
+    || rawRequestStatus === 'APPROVED'
+    || rawRequestStatus === 'OPEN'
+    || rawRequestStatus.includes('IN PROGRESS')
+    || rawRequestStatus.includes('COMPLETE')
+  );
+  const isDeclined = request?.rejected || rawRequestStatus === 'DECLINED' || rawRequestStatus === 'REJECTED';
+  const isApproved = hasWorkOrderReference && !isDeclined;
+
+  const statusLabel = isDeclined
+    ? 'Declined'
+    : isApproved
+      ? 'Approved'
+      : 'Pending';
+
+  return {
+    isDeclined,
+    isApproved,
+    isCompleted: false,
+    isInProgress: false,
+    statusLabel,
+  };
+};
+
+const getWorkOrderStatusLabel = (rawStatus, fallback = 'None') => {
+  const normalized = String(rawStatus || '').toUpperCase().replace(/_/g, ' ').trim();
+  const safeFallback = String(fallback || 'None').trim() || 'None';
+  if (normalized.includes('COMPLETE') || normalized.includes('CLOSED') || normalized.includes('RESOLVED')) return 'Completed';
+  if (normalized.includes('PROGRESS')) return 'In Progress';
+  if (normalized.includes('OPEN') || normalized.includes('APPROVED')) return 'Open';
+  return safeFallback;
+};
+
 // Minimal fallback form to avoid runtime errors when the real component is absent.
 // Replace with actual implementation when available.
 function ScheduleMaintenanceForm({ onSuccess, onClose }) {
@@ -1172,10 +1215,14 @@ const useBulkSelection = (items, getId) => {
       return id ? String(id) : null;
     })
     .filter(Boolean);
+  const idsSignature = ids.join('|');
 
   useEffect(() => {
-    setSelectedIds((prev) => prev.filter((id) => ids.includes(id)));
-  }, [items]);
+    setSelectedIds((prev) => {
+      const next = prev.filter((id) => ids.includes(id));
+      return next.length === prev.length && next.every((id, index) => id === prev[index]) ? prev : next;
+    });
+  }, [idsSignature]);
 
   const allSelected = ids.length > 0 && ids.every((id) => selectedIds.includes(id));
   const toggleAll = (checked) => setSelectedIds(checked ? ids : []);
@@ -7077,11 +7124,81 @@ function ClientDashboard() {
   const navigate = useNavigate();
   const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
   const { hasActive: hasActiveCompanySubscription, loading: companySubscriptionLoading } = useCompanySubscription();
+  const { trialStatus, isInTrial, hasExpired, daysRemaining, loading: trialStatusLoading } = useTrialStatus();
   const { language, setLanguage } = useLanguage();
   const { t } = useTranslation();
   const backendBase = (import.meta.env.VITE_API_URL || '') + '';
   const hasPaidSubscription = hasActiveCompanySubscription;
   const subscriptionVisibilityLoading = companySubscriptionLoading;
+  const sidebarTrialEndLabel = React.useMemo(() => {
+    const rawDate = trialStatus?.trialEndDate;
+    if (!rawDate) return '';
+    const parsed = new Date(rawDate);
+    if (Number.isNaN(parsed.getTime())) return '';
+    return parsed.toLocaleDateString();
+  }, [trialStatus?.trialEndDate]);
+  const sidebarTrialCard = React.useMemo(() => {
+    if (subscriptionVisibilityLoading || trialStatusLoading) {
+      return {
+        accent: '#64748B',
+        border: '#CBD5E1',
+        background: 'linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%)',
+        iconBg: 'rgba(100, 116, 139, 0.12)',
+        title: 'Trial Count',
+        value: 'Checking...',
+        subtitle: 'Loading subscription status',
+      };
+    }
+
+    if (hasPaidSubscription) {
+      return {
+        accent: '#047857',
+        border: '#86EFAC',
+        background: 'linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)',
+        iconBg: 'rgba(4, 120, 87, 0.12)',
+        title: 'Trial Count',
+        value: 'Active Plan',
+        subtitle: 'Your paid subscription is active',
+      };
+    }
+
+    if (hasExpired) {
+      return {
+        accent: '#B91C1C',
+        border: '#FCA5A5',
+        background: 'linear-gradient(135deg, #FEF2F2 0%, #FFF1F2 100%)',
+        iconBg: 'rgba(239, 68, 68, 0.12)',
+        title: 'Trial Count',
+        value: 'Expired',
+        subtitle: 'Your free trial has ended',
+      };
+    }
+
+    if (isInTrial) {
+      const soonEnding = daysRemaining <= 2;
+      return {
+        accent: soonEnding ? '#92400E' : '#1D4ED8',
+        border: soonEnding ? '#FCD34D' : '#93C5FD',
+        background: soonEnding
+          ? 'linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%)'
+          : 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)',
+        iconBg: soonEnding ? 'rgba(217, 119, 6, 0.12)' : 'rgba(37, 99, 235, 0.12)',
+        title: 'Trial Count',
+        value: `${daysRemaining} day${daysRemaining === 1 ? '' : 's'}`,
+        subtitle: 'Remaining in your free trial',
+      };
+    }
+
+    return {
+      accent: '#1D4ED8',
+      border: '#BFDBFE',
+      background: 'linear-gradient(135deg, #EFF6FF 0%, #F8FAFC 100%)',
+      iconBg: 'rgba(37, 99, 235, 0.12)',
+      title: 'Trial Count',
+      value: 'Unavailable',
+      subtitle: 'Trial status is not available yet',
+    };
+  }, [daysRemaining, hasExpired, hasPaidSubscription, isInTrial, subscriptionVisibilityLoading, trialStatusLoading]);
 
   const imageSrc = useCallback((path) => {
     if (!path || path === 'null' || path === 'undefined') return null;
@@ -7626,6 +7743,8 @@ function ClientDashboard() {
   const [pmSchedule, setPmSchedule] = useState({
     scheduleType: null,
     calendarRule: null,
+    meterRule: null,
+    combinedRule: null,
     reminderLeadMinutes: 60,
   });
   const [pmSessionId, setPmSessionId] = useState(0);
@@ -7749,7 +7868,7 @@ function ClientDashboard() {
     setPmTasks([{ id: Date.now(), title: '', status: 'Open' }]);
     setPmChecklist([{ id: Date.now() + 1, text: '', type: 'Status', meter: '' }]);
     // keep library across sessions
-    setPmSchedule({ scheduleType: null, calendarRule: null, reminderLeadMinutes: 60 });
+    setPmSchedule({ scheduleType: null, calendarRule: null, meterRule: null, combinedRule: null, reminderLeadMinutes: 60 });
     setPmAssetRowsSeed([{ id: 1, assetId: '', locationId: '', startDate: '', endDate: '', timezone: '(UTC+02:00) Africa/Kigali', assignee: '' }]);
     setPmSessionId((n) => n + 1);
     setShowCreatePm(true);
@@ -17356,13 +17475,7 @@ function ClientDashboard() {
 
   const pendingRequests = allIssues.filter((issue) => isRequestIssue(issue));
   const combinedOpen = (statusCounts.open || statusCounts.Open || 0) + (maintenanceCounts.open || maintenanceCounts.Open || 0);
-  const combinedPending = pendingRequests.filter((request) => {
-    const rawStatus = String(request.status || '').toUpperCase();
-    const isDeclined = request.rejected || rawStatus === 'DECLINED' || rawStatus === 'REJECTED';
-    const isInProgress = rawStatus === 'IN PROGRESS' || rawStatus === 'IN_PROGRESS' || rawStatus.includes('IN PROGRESS');
-    const isApproved = request.approved || rawStatus === 'APPROVED' || isInProgress;
-    return !isDeclined && !isApproved;
-  }).length;
+  const combinedPending = pendingRequests.filter((request) => getRequestDisplayState(request).statusLabel === 'Pending').length;
   const combinedInProgress = (statusCounts.inProgress || statusCounts['In Progress'] || 0) + (maintenanceCounts.inProgress || maintenanceCounts['In Progress'] || 0);
   const combinedCompleted = (statusCounts.completed || statusCounts.Completed || 0) + (maintenanceCounts.completed || maintenanceCounts.Completed || 0);
   const combinedOverdue = (statusCounts.overdue || statusCounts.Overdue || 0) + (maintenanceCounts.overdue || maintenanceCounts.Overdue || 0);
@@ -17399,17 +17512,7 @@ function ClientDashboard() {
   const filteredRequests = React.useMemo(() => {
     const query = String(requestSearchQuery || '').trim().toLowerCase();
     const rows = pendingRequests.filter((request) => {
-      const rawStatus = String(request.status || '').toUpperCase();
-      const isDeclined = request.rejected || rawStatus === 'DECLINED' || rawStatus === 'REJECTED';
-      const isInProgress = rawStatus === 'IN PROGRESS' || rawStatus === 'IN_PROGRESS' || rawStatus.includes('IN PROGRESS');
-      const isApproved = request.approved || rawStatus === 'APPROVED' || isInProgress;
-      const statusLabel = isDeclined
-        ? 'Declined'
-        : isInProgress
-          ? 'In Progress'
-          : isApproved
-            ? 'Approved'
-            : 'Pending';
+      const { statusLabel } = getRequestDisplayState(request);
       const location = String(request.location || request.property?.name || request.propertyName || request.assetLocation || '').trim();
       const asset = String(request.assetName || request.asset?.name || request.asset || '').trim();
       const assignedTo = String(getAssignedName(request) || '').trim();
@@ -17472,6 +17575,62 @@ function ClientDashboard() {
   ]);
   const requestBulkSelection = useBulkSelection(filteredRequests, (request) => request?._id || request?.id);
   const workOrders = allIssues.filter(issue => isApprovedWorkOrder(issue));
+  const resolveRequestWorkOrderLabel = React.useCallback((request) => {
+    const rawRequestStatus = String(request?.status || '').toUpperCase().replace(/_/g, ' ').trim();
+    const requestRefs = Array.from(new Set([
+      request?._id,
+      request?.id,
+      request?.issueId,
+      request?.workOrderId,
+      request?.workOrderNumber,
+      request?.workOrderNo,
+      request?.workOrderRef,
+      request?.workOrderCode,
+      request?.workOrder?._id,
+      request?.workOrder?.id,
+      request?.workOrder?.workOrderNumber,
+      request?.workOrder?.workOrderNo,
+      request?.workOrder?.workOrderRef,
+      request?.workOrder?.number,
+    ].filter(Boolean).map((value) => String(value).trim().toLowerCase())));
+
+    const linkedWorkOrder = workOrders.find((issue) => {
+      const workOrderRefs = [
+        issue?._id,
+        issue?.id,
+        issue?.issueId,
+        issue?.workOrderId,
+        issue?.workOrderNumber,
+        issue?.workOrderNo,
+        issue?.workOrderRef,
+        issue?.workOrderCode,
+        issue?.number,
+      ]
+        .filter(Boolean)
+        .map((value) => String(value).trim().toLowerCase());
+
+      return requestRefs.some((value) => workOrderRefs.includes(value));
+    });
+
+    if (linkedWorkOrder) {
+      return getWorkOrderStatusLabel(linkedWorkOrder.status, 'Open');
+    }
+
+    const embeddedStatus = request?.workOrder?.status
+      || request?.workOrderStatus
+      || request?.workOrderState
+      || request?.issueStatus
+      || request?.workOrderStatusLabel
+      || rawRequestStatus;
+    const hasWorkOrderRef = requestRefs.length > 0
+      || Boolean(request?.workOrder)
+      || Boolean(request?.approved)
+      || rawRequestStatus === 'APPROVED'
+      || rawRequestStatus === 'OPEN'
+      || rawRequestStatus.includes('IN PROGRESS')
+      || rawRequestStatus.includes('COMPLETE');
+    return getWorkOrderStatusLabel(embeddedStatus, hasWorkOrderRef ? 'Open' : 'None');
+  }, [workOrders]);
   const navBadgeCounts = React.useMemo(() => ({
     workOrders: workOrders.length,
     preventiveMaintenance: maintenanceSchedules.length,
@@ -20251,6 +20410,56 @@ function ClientDashboard() {
             </div>
           </div>
         </div>
+        {!trialStatusLoading && isInTrial && !hasPaidSubscription && (
+          <div style={{ padding: '12px 16px', borderBottom: '1px solid #F3F4F6' }}>
+            <button
+              type="button"
+              onClick={() => handleSidebarTabNavigation('subscription')}
+              style={{
+                width: '100%',
+                border: `1px solid ${sidebarTrialCard.border}`,
+                background: sidebarTrialCard.background,
+                borderRadius: 12,
+                padding: '12px',
+                textAlign: 'left',
+                cursor: 'pointer',
+                boxShadow: '0 6px 18px rgba(15, 23, 42, 0.08)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: sidebarTrialCard.accent }}>
+                    {sidebarTrialCard.title}
+                  </div>
+                  <div style={{ marginTop: 4, fontSize: 22, fontWeight: 800, color: '#0F172A', lineHeight: 1 }}>
+                    {sidebarTrialCard.value}
+                  </div>
+                  <div style={{ marginTop: 6, fontSize: 11, color: '#475569' }}>
+                    {sidebarTrialCard.subtitle}
+                  </div>
+                  {sidebarTrialEndLabel ? (
+                    <div style={{ marginTop: 4, fontSize: 10, color: '#64748B' }}>
+                      Ends on {sidebarTrialEndLabel}
+                    </div>
+                  ) : null}
+                </div>
+                <div style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 10,
+                  background: sidebarTrialCard.iconBg,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: sidebarTrialCard.accent,
+                  flexShrink: 0,
+                }}>
+                  <Clock className="h-4 w-4" />
+                </div>
+              </div>
+            </button>
+          </div>
+        )}
         <div style={{ padding: '10px 16px', borderBottom: '1px solid #F3F4F6' }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
             {t("language.label")}
@@ -24006,10 +24215,10 @@ function ClientDashboard() {
                   checklistTemplateName: payload?.checklistTemplateName || selectedSchedule?.checklistTemplateName || selectedSchedule?.checklistName || '',
                   checklistTemplateDescription: payload?.checklistTemplateDescription || selectedSchedule?.checklistTemplateDescription || '',
                   assetsRows: Array.isArray(selectedSchedule?.assetsRows) ? selectedSchedule.assetsRows : [],
-                  scheduleType: selectedSchedule?.scheduleType || pmSchedule?.scheduleType || null,
-                  calendarRule: selectedSchedule?.calendarRule || pmSchedule?.calendarRule || null,
-                  meterRule: selectedSchedule?.meterRule || pmSchedule?.meterRule || null,
-                  combinedRule: selectedSchedule?.combinedRule || pmSchedule?.combinedRule || null,
+                  scheduleType: pmSchedule?.scheduleType || selectedSchedule?.scheduleType || null,
+                  calendarRule: pmSchedule?.calendarRule || selectedSchedule?.calendarRule || null,
+                  meterRule: pmSchedule?.meterRule || selectedSchedule?.meterRule || null,
+                  combinedRule: pmSchedule?.combinedRule || selectedSchedule?.combinedRule || null,
                   nextDate: selectedSchedule?.nextDate || null,
                   date: selectedSchedule?.date || '',
                   time: selectedSchedule?.time || '',
@@ -24149,14 +24358,28 @@ function ClientDashboard() {
             setScheduleConfig={setPmSchedule}
             mode={pmScheduleEditorMode}
           />
-          <MeterScheduleModal open={showMeterSchedule} onClose={() => {
-            setShowMeterSchedule(false);
-            setPmScheduleEditorMode('add');
-          }} mode={pmScheduleEditorMode} />
-          <CombinedScheduleModal open={showCombinedSchedule} onClose={() => {
+          <MeterScheduleModal
+            resetKey={pmSessionId}
+            open={showMeterSchedule}
+            onClose={() => {
+              setShowMeterSchedule(false);
+              setPmScheduleEditorMode('add');
+            }}
+            scheduleConfig={pmSchedule}
+            setScheduleConfig={setPmSchedule}
+            mode={pmScheduleEditorMode}
+          />
+          <CombinedScheduleModal
+            resetKey={pmSessionId}
+            open={showCombinedSchedule}
+            onClose={() => {
             setShowCombinedSchedule(false);
             setPmScheduleEditorMode('add');
-          }} mode={pmScheduleEditorMode} />
+            }}
+            scheduleConfig={pmSchedule}
+            setScheduleConfig={setPmSchedule}
+            mode={pmScheduleEditorMode}
+          />
             </div>
           )}
           {activeTab === 'scheduler' && (
@@ -24834,24 +25057,17 @@ function ClientDashboard() {
                           const imagePath = request.beforePhoto || request.photo || request.image || request.beforeImage || request.afterImage || request.afterPhoto || (Array.isArray(request.files) ? request.files[0] : null);
                           const imageUrl = imageSrc(imagePath);
                           const asset = renderValue(request.assetName || request.asset?.name || request.asset || request.location || getPropertyName(request) || 'N/A');
-                          const rawStatus = String(request.status || '').toUpperCase();
-                          const isDeclined = request.rejected || rawStatus === 'DECLINED' || rawStatus === 'REJECTED';
-                          const isInProgress = rawStatus === 'IN PROGRESS' || rawStatus === 'IN_PROGRESS' || rawStatus.includes('IN PROGRESS');
-                          const isApproved = request.approved || rawStatus === 'APPROVED' || isInProgress;
-                          const rawWorkOrderStatus = request.workOrderStatus || request.workOrder?.status || request.workOrderState || request.issueStatus || request.workOrderStatusLabel || '';
-                          const normalizedWorkOrder = String(rawWorkOrderStatus || '').toUpperCase();
-                          const hasWorkOrderRef = !!(request.workOrderId || request.workOrderNumber || request.workOrderNo || request.workOrder);
-                          const workOrderLabel = normalizedWorkOrder.includes('PROGRESS') ? 'Open'
-                            : normalizedWorkOrder.includes('COMPLETE') ? 'Completed'
-                            : normalizedWorkOrder.includes('OPEN') ? 'Open'
-                                : (isApproved || hasWorkOrderRef ? 'Open' : 'None');
-                          const statusLabel = isDeclined
-                            ? 'Declined'
-                            : isInProgress
-                              ? 'In Progress'
-                              : isApproved
-                                ? 'Approved'
-                                : 'Pending';
+                          const { statusLabel } = getRequestDisplayState(request);
+                          const hasWorkOrderReference = Boolean(
+                            request?.approved
+                            || request?.workOrderId
+                            || request?.workOrderNumber
+                            || request?.workOrderNo
+                            || request?.workOrderRef
+                            || request?.workOrderCode
+                            || request?.workOrder
+                          );
+                          const workOrderLabel = String(resolveRequestWorkOrderLabel(request) || '').trim() || (hasWorkOrderReference ? 'Open' : 'None');
                           const submittedAt = request.createdAt || request.submittedAt || request.date || null;
                           const submittedBy = request.name || request.requestorName || request.userName || request.email || 'N/A';
                           const category = request.category || request.issueType || request.type || request.submissionType || 'N/A';
@@ -24901,7 +25117,7 @@ function ClientDashboard() {
                                 </span>
                               </td>
                               <td className="py-3 px-3">
-                                <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${workOrderClass}`}>
+                                <span className={`inline-flex min-w-[84px] items-center justify-center whitespace-nowrap px-2.5 py-1 rounded-full text-xs font-semibold border ${workOrderClass}`}>
                                   {workOrderLabel}
                                 </span>
                               </td>
@@ -44154,6 +44370,9 @@ function CreatePmModal({
   const [assetRows, setAssetRows] = React.useState([{ id: 1, assetId: '', locationId: '', startDate: '', endDate: '', timezone: '(UTC+02:00) Africa/Kigali', assignee: '' }]);
   const [creating, setCreating] = React.useState(false);
   const [error, setError] = React.useState('');
+  const hasCombinedSchedule = !!scheduleConfig?.combinedRule || scheduleConfig?.scheduleType === 'combined';
+  const hasMeterSchedule = !hasCombinedSchedule && (!!scheduleConfig?.meterRule || scheduleConfig?.scheduleType === 'meter');
+  const hasCalendarSchedule = !hasCombinedSchedule && !hasMeterSchedule && !!scheduleConfig?.calendarRule;
   const imageFiles = Array.isArray(workOrderDetails?.imageFiles) ? workOrderDetails.imageFiles : [];
   const attachmentFiles = Array.isArray(workOrderDetails?.attachmentFiles) ? workOrderDetails.attachmentFiles : [];
   const locationOptions = React.useMemo(
@@ -44274,6 +44493,14 @@ function CreatePmModal({
           assignedToName: effectiveAssigneeName,
         };
       });
+      const resolvedScheduleType = scheduleConfig?.scheduleType
+        || existingSchedule?.scheduleType
+        || (scheduleConfig?.combinedRule ? 'combined' : (scheduleConfig?.meterRule ? 'meter' : 'calendar'));
+      const resolvedCalendarRule = scheduleConfig?.calendarRule
+        || existingSchedule?.calendarRule
+        || (resolvedScheduleType === 'calendar' ? { every: 1, unit: 'day', time: '09:00', leadDays: 0 } : null);
+      const resolvedMeterRule = scheduleConfig?.meterRule || existingSchedule?.meterRule || null;
+      const resolvedCombinedRule = scheduleConfig?.combinedRule || existingSchedule?.combinedRule || null;
       const payload = {
         name: resolvedPmTitle,
         workOrderTitle: resolvedWorkOrderTitle,
@@ -44298,8 +44525,10 @@ function CreatePmModal({
             }]
           : [],
         employees: resolvedAssigneeId || resolvedAssigneeName || '',
-        scheduleType: scheduleConfig?.scheduleType || 'calendar',
-        calendarRule: scheduleConfig?.calendarRule || { every: 1, unit: 'day', time: '09:00', leadDays: 0 },
+        scheduleType: resolvedScheduleType,
+        calendarRule: resolvedCalendarRule,
+        meterRule: resolvedMeterRule,
+        combinedRule: resolvedCombinedRule,
         reminderLeadMinutes: Number(scheduleConfig?.reminderLeadMinutes || existingSchedule?.reminderLeadMinutes || 60),
         nextDate,
         routine: true,
@@ -44309,8 +44538,6 @@ function CreatePmModal({
       if (mode === 'edit' && editingScheduleId) {
         await api.put(`/api/maintenance-schedules/${editingScheduleId}`, {
           ...payload,
-          meterRule: existingSchedule?.meterRule || null,
-          combinedRule: existingSchedule?.combinedRule || null,
           date: existingSchedule?.date || '',
           time: existingSchedule?.time || '',
           status: existingSchedule?.status || 'Pending',
@@ -44464,7 +44691,7 @@ function CreatePmModal({
                 Add Schedule
               </button>
             </div>
-            {scheduleConfig?.calendarRule && (
+            {hasCalendarSchedule && (
               <div className="mt-3 border border-gray-200 rounded-xl p-4 bg-gray-50">
                 <div className="flex items-center justify-between">
                   <div>
@@ -44476,6 +44703,44 @@ function CreatePmModal({
                   </div>
                   <div className="flex gap-2">
                     <button className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-100" type="button" onClick={onAddCalendar}>Edit</button>
+                    <button className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-100" type="button" onClick={() => setScheduleConfig?.({ scheduleType: null, calendarRule: null, meterRule: null, combinedRule: null, reminderLeadMinutes: 60 })}>Remove</button>
+                  </div>
+                </div>
+              </div>
+            )}
+            {hasMeterSchedule && (
+              <div className="mt-3 border border-gray-200 rounded-xl p-4 bg-gray-50">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-bold text-gray-900">
+                      Meter trigger: {scheduleConfig?.meterRule?.trigger || 'Reaches every'} {scheduleConfig?.meterRule?.value || 1} {scheduleConfig?.meterRule?.unit || 'units'}
+                    </div>
+                    <div className="text-xs text-gray-600 mt-1">
+                      WO due {scheduleConfig?.meterRule?.dueAfter || 1} {scheduleConfig?.meterRule?.dueUnit || 'day'}(s) after creation
+                      {` â€¢ Email reminder ${Number(scheduleConfig?.reminderLeadMinutes || 60)} min before`}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-100" type="button" onClick={onAddMeter}>Edit</button>
+                    <button className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-100" type="button" onClick={() => setScheduleConfig?.({ scheduleType: null, calendarRule: null, meterRule: null, combinedRule: null, reminderLeadMinutes: 60 })}>Remove</button>
+                  </div>
+                </div>
+              </div>
+            )}
+            {hasCombinedSchedule && (
+              <div className="mt-3 border border-gray-200 rounded-xl p-4 bg-gray-50">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-bold text-gray-900">
+                      Combined schedule: every {scheduleConfig?.calendarRule?.every || 1} {scheduleConfig?.calendarRule?.unit || 'month'}(s) or meter at {scheduleConfig?.meterRule?.value || 1} {scheduleConfig?.meterRule?.unit || 'units'}
+                    </div>
+                    <div className="text-xs text-gray-600 mt-1">
+                      Creates work from whichever happens first at {scheduleConfig?.calendarRule?.time || '09:00'}
+                      {` â€¢ Email reminder ${Number(scheduleConfig?.reminderLeadMinutes || 60)} min before`}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-100" type="button" onClick={onAddCombined}>Edit</button>
                     <button className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-100" type="button" onClick={() => setScheduleConfig?.({ scheduleType: null, calendarRule: null, meterRule: null, combinedRule: null, reminderLeadMinutes: 60 })}>Remove</button>
                   </div>
                 </div>
@@ -46622,6 +46887,16 @@ function CalendarScheduleModal({ open, onClose, scheduleConfig, setScheduleConfi
   const [leadDays, setLeadDays] = React.useState(scheduleConfig?.calendarRule?.leadDays || 0);
   const [reminderLeadMinutes, setReminderLeadMinutes] = React.useState(Number(scheduleConfig?.reminderLeadMinutes || 60));
   const [inactivePeriods, setInactivePeriods] = React.useState(Array.isArray(scheduleConfig?.calendarRule?.inactivePeriods) ? scheduleConfig.calendarRule.inactivePeriods : []);
+  
+  // Recurrence settings
+  const [recurrenceType, setRecurrenceType] = React.useState(scheduleConfig?.calendarRule?.recurrenceType || 'none');
+  const [recurrenceEndType, setRecurrenceEndType] = React.useState(scheduleConfig?.calendarRule?.recurrenceEndType || 'never');
+  const [recurrenceEndDate, setRecurrenceEndDate] = React.useState(scheduleConfig?.calendarRule?.recurrenceEndDate || '');
+  const [recurrenceMaxOccurrences, setRecurrenceMaxOccurrences] = React.useState(scheduleConfig?.calendarRule?.recurrenceMaxOccurrences || '');
+  const [selectedWeekDays, setSelectedWeekDays] = React.useState(scheduleConfig?.calendarRule?.selectedWeekDays || []);
+  const [selectedMonthDay, setSelectedMonthDay] = React.useState(scheduleConfig?.calendarRule?.selectedMonthDay || '1');
+  
+  const weekDays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
   React.useEffect(() => {
     if (!open) return;
@@ -46631,12 +46906,42 @@ function CalendarScheduleModal({ open, onClose, scheduleConfig, setScheduleConfi
     setLeadDays(scheduleConfig?.calendarRule?.leadDays || 0);
     setReminderLeadMinutes(Number(scheduleConfig?.reminderLeadMinutes || 60));
     setInactivePeriods(Array.isArray(scheduleConfig?.calendarRule?.inactivePeriods) ? scheduleConfig.calendarRule.inactivePeriods : []);
+    setRecurrenceType(scheduleConfig?.calendarRule?.recurrenceType || 'none');
+    setRecurrenceEndType(scheduleConfig?.calendarRule?.recurrenceEndType || 'never');
+    setRecurrenceEndDate(scheduleConfig?.calendarRule?.recurrenceEndDate || '');
+    setRecurrenceMaxOccurrences(scheduleConfig?.calendarRule?.recurrenceMaxOccurrences || '');
+    setSelectedWeekDays(scheduleConfig?.calendarRule?.selectedWeekDays || []);
+    setSelectedMonthDay(scheduleConfig?.calendarRule?.selectedMonthDay || '1');
   }, [open, scheduleConfig, resetKey]);
+
+  const toggleWeekDay = (dayIndex) => {
+    setSelectedWeekDays((prev) => {
+      if (prev.includes(dayIndex)) {
+        return prev.filter((d) => d !== dayIndex);
+      }
+      return [...prev, dayIndex].sort();
+    });
+  };
 
   const saveAndClose = () => {
     setScheduleConfig?.({
       scheduleType: 'calendar',
-      calendarRule: { every: Number(every) || 1, unit, time, leadDays: Number(leadDays) || 0, inactivePeriods },
+      calendarRule: {
+        every: Number(every) || 1,
+        unit,
+        time,
+        leadDays: Number(leadDays) || 0,
+        inactivePeriods,
+        // New recurrence fields
+        recurrenceType,
+        recurrenceEndType,
+        recurrenceEndDate: recurrenceEndType === 'date' ? recurrenceEndDate : null,
+        recurrenceMaxOccurrences: recurrenceEndType === 'occurrences' ? Number(recurrenceMaxOccurrences) || null : null,
+        selectedWeekDays: recurrenceType === 'weekly' ? selectedWeekDays : [],
+        selectedMonthDay: recurrenceType === 'monthly' ? selectedMonthDay : null,
+      },
+      meterRule: null,
+      combinedRule: null,
       reminderLeadMinutes: Math.max(0, Number(reminderLeadMinutes) || 60),
     });
     onClose?.();
@@ -46686,6 +46991,121 @@ function CalendarScheduleModal({ open, onClose, scheduleConfig, setScheduleConfi
               <div>
                 <input type="time" className="w-40 border border-gray-300 rounded-lg px-3 py-2 text-sm" value={time} onChange={(e) => setTime(e.target.value)} />
               </div>
+            </div>
+          </div>
+
+          {/* Recurring PM Settings */}
+          <div className="border-t border-gray-100 pt-4 space-y-4">
+            <label className="text-sm font-bold text-gray-800">Recurring Schedule</label>
+            <div className="grid grid-cols-1 gap-3">
+              <select
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                value={recurrenceType}
+                onChange={(e) => setRecurrenceType(e.target.value)}
+              >
+                <option value="none">No Recurrence (One-time)</option>
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+              </select>
+
+              {/* Weekly Day Selection */}
+              {recurrenceType === 'weekly' && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <p className="text-sm font-semibold text-gray-800 mb-3">Select days to repeat on:</p>
+                  <div className="grid grid-cols-4 gap-2">
+                    {weekDays.map((day, idx) => (
+                      <label key={idx} className="flex items-center gap-2 text-sm text-gray-700">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-gray-300"
+                          checked={selectedWeekDays.includes(idx)}
+                          onChange={() => toggleWeekDay(idx)}
+                        />
+                        <span className="font-medium">{day.slice(0, 3)}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Monthly Day Selection */}
+              {recurrenceType === 'monthly' && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <p className="text-sm font-semibold text-gray-800 mb-3">Repeat on day:</p>
+                  <select
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                    value={selectedMonthDay}
+                    onChange={(e) => setSelectedMonthDay(e.target.value)}
+                  >
+                    {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
+                      <option key={day} value={String(day)}>
+                        Day {day} of the month
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Recurrence End Date */}
+              {recurrenceType !== 'none' && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <p className="text-sm font-semibold text-gray-800 mb-3">When does the recurrence end?</p>
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 text-sm text-gray-700">
+                      <input
+                        type="radio"
+                        name="endType"
+                        value="never"
+                        checked={recurrenceEndType === 'never'}
+                        onChange={(e) => setRecurrenceEndType(e.target.value)}
+                        className="h-4 w-4 border-gray-300"
+                      />
+                      Never (infinite recurrence)
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-gray-700">
+                      <input
+                        type="radio"
+                        name="endType"
+                        value="date"
+                        checked={recurrenceEndType === 'date'}
+                        onChange={(e) => setRecurrenceEndType(e.target.value)}
+                        className="h-4 w-4 border-gray-300"
+                      />
+                      On a specific date
+                    </label>
+                    {recurrenceEndType === 'date' && (
+                      <input
+                        type="date"
+                        className="ml-6 border border-gray-300 rounded-lg px-3 py-2 text-sm w-full"
+                        value={recurrenceEndDate}
+                        onChange={(e) => setRecurrenceEndDate(e.target.value)}
+                      />
+                    )}
+                    <label className="flex items-center gap-2 text-sm text-gray-700">
+                      <input
+                        type="radio"
+                        name="endType"
+                        value="occurrences"
+                        checked={recurrenceEndType === 'occurrences'}
+                        onChange={(e) => setRecurrenceEndType(e.target.value)}
+                        className="h-4 w-4 border-gray-300"
+                      />
+                      After a number of occurrences
+                    </label>
+                    {recurrenceEndType === 'occurrences' && (
+                      <input
+                        type="number"
+                        className="ml-6 border border-gray-300 rounded-lg px-3 py-2 text-sm w-full"
+                        placeholder="Number of occurrences"
+                        min="1"
+                        value={recurrenceMaxOccurrences}
+                        onChange={(e) => setRecurrenceMaxOccurrences(e.target.value)}
+                      />
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -46834,9 +47254,52 @@ function CalendarScheduleModal({ open, onClose, scheduleConfig, setScheduleConfi
 }
 
 // --- Meter Schedule Modal ---
-function MeterScheduleModal({ open, onClose, mode = 'add' }) {
-  if (!open) return null;
+function MeterScheduleModal({ open, onClose, scheduleConfig, setScheduleConfig, resetKey, mode = 'add' }) {
   const triggerOptions = ['Reaches every', 'Is exactly', 'Is less than', 'Is greater than'];
+  const reminderOptions = [
+    { value: 15, label: '15 minutes before' },
+    { value: 30, label: '30 minutes before' },
+    { value: 60, label: '1 hour before' },
+    { value: 120, label: '2 hours before' },
+    { value: 1440, label: '1 day before' },
+  ];
+  const existingMeterRule = scheduleConfig?.meterRule || {};
+  const [trigger, setTrigger] = React.useState(existingMeterRule?.trigger || triggerOptions[0]);
+  const [meterValue, setMeterValue] = React.useState(existingMeterRule?.value || 1);
+  const [meterUnit, setMeterUnit] = React.useState(existingMeterRule?.unit || 'units');
+  const [dueAfter, setDueAfter] = React.useState(existingMeterRule?.dueAfter || 1);
+  const [dueUnit, setDueUnit] = React.useState(existingMeterRule?.dueUnit || 'day');
+  const [reminderLeadMinutes, setReminderLeadMinutes] = React.useState(Number(scheduleConfig?.reminderLeadMinutes || 60));
+
+  React.useEffect(() => {
+    if (!open) return;
+    const nextMeterRule = scheduleConfig?.meterRule || {};
+    setTrigger(nextMeterRule?.trigger || triggerOptions[0]);
+    setMeterValue(nextMeterRule?.value || 1);
+    setMeterUnit(nextMeterRule?.unit || 'units');
+    setDueAfter(nextMeterRule?.dueAfter || 1);
+    setDueUnit(nextMeterRule?.dueUnit || 'day');
+    setReminderLeadMinutes(Number(scheduleConfig?.reminderLeadMinutes || 60));
+  }, [open, scheduleConfig, resetKey]);
+
+  const saveAndClose = () => {
+    setScheduleConfig?.({
+      scheduleType: 'meter',
+      calendarRule: null,
+      meterRule: {
+        trigger,
+        value: Math.max(1, Number(meterValue) || 1),
+        unit: meterUnit,
+        dueAfter: Math.max(1, Number(dueAfter) || 1),
+        dueUnit,
+      },
+      combinedRule: null,
+      reminderLeadMinutes: Math.max(0, Number(reminderLeadMinutes) || 60),
+    });
+    onClose?.();
+  };
+
+  if (!open) return null;
   return (
     <div className="fixed inset-0 z-[999] flex items-start justify-center bg-black/50 overflow-auto py-10">
       <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-4xl mx-4">
@@ -46856,154 +47319,204 @@ function MeterScheduleModal({ open, onClose, mode = 'add' }) {
             <label className="text-sm font-bold text-gray-800">Create WOs</label>
             <div className="grid grid-cols-[auto_1fr_auto_auto_auto] items-center gap-2 text-sm text-gray-700">
               <span className="font-semibold text-gray-800">When a reading</span>
-              <select className="border border-gray-300 rounded-lg px-2 py-2 text-sm">
-                {triggerOptions.map(opt => <option key={opt}>{opt}</option>)}
+              <select className="border border-gray-300 rounded-lg px-2 py-2 text-sm" value={trigger} onChange={(e) => setTrigger(e.target.value)}>
+                {triggerOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
               </select>
-              <input className="w-16 border border-gray-300 rounded-lg px-2 py-2 text-sm" defaultValue="1" />
-              <span className="text-gray-700">units</span>
+              <input className="w-16 border border-gray-300 rounded-lg px-2 py-2 text-sm" value={meterValue} onChange={(e) => setMeterValue(e.target.value)} />
+              <input className="border border-gray-300 rounded-lg px-3 py-2 text-sm" value={meterUnit} onChange={(e) => setMeterUnit(e.target.value)} placeholder="units" />
             </div>
           </div>
 
           <div className="border-t border-gray-100 pt-4 space-y-3">
             <label className="text-sm font-bold text-gray-800">WOs Due</label>
             <div className="flex items-center gap-2 text-sm text-gray-700">
-              <input className="w-16 border border-gray-300 rounded-lg px-2 py-2 text-sm" defaultValue="1" />
-              <select className="border border-gray-300 rounded-lg px-2 py-2 text-sm">
-                <option>Day(s)</option>
-                <option>Week(s)</option>
-                <option>Month(s)</option>
+              <input className="w-16 border border-gray-300 rounded-lg px-2 py-2 text-sm" value={dueAfter} onChange={(e) => setDueAfter(e.target.value)} />
+              <select className="border border-gray-300 rounded-lg px-2 py-2 text-sm" value={dueUnit} onChange={(e) => setDueUnit(e.target.value)}>
+                <option value="day">Day(s)</option>
+                <option value="week">Week(s)</option>
+                <option value="month">Month(s)</option>
               </select>
               <span>after creation</span>
             </div>
+          </div>
+
+          <div className="border-t border-gray-100 pt-4 space-y-2">
+            <label className="text-sm font-bold text-gray-800">Email Reminder</label>
+            <select
+              className="min-w-[220px] border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              value={reminderLeadMinutes}
+              onChange={(e) => setReminderLeadMinutes(e.target.value)}
+            >
+              {reminderOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
           </div>
         </div>
 
         <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100">
           <button onClick={onClose} className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50">Cancel</button>
-          <button className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold shadow-sm hover:bg-blue-700">Done</button>
+          <button onClick={saveAndClose} className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold shadow-sm hover:bg-blue-700" type="button">Done</button>
         </div>
       </div>
     </div>
   );
 }
 
-// --- Combined Calendar OR Meter Modal ---
-function CombinedScheduleModal({ open, onClose, mode = 'add' }) {
-  if (!open) return null;
+function CombinedScheduleModal({ open, onClose, scheduleConfig, setScheduleConfig, resetKey, mode = 'add' }) {
   const triggerOptions = ['Reaches every', 'Is exactly', 'Is less than', 'Is greater than'];
+  const reminderOptions = [
+    { value: 15, label: '15 minutes before' },
+    { value: 30, label: '30 minutes before' },
+    { value: 60, label: '1 hour before' },
+    { value: 120, label: '2 hours before' },
+    { value: 1440, label: '1 day before' },
+  ];
+  const combinedRule = scheduleConfig?.combinedRule || {};
+  const existingCalendarRule = combinedRule?.calendarRule || scheduleConfig?.calendarRule || {};
+  const existingMeterRule = combinedRule?.meterRule || scheduleConfig?.meterRule || {};
+  const [every, setEvery] = React.useState(existingCalendarRule?.every || 1);
+  const [unit, setUnit] = React.useState(existingCalendarRule?.unit || 'month');
+  const [time, setTime] = React.useState(existingCalendarRule?.time || '22:00');
+  const [leadDays, setLeadDays] = React.useState(existingCalendarRule?.leadDays || 1);
+  const [reminderLeadMinutes, setReminderLeadMinutes] = React.useState(Number(scheduleConfig?.reminderLeadMinutes || 60));
+  const [meterTrigger, setMeterTrigger] = React.useState(existingMeterRule?.trigger || triggerOptions[0]);
+  const [meterValue, setMeterValue] = React.useState(existingMeterRule?.value || 1);
+  const [meterUnit, setMeterUnit] = React.useState(existingMeterRule?.unit || 'units');
+  const [meterDueAfter, setMeterDueAfter] = React.useState(existingMeterRule?.dueAfter || 1);
+  const [meterDueUnit, setMeterDueUnit] = React.useState(existingMeterRule?.dueUnit || 'day');
+
+  React.useEffect(() => {
+    if (!open) return;
+    const nextCombinedRule = scheduleConfig?.combinedRule || {};
+    const nextCalendarRule = nextCombinedRule?.calendarRule || scheduleConfig?.calendarRule || {};
+    const nextMeterRule = nextCombinedRule?.meterRule || scheduleConfig?.meterRule || {};
+    setEvery(nextCalendarRule?.every || 1);
+    setUnit(nextCalendarRule?.unit || 'month');
+    setTime(nextCalendarRule?.time || '22:00');
+    setLeadDays(nextCalendarRule?.leadDays || 1);
+    setReminderLeadMinutes(Number(scheduleConfig?.reminderLeadMinutes || 60));
+    setMeterTrigger(nextMeterRule?.trigger || triggerOptions[0]);
+    setMeterValue(nextMeterRule?.value || 1);
+    setMeterUnit(nextMeterRule?.unit || 'units');
+    setMeterDueAfter(nextMeterRule?.dueAfter || 1);
+    setMeterDueUnit(nextMeterRule?.dueUnit || 'day');
+  }, [open, scheduleConfig, resetKey]);
+
+  const saveAndClose = () => {
+    const nextCalendarRule = {
+      every: Math.max(1, Number(every) || 1),
+      unit,
+      time,
+      leadDays: Math.max(0, Number(leadDays) || 0),
+    };
+    const nextMeterRule = {
+      trigger: meterTrigger,
+      value: Math.max(1, Number(meterValue) || 1),
+      unit: meterUnit,
+      dueAfter: Math.max(1, Number(meterDueAfter) || 1),
+      dueUnit: meterDueUnit,
+    };
+    setScheduleConfig?.({
+      scheduleType: 'combined',
+      calendarRule: nextCalendarRule,
+      meterRule: nextMeterRule,
+      combinedRule: {
+        strategy: 'whichever_happens_first',
+        calendarRule: nextCalendarRule,
+        meterRule: nextMeterRule,
+      },
+      reminderLeadMinutes: Math.max(0, Number(reminderLeadMinutes) || 60),
+    });
+    onClose?.();
+  };
+
+  if (!open) return null;
+  const isEditMode = mode === 'edit';
+
   return (
     <div className="fixed inset-0 z-[999] flex items-start justify-center bg-black/50 overflow-auto py-10">
       <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-5xl mx-4">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-          <div className="text-xl font-bold text-gray-900">{mode === 'edit' ? 'Edit Record' : 'Add Calendar OR Meter Schedule'}</div>
+          <div className="text-xl font-bold text-gray-900">{isEditMode ? 'Edit Record' : 'Add Calendar OR Meter Schedule'}</div>
           <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100">
             <X className="w-5 h-5 text-gray-500" />
           </button>
         </div>
 
         <div className="px-6 py-6 space-y-8">
-          {/* Calendar Section */}
+          <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+            This schedule uses both calendar timing and meter readings, and creates work orders based on whichever happens first.
+          </div>
+
           <div className="space-y-4">
             <h3 className="text-lg font-bold text-gray-900">Calendar Schedule</h3>
-            <div className="space-y-2">
-              <label className="text-sm font-bold text-gray-800">Schedule Type</label>
-              <select className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
-                <option>Regular Interval</option>
-                <option>After Completion</option>
-                <option>Custom</option>
-              </select>
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-bold text-gray-800">WOs Due</label>
-              <div className="grid grid-cols-2 gap-3 items-center">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold text-gray-700">Every</span>
-                  <input className="w-20 border border-gray-300 rounded-lg px-3 py-2 text-sm" defaultValue="1" />
-                  <select className="w-32 border border-gray-300 rounded-lg px-2 py-2 text-sm">
-                    <option>Day(s)</option>
-                    <option>Week(s)</option>
-                    <option>Month(s)</option>
-                  </select>
-                </div>
-                <div>
-                  <input type="time" className="w-40 border border-gray-300 rounded-lg px-3 py-2 text-sm" defaultValue="22:00" />
-                </div>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_auto] md:items-end">
+              <div className="flex items-center gap-2 text-sm text-gray-700">
+                <span className="font-semibold text-gray-800">Every</span>
+                <input className="w-20 border border-gray-300 rounded-lg px-3 py-2 text-sm" value={every} onChange={(e) => setEvery(e.target.value)} />
+                <select className="w-32 border border-gray-300 rounded-lg px-2 py-2 text-sm" value={unit} onChange={(e) => setUnit(e.target.value)}>
+                  <option value="day">Day(s)</option>
+                  <option value="week">Week(s)</option>
+                  <option value="month">Month(s)</option>
+                </select>
               </div>
+              <input type="time" className="w-40 border border-gray-300 rounded-lg px-3 py-2 text-sm" value={time} onChange={(e) => setTime(e.target.value)} />
             </div>
-            <div className="border-t border-gray-100 pt-3 space-y-2">
-              <label className="text-sm font-bold text-gray-800 flex items-center gap-2">
-                Create WOs
-                <AlertCircle className="w-4 h-4 text-gray-400" />
-              </label>
-              <label className="flex items-center gap-2 text-sm text-gray-700">
-                <input type="radio" name="createWOCombo" defaultChecked className="h-4 w-4 text-blue-600 border-gray-300" />
-                <div className="flex items-center gap-2">
-                  <input className="w-16 border border-gray-300 rounded-lg px-2 py-2 text-sm" defaultValue="1" />
-                  <select className="w-28 border border-gray-300 rounded-lg px-2 py-2 text-sm">
-                    <option>Day(s)</option>
-                    <option>Week(s)</option>
-                    <option>Month(s)</option>
-                  </select>
-                  <span className="text-gray-700">before the due date</span>
-                </div>
-              </label>
-              <label className="flex items-center gap-2 text-sm text-gray-700">
-                <input type="radio" name="createWOCombo" className="h-4 w-4 text-blue-600 border-gray-300" />
-                <div className="flex items-center gap-2">
-                  <span>On the</span>
-                  <select className="w-28 border border-gray-300 rounded-lg px-2 py-2 text-sm" disabled>
-                    <option>Day(s)</option>
-                  </select>
-                  <span className="text-gray-700">before the due date</span>
-                </div>
-              </label>
-              <div className="flex items-center gap-2 pl-6">
-                <span className="text-sm text-gray-700">At</span>
-                <input type="time" className="w-40 border border-gray-300 rounded-lg px-3 py-2 text-sm" defaultValue="22:00" />
-              </div>
+            <div className="flex items-center gap-2 text-sm text-gray-700">
+              <span>Create the WO</span>
+              <input className="w-16 border border-gray-300 rounded-lg px-2 py-2 text-sm" value={leadDays} onChange={(e) => setLeadDays(e.target.value)} />
+              <span>day(s) before the due date</span>
             </div>
           </div>
 
-          {/* Meter Section */}
           <div className="space-y-4 border-t border-gray-200 pt-4">
             <h3 className="text-lg font-bold text-gray-900">Meter Schedule</h3>
-            <div className="text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-xl p-4">
-              When editing the PM's records, you can set a specific meter and unit baseline for each record applied to this schedule.
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-[auto_1fr_auto_auto] md:items-center">
+              <span className="text-sm font-semibold text-gray-800">When a reading</span>
+              <select className="border border-gray-300 rounded-lg px-2 py-2 text-sm" value={meterTrigger} onChange={(e) => setMeterTrigger(e.target.value)}>
+                {triggerOptions.map((option) => (
+                  <option key={option} value={option}>{option}</option>
+                ))}
+              </select>
+              <input className="w-20 border border-gray-300 rounded-lg px-2 py-2 text-sm" value={meterValue} onChange={(e) => setMeterValue(e.target.value)} />
+              <input className="border border-gray-300 rounded-lg px-3 py-2 text-sm" value={meterUnit} onChange={(e) => setMeterUnit(e.target.value)} placeholder="units" />
             </div>
-            <div className="space-y-3">
-              <label className="text-sm font-bold text-gray-800">Create WOs</label>
-              <div className="grid grid-cols-[auto_1fr_auto_auto_auto] items-center gap-2 text-sm text-gray-700">
-                <span className="font-semibold text-gray-800">When a reading</span>
-                <select className="border border-gray-300 rounded-lg px-2 py-2 text-sm">
-                  {triggerOptions.map(opt => <option key={opt}>{opt}</option>)}
-                </select>
-                <input className="w-16 border border-gray-300 rounded-lg px-2 py-2 text-sm" defaultValue="1" />
-                <span className="text-gray-700">units</span>
-              </div>
+            <div className="flex items-center gap-2 text-sm text-gray-700">
+              <span>WO due</span>
+              <input className="w-16 border border-gray-300 rounded-lg px-2 py-2 text-sm" value={meterDueAfter} onChange={(e) => setMeterDueAfter(e.target.value)} />
+              <select className="border border-gray-300 rounded-lg px-2 py-2 text-sm" value={meterDueUnit} onChange={(e) => setMeterDueUnit(e.target.value)}>
+                <option value="day">Day(s)</option>
+                <option value="week">Week(s)</option>
+                <option value="month">Month(s)</option>
+              </select>
+              <span>after creation</span>
             </div>
-            <div className="border-t border-gray-100 pt-4 space-y-3">
-              <label className="text-sm font-bold text-gray-800">WOs Due</label>
-              <div className="flex items-center gap-2 text-sm text-gray-700">
-                <input className="w-16 border border-gray-300 rounded-lg px-2 py-2 text-sm" defaultValue="1" />
-                <select className="border border-gray-300 rounded-lg px-2 py-2 text-sm">
-                  <option>Day(s)</option>
-                  <option>Week(s)</option>
-                  <option>Month(s)</option>
-                </select>
-                <span>after creation</span>
-              </div>
-            </div>
+          </div>
+
+          <div className="space-y-2 border-t border-gray-200 pt-4">
+            <label className="text-sm font-bold text-gray-800">Email Reminder</label>
+            <select
+              className="min-w-[220px] border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              value={reminderLeadMinutes}
+              onChange={(e) => setReminderLeadMinutes(e.target.value)}
+            >
+              {reminderOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
           </div>
         </div>
 
         <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100">
           <button onClick={onClose} className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50">Cancel</button>
-          <button className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold shadow-sm hover:bg-blue-700">Done</button>
+          <button onClick={saveAndClose} className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold shadow-sm hover:bg-blue-700" type="button">Done</button>
         </div>
       </div>
     </div>
   );
 }
+ 
  
  
 

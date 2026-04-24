@@ -102,10 +102,16 @@ import ChurchesNonProfitsSolution from './components/solutions/industries/Church
 import RestaurantsSolution from './components/solutions/industries/RestaurantsSolution';
 import GymFitnessSolution from './components/solutions/industries/GymFitnessSolution';
 import HospitalitySolution from './components/solutions/industries/HospitalitySolution';
+import MarketingPageTemplate from './components/marketing/MarketingPageTemplate';
+import { generatedFooterPages } from './data/footerNavigation';
+import LegalDocumentPage from './components/legal/LegalDocumentPage';
+import SitemapPage from './components/legal/SitemapPage';
+import { legalDocuments, sitemapSections } from './data/legalPages';
 
 // Trial Components
 import TrialCountdown from './components/TrialCountdown';
-import TrialExpiredModal from './components/TrialExpiredModal';
+import useTrialStatus from './hooks/useTrialStatus';
+import useCompanySubscription from './hooks/useCompanySubscription';
 
 const getHomeRouteForRole = (role) => {
   const normalizedRole = String(role || '').trim().toLowerCase();
@@ -117,6 +123,42 @@ const getHomeRouteForRole = (role) => {
 
 import Footer from './components/Footer';
 import { useLocation } from 'react-router-dom';
+
+function ScrollToTop() {
+  const location = useLocation();
+
+  React.useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, [location.pathname]);
+
+  return null;
+}
+
+function SubscriptionGuard({ auth, onLogin, children }) {
+  const { isInTrial, loading: trialLoading } = useTrialStatus();
+  const { hasActive: hasActiveCompanySubscription, loading: subscriptionLoading } = useCompanySubscription();
+  const privateRouteLoading = trialLoading || subscriptionLoading;
+  const requiresSubscription = !privateRouteLoading && !isInTrial && !hasActiveCompanySubscription;
+
+  if (!auth) return <Login onLogin={onLogin} />;
+
+  if (privateRouteLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gray-50">
+        <div className="text-center">
+          <div className="inline-flex items-center justify-center mb-4">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600"></div>
+          </div>
+          <p className="text-gray-600">Checking subscription access...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (requiresSubscription) return <Navigate to="/subscription" replace />;
+
+  return children;
+}
 
 function App() {
   const [auth, setAuth] = useState(() => {
@@ -151,19 +193,24 @@ function App() {
     '/payment-confirmation'
   ];
   const shouldHideFooter = hideFooterRoutes.some(route => location.pathname.startsWith(route));
+  const renderPrivateRoute = (element) => {
+    return (
+      <SubscriptionGuard auth={auth} onLogin={handleLogin}>
+        {element}
+      </SubscriptionGuard>
+    );
+  };
 
   return (
     <LanguageProvider>
+      <ScrollToTop />
       {/* Trial Countdown - Shows for authenticated users in trial period */}
       {auth && <TrialCountdown />}
-      
-      {/* Trial Expired Modal - Blocks access when trial ends */}
-      {auth && <TrialExpiredModal />}
       
       <div className="glass-app glass-theme-blue">
         <Routes>
           <Route path="/" element={<LandingPage />} />
-          <Route path="/dashboard" element={<Dashboard user={auth?.user} />} />
+          <Route path="/dashboard" element={renderPrivateRoute(<Dashboard user={auth?.user} />)} />
           <Route path="/login" element={<Login onLogin={handleLogin} />} />
           <Route path="/sso-login" element={<SsoLogin />} />
           <Route path="/register" element={<Register />} />
@@ -177,27 +224,23 @@ function App() {
           <Route path="/subscription" element={auth ? (
             <SubscriptionPlan userId={auth.user?.id} />
           ) : <Subscribe />} />
-          <Route path="/dashboard" element={auth ? (
-            <Dashboard user={auth.user} />
-          ) : <Login onLogin={handleLogin} />} />
-          <Route path="/dashboard/:view" element={auth ? (
-            <Dashboard user={auth.user} />
-          ) : <Login onLogin={handleLogin} />} />
-          <Route path="/issues" element={auth ? <AllIssues /> : <Login onLogin={handleLogin} />} />
+          <Route path="/dashboard" element={renderPrivateRoute(<Dashboard user={auth?.user} />)} />
+          <Route path="/dashboard/:view" element={renderPrivateRoute(<Dashboard user={auth?.user} />)} />
+          <Route path="/issues" element={renderPrivateRoute(<AllIssues />)} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password/:token" element={<ResetPassword />} />
           <Route path="/new-issue" element={<NewIssue />} />
-          <Route path="/requests" element={auth ? <RequestsPage /> : <Login onLogin={handleLogin} />} />
+          <Route path="/requests" element={renderPrivateRoute(<RequestsPage />)} />
           <Route path="/admin-dashboard" element={auth ? <Navigate to={getHomeRouteForRole(auth.user?.role)} replace /> : <Login onLogin={handleLogin} />} />
-          <Route path="/manager-dashboard" element={auth ? (
-            (String(auth.user?.role || '').toLowerCase() === 'superadmin' || String(auth.user?.role || '').toLowerCase() === 'super-admin')
+          <Route path="/manager-dashboard" element={renderPrivateRoute(
+            (String(auth?.user?.role || '').toLowerCase() === 'superadmin' || String(auth?.user?.role || '').toLowerCase() === 'super-admin')
               ? <ManagerDashboard />
-              : <Navigate to={getHomeRouteForRole(auth.user?.role)} replace />
-          ) : <Login onLogin={handleLogin} />} />
-          <Route path="/analytics" element={auth ? <Analytics /> : <Login onLogin={handleLogin} />} />
-          <Route path="/technicians" element={auth ? <TechnicianManagement /> : <Login onLogin={handleLogin} />} />
-          <Route path="/technician-dashboard" element={auth ? <TechnicianDashboard /> : <Login onLogin={handleLogin} />} />
-          <Route path="/manager-issues" element={auth ? <ManagementIssues issues={issues} setIssues={setIssues} /> : <Login onLogin={handleLogin} />} />
+              : <Navigate to={getHomeRouteForRole(auth?.user?.role)} replace />
+          )} />
+          <Route path="/analytics" element={renderPrivateRoute(<Analytics />)} />
+          <Route path="/technicians" element={renderPrivateRoute(<TechnicianManagement />)} />
+          <Route path="/technician-dashboard" element={renderPrivateRoute(<TechnicianDashboard />)} />
+          <Route path="/manager-issues" element={renderPrivateRoute(<ManagementIssues issues={issues} setIssues={setIssues} />)} />
           <Route path="/properties" element={<PropertiesPage />} />
           <Route path="/properties-cards" element={<PropertiesCards />} />
           <Route path="/property-details/:id" element={<PropertyDetails />} />
@@ -206,8 +249,8 @@ function App() {
           <Route path="/public-request/:companySlug" element={<PublicRequestForm />} />
           <Route path="/public-purchase-order/:token" element={<PublicPurchaseOrder />} />
           <Route path="/feedback" element={<Feedback />} />
-          <Route path="/manager-feedback" element={auth ? <ManagerFeedback /> : <Login onLogin={handleLogin} />} />
-          <Route path="/admin-chat" element={auth && auth.user?.role === 'superadmin' ? <AdminChat /> : <Login onLogin={handleLogin} />} />
+          <Route path="/manager-feedback" element={renderPrivateRoute(<ManagerFeedback />)} />
+          <Route path="/admin-chat" element={renderPrivateRoute(auth?.user?.role === 'superadmin' ? <AdminChat /> : <Navigate to={getHomeRouteForRole(auth?.user?.role)} replace />)} />
 
           {/* Product Pages */}
           <Route path="/product/cmms" element={<CMSSProduct />} />
@@ -271,6 +314,17 @@ function App() {
           <Route path="/resource/roi-calculator" element={<ROICalculatorResource />} />
           <Route path="/resource/maintenance-calculator" element={<MaintenanceCalculatorResource />} />
           <Route path="/resource/qr-generator" element={<QRGeneratorResource />} />
+          <Route path="/cookie-settings" element={<LegalDocumentPage document={legalDocuments.cookieSettings} />} />
+          <Route path="/privacy-policy" element={<LegalDocumentPage document={legalDocuments.privacyPolicy} />} />
+          <Route path="/terms-of-use" element={<LegalDocumentPage document={legalDocuments.termsOfUse} />} />
+          <Route path="/sitemap" element={<SitemapPage sections={sitemapSections} />} />
+          {generatedFooterPages.map((page) => (
+            <Route
+              key={page.path}
+              path={page.path}
+              element={<MarketingPageTemplate page={page} />}
+            />
+          ))}
         </Routes>
         {!shouldHideFooter && <Footer />}
         {/* Only show AIChatbot on authenticated/internal app routes, not on landing page or public pages */}

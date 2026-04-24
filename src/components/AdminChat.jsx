@@ -230,7 +230,7 @@ const AdminChat = () => {
                   </div>
                   );
                 })
-              )}}
+                )}
               <div ref={messagesEndRef} />
             </div>
 

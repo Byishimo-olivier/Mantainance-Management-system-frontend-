@@ -98,7 +98,7 @@ const TrialExpiredModal = ({ onClose, showOverlay = true }) => {
             </button>
             <h2 className='text-2xl font-bold mb-2'>Free Trial Period Ended</h2>
             <p className='text-red-100'>
-              Your 5-day free trial has expired. Please select a plan to continue accessing all features.
+              Your 7-day free trial has expired. Please select a plan to continue accessing all features.
             </p>
           </div>
 

@@ -1156,7 +1156,7 @@ const LandingPage = () => {
               </div>
               <div className="p-6 text-center">
                 <h3 className="text-2xl font-bold text-slate-900 mb-1">Byishimo Olivier</h3>
-                <p className="text-purple-600 font-semibold mb-3">Software Developer</p>
+                <p className="text-purple-600 font-semibold mb-3">Software Engineer</p>
                 <p className="text-slate-600 text-sm">Expert software engineer building the robust technical foundation of Fixnest.</p>
               </div>
             </motion.div>

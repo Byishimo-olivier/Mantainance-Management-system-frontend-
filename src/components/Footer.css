@@ -118,7 +118,7 @@
 
 .footer-main-grid {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 32px;
   margin-bottom: 64px;
 }
@@ -170,15 +170,9 @@
     grid-template-columns: 1fr;
     gap: 48px;
   }
-  .footer-main-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
 }
 
 @media (max-width: 640px) {
-  .footer-main-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
   .footer-bottom {
     flex-direction: column;
     gap: 24px;
