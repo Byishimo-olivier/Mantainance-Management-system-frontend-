@@ -7214,6 +7214,7 @@ function ClientDashboard() {
   // â”€â”€ State â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const location = useLocation();
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [hasVisitedSubscriptionTab, setHasVisitedSubscriptionTab] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Dashboard Card Management
@@ -7237,6 +7238,12 @@ function ClientDashboard() {
       setIsMobileMenuOpen(false); // Close menu on tab change
     }
   }, [location.search]);
+
+  useEffect(() => {
+    if (activeTab === 'subscription') {
+      setHasVisitedSubscriptionTab(true);
+    }
+  }, [activeTab]);
   const [properties, setProperties] = useState([]);
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [propertyUseNamedBlocks, setPropertyUseNamedBlocks] = useState(false);
@@ -20289,6 +20296,11 @@ function ClientDashboard() {
   ];
 
   const handleSidebarTabNavigation = useCallback((nextTab) => {
+    if (nextTab === activeTab) {
+      setIsMobileMenuOpen(false);
+      return;
+    }
+
     // Reset Work Order & Request Modals
     setModalData({ open: false, type: '', item: null });
     setShowWorkOrderModal(false);
@@ -20336,7 +20348,7 @@ function ClientDashboard() {
     setShowUserProfileModal(false);
     setIsMobileMenuOpen(false);
     setActiveTab(nextTab);
-  }, []);
+  }, [activeTab]);
 
   useEffect(() => {
     if ((activeTab === 'branches' || activeTab === 'assets') && currentUser?.companyName) {
@@ -25674,8 +25686,8 @@ function ClientDashboard() {
             </div>
           )}
 
-          {activeTab === 'subscription' && (
-            <div style={{ padding: '0' }}>
+          {hasVisitedSubscriptionTab && (
+            <div style={{ padding: '0', display: activeTab === 'subscription' ? 'block' : 'none' }}>
               {(currentUser?.role === 'superadmin' || currentUser?.role === 'super-admin') ? (
                 <SubscriptionManagement />
               ) : (currentUser?.role === 'admin' || currentUser?.role === 'manager') ? (

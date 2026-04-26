@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSubscription } from '../hooks/useSubscription';
 import subscriptionAPI from '../api/subscription';
+import MobileMoneyPendingModal from './payments/MobileMoneyPendingModal';
 import {
   CreditCard,
   CheckCircle,
@@ -28,6 +29,7 @@ const SubscriptionWidget = ({ userId }) => {
   const [billingCycle, setBillingCycle] = useState('monthly');
   const [email, setEmail] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('card');
+  const [provider, setProvider] = useState('mtn');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState(null);
@@ -36,6 +38,15 @@ const SubscriptionWidget = ({ userId }) => {
   const [properties, setProperties] = useState([]);
   const [pricing, setPricing] = useState(null);
   const [currency, setCurrency] = useState('USD');
+  const [pendingPaymentModal, setPendingPaymentModal] = useState({
+    open: false,
+    paymentId: '',
+    requestTransactionId: '',
+    transactionId: '',
+    message: '',
+    amount: 0,
+    subscriptionId: '',
+  });
 
   const handleOpenCreateModal = () => {
     setModalMode('create');
@@ -48,7 +59,8 @@ const SubscriptionWidget = ({ userId }) => {
     setPlan(subscription.plan);
     setBillingCycle(subscription.billingCycle);
     setEmail(subscription.email);
-    setPaymentMethod(subscription.paymentMethod || 'card');
+    setPaymentMethod(subscription.paymentMethod === 'intouchpay' ? 'mobile_money' : (subscription.paymentMethod || 'card'));
+    setProvider(subscription.metadata?.provider || 'mtn');
     setPhoneNumber('');
     setSelectedPropertyId(subscription.propertyId || '');
     setError(null);
@@ -61,6 +73,7 @@ const SubscriptionWidget = ({ userId }) => {
     setBillingCycle('monthly');
     setEmail('');
     setPaymentMethod('card');
+    setProvider('mtn');
     setPhoneNumber('');
     setSelectedPropertyId('');
     setError(null);
@@ -72,6 +85,10 @@ const SubscriptionWidget = ({ userId }) => {
     setError(null);
     setCreating(false);
     setPaymentStep('details');
+  };
+
+  const closePendingPaymentModal = () => {
+    setPendingPaymentModal((prev) => ({ ...prev, open: false }));
   };
 
   // Fetch properties and pricing on mount
@@ -132,19 +149,57 @@ const SubscriptionWidget = ({ userId }) => {
       if (paymentMethod === 'mobile_money' || paymentMethod === 'card') {
         setPaymentStep('processing');
 
-        const paymentResp = await subscriptionAPI.initiatePayPackPayment(
-          subscriptionId,
-          amount,
-          paymentMethod,
-          phoneNumber || undefined,
-          email
-        );
+        if (paymentMethod === 'mobile_money') {
+          const mobileMoneyResp = await subscriptionAPI.initiateMobileMoneyPayment(
+            subscriptionId,
+            amount,
+            provider,
+            phoneNumber || undefined,
+            currency,
+            email,
+            storedUser?.id || storedUser?._id || null
+          );
+          const createdPayment = mobileMoneyResp?.data || {};
+          const immediateFailureMessage =
+            createdPayment?.status === 'failed'
+              ? createdPayment?.failureReason || createdPayment?.metadata?.intouchpayMessage || 'Mobile money payment was rejected by the gateway.'
+              : null;
 
-        if (paymentResp.redirectUrl) {
-          window.location.href = paymentResp.redirectUrl;
+          if (immediateFailureMessage) {
+            setPaymentStep('details');
+            setError(immediateFailureMessage);
+            return;
+          }
+
+          const requestTransactionId = createdPayment?.metadata?.requestTransactionId || createdPayment?.transactionId || '';
+          const transactionId = createdPayment?.metadata?.intouchpayTransactionId || '';
+          setShowModal(false);
+          setPendingPaymentModal({
+            open: true,
+            paymentId: createdPayment.id || '',
+            requestTransactionId,
+            transactionId,
+            message:
+              createdPayment?.metadata?.intouchpayMessage ||
+              createdPayment?.message ||
+              'Approve the payment request on your phone. We will refresh the subscription automatically.',
+            amount,
+            subscriptionId,
+          });
         } else {
-          setPaymentStep('details');
-          setError('Payment initiated but redirect URL not provided. Please contact support.');
+          const paymentResp = await subscriptionAPI.initiatePesaPalPayment(
+            subscriptionId,
+            amount,
+            null,
+            email
+          );
+
+          if (paymentResp.redirectUrl) {
+            window.location.href = paymentResp.redirectUrl;
+          } else {
+            setPaymentStep('details');
+            setError('Payment initiated but redirect URL not provided. Please contact support.');
+          }
         }
       } else {
         // For test payments, reload
@@ -265,6 +320,7 @@ const SubscriptionWidget = ({ userId }) => {
               billingCycle,
               email,
               paymentMethod,
+              provider,
               phoneNumber,
               selectedPropertyId,
               properties,
@@ -275,6 +331,7 @@ const SubscriptionWidget = ({ userId }) => {
               setBillingCycle,
               setEmail,
               setPaymentMethod,
+              setProvider,
               setPhoneNumber,
               setSelectedPropertyId
             }}
@@ -283,6 +340,25 @@ const SubscriptionWidget = ({ userId }) => {
             paymentStep={paymentStep}
           />
         )}
+
+        <MobileMoneyPendingModal
+          open={pendingPaymentModal.open}
+          paymentId={pendingPaymentModal.paymentId}
+          requestTransactionId={pendingPaymentModal.requestTransactionId}
+          transactionId={pendingPaymentModal.transactionId}
+          provider={provider}
+          phoneNumber={phoneNumber}
+          amount={pendingPaymentModal.amount}
+          currency={currency}
+          planName={plan}
+          initialMessage={pendingPaymentModal.message}
+          onClose={closePendingPaymentModal}
+          onSuccess={async () => {
+            setError(null);
+            await refresh();
+            closePendingPaymentModal();
+          }}
+        />
       </div>
     );
   }
@@ -404,6 +480,7 @@ const SubscriptionWidget = ({ userId }) => {
             billingCycle,
             email,
             paymentMethod,
+            provider,
             phoneNumber,
             selectedPropertyId,
             properties,
@@ -415,6 +492,7 @@ const SubscriptionWidget = ({ userId }) => {
             setBillingCycle,
             setEmail,
             setPaymentMethod,
+            setProvider,
             setPhoneNumber,
             setSelectedPropertyId
           }}
@@ -423,6 +501,25 @@ const SubscriptionWidget = ({ userId }) => {
           paymentStep={paymentStep}
         />
       )}
+
+      <MobileMoneyPendingModal
+        open={pendingPaymentModal.open}
+        paymentId={pendingPaymentModal.paymentId}
+        requestTransactionId={pendingPaymentModal.requestTransactionId}
+        transactionId={pendingPaymentModal.transactionId}
+        provider={provider}
+        phoneNumber={phoneNumber}
+        amount={pendingPaymentModal.amount}
+        currency={currency}
+        planName={plan}
+        initialMessage={pendingPaymentModal.message}
+        onClose={closePendingPaymentModal}
+        onSuccess={async () => {
+          setError(null);
+          await refresh();
+          closePendingPaymentModal();
+        }}
+      />
     </>
   );
 };
@@ -443,6 +540,7 @@ const SubscriptionModal = ({
     billingCycle,
     email,
     paymentMethod,
+    provider,
     phoneNumber,
     selectedPropertyId,
     properties,
@@ -454,6 +552,7 @@ const SubscriptionModal = ({
     setBillingCycle,
     setEmail,
     setPaymentMethod,
+    setProvider,
     setPhoneNumber,
     setSelectedPropertyId
   } = setFormData;
@@ -617,22 +716,38 @@ const SubscriptionModal = ({
 
               {/* Phone Number - Only for mobile money */}
               {paymentMethod === 'mobile_money' && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Phone Number <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="tel"
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                    placeholder="+250 7XX XXX XXX"
-                    value={phoneNumber}
-                    onChange={e => setPhoneNumber(e.target.value)}
-                    required
-                    disabled={creating}
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Enter your mobile money phone number
-                  </p>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Provider <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                      value={provider}
+                      onChange={e => setProvider(e.target.value)}
+                      disabled={creating}
+                    >
+                      <option value="mtn">MTN Rwanda</option>
+                      <option value="airtel">Airtel Rwanda</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Phone Number <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="tel"
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                      placeholder="+250 7XX XXX XXX"
+                      value={phoneNumber}
+                      onChange={e => setPhoneNumber(e.target.value)}
+                      required
+                      disabled={creating}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Enter the phone number that will approve the InTouchPay request.
+                    </p>
+                  </div>
                 </div>
               )}
             </div>

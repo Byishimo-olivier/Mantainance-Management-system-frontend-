@@ -135,12 +135,15 @@ function ScrollToTop() {
 }
 
 function SubscriptionGuard({ auth, onLogin, children }) {
+  const normalizedRole = String(auth?.user?.role || '').toLowerCase();
+  const isSuperAdmin = normalizedRole === 'superadmin' || normalizedRole === 'super-admin';
   const { isInTrial, loading: trialLoading } = useTrialStatus();
   const { hasActive: hasActiveCompanySubscription, loading: subscriptionLoading } = useCompanySubscription();
   const privateRouteLoading = trialLoading || subscriptionLoading;
   const requiresSubscription = !privateRouteLoading && !isInTrial && !hasActiveCompanySubscription;
 
   if (!auth) return <Login onLogin={onLogin} />;
+  if (isSuperAdmin) return children;
 
   if (privateRouteLoading) {
     return (
@@ -205,7 +208,7 @@ function App() {
     <LanguageProvider>
       <ScrollToTop />
       {/* Trial Countdown - Shows for authenticated users in trial period */}
-      {auth && <TrialCountdown />}
+      {auth && !['superadmin', 'super-admin'].includes(String(auth?.user?.role || '').toLowerCase()) && <TrialCountdown />}
       
       <div className="glass-app glass-theme-blue">
         <Routes>
@@ -222,7 +225,9 @@ function App() {
           <Route path="/payment-selection" element={<PaymentSelection />} />
           <Route path="/payment-confirmation" element={<PaymentConfirmation />} />
           <Route path="/subscription" element={auth ? (
-            <SubscriptionPlan userId={auth.user?.id} />
+            ['superadmin', 'super-admin'].includes(String(auth?.user?.role || '').toLowerCase())
+              ? <Navigate to={getHomeRouteForRole(auth.user?.role)} replace />
+              : <SubscriptionPlan userId={auth.user?.id} />
           ) : <Subscribe />} />
           <Route path="/dashboard" element={renderPrivateRoute(<Dashboard user={auth?.user} />)} />
           <Route path="/dashboard/:view" element={renderPrivateRoute(<Dashboard user={auth?.user} />)} />

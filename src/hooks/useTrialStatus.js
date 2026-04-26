@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import subscriptionAPI from '../api/subscription';
 
+let trialStatusCache = null;
+let trialStatusPendingPromise = null;
+
 /**
  * Custom hook to manage trial status
  * Provides trial state and update functions for components
@@ -9,28 +12,41 @@ import subscriptionAPI from '../api/subscription';
  *   const { trialStatus, isInTrial, hasExpired, daysRemaining, loading, refetch } = useTrialStatus();
  */
 const useTrialStatus = () => {
-  const [trialStatus, setTrialStatus] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [trialStatus, setTrialStatus] = useState(trialStatusCache);
+  const [loading, setLoading] = useState(!trialStatusCache);
   const [error, setError] = useState(null);
 
   const fetchTrialStatus = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await subscriptionAPI.getTrialStatus();
-      setTrialStatus(response?.data);
+      if (!trialStatusPendingPromise) {
+        trialStatusPendingPromise = subscriptionAPI.getTrialStatus();
+      }
+
+      const response = await trialStatusPendingPromise;
+      trialStatusCache = response?.data || null;
+      setTrialStatus(trialStatusCache);
       setError(null);
-      return response?.data;
+      return trialStatusCache;
     } catch (err) {
       console.error('Failed to fetch trial status:', err);
       setError(err?.message || 'Failed to fetch trial status');
       setTrialStatus(null);
+      trialStatusCache = null;
     } finally {
+      trialStatusPendingPromise = null;
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchTrialStatus();
+    if (!trialStatusCache) {
+      fetchTrialStatus();
+    } else {
+      setTrialStatus(trialStatusCache);
+      setLoading(false);
+    }
+
     // Refresh trial status every minute
     const interval = setInterval(fetchTrialStatus, 60000);
     return () => clearInterval(interval);

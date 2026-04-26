@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import AuthHeader from './auth/AuthHeader';
 import api from '../api/axios';
+import subscriptionAPI from '../api/subscription';
 import { CheckCircle, AlertCircle, Clock, RefreshCw, Home } from 'lucide-react';
 
 export default function PaymentConfirmation() {
@@ -12,6 +13,10 @@ export default function PaymentConfirmation() {
   const paymentStatus = searchParams.get('payment_status'); // COMPLETED, FAILED, PENDING
   const transactionId = searchParams.get('transaction_id');
   const orderTrackingId = searchParams.get('orderTrackingId');
+  const method = searchParams.get('method') || '';
+  const paymentId = searchParams.get('paymentId') || '';
+  const requestTransactionId = searchParams.get('requestTransactionId') || '';
+  const mobileTransactionId = searchParams.get('transactionId') || '';
 
   const [paymentDetails, setPaymentDetails] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -32,8 +37,9 @@ export default function PaymentConfirmation() {
           setPaymentDetails(details);
         }
 
-        // Step 5: Query PesaPal for payment status if orderTrackingId is available
-        if (orderTrackingId && paymentStatus !== 'completed' && paymentStatus !== 'failed') {
+        if (method === 'mobile_money' && paymentStatus !== 'completed' && paymentStatus !== 'failed') {
+          await queryMobileMoneyStatus();
+        } else if (orderTrackingId && paymentStatus !== 'completed' && paymentStatus !== 'failed') {
           await queryPaymentStatus(orderTrackingId);
         }
       } catch (err) {
@@ -45,7 +51,7 @@ export default function PaymentConfirmation() {
     };
 
     loadPaymentDetails();
-  }, [orderTrackingId, paymentStatus]);
+  }, [method, orderTrackingId, paymentStatus, paymentId, requestTransactionId, mobileTransactionId]);
 
   // Step 5: Query PesaPal for payment status using orderTrackingId
   const queryPaymentStatus = async (trackingId) => {
@@ -73,11 +79,51 @@ export default function PaymentConfirmation() {
     }
   };
 
+  const queryMobileMoneyStatus = async () => {
+    try {
+      setCheckingStatus(true);
+      const response = await subscriptionAPI.getMobileMoneyPaymentStatus({
+        paymentId,
+        requestTransactionId,
+        transactionId: mobileTransactionId,
+      });
+
+      const mobileStatus = response?.data?.status || response?.status;
+      const mobileMessage = response?.data?.message || response?.message || null;
+      const responseCode = response?.data?.responseCode || response?.responseCode || null;
+      if (mobileStatus === 'completed') {
+        setStatus('completed');
+        setError(null);
+      } else if (mobileStatus === 'failed') {
+        setStatus('failed');
+        setError(
+          mobileMessage
+            ? `${mobileMessage}${responseCode ? ` (code: ${responseCode})` : ''}`
+            : 'The mobile money payment was rejected by the gateway.'
+        );
+      } else {
+        setStatus('pending');
+        if (mobileMessage) {
+          setError(null);
+        }
+      }
+    } catch (err) {
+      console.error('Error checking mobile money status:', err);
+      setError(err?.error || err?.message || err?.response?.data?.error || 'Failed to check mobile money payment status.');
+    } finally {
+      setCheckingStatus(false);
+    }
+  };
+
   // Retry status check every 5 seconds (up to 60 seconds for pending payments)
   useEffect(() => {
-    if (status === 'pending' && orderTrackingId) {
+    if (status === 'pending' && (orderTrackingId || method === 'mobile_money')) {
       const interval = setInterval(() => {
-        queryPaymentStatus(orderTrackingId);
+        if (method === 'mobile_money') {
+          queryMobileMoneyStatus();
+        } else {
+          queryPaymentStatus(orderTrackingId);
+        }
       }, 5000);
 
       // Clear interval after 60 seconds
@@ -88,7 +134,7 @@ export default function PaymentConfirmation() {
         clearTimeout(timeout);
       };
     }
-  }, [status, orderTrackingId]);
+  }, [status, orderTrackingId, method, paymentId, requestTransactionId, mobileTransactionId]);
 
   if (loading) {
     return (
@@ -97,7 +143,9 @@ export default function PaymentConfirmation() {
         <div style={{ textAlign: 'center', padding: '60px 20px', maxWidth: '700px', margin: '0 auto' }}>
           <RefreshCw size={48} style={{ color: '#0066cc', animation: 'spin 1s linear infinite', margin: '0 auto 20px' }} />
           <h2>Processing Payment...</h2>
-          <p style={{ color: '#666', marginTop: '10px' }}>Please wait while we confirm your payment with PesaPal.</p>
+          <p style={{ color: '#666', marginTop: '10px' }}>
+            Please wait while we confirm your payment {method === 'mobile_money' ? 'with InTouchPay' : 'with PesaPal'}.
+          </p>
         </div>
       </div>
     );
@@ -184,7 +232,7 @@ export default function PaymentConfirmation() {
             color: '#c0392b'
           }}>
             <p style={{ margin: 0, fontSize: '14px' }}>
-              {error || 'Payment could not be completed. Please try another payment method or contact support.'}
+              {error || `Payment could not be completed. Please try another ${method === 'mobile_money' ? 'mobile money' : 'payment'} method or contact support.`}
             </p>
           </div>
 
@@ -236,7 +284,9 @@ export default function PaymentConfirmation() {
             Payment Processing
           </h1>
           <p style={{ fontSize: '16px', color: '#666', marginBottom: '20px', lineHeight: '1.6' }}>
-            Your payment is being processed. This usually takes a few moments. You can close this page and we'll confirm your subscription via email.
+            {method === 'mobile_money'
+              ? 'Your mobile money request has been sent through InTouchPay. Approve it on your phone and we will keep checking the payment status automatically.'
+              : 'Your payment is being processed. This usually takes a few moments. You can close this page and we will confirm your subscription via email.'}
           </p>
         </div>
 
@@ -251,10 +301,21 @@ export default function PaymentConfirmation() {
             What happens next?
           </h3>
           <ul style={{ margin: 0, paddingLeft: '20px', color: '#555', fontSize: '14px', lineHeight: '1.8' }}>
-            <li>We're verifying your payment with PesaPal</li>
-            <li>You'll receive a confirmation email within 2-5 minutes</li>
-            <li>Your subscription activates immediately upon confirmation</li>
-            <li>You can start using all premium features right away</li>
+            {method === 'mobile_money' ? (
+              <>
+                <li>Approve the pending debit request on your phone</li>
+                <li>We are checking InTouchPay for the latest transaction result</li>
+                <li>Your subscription activates as soon as the payment is confirmed</li>
+                <li>If the request expires, you can retry the collection from the subscription page</li>
+              </>
+            ) : (
+              <>
+                <li>We're verifying your payment with PesaPal</li>
+                <li>You'll receive a confirmation email within 2-5 minutes</li>
+                <li>Your subscription activates immediately upon confirmation</li>
+                <li>You can start using all premium features right away</li>
+              </>
+            )}
           </ul>
         </div>
 
@@ -269,7 +330,13 @@ export default function PaymentConfirmation() {
             {checkingStatus ? 'Checking payment status...' : 'Last checked: just now'}
           </p>
           <button
-            onClick={() => queryPaymentStatus(orderTrackingId || transactionId)}
+            onClick={() => {
+              if (method === 'mobile_money') {
+                queryMobileMoneyStatus();
+              } else {
+                queryPaymentStatus(orderTrackingId || transactionId);
+              }
+            }}
             disabled={checkingStatus}
             style={{
               padding: '10px 20px',

@@ -133,11 +133,8 @@ export default function Pricing() {
 
   const handlePaymentMethodSelect = async (paymentMethod) => {
     try {
-      // Determine payment type
-      const paymentType = paymentMethod.includes('card') ? 'card' : 'mobile';
-      
       // Redirect to subscription page with payment details
-      window.location.href = `/subscription?plan=${selectedPlan}&cycle=${billingCycle}&currency=${currency}&paymentMethod=${paymentType}`;
+      window.location.href = `/subscription?plan=${selectedPlan}&cycle=${billingCycle}&currency=${currency}&paymentMethod=${paymentMethod}`;
     } catch (error) {
       console.error('Error selecting payment method:', error);
       alert('Failed to proceed with payment. Please try again.');

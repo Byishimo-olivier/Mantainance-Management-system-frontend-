@@ -424,7 +424,7 @@ export default function AuthHeader() {
             <span className="nav-search-icon" aria-hidden="true" />
             <span className="nav-search-label">Search</span>
           </button>
-          {user && location.pathname !== '/subscription' && (
+          {user && !['superadmin', 'super-admin'].includes(String(user?.role || '').toLowerCase()) && location.pathname !== '/subscription' && (
             <Link to="/subscription" className="nav-link nav-link--upgrade" style={{ color: '#0F172A', fontWeight: 600 }}>Upgrade</Link>
           )}
           <Link to="/login" className="nav-link">Log in</Link>

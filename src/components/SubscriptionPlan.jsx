@@ -4,6 +4,7 @@ import { useSubscription } from '../hooks/useSubscription';
 import subscriptionAPI from '../api/subscription';
 import api from '../api/axios';
 import useCompanySubscription from '../hooks/useCompanySubscription';
+import MobileMoneyPendingModal from './payments/MobileMoneyPendingModal';
 import {
   Check,
   Download,
@@ -20,7 +21,12 @@ const SubscriptionPlan = ({ userId }) => {
   const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
   const subscriptionLookupName = storedUser?.companyName || storedUser?.company?.name || storedUser?.company || userId;
   const { subscription, loading, refresh } = useSubscription(subscriptionLookupName);
-  const { hasActive: hasActiveCompanySubscription, subscription: companySubscription, loading: companySubscriptionLoading } = useCompanySubscription();
+  const {
+    hasActive: hasActiveCompanySubscription,
+    subscription: companySubscription,
+    loading: companySubscriptionLoading,
+    refresh: refreshCompanySubscription,
+  } = useCompanySubscription();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   
@@ -48,11 +54,29 @@ const SubscriptionPlan = ({ userId }) => {
     phoneNumber: '',
     amount: 0,
   });
+  const [pendingPaymentModal, setPendingPaymentModal] = useState({
+    open: false,
+    paymentId: '',
+    requestTransactionId: '',
+    transactionId: '',
+    provider: 'mtn',
+    phoneNumber: '',
+    amount: 0,
+    currency: 'USD',
+    planId: '',
+    subscriptionId: '',
+    message: '',
+  });
 
   const currencySymbols = {
     'USD': '$',
     'RWF': 'FRw'
   };
+
+  const formatPlanName = (planId) =>
+    String(planId || 'subscription')
+      .replace(/[-_]+/g, ' ')
+      .replace(/\b\w/g, (letter) => letter.toUpperCase());
 
   const plans = [
     {
@@ -297,6 +321,19 @@ const SubscriptionPlan = ({ userId }) => {
     setPaymentModal((prev) => ({ ...prev, open: false }));
   };
 
+  const closePendingPaymentModal = () => {
+    setPendingPaymentModal((prev) => ({ ...prev, open: false }));
+  };
+
+  const handlePendingPaymentSuccess = async () => {
+    await Promise.allSettled([refresh?.(), refreshCompanySubscription?.()]);
+    setPendingPaymentModal((prev) => ({ ...prev, open: false }));
+    setError(null);
+    setSuccess('Payment received and your subscription is now active.');
+    setActiveTab('overview');
+    navigate('/subscription', { replace: true });
+  };
+
   const handlePaymentContinue = async () => {
     const { subscriptionId: existingSubscriptionId, planId, paymentMethod, provider, phoneNumber, amount } = paymentModal;
     const trimmedPhone = String(phoneNumber || '').trim();
@@ -341,10 +378,9 @@ const SubscriptionPlan = ({ userId }) => {
         subId = subId || subData.id || subData._id;
 
         setSuccess(`${isUpgrade ? 'Upgrade' : 'Subscription'} created successfully! Please complete the payment...`);
-        closePaymentModal();
 
         if (paymentMethod === 'mobile_money') {
-          await subscriptionAPI.initiateMobileMoneyPayment(
+          const mobileMoneyResponse = await subscriptionAPI.initiateMobileMoneyPayment(
             subId,
             amount,
             provider,
@@ -353,12 +389,40 @@ const SubscriptionPlan = ({ userId }) => {
             subData.email || userEmail || '',
             storedUser?.id || storedUser?._id || null
           );
-          setTimeout(() => {
-            navigate(`/payment-confirmation?status=pending&method=mobile_money&provider=${provider}&subscriptionId=${subId}`);
-          }, 300);
+          const createdPayment = mobileMoneyResponse?.data || {};
+          const immediateFailureMessage =
+            createdPayment?.status === 'failed'
+              ? createdPayment?.failureReason || createdPayment?.metadata?.intouchpayMessage || 'Mobile money payment was rejected by the gateway.'
+              : null;
+
+          if (immediateFailureMessage) {
+            setError(immediateFailureMessage);
+            return;
+          }
+
+          const requestTransactionId = createdPayment?.metadata?.requestTransactionId || createdPayment?.transactionId || '';
+          const transactionId = createdPayment?.metadata?.intouchpayTransactionId || '';
+          closePaymentModal();
+          setPendingPaymentModal({
+            open: true,
+            paymentId: createdPayment.id || '',
+            requestTransactionId,
+            transactionId,
+            provider,
+            phoneNumber: trimmedPhone,
+            amount,
+            currency,
+            planId,
+            subscriptionId: subId,
+            message:
+              createdPayment?.metadata?.intouchpayMessage ||
+              createdPayment?.message ||
+              'Approve the payment request on your phone. We will activate the subscription here once it is paid.',
+          });
           return;
         }
 
+        closePaymentModal();
         const paymentResponse = await subscriptionAPI.initiatePesaPalPayment(
           subId,
           amount,
@@ -468,7 +532,7 @@ const SubscriptionPlan = ({ userId }) => {
                       openPaymentModal(subscription.plan, {
                         allowCurrentPlan: true,
                         subscriptionId: subscription.id || subscription._id || '',
-                        paymentMethod: subscription.paymentMethod === 'mobile_money' ? 'mobile_money' : 'card',
+                        paymentMethod: ['mobile_money', 'intouchpay'].includes(subscription.paymentMethod) ? 'mobile_money' : 'card',
                         provider: subscription.metadata?.provider || 'mtn',
                         phoneNumber: subscription.metadata?.phoneNumber || subscription.phoneNumber || '',
                       });
@@ -490,10 +554,11 @@ const SubscriptionPlan = ({ userId }) => {
                   <div className="mt-3 text-sm text-blue-700">
                     <span>Payment Method: <strong>
                       {subscription.paymentMethod === 'mobile_money' ? '📱 Mobile Money' : 
+                       subscription.paymentMethod === 'intouchpay' ? '📱 InTouchPay Mobile Money' :
                        subscription.paymentMethod === 'pesapal' ? '💳 PesaPal (Card)' : 
                        subscription.paymentMethod}
                     </strong></span>
-                    {subscription.paymentMethod === 'mobile_money' && subscription.metadata?.provider && (
+                    {['mobile_money', 'intouchpay'].includes(subscription.paymentMethod) && subscription.metadata?.provider && (
                       <div className="mt-1 text-xs text-blue-600">
                         Provider: <strong>{subscription.metadata.provider.toUpperCase()}</strong>
                       </div>
@@ -519,7 +584,7 @@ const SubscriptionPlan = ({ userId }) => {
                       onClick={() => openPaymentModal(subscription.plan, {
                         allowCurrentPlan: true,
                         subscriptionId: subscription.id || subscription._id || '',
-                        paymentMethod: subscription.paymentMethod === 'mobile_money' ? 'mobile_money' : 'card',
+                        paymentMethod: ['mobile_money', 'intouchpay'].includes(subscription.paymentMethod) ? 'mobile_money' : 'card',
                         provider: subscription.metadata?.provider || 'mtn',
                         phoneNumber: subscription.metadata?.phoneNumber || subscription.phoneNumber || '',
                       })}
@@ -733,7 +798,7 @@ const SubscriptionPlan = ({ userId }) => {
                           <div className="text-base font-bold text-slate-900">Mobile Money</div>
                         </div>
                         <p className="mt-3 text-sm leading-6 text-slate-500">
-                          Pay with MTN, Airtel, M-Pesa, Orange Money, and other supported wallets.
+                          Pay with MTN Rwanda or Airtel Rwanda through InTouchPay.
                         </p>
                       </button>
                     </div>
@@ -749,8 +814,6 @@ const SubscriptionPlan = ({ userId }) => {
                           >
                             <option value="mtn">MTN Money</option>
                             <option value="airtel">Airtel Money</option>
-                            <option value="mpesa">M-Pesa</option>
-                            <option value="orange">Orange Money</option>
                           </select>
                         </label>
 
@@ -790,28 +853,37 @@ const SubscriptionPlan = ({ userId }) => {
               </div>
             )}
 
+            <MobileMoneyPendingModal
+              open={pendingPaymentModal.open}
+              paymentId={pendingPaymentModal.paymentId}
+              requestTransactionId={pendingPaymentModal.requestTransactionId}
+              transactionId={pendingPaymentModal.transactionId}
+              provider={pendingPaymentModal.provider}
+              phoneNumber={pendingPaymentModal.phoneNumber}
+              amount={pendingPaymentModal.amount}
+              currency={pendingPaymentModal.currency}
+              planName={formatPlanName(pendingPaymentModal.planId)}
+              initialMessage={pendingPaymentModal.message}
+              onClose={closePendingPaymentModal}
+              onSuccess={handlePendingPaymentSuccess}
+            />
+
             {/* Supported Payment Methods Footer */}
             <div className="mt-12 pt-8 border-t border-gray-200">
               <div className="flex flex-col items-center">
-                <p className="text-sm font-semibold text-gray-500 mb-4 uppercase tracking-wider">Secure Payment Options via PesaPal</p>
+                <p className="text-sm font-semibold text-gray-500 mb-4 uppercase tracking-wider">Secure Payment Options via InTouchPay & PesaPal</p>
                 <div className="flex flex-wrap justify-center gap-8 opacity-70 grayscale hover:grayscale-0 transition-all duration-300">
                   <div className="flex flex-col items-center gap-2">
                     <div className="p-3 bg-gray-50 rounded-full border border-gray-100">
                       <Smartphone className="text-yellow-600" size={24} />
                     </div>
-                    <span className="text-xs font-medium text-gray-600">Mobile Money</span>
+                    <span className="text-xs font-medium text-gray-600">InTouchPay Mobile Money</span>
                   </div>
                   <div className="flex flex-col items-center gap-2">
                     <div className="p-3 bg-gray-50 rounded-full border border-gray-100">
                       <CreditCard className="text-blue-600" size={24} />
                     </div>
-                    <span className="text-xs font-medium text-gray-600">Visa / Mastercard</span>
-                  </div>
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="p-3 bg-gray-50 rounded-full border border-gray-100">
-                      <Building2 className="text-green-600" size={24} />
-                    </div>
-                    <span className="text-xs font-medium text-gray-600">Bank Transfer</span>
+                    <span className="text-xs font-medium text-gray-600">PesaPal Cards</span>
                   </div>
                 </div>
                 <div className="mt-6 flex items-center gap-2 text-gray-400 text-xs text-center">

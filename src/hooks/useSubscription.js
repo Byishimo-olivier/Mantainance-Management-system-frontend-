@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import subscriptionAPI from '../api/subscription';
 
+const subscriptionCache = new Map();
+const subscriptionPendingPromises = new Map();
+
 // Custom hook for managing company subscription, preferring company name lookup
 export const useSubscription = (lookupValue) => {
   const [subscription, setSubscription] = useState(null);
@@ -29,6 +32,23 @@ export const useSubscription = (lookupValue) => {
     currentUser?._id ||
     null;
 
+  const cachedSubscription = resolvedLookupValue ? subscriptionCache.get(resolvedLookupValue) : undefined;
+
+  useEffect(() => {
+    if (!resolvedLookupValue) {
+      setSubscription(null);
+      setLoading(false);
+      return;
+    }
+
+    if (subscriptionCache.has(resolvedLookupValue)) {
+      setSubscription(cachedSubscription ?? null);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+  }, [cachedSubscription, resolvedLookupValue]);
+
   const fetchSubscription = useCallback(async () => {
     if (!resolvedLookupValue) {
       setLoading(false);
@@ -37,23 +57,39 @@ export const useSubscription = (lookupValue) => {
 
     try {
       setLoading(true);
-      const response = await subscriptionAPI.getSubscriptionByUserId(resolvedLookupValue);
-      setSubscription(response?.data || null);
+      if (!subscriptionPendingPromises.has(resolvedLookupValue)) {
+        subscriptionPendingPromises.set(
+          resolvedLookupValue,
+          subscriptionAPI.getSubscriptionByUserId(resolvedLookupValue)
+        );
+      }
+
+      const response = await subscriptionPendingPromises.get(resolvedLookupValue);
+      const nextSubscription = response?.data || null;
+      subscriptionCache.set(resolvedLookupValue, nextSubscription);
+      setSubscription(nextSubscription);
       setError(null);
     } catch (err) {
       if (err?.status === 404 || err?.error === 'Subscription not found') {
+        subscriptionCache.set(resolvedLookupValue, null);
         setSubscription(null);
         setError(null);
         return;
       }
       console.error('Error fetching subscription:', err);
       setError(err.error || 'Failed to fetch subscription');
+      subscriptionCache.delete(resolvedLookupValue);
     } finally {
+      subscriptionPendingPromises.delete(resolvedLookupValue);
       setLoading(false);
     }
   }, [resolvedLookupValue]);
 
   useEffect(() => {
+    if (!resolvedLookupValue || subscriptionCache.has(resolvedLookupValue)) {
+      return;
+    }
+
     fetchSubscription();
   }, [fetchSubscription]);
 
@@ -111,9 +147,7 @@ export const useSubscription = (lookupValue) => {
     }
   }, [subscription?.id]);
 
-  const refresh = useCallback(() => {
-    fetchSubscription();
-  }, [fetchSubscription]);
+  const refresh = useCallback(() => fetchSubscription(), [fetchSubscription]);
 
   const canUpdate = !!(
     subscription &&

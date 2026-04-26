@@ -197,7 +197,7 @@ const subscriptionAPI = {
   },
 
   // Payment API methods
-  // Process payment (simulated or real PayPack)
+  // Process payment (generic / legacy helper)
   processPayment: async (subscriptionId, amount, paymentMethod, phoneNumber = null, email = null) => {
     try {
       const response = await api.post(`${BASE}/payments/process`, {
@@ -213,7 +213,7 @@ const subscriptionAPI = {
     }
   },
 
-  // Initiate PayPack payment
+  // Legacy PayPack initiation endpoint
   initiatePayPackPayment: async (subscriptionId, amount, paymentMethod, phoneNumber = null, email = null) => {
     try {
       const response = await api.post(`${BASE}/payments/initiate-paypack`, {
@@ -229,7 +229,7 @@ const subscriptionAPI = {
     }
   },
 
-  // Initiate PesaPal payment
+  // Initiate PesaPal card payment
   initiatePesaPalPayment: async (subscriptionId, amount, phoneNumber = null, email = null) => {
     try {
       const response = await api.post(`${BASE}/payments/initiate-pesapal`, {
@@ -244,7 +244,7 @@ const subscriptionAPI = {
     }
   },
 
-  // Initiate mobile money payment
+  // Initiate InTouchPay mobile money payment
   initiateMobileMoneyPayment: async (
     subscriptionId,
     amount,
@@ -264,6 +264,19 @@ const subscriptionAPI = {
         email,
         userId,
       });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  getMobileMoneyPaymentStatus: async ({ paymentId = null, requestTransactionId = null, transactionId = null }) => {
+    try {
+      const params = new URLSearchParams();
+      if (paymentId) params.append('paymentId', paymentId);
+      if (requestTransactionId) params.append('requestTransactionId', requestTransactionId);
+      if (transactionId) params.append('transactionId', transactionId);
+      const response = await api.get(`${BASE}/payments/mobile-money-status?${params.toString()}`);
       return response.data;
     } catch (error) {
       throw error.response?.data || error.message;

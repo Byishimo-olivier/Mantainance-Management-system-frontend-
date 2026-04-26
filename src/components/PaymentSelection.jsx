@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import AuthHeader from './auth/AuthHeader';
 import api from '../api/axios';
 import subscriptionAPI from '../api/subscription';
+import MobileMoneyPendingModal from './payments/MobileMoneyPendingModal';
 import { Smartphone, CreditCard, Building2, AlertCircle, Loader } from 'lucide-react';
 
 export default function PaymentSelection() {
@@ -13,6 +14,13 @@ export default function PaymentSelection() {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [systemCurrency, setSystemCurrency] = useState('USD');
+  const [pendingPaymentModal, setPendingPaymentModal] = useState({
+    open: false,
+    paymentId: '',
+    requestTransactionId: '',
+    transactionId: '',
+    message: '',
+  });
 
   // Extract parameters from URL
   const plan = searchParams.get('plan') || 'basic';
@@ -25,6 +33,10 @@ export default function PaymentSelection() {
   const amount = searchParams.get('amount') || '0';
   const paymentMethod = searchParams.get('paymentMethod') || 'card';
   const provider = searchParams.get('provider') || 'mtn';
+
+  const closePendingPaymentModal = () => {
+    setPendingPaymentModal((prev) => ({ ...prev, open: false }));
+  };
 
   // Fetch system currency on mount
   useEffect(() => {
@@ -126,11 +138,33 @@ export default function PaymentSelection() {
       console.log('Sending payment request:', { ...paymentData, paymentMethod, provider });
 
       if (paymentMethod === 'mobile_money') {
-        await api.post('/api/subscriptions/payments/initiate-mobile-money', {
+        const paymentResponse = await api.post('/api/subscriptions/payments/initiate-mobile-money', {
           ...paymentData,
           provider,
         });
-        navigate(`/payment-confirmation?status=pending&method=mobile_money&provider=${provider}&subscriptionId=${subId}`);
+        const createdPayment = paymentResponse?.data?.data || {};
+        const immediateFailureMessage =
+          createdPayment?.status === 'failed'
+            ? createdPayment?.failureReason || createdPayment?.metadata?.intouchpayMessage || 'Mobile money payment was rejected by the gateway.'
+            : null;
+
+        if (immediateFailureMessage) {
+          setError(immediateFailureMessage);
+          return;
+        }
+
+        const requestTransactionId = createdPayment?.metadata?.requestTransactionId || createdPayment?.transactionId || '';
+        const transactionId = createdPayment?.metadata?.intouchpayTransactionId || '';
+        setPendingPaymentModal({
+          open: true,
+          paymentId: createdPayment.id || '',
+          requestTransactionId,
+          transactionId,
+          message:
+            createdPayment?.metadata?.intouchpayMessage ||
+            createdPayment?.message ||
+            'Approve the mobile money request on your phone. We will update the subscription here automatically.',
+        });
       } else {
         const paymentResponse = await api.post(
           '/api/subscriptions/payments/initiate-pesapal',
@@ -198,11 +232,11 @@ export default function PaymentSelection() {
             <div>
               <h4 style={{ margin: '0 0 8px 0', fontWeight: '600', color: '#0066cc' }}>Flexible Payment Options</h4>
               <p style={{ margin: '0', fontSize: '14px', color: '#555', lineHeight: '1.6' }}>
-                After clicking "Proceed to Payment" below, you'll be redirected to PesaPal where you can choose from all available payment methods including:
+                Card payments continue through PesaPal, while mobile money collections are sent through InTouchPay using the phone number on the subscription:
               </p>
               <ul style={{ margin: '8px 0 0 0', paddingLeft: '20px', fontSize: '14px', color: '#555' }}>
-                <li>Mobile Money (M-Pesa, Airtel Money, MTN, Orange Money)</li>
-                <li>Credit/Debit Cards (Visa, Mastercard, American Express)</li>
+                <li>Mobile Money via InTouchPay (MTN Rwanda, Airtel Rwanda)</li>
+                <li>Credit/Debit Cards via PesaPal</li>
               </ul>
             </div>
           </div>
@@ -234,7 +268,7 @@ export default function PaymentSelection() {
               <strong>Mobile Money</strong>
             </div>
             <p style={{ margin: 0, fontSize: '14px', color: '#555', lineHeight: '1.6' }}>
-              Provider: <strong>{provider.toUpperCase()}</strong>{companyPhone ? ` • Phone: ${companyPhone}` : ''}
+              Gateway: <strong>InTouchPay</strong>{companyPhone ? ` • Phone: ${companyPhone}` : ''}{provider ? ` • Network: ${provider.toUpperCase()}` : ''}
             </p>
           </div>
         </div>
@@ -328,6 +362,24 @@ export default function PaymentSelection() {
           Your subscription is created but not yet active. Complete payment to unlock all features.
         </p>
       </section>
+
+      <MobileMoneyPendingModal
+        open={pendingPaymentModal.open}
+        paymentId={pendingPaymentModal.paymentId}
+        requestTransactionId={pendingPaymentModal.requestTransactionId}
+        transactionId={pendingPaymentModal.transactionId}
+        provider={provider}
+        phoneNumber={companyPhone}
+        amount={amount}
+        currency={currency}
+        planName={plan}
+        initialMessage={pendingPaymentModal.message}
+        onClose={closePendingPaymentModal}
+        onSuccess={async () => {
+          setError(null);
+          navigate('/subscription', { replace: true });
+        }}
+      />
     </div>
   );
 }

@@ -81,8 +81,7 @@ export default function Subscribe() {
       return;
     }
     
-    // For all paid plans OR free plans, route to register then payment selection
-    // Mobile money auto-routes through PesaPal on the payment selection page
+    // Route to registration first, then let the subscription flow collect payment.
     const params = new URLSearchParams({
       plan: planKey,
       cycle: billingCycle,
@@ -239,7 +238,7 @@ export default function Subscribe() {
               </div>
             </div>
 
-            {/* Payment Method Selection - SIMPLIFIED: All payments route through PesaPal */}
+            {/* Payment information */}
             {price > 0 && (
               <div style={{ marginBottom: '30px', paddingBottom: '30px', borderBottom: '1px solid #e0e0e0', backgroundColor: '#f0f7ff', padding: '20px', borderRadius: '8px' }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
@@ -247,7 +246,7 @@ export default function Subscribe() {
                   <div>
                     <h4 style={{ margin: '0 0 8px 0', fontWeight: '600', color: '#0066cc' }}>Flexible Payment Options</h4>
                     <p style={{ margin: '0', fontSize: '14px', color: '#555', lineHeight: '1.5' }}>
-                      After registration, you can pay using mobile money (M-Pesa, Airtel Money, MTN, Orange Money, etc.) or cards via PesaPal. All payments are processed securely through our trusted payment partner.
+                      After registration, you can pay using MTN Rwanda or Airtel Rwanda mobile money through InTouchPay, or complete card payment through PesaPal.
                     </p>
                   </div>
                 </div>
