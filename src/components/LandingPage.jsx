@@ -7,7 +7,12 @@ import ContactWidget from './ContactWidget';
 import subscriptionAPI from '../api/subscription';
 import api from '../api/axios';
 import ThierryImage from '../assets/Thierry.jpeg';
-import OlivierImage from '../assets/Byishimo.jpeg';
+import OlivierImage from '../assets/olivier.jpeg';
+import ShemaImage from '../assets/shema.jpeg';
+import ChristianImage from '../assets/Mugisha king christian.jpeg';
+import PatrickImage from '../assets/Mbabazi Patrick.jpeg';
+import MirellieImage from '../assets/Umugwaneza mirellie.jpeg';
+import LauretteImage from '../assets/Kazenga Laurette.jpeg';
 import DashboardScreenshot from '../assets/Dashboard.png';
 import RequestScreenshot from '../assets/Request.png';
 import AssetScreenshot from '../assets/Asset55.png';
@@ -15,6 +20,58 @@ import AnalyticsScreenshot from '../assets/analytics.png';
 import PMScreenshot from '../assets/PM.png';
 import WorkOrderScreenshot from '../assets/Workorder4.png';
 import ScheduleScreenshot from '../assets/schedule3.png';
+
+const teamMembers = [
+  {
+    name: 'Ndagano Thierry',
+    role: 'Leadership',
+    bio: 'Visionary leader driving the strategic direction and mission of Fixnest CMMS.',
+    image: ThierryImage,
+    accent: 'text-indigo-600',
+  },
+  {
+    name: 'Byishimo Olivier',
+    role: 'Software Engineer',
+    bio: 'Expert software engineer building the robust technical foundation of Fixnest.',
+    image: OlivierImage,
+    accent: 'text-purple-600',
+  },
+  {
+    name: 'Byaruhanga Shema',
+    role: 'Social Media Manager',
+    bio: 'Building our online presence and connecting with the Fixnest community globally.',
+    image: ShemaImage,
+    accent: 'text-pink-600',
+  },
+  {
+    name: 'Mugisha King Christian',
+    role: 'Customer Support',
+    bio: 'Supports customers closely, resolves issues quickly, and helps every client feel confident using Fixnest.',
+    image: ChristianImage,
+    accent: 'text-sky-600',
+  },
+  {
+    name: 'Mbabazi Patrick',
+    role: 'Operations Manager',
+    bio: 'Keeps delivery moving smoothly across teams and helps translate field needs into reliable execution.',
+    image: PatrickImage,
+    accent: 'text-emerald-600',
+  },
+  {
+    name: 'Umugwaneza Mirellie',
+    role: 'Innovation Lead',
+    bio: 'Guides product innovation and turns operational ideas into practical tools teams can use every day.',
+    image: MirellieImage,
+    accent: 'text-rose-600',
+  },
+  {
+    name: 'Kazenga Laurette',
+    role: 'Finance',
+    bio: 'Oversees financial operations and helps keep the business side of Fixnest disciplined and growth-ready.',
+    image: LauretteImage,
+    accent: 'text-amber-600',
+  },
+];
 
 const products = [
   {
@@ -1122,95 +1179,35 @@ const LandingPage = () => {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {/* Team Member 1 - Thierry */}
-            <motion.div 
-              whileHover={{ y: -8 }}
-              className="bg-slate-50 rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-shadow"
-            >
-              <div className="h-48 bg-gray-200 relative overflow-hidden">
-                <img 
-                  src={ThierryImage} 
-                  alt="Ndagano Thierry" 
-                  className="w-full h-full object-cover object-top hover:scale-110 transition-transform duration-300"
-                />
-              </div>
-              <div className="p-6 text-center">
-                <h3 className="text-2xl font-bold text-slate-900 mb-1">Ndagano Thierry</h3>
-                <p className="text-indigo-600 font-semibold mb-3">Leadership</p>
-                <p className="text-slate-600 text-sm">Visionary leader driving the strategic direction and mission of Fixnest CMMS.</p>
-              </div>
-            </motion.div>
-
-            {/* Team Member 2 - Olivier */}
-            <motion.div 
-              whileHover={{ y: -8 }}
-              className="bg-slate-50 rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-shadow"
-            >
-              <div className="h-48 bg-gray-200 relative overflow-hidden">
-                <img 
-                  src={OlivierImage} 
-                  alt="Byishimo Olivier" 
-                  className="w-full h-full object-cover object-top hover:scale-110 transition-transform duration-300"
-                />
-              </div>
-              <div className="p-6 text-center">
-                <h3 className="text-2xl font-bold text-slate-900 mb-1">Byishimo Olivier</h3>
-                <p className="text-purple-600 font-semibold mb-3">Software Engineer</p>
-                <p className="text-slate-600 text-sm">Expert software engineer building the robust technical foundation of Fixnest.</p>
-              </div>
-            </motion.div>
-
-            {/* Team Member 3 */}
-            <motion.div 
-              whileHover={{ y: -8 }}
-              className="bg-slate-50 rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-shadow"
-            >
-              <div className="h-48 bg-gradient-to-br from-pink-400 to-pink-600 flex items-center justify-center">
-                <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center text-2xl font-bold text-pink-600">
-                  BS
+          <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
+            {teamMembers.map((member) => (
+              <motion.div
+                key={member.name}
+                whileHover={{ y: -8 }}
+                className="overflow-hidden rounded-2xl bg-slate-50 shadow-md transition-shadow hover:shadow-xl"
+              >
+                {member.image ? (
+                  <div className="relative h-64 overflow-hidden bg-gray-200">
+                    <img
+                      src={member.image}
+                      alt={member.name}
+                      className="h-full w-full object-cover object-top transition-transform duration-300 hover:scale-110"
+                    />
+                  </div>
+                ) : (
+                  <div className={`flex h-64 items-center justify-center bg-gradient-to-br ${member.placeholder || 'from-slate-400 to-slate-600'}`}>
+                    <div className="flex h-24 w-24 items-center justify-center rounded-full bg-white text-2xl font-bold text-slate-700">
+                      {member.initials || 'TM'}
+                    </div>
+                  </div>
+                )}
+                <div className="p-6 text-center">
+                  <h3 className="mb-1 text-2xl font-bold text-slate-900">{member.name}</h3>
+                  <p className={`mb-3 font-semibold ${member.accent}`}>{member.role}</p>
+                  <p className="text-sm text-slate-600">{member.bio}</p>
                 </div>
-              </div>
-              <div className="p-6 text-center">
-                <h3 className="text-2xl font-bold text-slate-900 mb-1">BYARUHANGA SHEMA</h3>
-                <p className="text-pink-600 font-semibold mb-3">Social Media Manager</p>
-                <p className="text-slate-600 text-sm">Building our online presence and connecting with the Fixnest community globally.</p>
-              </div>
-            </motion.div>
-
-            {/* Team Member 4 */}
-            <motion.div 
-              whileHover={{ y: -8 }}
-              className="bg-slate-50 rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-shadow"
-            >
-              <div className="h-48 bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center">
-                <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center text-2xl font-bold text-green-600">
-                  RK
-                </div>
-              </div>
-              <div className="p-6 text-center">
-                <h3 className="text-2xl font-bold text-slate-900 mb-1">Ruzibiza Kellia</h3>
-                <p className="text-green-600 font-semibold mb-3">Developer</p>
-                <p className="text-slate-600 text-sm">Talented developer contributing to the innovation and scalability of our platform.</p>
-              </div>
-            </motion.div>
-
-            {/* Team Member 5 */}
-            <motion.div 
-              whileHover={{ y: -8 }}
-              className="bg-slate-50 rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-shadow"
-            >
-              <div className="h-48 bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center">
-                <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center text-2xl font-bold text-amber-600">
-                  HK
-                </div>
-              </div>
-              <div className="p-6 text-center">
-                <h3 className="text-2xl font-bold text-slate-900 mb-1">Hannah Kamanzi</h3>
-                <p className="text-amber-600 font-semibold mb-3">Partnership Manager</p>
-                <p className="text-slate-600 text-sm">Building strategic partnerships to expand Fixnest's reach and impact globally.</p>
-              </div>
-            </motion.div>
+              </motion.div>
+            ))}
           </div>
 
           <div className="mt-16 text-center p-8 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-2xl border border-indigo-200">
