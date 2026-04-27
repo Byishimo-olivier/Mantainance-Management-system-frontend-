@@ -8,7 +8,6 @@ import { WorkOrderForm } from './WorkOrder';
 import SubscriptionPlan from './SubscriptionPlan';
 import SubscriptionManagement from './SubscriptionManagement';
 import CompanySubscriptionDashboard from './CompanySubscriptionDashboard';
-import TrialBanner from './TrialBanner';
 import { useCompanySubscription } from '../hooks/useCompanySubscription';
 import useTrialStatus from '../hooks/useTrialStatus';
 import { useSubscription } from '../hooks/useSubscription';
@@ -7156,7 +7155,7 @@ function ClientDashboard() {
         border: '#86EFAC',
         background: 'linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)',
         iconBg: 'rgba(4, 120, 87, 0.12)',
-        title: 'Trial Count',
+        title: 'Free Trial',
         value: 'Active Plan',
         subtitle: 'Your paid subscription is active',
       };
@@ -7168,7 +7167,7 @@ function ClientDashboard() {
         border: '#FCA5A5',
         background: 'linear-gradient(135deg, #FEF2F2 0%, #FFF1F2 100%)',
         iconBg: 'rgba(239, 68, 68, 0.12)',
-        title: 'Trial Count',
+        title: 'Free Trial',
         value: 'Expired',
         subtitle: 'Your free trial has ended',
       };
@@ -7183,7 +7182,7 @@ function ClientDashboard() {
           ? 'linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%)'
           : 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)',
         iconBg: soonEnding ? 'rgba(217, 119, 6, 0.12)' : 'rgba(37, 99, 235, 0.12)',
-        title: 'Trial Count',
+        title: 'Free Trial',
         value: `${daysRemaining} day${daysRemaining === 1 ? '' : 's'}`,
         subtitle: 'Remaining in your free trial',
       };
@@ -7194,7 +7193,7 @@ function ClientDashboard() {
       border: '#BFDBFE',
       background: 'linear-gradient(135deg, #EFF6FF 0%, #F8FAFC 100%)',
       iconBg: 'rgba(37, 99, 235, 0.12)',
-      title: 'Trial Count',
+      title: 'Free Trial',
       value: 'Unavailable',
       subtitle: 'Trial status is not available yet',
     };
@@ -7238,6 +7237,16 @@ function ClientDashboard() {
       setIsMobileMenuOpen(false); // Close menu on tab change
     }
   }, [location.search]);
+
+  useEffect(() => {
+    if (trialStatusLoading || subscriptionVisibilityLoading) {
+      return;
+    }
+
+    if (!isInTrial && !hasPaidSubscription) {
+      navigate('/subscription', { replace: true });
+    }
+  }, [hasPaidSubscription, isInTrial, navigate, subscriptionVisibilityLoading, trialStatusLoading]);
 
   useEffect(() => {
     if (activeTab === 'subscription') {
@@ -20717,7 +20726,6 @@ function ClientDashboard() {
 
           {activeTab === 'dashboard' && (
             <div>
-              <TrialBanner />
               {/* Welcome */}
               <div className="glass-surface responsive-card mb-6 text-gray-900 flex items-center justify-between overflow-hidden relative shadow-2xl border border-gray-200/70">
                 <div style={{ position: 'absolute', right: -30, top: -30, width: 180, height: 180, borderRadius: '50%', background: 'rgba(255,255,255,0.05)' }} />

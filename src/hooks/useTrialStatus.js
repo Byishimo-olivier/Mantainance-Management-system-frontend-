@@ -47,8 +47,8 @@ const useTrialStatus = () => {
       setLoading(false);
     }
 
-    // Refresh trial status every minute
-    const interval = setInterval(fetchTrialStatus, 60000);
+    // Refresh trial status regularly so expiry redirects happen without a manual refresh.
+    const interval = setInterval(fetchTrialStatus, 30000);
     return () => clearInterval(interval);
   }, [fetchTrialStatus]);
 

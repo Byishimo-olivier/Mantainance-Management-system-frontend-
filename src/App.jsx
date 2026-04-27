@@ -108,8 +108,6 @@ import LegalDocumentPage from './components/legal/LegalDocumentPage';
 import SitemapPage from './components/legal/SitemapPage';
 import { legalDocuments, sitemapSections } from './data/legalPages';
 
-// Trial Components
-import TrialCountdown from './components/TrialCountdown';
 import useTrialStatus from './hooks/useTrialStatus';
 import useCompanySubscription from './hooks/useCompanySubscription';
 
@@ -207,9 +205,6 @@ function App() {
   return (
     <LanguageProvider>
       <ScrollToTop />
-      {/* Trial Countdown - Shows for authenticated users in trial period */}
-      {auth && !['superadmin', 'super-admin'].includes(String(auth?.user?.role || '').toLowerCase()) && <TrialCountdown />}
-      
       <div className="glass-app glass-theme-blue">
         <Routes>
           <Route path="/" element={<LandingPage />} />

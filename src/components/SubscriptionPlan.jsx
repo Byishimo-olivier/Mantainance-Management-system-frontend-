@@ -325,6 +325,14 @@ const SubscriptionPlan = ({ userId }) => {
     setPendingPaymentModal((prev) => ({ ...prev, open: false }));
   };
 
+  const getCurrentSubscriptionPaymentOptions = () => ({
+    allowCurrentPlan: true,
+    subscriptionId: subscription?.id || subscription?._id || '',
+    paymentMethod: ['mobile_money', 'intouchpay'].includes(subscription?.paymentMethod) ? 'mobile_money' : 'card',
+    provider: subscription?.metadata?.provider || 'mtn',
+    phoneNumber: subscription?.metadata?.phoneNumber || subscription?.phoneNumber || '',
+  });
+
   const handlePendingPaymentSuccess = async () => {
     await Promise.allSettled([refresh?.(), refreshCompanySubscription?.()]);
     setPendingPaymentModal((prev) => ({ ...prev, open: false }));
@@ -452,7 +460,17 @@ const SubscriptionPlan = ({ userId }) => {
     return pricing[planId]?.[billingCycle];
   };
 
-  const currentPlan = subscription?.plan || null;
+  const subscriptionStatus = String(subscription?.status || '').toLowerCase();
+  const subscriptionPaymentStatus = String(subscription?.paymentStatus || '').toLowerCase();
+  const isSubscriptionActive =
+    subscriptionStatus === 'active' && subscriptionPaymentStatus === 'paid';
+  const isSubscriptionPendingPayment =
+    !!subscription &&
+    (subscriptionPaymentStatus === 'pending' ||
+      subscriptionStatus === 'pending' ||
+      subscriptionStatus === 'pending_payment');
+  const currentPlan = isSubscriptionActive ? subscription?.plan || null : null;
+  const pendingPlan = isSubscriptionPendingPayment ? subscription?.plan || null : null;
 
   if (loading) {
     return (
@@ -526,25 +544,27 @@ const SubscriptionPlan = ({ userId }) => {
             {subscription && (
               <div className="mb-8 rounded-lg bg-blue-50 p-6 border border-blue-200">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="font-semibold text-blue-900">Current Subscription</h3>
+                  <h3 className="font-semibold text-blue-900">
+                    {isSubscriptionActive ? 'Current Subscription' : 'Pending Subscription'}
+                  </h3>
                   <button
-                    onClick={() => {
-                      openPaymentModal(subscription.plan, {
-                        allowCurrentPlan: true,
-                        subscriptionId: subscription.id || subscription._id || '',
-                        paymentMethod: ['mobile_money', 'intouchpay'].includes(subscription.paymentMethod) ? 'mobile_money' : 'card',
-                        provider: subscription.metadata?.provider || 'mtn',
-                        phoneNumber: subscription.metadata?.phoneNumber || subscription.phoneNumber || '',
-                      });
-                    }}
+                    onClick={() => openPaymentModal(subscription.plan, getCurrentSubscriptionPaymentOptions())}
                     className="text-sm bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-all"
                   >
                     Change Payment Method
                   </button>
                 </div>
                 <p className="text-blue-700 text-sm">
-                  You're currently on the <strong>{subscription.plan.charAt(0).toUpperCase() + subscription.plan.slice(1)}</strong> plan.
-                  {subscription.nextBillingDate && (
+                  {isSubscriptionActive ? (
+                    <>
+                      You're currently on the <strong>{subscription.plan.charAt(0).toUpperCase() + subscription.plan.slice(1)}</strong> plan.
+                    </>
+                  ) : (
+                    <>
+                      Your <strong>{subscription.plan.charAt(0).toUpperCase() + subscription.plan.slice(1)}</strong> plan is waiting for payment confirmation.
+                    </>
+                  )}
+                  {isSubscriptionActive && subscription.nextBillingDate && (
                     <> Next billing date: <strong>{new Date(subscription.nextBillingDate).toLocaleDateString()}</strong></>
                   )}
                 </p>
@@ -566,7 +586,7 @@ const SubscriptionPlan = ({ userId }) => {
                   </div>
                 )}
 
-                {(subscription.status === 'pending' || subscription.paymentStatus === 'pending') && (
+                {isSubscriptionPendingPayment && (
                   <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex items-center justify-between">
                       <div className="flex gap-3">
                         <AlertCircle className="text-yellow-600 mt-0.5" size={20} />
@@ -581,13 +601,7 @@ const SubscriptionPlan = ({ userId }) => {
                         </div>
                       </div>
                     <button
-                      onClick={() => openPaymentModal(subscription.plan, {
-                        allowCurrentPlan: true,
-                        subscriptionId: subscription.id || subscription._id || '',
-                        paymentMethod: ['mobile_money', 'intouchpay'].includes(subscription.paymentMethod) ? 'mobile_money' : 'card',
-                        provider: subscription.metadata?.provider || 'mtn',
-                        phoneNumber: subscription.metadata?.phoneNumber || subscription.phoneNumber || '',
-                      })}
+                      onClick={() => openPaymentModal(subscription.plan, getCurrentSubscriptionPaymentOptions())}
                       disabled={upgrading}
                       className="bg-yellow-600 hover:bg-yellow-700 text-white px-6 py-2 rounded-lg text-sm font-bold transition-all shadow-sm active:scale-95 disabled:opacity-50"
                     >
@@ -628,6 +642,7 @@ const SubscriptionPlan = ({ userId }) => {
               {plans.map((plan) => {
                 const price = getPrice(plan.id);
                 const isCurrentPlan = currentPlan === plan.id;
+                const isPendingPlan = pendingPlan === plan.id;
                 const isCurrentCompanyPlan = hasActiveCompanySubscription && String(companySubscription?.plan || '').toLowerCase() === String(plan.id || '').toLowerCase();
                 const isCustomQuotePlan = plan.id === 'premium';
                 const isPopularPlan = plan.id === 'professional';
@@ -638,8 +653,10 @@ const SubscriptionPlan = ({ userId }) => {
                     className={`rounded-lg border transition-all ${
                       isCustomQuotePlan
                         ? 'border-purple-400 bg-purple-50/40 hover:shadow-md'
-                        : isCurrentPlan
+                        : isCurrentPlan || isCurrentCompanyPlan
                           ? 'border-blue-600 ring-2 ring-blue-200 bg-blue-50'
+                          : isPendingPlan
+                            ? 'border-yellow-400 ring-2 ring-yellow-100 bg-yellow-50'
                           : 'border-gray-200 bg-white hover:shadow-md'
                     }`}
                   >
@@ -691,11 +708,13 @@ const SubscriptionPlan = ({ userId }) => {
 
                       {/* Button */}
                       <button
-                        onClick={() => openPaymentModal(plan.id)}
+                        onClick={() => openPaymentModal(plan.id, isPendingPlan ? getCurrentSubscriptionPaymentOptions() : {})}
                         disabled={isCurrentPlan || isCurrentCompanyPlan || upgrading || companySubscriptionLoading}
                         className={`w-full py-2 px-4 rounded-lg font-semibold text-sm transition-all flex items-center justify-center gap-2 ${
                           isCurrentPlan || isCurrentCompanyPlan
                             ? 'bg-emerald-500 text-white cursor-not-allowed'
+                            : isPendingPlan
+                              ? 'bg-yellow-500 text-white hover:bg-yellow-600 hover:shadow-md active:scale-95'
                             : isCustomQuotePlan
                               ? 'bg-gradient-to-r from-purple-600 to-fuchsia-500 text-white hover:from-purple-700 hover:to-fuchsia-600 hover:shadow-md active:scale-95'
                               : 'bg-blue-600 text-white hover:bg-blue-700 hover:shadow-md active:scale-95'
@@ -710,6 +729,8 @@ const SubscriptionPlan = ({ userId }) => {
                           'Loading...'
                         ) : isCurrentPlan || isCurrentCompanyPlan ? (
                           'Active'
+                        ) : isPendingPlan ? (
+                          'Complete Payment'
                         ) : isCustomQuotePlan ? (
                           'Request Quotation'
                         ) : subscription === null ? (
