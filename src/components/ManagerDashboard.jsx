@@ -727,6 +727,7 @@ function ManagerDashboard() {
   const [feedbacks, setFeedbacks] = useState([]);
   const [loadingFeedbacks, setLoadingFeedbacks] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [hasLoadedDashboard, setHasLoadedDashboard] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [aiSentiment, setAiSentiment] = useState(null);
   const [aiRecommendations, setAiRecommendations] = useState([]);
@@ -824,6 +825,29 @@ function ManagerDashboard() {
     }
   };
 
+  const requestWithTimeout = (promise, timeoutMs = 10000) => new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`Request timed out after ${timeoutMs}ms`)), timeoutMs);
+    promise
+      .then((value) => {
+        clearTimeout(timer);
+        resolve(value);
+      })
+      .catch((error) => {
+        clearTimeout(timer);
+        reject(error);
+      });
+  });
+
+  const safeApiGet = async (path, fallback, timeoutMs = 10000) => {
+    try {
+      const response = await requestWithTimeout(api.get(path), timeoutMs);
+      return response?.data ?? fallback;
+    } catch (error) {
+      console.error(`Failed to load ${path}:`, error);
+      return fallback;
+    }
+  };
+
   // Fetch all dashboard data
   const fetchDashboardData = async () => {
     try {
@@ -841,17 +865,17 @@ function ManagerDashboard() {
       console.log('Token exists:', !!token, 'First 20 chars:', token?.substring(0, 20));
       // const config = { headers: { Authorization: `Bearer ${token}` } }; // handled by interceptor
 
-      const [issuesRes, techRes, usersRes, teamsRes, summaryRes, locationsRes, assetsRes] = await Promise.all([
-        api.get("/api/issues"),
-        api.get("/api/technicians"),
-        api.get("/api/users"),
-        api.get("/api/teams"),
-        api.get("/api/managers/dashboard/summary"),
-        api.get("/api/properties"),
-        api.get("/api/assets")
+      const [issuesData, techData, usersData, teamsData, summaryData, locationsData, assetsData] = await Promise.all([
+        safeApiGet("/api/issues", []),
+        safeApiGet("/api/technicians", []),
+        safeApiGet("/api/users", []),
+        safeApiGet("/api/teams", []),
+        safeApiGet("/api/managers/dashboard/summary", {}),
+        safeApiGet("/api/properties", []),
+        safeApiGet("/api/assets", [])
       ]);
 
-      const allIssuesData = issuesRes.data || [];
+      const allIssuesData = Array.isArray(issuesData) ? issuesData : [];
       setAllIssues(allIssuesData);
 
       const approvedWorkOrders = allIssuesData.filter(issue => issue.approved);
@@ -859,14 +883,14 @@ function ManagerDashboard() {
 
       setIssues(approvedWorkOrders);
       setPendingRequests(pendingRequestsData);
-      setSystemUsers(usersRes.data || []);
+      setSystemUsers(Array.isArray(usersData) ? usersData : []);
 
-      const combinedTechs = combinePeopleUsers(techRes.data || [], usersRes.data || []);
+      const combinedTechs = combinePeopleUsers(Array.isArray(techData) ? techData : [], Array.isArray(usersData) ? usersData : []);
       setTechnicians(combinedTechs);
-      setTeams(teamsRes.data || []);
-      setLocations(locationsRes.data || []);
-      setAssets(assetsRes.data || []);
-      setSummary(summaryRes.data || {});
+      setTeams(Array.isArray(teamsData) ? teamsData : []);
+      setLocations(Array.isArray(locationsData) ? locationsData : []);
+      setAssets(Array.isArray(assetsData) ? assetsData : []);
+      setSummary(summaryData && typeof summaryData === 'object' ? summaryData : {});
     } catch (err) {
       console.error('Failed to load data:', err);
       console.error('Error response:', err.response?.data);
@@ -888,6 +912,7 @@ function ManagerDashboard() {
       setTechnicians([]);
       setSummary({ pending: 0, inProgress: 0, completed: 0, overdue: 0 });
     } finally {
+      setHasLoadedDashboard(true);
       setLoading(false);
     }
   };
@@ -1891,7 +1916,7 @@ function ManagerDashboard() {
         {/* Main Content Scroll Area */}
         <div className="flex-1 overflow-y-auto p-6 bg-white/30 backdrop-blur-sm relative z-0">
           <div id="dashboard-content">
-            {loading ? (
+            {loading && !hasLoadedDashboard ? (
               <div className="flex flex-col items-center justify-center py-20">
                 <div className="w-10 h-10 border-2 border-blue-100 border-t-blue-600 rounded-full animate-spin"></div>
                 <p className="mt-4 text-sm font-medium text-gray-500">Loading data...</p>
@@ -4016,41 +4041,41 @@ const AnalyticsTab = ({ issues, technicians, aiSentiment, aiRecommendations, loa
     : dateRange;
 
   return (
-    <div className="flex flex-col gap-0 bg-transparent min-h-screen -m-6 glass-theme-blue">
-      {/* Sub-Tab Navigation */}
-      <div className="flex items-center justify-between px-6 pt-4 border-b border-gray-100 bg-white sticky top-0 z-10">
-        <div className="flex gap-0">
-          {subTabs.map(t => (
-            <button
-              key={t.id}
-              onClick={() => setSubTab(t.id)}
-              className={`px-4 pb-3 pt-1 text-sm font-bold border-b-2 transition-colors ${subTab === t.id ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-        <div className="flex items-center gap-3 pb-3">
-          <button className="flex items-center gap-2 text-xs font-bold text-gray-500 hover:text-gray-700 px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-            <Bell className="w-3.5 h-3.5" />
-            Manage Pins
-          </button>
-          <div className="relative">
-            <button
-              onClick={() => setShowDateDropdown(!showDateDropdown)}
-              className="flex items-center gap-2 text-xs font-bold text-gray-600 px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              <LayoutDashboard className="w-3.5 h-3.5" />
-              View: {subTabs.find(t => t.id === subTab)?.label}
-              <ChevronDown className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div className="p-6 flex gap-6">
+    <div className="flex gap-6">
         {/* Main Chart Area */}
         <div className="flex-1 min-w-0 flex flex-col gap-6">
+          <div className="glass-surface rounded-2xl border border-white/20 p-5 shadow-lg">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex gap-0">
+                {subTabs.map(t => (
+                  <button
+                    key={t.id}
+                    onClick={() => setSubTab(t.id)}
+                    className={`px-4 pb-3 pt-1 text-sm font-bold border-b-2 transition-colors ${subTab === t.id ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center gap-3">
+                <button className="flex items-center gap-2 text-xs font-bold text-gray-500 hover:text-gray-700 px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                  <Bell className="w-3.5 h-3.5" />
+                  Manage Pins
+                </button>
+                <div className="relative">
+                  <button
+                    onClick={() => setShowDateDropdown(!showDateDropdown)}
+                    className="flex items-center gap-2 text-xs font-bold text-gray-600 px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    <LayoutDashboard className="w-3.5 h-3.5" />
+                    View: {subTabs.find(t => t.id === subTab)?.label}
+                    <ChevronDown className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Sub-Tab Header */}
           <div>
             <h2 className="text-2xl font-bold text-gray-900 mb-3">{subTabs.find(t => t.id === subTab)?.label}</h2>
@@ -4470,7 +4495,6 @@ const AnalyticsTab = ({ issues, technicians, aiSentiment, aiRecommendations, loa
             </div>
           </div>
         </div>
-      </div>
     </div>
   );
 };

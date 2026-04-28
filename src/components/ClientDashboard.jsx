@@ -4,6 +4,8 @@ import companyLogoAsset from "../assets/company logo.jpeg";
 import { createPortal } from "react-dom";
 import api from "../api/axios";
 import { useNavigate, Link, useLocation } from "react-router-dom";
+import 'chart.js/auto';
+import { Chart } from 'primereact/chart';
 import { WorkOrderForm } from './WorkOrder';
 import SubscriptionPlan from './SubscriptionPlan';
 import SubscriptionManagement from './SubscriptionManagement';
@@ -583,6 +585,46 @@ const normalizeCoordinate = (value) => {
   const numeric = Number(value);
   if (Number.isNaN(numeric)) return '';
   return numeric.toFixed(6);
+};
+
+const normalizeSearchText = (value) => String(value || '')
+  .toLowerCase()
+  .replace(/[_-]+/g, ' ')
+  .replace(/[^a-z0-9]+/g, ' ')
+  .replace(/\s+/g, ' ')
+  .trim();
+
+const buildSearchInitialism = (value) => {
+  const normalized = normalizeSearchText(value);
+  if (!normalized) return '';
+  const tokens = normalized.split(' ').filter(Boolean);
+  if (tokens.length <= 1) return normalized.replace(/\s+/g, '');
+  return tokens.map((token) => (/^\d+$/.test(token) ? token : token.charAt(0))).join('');
+};
+
+const buildSearchAliases = (value) => {
+  const normalized = normalizeSearchText(value);
+  if (!normalized) return [];
+  return Array.from(new Set([
+    normalized,
+    normalized.replace(/\s+/g, ''),
+    buildSearchInitialism(normalized),
+  ].filter(Boolean)));
+};
+
+const matchesAliasedSearch = (candidates, query) => {
+  const queryAliases = buildSearchAliases(query);
+  if (queryAliases.length === 0) return true;
+
+  return (Array.isArray(candidates) ? candidates : [candidates]).some((candidate) => {
+    const candidateAliases = buildSearchAliases(candidate);
+    return candidateAliases.some((candidateAlias) => (
+      queryAliases.some((queryAlias) => (
+        candidateAlias.includes(queryAlias) ||
+        (queryAlias.length >= 3 && queryAlias.includes(candidateAlias))
+      ))
+    ));
+  });
 };
 
 const buildDirectionsUrl = (latitude, longitude) => {
@@ -17529,10 +17571,17 @@ function ClientDashboard() {
     selectedRequestAssets.length +
     selectedRequestAssignedTo.length;
   const filteredRequests = React.useMemo(() => {
-    const query = String(requestSearchQuery || '').trim().toLowerCase();
+    const query = String(requestSearchQuery || '').trim();
+    const normalizedQuery = normalizeSearchText(query);
     const rows = pendingRequests.filter((request) => {
       const { statusLabel } = getRequestDisplayState(request);
-      const location = String(request.location || request.property?.name || request.propertyName || request.assetLocation || '').trim();
+      const locationCandidates = [
+        request.location,
+        request.property?.name,
+        request.propertyName,
+        request.assetLocation,
+      ].filter(Boolean);
+      const location = String(locationCandidates[0] || '').trim();
       const asset = String(request.assetName || request.asset?.name || request.asset || '').trim();
       const assignedTo = String(getAssignedName(request) || '').trim();
 
@@ -17541,20 +17590,19 @@ function ClientDashboard() {
       if (selectedRequestAssets.length > 0 && !selectedRequestAssets.includes(asset)) return false;
       if (selectedRequestAssignedTo.length > 0 && !selectedRequestAssignedTo.includes(assignedTo)) return false;
 
-      if (!query) return true;
-      const haystack = [
+      if (!normalizedQuery) return true;
+      const haystack = normalizeSearchText([
         request.title,
         request.description,
         statusLabel,
-        location,
         asset,
         assignedTo,
         request.category,
         request.requestorName,
         request.userName,
         request.email,
-      ].join(' ').toLowerCase();
-      return haystack.includes(query);
+      ].join(' '));
+      return haystack.includes(normalizedQuery) || matchesAliasedSearch(locationCandidates, query);
     });
 
     return [...rows].sort((a, b) => {
@@ -17751,10 +17799,17 @@ function ClientDashboard() {
     selectedWorkOrderAssets.length +
     selectedWorkOrderAssignedTo.length;
   const filteredClientWorkOrders = React.useMemo(() => {
-    const query = String(workOrderSearchQuery || '').trim().toLowerCase();
+    const query = String(workOrderSearchQuery || '').trim();
+    const normalizedQuery = normalizeSearchText(query);
     const filtered = workOrders.filter((issue) => {
       const status = getWorkOrderDisplayStatus(issue);
-      const location = String(issue.location || issue.property?.name || issue.propertyName || issue.assetLocation || '').trim();
+      const locationCandidates = [
+        issue.location,
+        issue.property?.name,
+        issue.propertyName,
+        issue.assetLocation,
+      ].filter(Boolean);
+      const location = String(locationCandidates[0] || '').trim();
       const asset = String(issue.assetName || issue.asset?.name || '').trim();
       const assignedTo = String(getAssignedName(issue) || '').trim();
       const priority = String(issue.priority || 'NONE').toUpperCase();
@@ -17765,17 +17820,16 @@ function ClientDashboard() {
       if (selectedWorkOrderAssets.length > 0 && !selectedWorkOrderAssets.includes(asset)) return false;
       if (selectedWorkOrderAssignedTo.length > 0 && !selectedWorkOrderAssignedTo.includes(assignedTo)) return false;
 
-      if (!query) return true;
-      const haystack = [
+      if (!normalizedQuery) return true;
+      const haystack = normalizeSearchText([
         issue.title,
         issue.description,
         status,
-        location,
         asset,
         assignedTo,
         priority,
-      ].join(' ').toLowerCase();
-      return haystack.includes(query);
+      ].join(' '));
+      return haystack.includes(normalizedQuery) || matchesAliasedSearch(locationCandidates, query);
     });
     return [...filtered].sort((a, b) => {
       const aTime = new Date(a.createdAt || a.updatedAt || 0).getTime();
@@ -18910,7 +18964,8 @@ function ClientDashboard() {
     selectedPmLocations.length +
     selectedPmPriorities.length;
   const filteredMaintenanceSchedules = React.useMemo(() => {
-    const query = String(pmSearchQuery || '').trim().toLowerCase();
+    const query = String(pmSearchQuery || '').trim();
+    const normalizedQuery = normalizeSearchText(query);
     const filtered = maintenanceSchedules.filter((schedule) => {
       const assignedNames = getPmAssignedNames(schedule);
       const location = getPmLocationLabel(schedule);
@@ -18922,20 +18977,19 @@ function ClientDashboard() {
       if (selectedPmLocations.length > 0 && !selectedPmLocations.includes(location)) return false;
       if (selectedPmPriorities.length > 0 && !selectedPmPriorities.includes(priority)) return false;
 
-      if (!query) return true;
-      const haystack = [
+      if (!normalizedQuery) return true;
+      const haystack = normalizeSearchText([
         schedule?.name,
         schedule?.title,
         schedule?.workOrderTitle,
         schedule?.description,
         schedule?.category,
         priority,
-        location,
         assignedNames.join(' '),
         checklistLabel,
         checklistId,
-      ].join(' ').toLowerCase();
-      return haystack.includes(query);
+      ].join(' '));
+      return haystack.includes(normalizedQuery) || matchesAliasedSearch(location, query);
     });
 
     return [...filtered].sort((a, b) => {
@@ -19084,17 +19138,24 @@ function ClientDashboard() {
     return Array.from(new Set((assets || []).map((asset) => getAssetLocationLabel(asset)).filter(Boolean))).sort((a, b) => a.localeCompare(b));
   }, [assets, getAssetLocationLabel]);
   const filteredAssets = React.useMemo(() => {
-    const query = String(assetSearchQuery || '').trim().toLowerCase();
+    const query = String(assetSearchQuery || '').trim();
+    const normalizedQuery = normalizeSearchText(query);
     return (assets || []).filter((asset) => {
       const locationLabel = getAssetLocationLabel(asset);
       const matchesLocation = !selectedAssetLocationFilter || locationLabel === selectedAssetLocationFilter;
-      const matchesSearch = !query || [
+      const matchesSearch = !normalizedQuery || normalizeSearchText([
         asset?.name,
         asset?.serialNumber,
         asset?.barcode,
         asset?.description,
+      ].join(' ')).includes(normalizedQuery) || matchesAliasedSearch([
         locationLabel,
-      ].filter(Boolean).some((value) => String(value).toLowerCase().includes(query));
+        asset?.property?.name,
+        asset?.propertyName,
+        asset?.location?.branchName,
+        asset?.location?.building,
+        asset?.location,
+      ], query);
       return matchesLocation && matchesSearch;
     });
   }, [assetSearchQuery, assets, getAssetLocationLabel, selectedAssetLocationFilter]);
@@ -20725,7 +20786,7 @@ function ClientDashboard() {
         )}
 
         {/* Content */}
-        <div className="flex-1 responsive-padding overflow-y-auto">
+        <div className={`flex-1 overflow-y-auto ${activeTab === 'analytics' ? 'px-3 xs:px-4 sm:px-6 md:px-8 lg:px-10 pb-3 xs:pb-4 sm:pb-6 md:pb-8 lg:pb-10 pt-0' : 'responsive-padding'}`}>
 
           {activeTab === 'dashboard' && (
             <div>
@@ -23428,7 +23489,7 @@ function ClientDashboard() {
                               </div>
                               <div className="max-h-[220px] space-y-1 overflow-y-auto">
                                 {selectedScheduleAssetLocationOptions
-                                  .filter((location) => location.toLowerCase().includes(selectedScheduleAssetLocationSearch.toLowerCase()))
+                                  .filter((location) => matchesAliasedSearch(location, selectedScheduleAssetLocationSearch))
                                   .map((location) => (
                                     <label key={location} className="flex items-center gap-3 rounded-lg p-2 hover:bg-gray-50">
                                       <input
@@ -24021,7 +24082,7 @@ function ClientDashboard() {
                               <input value={pmLocationSearch} onChange={(e) => setPmLocationSearch(e.target.value)} placeholder="Search" className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-3 text-sm outline-none focus:border-blue-500" />
                             </div>
                             <div className="max-h-[220px] space-y-1 overflow-y-auto">
-                              {pmLocationOptions.filter((location) => location.toLowerCase().includes(pmLocationSearch.toLowerCase())).map((location) => (
+                              {pmLocationOptions.filter((location) => matchesAliasedSearch(location, pmLocationSearch)).map((location) => (
                                 <label key={location} className="flex items-center gap-3 rounded-lg p-2 hover:bg-gray-50">
                                   <input type="checkbox" checked={selectedPmLocations.includes(location)} onChange={(e) => setSelectedPmLocations(e.target.checked ? [...selectedPmLocations, location] : selectedPmLocations.filter((value) => value !== location))} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
                                   <span className="text-sm font-medium text-gray-700">{location}</span>
@@ -24569,7 +24630,7 @@ function ClientDashboard() {
                         </div>
                         <div className="max-h-[220px] space-y-1 overflow-y-auto">
                           {workOrderLocationOptions
-                            .filter((location) => location.toLowerCase().includes(workOrderLocationSearch.toLowerCase()))
+                            .filter((location) => matchesAliasedSearch(location, workOrderLocationSearch))
                             .map((location) => (
                               <label key={location} className="flex items-center gap-3 rounded-lg p-2 hover:bg-gray-50">
                                 <input
@@ -35266,14 +35327,34 @@ const ClientAnalyticsTab = ({
     const maxValue = maxMetricChartValue(series);
     return linePadding + linePlotHeight - ((value / maxValue) * linePlotHeight);
   };
-  const donutStyle = (primary, secondary, percentage) => ({
-    background: `conic-gradient(${primary} 0deg ${percentage * 3.6}deg, ${secondary} ${percentage * 3.6}deg 360deg)`,
-  });
   const maxLeaderboardValue = (entries) => Math.max(1, ...entries.map((entry) => entry.value || entry.count || 0));
   const backlogTotal = backlogByPriority.reduce((sum, item) => sum + item.value, 0);
-  const priorityDonutStyle = {
-    background: `conic-gradient(${backlogByPriority[0].color} 0deg ${((backlogByPriority[0].value / Math.max(1, backlogTotal)) * 360)}deg, ${backlogByPriority[1].color} ${((backlogByPriority[0].value / Math.max(1, backlogTotal)) * 360)}deg ${(((backlogByPriority[0].value + backlogByPriority[1].value) / Math.max(1, backlogTotal)) * 360)}deg, ${backlogByPriority[2].color} ${(((backlogByPriority[0].value + backlogByPriority[1].value) / Math.max(1, backlogTotal)) * 360)}deg ${(((backlogByPriority[0].value + backlogByPriority[1].value + backlogByPriority[2].value) / Math.max(1, backlogTotal)) * 360)}deg, ${backlogByPriority[3].color} ${(((backlogByPriority[0].value + backlogByPriority[1].value + backlogByPriority[2].value) / Math.max(1, backlogTotal)) * 360)}deg 360deg)`,
-  };
+  const preventiveReactiveBars = React.useMemo(() => {
+    const total = Math.max(1, totalPreventive + totalReactive);
+    return [
+      {
+        label: 'Preventive',
+        value: totalPreventive,
+        share: Math.round((totalPreventive / total) * 100),
+        color: '#1d4ed8',
+        tone: 'border-blue-100 bg-blue-50 text-blue-700',
+      },
+      {
+        label: 'Reactive',
+        value: totalReactive,
+        share: Math.round((totalReactive / total) * 100),
+        color: '#0ea5e9',
+        tone: 'border-sky-100 bg-sky-50 text-sky-700',
+      },
+    ];
+  }, [totalPreventive, totalReactive]);
+  const backlogPriorityBars = React.useMemo(() => {
+    const total = Math.max(1, backlogTotal);
+    return backlogByPriority.map((entry) => ({
+      ...entry,
+      share: Math.round(((entry.value || 0) / total) * 100),
+    }));
+  }, [backlogByPriority, backlogTotal]);
   const upcomingLabelStep = Math.max(1, Math.ceil(labels.length / 8));
   const costCurrency = React.useMemo(() => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'RWF', maximumFractionDigits: 0 }), []);
   const formatCost = (value) => costCurrency.format(Number.isFinite(value) ? value : 0);
@@ -36220,24 +36301,391 @@ const ClientAnalyticsTab = ({
     return events.sort((a, b) => b.timestamp - a.timestamp);
   }, [allIssues, assets]);
 
-  const requestStatusChart = React.useMemo(() => ([
-    { label: 'Approved', value: requestAnalytics.approved, color: '#10b981' },
-    { label: 'Pending', value: requestAnalytics.pending, color: '#f59e0b' },
-    { label: 'Other', value: Math.max(0, requestAnalytics.submitted - requestAnalytics.approved - requestAnalytics.pending), color: '#94a3b8' },
-  ]), [requestAnalytics]);
+  const requestStatusChart = React.useMemo(() => {
+    const items = [
+      { label: 'Approved', value: requestAnalytics.approved, color: '#10b981' },
+      { label: 'Pending', value: requestAnalytics.pending, color: '#f59e0b' },
+      { label: 'Other', value: Math.max(0, requestAnalytics.submitted - requestAnalytics.approved - requestAnalytics.pending), color: '#94a3b8' },
+    ];
+    const total = Math.max(1, items.reduce((sum, item) => sum + item.value, 0));
+    return items.map((item) => ({
+      ...item,
+      share: Math.round((item.value / total) * 100),
+    }));
+  }, [requestAnalytics]);
 
   const requestStatusTotal = requestStatusChart.reduce((sum, item) => sum + item.value, 0);
-  const requestStatusDonut = React.useMemo(() => {
-    if (!requestStatusTotal) return 'conic-gradient(#e5e7eb 0deg 360deg)';
-    let cursor = 0;
-    const stops = requestStatusChart.map((item) => {
-      const share = (item.value / requestStatusTotal) * 360;
-      const start = cursor;
-      cursor += share;
-      return `${item.color} ${start}deg ${cursor}deg`;
-    });
-    return `conic-gradient(${stops.join(', ')})`;
-  }, [requestStatusChart, requestStatusTotal]);
+  const requestsOverTimeSeries = React.useMemo(() => labels.map((_, index) => requestAnalytics.rows.filter((row) => {
+    const dt = row.submittedAt;
+    const bucket = chartBuckets[index];
+    return dt && dt >= bucket.start && dt <= bucket.end;
+  }).length), [chartBuckets, labels, requestAnalytics.rows]);
+  const compactAxisNumber = React.useCallback((value) => {
+    const amount = Number(value || 0);
+    if (Math.abs(amount) >= 1000000) return `${(amount / 1000000).toFixed(1).replace(/\.0$/, '')}m`;
+    if (Math.abs(amount) >= 1000) return `${(amount / 1000).toFixed(1).replace(/\.0$/, '')}k`;
+    return `${Math.round(amount)}`;
+  }, []);
+  const baseLineChartOptions = React.useMemo(() => ({
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: {
+      mode: 'index',
+      intersect: false,
+    },
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: {
+          color: '#475569',
+          usePointStyle: true,
+          boxWidth: 10,
+          boxHeight: 10,
+        },
+      },
+      tooltip: {
+        backgroundColor: '#0f172a',
+        titleColor: '#ffffff',
+        bodyColor: '#ffffff',
+        padding: 12,
+      },
+    },
+    scales: {
+      x: {
+        ticks: {
+          color: '#64748b',
+          maxRotation: 0,
+        },
+        grid: {
+          display: false,
+        },
+        border: {
+          display: false,
+        },
+      },
+      y: {
+        beginAtZero: true,
+        ticks: {
+          color: '#64748b',
+        },
+        grid: {
+          color: '#e2e8f0',
+          drawBorder: false,
+        },
+        border: {
+          display: false,
+        },
+      },
+    },
+  }), []);
+  const teamCompletionChartData = React.useMemo(() => ({
+    labels,
+    datasets: [
+      {
+        label: 'Created',
+        data: createdSeries,
+        borderColor: '#3b82f6',
+        backgroundColor: 'rgba(59, 130, 246, 0.18)',
+        tension: 0.35,
+        borderWidth: 3,
+        pointRadius: 3,
+        pointHoverRadius: 5,
+        fill: false,
+      },
+      {
+        label: 'Completed',
+        data: completedSeries,
+        borderColor: '#10b981',
+        backgroundColor: 'rgba(16, 185, 129, 0.18)',
+        tension: 0.35,
+        borderWidth: 3,
+        pointRadius: 3,
+        pointHoverRadius: 5,
+        fill: false,
+      },
+    ],
+  }), [labels, createdSeries, completedSeries]);
+  const teamCompletionChartOptions = React.useMemo(() => ({
+    ...baseLineChartOptions,
+    plugins: {
+      ...baseLineChartOptions.plugins,
+      tooltip: {
+        ...baseLineChartOptions.plugins.tooltip,
+        callbacks: {
+          label: (context) => `${context.dataset.label}: ${context.parsed.y}`,
+        },
+      },
+    },
+    scales: {
+      ...baseLineChartOptions.scales,
+      y: {
+        ...baseLineChartOptions.scales.y,
+        ticks: {
+          ...baseLineChartOptions.scales.y.ticks,
+          precision: 0,
+        },
+      },
+    },
+  }), [baseLineChartOptions]);
+  const preventiveReactiveChartData = React.useMemo(() => ({
+    labels: preventiveReactiveBars.map((entry) => entry.label),
+    datasets: [
+      {
+        label: 'Requests + Work Orders',
+        data: preventiveReactiveBars.map((entry) => entry.value),
+        backgroundColor: preventiveReactiveBars.map((entry) => entry.color),
+        borderRadius: 10,
+        borderSkipped: false,
+      },
+    ],
+  }), [preventiveReactiveBars]);
+  const preventiveReactiveChartOptions = React.useMemo(() => ({
+    ...baseLineChartOptions,
+    indexAxis: 'y',
+    plugins: {
+      ...baseLineChartOptions.plugins,
+      legend: {
+        display: false,
+      },
+      tooltip: {
+        ...baseLineChartOptions.plugins.tooltip,
+        callbacks: {
+          label: (context) => `${context.parsed.x} items`,
+        },
+      },
+    },
+    scales: {
+      x: {
+        ...baseLineChartOptions.scales.y,
+        ticks: {
+          ...baseLineChartOptions.scales.y.ticks,
+          precision: 0,
+        },
+      },
+      y: {
+        ...baseLineChartOptions.scales.x,
+      },
+    },
+  }), [baseLineChartOptions]);
+  const responseTimeChartData = React.useMemo(() => ({
+    labels,
+    datasets: [
+      {
+        label: 'Response Time (hrs)',
+        data: responseStats.series,
+        borderColor: '#2563eb',
+        backgroundColor: 'rgba(37, 99, 235, 0.16)',
+        tension: 0.35,
+        borderWidth: 3,
+        pointRadius: 3,
+        pointHoverRadius: 5,
+        fill: true,
+      },
+    ],
+  }), [labels, responseStats.series]);
+  const cycleTimeChartData = React.useMemo(() => ({
+    labels,
+    datasets: [
+      {
+        label: 'Cycle Time (hrs)',
+        data: cycleStats.series,
+        borderColor: '#10b981',
+        backgroundColor: 'rgba(16, 185, 129, 0.16)',
+        tension: 0.35,
+        borderWidth: 3,
+        pointRadius: 3,
+        pointHoverRadius: 5,
+        fill: true,
+      },
+    ],
+  }), [labels, cycleStats.series]);
+  const hoursChartOptions = React.useMemo(() => ({
+    ...baseLineChartOptions,
+    plugins: {
+      ...baseLineChartOptions.plugins,
+      legend: {
+        display: false,
+      },
+      tooltip: {
+        ...baseLineChartOptions.plugins.tooltip,
+        callbacks: {
+          label: (context) => `${formatMetricNumber(context.parsed.y, 1)} hrs`,
+        },
+      },
+    },
+    scales: {
+      ...baseLineChartOptions.scales,
+      y: {
+        ...baseLineChartOptions.scales.y,
+        ticks: {
+          ...baseLineChartOptions.scales.y.ticks,
+          callback: (value) => `${compactAxisNumber(value)}h`,
+        },
+      },
+    },
+  }), [baseLineChartOptions, compactAxisNumber, formatMetricNumber]);
+  const costSpendTrendChartData = React.useMemo(() => ({
+    labels,
+    datasets: [
+      {
+        label: 'All',
+        data: costSummary.weeklyTotals.map((entry) => entry.all),
+        borderColor: '#111827',
+        backgroundColor: 'rgba(17, 24, 39, 0.14)',
+        tension: 0.35,
+        borderWidth: 3,
+        pointRadius: 3,
+        pointHoverRadius: 5,
+        fill: false,
+      },
+      {
+        label: 'Preventive',
+        data: costSummary.weeklyTotals.map((entry) => entry.preventive),
+        borderColor: '#2563eb',
+        backgroundColor: 'rgba(37, 99, 235, 0.14)',
+        tension: 0.35,
+        borderWidth: 3,
+        pointRadius: 3,
+        pointHoverRadius: 5,
+        fill: false,
+      },
+      {
+        label: 'Reactive',
+        data: costSummary.weeklyTotals.map((entry) => entry.reactive),
+        borderColor: '#0f766e',
+        backgroundColor: 'rgba(15, 118, 110, 0.14)',
+        tension: 0.35,
+        borderWidth: 3,
+        pointRadius: 3,
+        pointHoverRadius: 5,
+        fill: false,
+      },
+    ],
+  }), [labels, costSummary.weeklyTotals]);
+  const currencyLineChartOptions = React.useMemo(() => ({
+    ...baseLineChartOptions,
+    plugins: {
+      ...baseLineChartOptions.plugins,
+      tooltip: {
+        ...baseLineChartOptions.plugins.tooltip,
+        callbacks: {
+          label: (context) => `${context.dataset.label}: ${formatCost(context.parsed.y)}`,
+        },
+      },
+    },
+    scales: {
+      ...baseLineChartOptions.scales,
+      y: {
+        ...baseLineChartOptions.scales.y,
+        ticks: {
+          ...baseLineChartOptions.scales.y.ticks,
+          callback: (value) => compactAxisNumber(value),
+        },
+      },
+    },
+  }), [baseLineChartOptions, compactAxisNumber, formatCost]);
+  const requestStatusChartData = React.useMemo(() => ({
+    labels: requestStatusChart.map((item) => item.label),
+    datasets: [
+      {
+        label: 'Requests',
+        data: requestStatusChart.map((item) => item.value),
+        backgroundColor: requestStatusChart.map((item) => item.color),
+        borderRadius: 10,
+        borderSkipped: false,
+      },
+    ],
+  }), [requestStatusChart]);
+  const requestStatusChartOptions = React.useMemo(() => ({
+    ...baseLineChartOptions,
+    indexAxis: 'y',
+    plugins: {
+      ...baseLineChartOptions.plugins,
+      legend: {
+        display: false,
+      },
+      tooltip: {
+        ...baseLineChartOptions.plugins.tooltip,
+        callbacks: {
+          label: (context) => `${context.parsed.x} requests`,
+        },
+      },
+    },
+    scales: {
+      x: {
+        ...baseLineChartOptions.scales.y,
+        ticks: {
+          ...baseLineChartOptions.scales.y.ticks,
+          precision: 0,
+        },
+      },
+      y: {
+        ...baseLineChartOptions.scales.x,
+      },
+    },
+  }), [baseLineChartOptions]);
+  const requestsOverTimeChartData = React.useMemo(() => ({
+    labels,
+    datasets: [
+      {
+        label: 'Requests',
+        data: requestsOverTimeSeries,
+        borderColor: '#2563eb',
+        backgroundColor: 'rgba(37, 99, 235, 0.16)',
+        tension: 0.35,
+        borderWidth: 3,
+        pointRadius: 3,
+        pointHoverRadius: 5,
+        fill: true,
+      },
+    ],
+  }), [labels, requestsOverTimeSeries]);
+  const miniPieChartOptions = React.useMemo(() => ({
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        display: false,
+      },
+      tooltip: {
+        backgroundColor: '#0f172a',
+        titleColor: '#ffffff',
+        bodyColor: '#ffffff',
+        padding: 12,
+        callbacks: {
+          label: (context) => {
+            const dataset = context.dataset?.data || [];
+            const total = dataset.reduce((sum, value) => sum + Number(value || 0), 0);
+            const value = Number(context.parsed || 0);
+            const share = total ? Math.round((value / total) * 100) : 0;
+            return `${context.label}: ${value} (${share}%)`;
+          },
+        },
+      },
+    },
+  }), []);
+  const backlogPriorityPieData = React.useMemo(() => ({
+    labels: backlogByPriority.map((entry) => entry.label),
+    datasets: [
+      {
+        data: backlogByPriority.map((entry) => entry.value),
+        backgroundColor: backlogByPriority.map((entry) => entry.color),
+        borderColor: '#ffffff',
+        borderWidth: 2,
+      },
+    ],
+  }), [backlogByPriority]);
+  const preventiveReactivePieData = React.useMemo(() => ({
+    labels: preventiveReactiveBars.map((entry) => entry.label),
+    datasets: [
+      {
+        data: preventiveReactiveBars.map((entry) => entry.value),
+        backgroundColor: preventiveReactiveBars.map((entry) => entry.color),
+        borderColor: '#ffffff',
+        borderWidth: 2,
+      },
+    ],
+  }), [preventiveReactiveBars]);
 
   const userHoursSeries = React.useMemo(() => {
     const buckets = labels.map(() => 0);
@@ -37925,7 +38373,7 @@ const ClientAnalyticsTab = ({
         </div>
       </div>
 
-      <div className="p-6 flex flex-col gap-6">
+      <div className="px-6 pb-6 pt-2 flex flex-col gap-4">
         {isCustomDashboardView ? (
           <>
             {isEditingCustomDashboard ? (
@@ -38047,7 +38495,7 @@ const ClientAnalyticsTab = ({
             )}
           </>
         ) : (
-          <>
+          <div className="mt-3">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">{activeDashboardLabel}</h2>
           <p className="text-sm text-gray-500 mt-1">Company-scoped analytics for your maintenance operations.</p>
@@ -38265,24 +38713,14 @@ const ClientAnalyticsTab = ({
                     <p className="mt-1 text-sm font-semibold text-emerald-700">Completed</p>
                   </div>
                 </div>
-                <div className="overflow-x-auto">
-                  <svg viewBox={`0 0 ${lineChartWidth} ${lineChartHeight}`} className="w-full min-w-[620px] h-[230px]">
-                    {[0, 1, 2, 3, 4].map((step) => {
-                      const y = linePadding + (linePlotHeight / 4) * step;
-                      return <line key={step} x1={linePadding} y1={y} x2={lineChartWidth - linePadding} y2={y} stroke="#e5e7eb" strokeDasharray="4 4" />;
-                    })}
-                    <path d={toLinePath(createdSeries)} fill="none" stroke="#3b82f6" strokeWidth="3" strokeLinecap="round" />
-                    <path d={toLinePath(completedSeries)} fill="none" stroke="#10b981" strokeWidth="3" strokeLinecap="round" />
-                    {labels.map((label, index) => (
-                      <text key={label} x={linePadding + index * xStep} y={lineChartHeight - 6} textAnchor="middle" className="fill-gray-400 text-[10px]">
-                        {label}
-                      </text>
-                    ))}
-                  </svg>
-                </div>
-                <div className="mt-4 flex items-center gap-4 text-xs font-medium text-gray-500">
-                  <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-blue-500 inline-block rounded" />Created</span>
-                  <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-emerald-500 inline-block rounded" />Completed</span>
+                <div className="h-[230px]">
+                  <Chart
+                    type="line"
+                    data={teamCompletionChartData}
+                    options={teamCompletionChartOptions}
+                    className="h-full w-full"
+                    pt={{ canvas: { role: 'img', 'aria-label': 'Work order completion rate chart' } }}
+                  />
                 </div>
               </div>
 
@@ -38291,25 +38729,23 @@ const ClientAnalyticsTab = ({
                   <p className="text-sm font-bold text-gray-700">Preventive vs Reactive Mix</p>
                   <span className="text-xs font-semibold text-gray-400">{totalPreventive + totalReactive} requests + work orders</span>
                 </div>
-                <div className="grid grid-cols-[1.1fr_0.9fr] gap-5 items-center">
-                  <div className="flex items-center justify-center">
-                    <div className="relative flex h-48 w-48 items-center justify-center rounded-full" style={donutStyle('#1d4ed8', '#93c5fd', preventiveShare || 0)}>
-                      <div className="flex h-28 w-28 items-center justify-center rounded-full bg-white shadow-inner">
-                        <div className="text-center">
-                          <p className="text-3xl font-black text-gray-900">{preventiveShare}%</p>
-                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-400">Preventive</p>
-                        </div>
+                <div className="space-y-4">
+                  <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                    <div className="mb-2 flex items-end justify-between gap-3">
+                      <div>
+                        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-gray-500">Share Split</p>
+                        <p className="mt-2 text-3xl font-black text-gray-900">{preventiveShare}%</p>
+                        <p className="text-sm text-gray-500">Preventive share of all maintenance activity</p>
                       </div>
                     </div>
-                  </div>
-                  <div className="space-y-3">
-                    <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
-                      <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600">Preventive</p>
-                      <p className="mt-2 text-3xl font-black text-blue-700">{totalPreventive}</p>
-                    </div>
-                    <div className="rounded-xl border border-sky-100 bg-sky-50 p-4">
-                      <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-sky-500">Reactive</p>
-                      <p className="mt-2 text-3xl font-black text-sky-600">{totalReactive}</p>
+                    <div className="h-[190px]">
+                      <Chart
+                        type="bar"
+                        data={preventiveReactiveChartData}
+                        options={preventiveReactiveChartOptions}
+                        className="h-full w-full"
+                        pt={{ canvas: { role: 'img', 'aria-label': 'Preventive versus reactive maintenance chart' } }}
+                      />
                     </div>
                   </div>
                 </div>
@@ -38390,19 +38826,14 @@ const ClientAnalyticsTab = ({
                     </div>
                   ))}
                 </div>
-                <div className="overflow-x-auto">
-                  <svg viewBox={`0 0 ${lineChartWidth} ${lineChartHeight}`} className="w-full min-w-[620px] h-[230px]">
-                    {[0, 1, 2, 3, 4].map((step) => {
-                      const y = linePadding + (linePlotHeight / 4) * step;
-                      return <line key={step} x1={linePadding} y1={y} x2={lineChartWidth - linePadding} y2={y} stroke="#e5e7eb" strokeDasharray="4 4" />;
-                    })}
-                    <path d={buildMetricPath(responseStats.series)} fill="none" stroke="#2563eb" strokeWidth="3" strokeLinecap="round" />
-                    {labels.map((label, index) => (
-                      <text key={label} x={linePadding + index * xStep} y={lineChartHeight - 6} textAnchor="middle" className="fill-gray-400 text-[10px]">
-                        {label}
-                      </text>
-                    ))}
-                  </svg>
+                <div className="h-[230px]">
+                  <Chart
+                    type="line"
+                    data={responseTimeChartData}
+                    options={hoursChartOptions}
+                    className="h-full w-full"
+                    pt={{ canvas: { role: 'img', 'aria-label': 'Work order request response time chart' } }}
+                  />
                 </div>
               </div>
 
@@ -38423,19 +38854,14 @@ const ClientAnalyticsTab = ({
                     </div>
                   ))}
                 </div>
-                <div className="overflow-x-auto">
-                  <svg viewBox={`0 0 ${lineChartWidth} ${lineChartHeight}`} className="w-full min-w-[620px] h-[230px]">
-                    {[0, 1, 2, 3, 4].map((step) => {
-                      const y = linePadding + (linePlotHeight / 4) * step;
-                      return <line key={step} x1={linePadding} y1={y} x2={lineChartWidth - linePadding} y2={y} stroke="#e5e7eb" strokeDasharray="4 4" />;
-                    })}
-                    <path d={buildMetricPath(cycleStats.series)} fill="none" stroke="#10b981" strokeWidth="3" strokeLinecap="round" />
-                    {labels.map((label, index) => (
-                      <text key={label} x={linePadding + index * xStep} y={lineChartHeight - 6} textAnchor="middle" className="fill-gray-400 text-[10px]">
-                        {label}
-                      </text>
-                    ))}
-                  </svg>
+                <div className="h-[230px]">
+                  <Chart
+                    type="line"
+                    data={cycleTimeChartData}
+                    options={hoursChartOptions}
+                    className="h-full w-full"
+                    pt={{ canvas: { role: 'img', 'aria-label': 'Work order cycle time chart' } }}
+                  />
                 </div>
               </div>
             </div>
@@ -38458,30 +38884,63 @@ const ClientAnalyticsTab = ({
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div className="rounded-2xl border border-gray-100 p-4">
                       <p className="text-sm font-bold text-gray-700 mb-4">Priority</p>
-                      <div className="flex items-center justify-center">
-                        <div
-                          className="h-36 w-36 rounded-full sm:h-40 sm:w-40 lg:h-44 lg:w-44"
-                          style={priorityDonutStyle}
-                        >
-                          <div className="m-5 flex h-[104px] w-[104px] items-center justify-center rounded-full bg-white text-center sm:m-6 sm:h-[112px] sm:w-[112px] lg:m-7 lg:h-[120px] lg:w-[120px]">
-                            <div>
-                              <p className="text-2xl font-black text-gray-900 sm:text-3xl">{backlogTotal}</p>
-                              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-400">Backlog</p>
+                      <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                        <div className="mb-3 flex items-center justify-between">
+                          <span className="text-sm font-semibold text-gray-600">Open work orders</span>
+                          <span className="text-2xl font-black text-gray-900">{backlogTotal}</span>
+                        </div>
+                        <div className="mb-4 h-[170px]">
+                          <Chart
+                            type="pie"
+                            data={backlogPriorityPieData}
+                            options={miniPieChartOptions}
+                            className="h-full w-full"
+                            pt={{ canvas: { role: 'img', 'aria-label': 'Open work order priority pie chart' } }}
+                          />
+                        </div>
+                        <div className="space-y-3">
+                          {backlogPriorityBars.map((entry) => (
+                            <div key={entry.label}>
+                              <div className="mb-1.5 flex items-center justify-between text-sm">
+                                <span className="font-semibold text-gray-700">{entry.label}</span>
+                                <span className="font-black" style={{ color: entry.color }}>{entry.value} ({entry.share}%)</span>
+                              </div>
+                              <div className="h-3 overflow-hidden rounded-full bg-white">
+                                <div className="h-full rounded-full" style={{ width: `${entry.share}%`, backgroundColor: entry.color }} />
+                              </div>
                             </div>
-                          </div>
+                          ))}
                         </div>
                       </div>
                     </div>
                     <div className="rounded-2xl border border-gray-100 p-4">
                       <p className="text-sm font-bold text-gray-700 mb-4">Preventive vs Reactive</p>
-                      <div className="flex items-center justify-center">
-                        <div className="h-36 w-36 rounded-full sm:h-40 sm:w-40 lg:h-44 lg:w-44" style={donutStyle('#1d4ed8', '#93c5fd', preventiveShare || 0)}>
-                          <div className="m-5 flex h-[104px] w-[104px] items-center justify-center rounded-full bg-white text-center sm:m-6 sm:h-[112px] sm:w-[112px] lg:m-7 lg:h-[120px] lg:w-[120px]">
-                            <div>
-                              <p className="text-2xl font-black text-gray-900 sm:text-3xl">{preventiveShare}%</p>
-                              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-400">Preventive</p>
+                      <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                        <div className="mb-3 flex items-center justify-between">
+                          <span className="text-sm font-semibold text-gray-600">Preventive share</span>
+                          <span className="text-2xl font-black text-gray-900">{preventiveShare}%</span>
+                        </div>
+                        <div className="mb-4 h-[170px]">
+                          <Chart
+                            type="pie"
+                            data={preventiveReactivePieData}
+                            options={miniPieChartOptions}
+                            className="h-full w-full"
+                            pt={{ canvas: { role: 'img', 'aria-label': 'Preventive versus reactive pie chart' } }}
+                          />
+                        </div>
+                        <div className="space-y-3">
+                          {preventiveReactiveBars.map((entry) => (
+                            <div key={entry.label}>
+                              <div className="mb-1.5 flex items-center justify-between text-sm">
+                                <span className="font-semibold text-gray-700">{entry.label}</span>
+                                <span className="font-black" style={{ color: entry.color }}>{entry.value}</span>
+                              </div>
+                              <div className="h-3 overflow-hidden rounded-full bg-white">
+                                <div className="h-full rounded-full" style={{ width: `${entry.share}%`, backgroundColor: entry.color }} />
+                              </div>
                             </div>
-                          </div>
+                          ))}
                         </div>
                       </div>
                     </div>
@@ -38548,26 +39007,14 @@ const ClientAnalyticsTab = ({
                   <p className="text-sm font-bold text-gray-700">Maintenance Spend Trend</p>
                   <span className="text-xs font-semibold text-gray-400">{costSummary.workOrderCount} costed work orders</span>
                 </div>
-                <div className="overflow-x-auto">
-                  <svg viewBox={`0 0 ${lineChartWidth} ${lineChartHeight}`} className="w-full min-w-[620px] h-[230px]">
-                    {[0, 1, 2, 3, 4].map((step) => {
-                      const y = linePadding + (linePlotHeight / 4) * step;
-                      return <line key={step} x1={linePadding} y1={y} x2={lineChartWidth - linePadding} y2={y} stroke="#e5e7eb" strokeDasharray="4 4" />;
-                    })}
-                    <path d={buildMetricPath(costSummary.weeklyTotals.map((entry) => entry.all))} fill="none" stroke="#111827" strokeWidth="3" strokeLinecap="round" />
-                    <path d={buildMetricPath(costSummary.weeklyTotals.map((entry) => entry.preventive))} fill="none" stroke="#2563eb" strokeWidth="3" strokeLinecap="round" />
-                    <path d={buildMetricPath(costSummary.weeklyTotals.map((entry) => entry.reactive))} fill="none" stroke="#0f766e" strokeWidth="3" strokeLinecap="round" />
-                    {labels.map((label, index) => (
-                      <text key={label} x={linePadding + index * xStep} y={lineChartHeight - 6} textAnchor="middle" className="fill-gray-400 text-[10px]">
-                        {label}
-                      </text>
-                    ))}
-                  </svg>
-                </div>
-                <div className="mt-4 flex flex-wrap items-center gap-4 text-xs font-medium text-gray-500">
-                  <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-gray-900 inline-block rounded" />All</span>
-                  <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-blue-600 inline-block rounded" />Preventive</span>
-                  <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-teal-600 inline-block rounded" />Reactive</span>
+                <div className="h-[230px]">
+                  <Chart
+                    type="line"
+                    data={costSpendTrendChartData}
+                    options={currencyLineChartOptions}
+                    className="h-full w-full"
+                    pt={{ canvas: { role: 'img', 'aria-label': 'Maintenance spend trend chart' } }}
+                  />
                 </div>
               </div>
 
@@ -39150,23 +39597,37 @@ const ClientAnalyticsTab = ({
                 )}
               </div>
 
-              {/* Compliance Rate Donut */}
-              <div className="bg-white border border-gray-100 rounded-2xl p-8 shadow-sm flex flex-col items-center justify-center">
+              <div className="bg-white border border-gray-100 rounded-2xl p-8 shadow-sm">
                 <div className="flex items-center justify-center gap-2 mb-10">
                   <h3 className="text-base font-bold text-gray-800">Compliance Rate</h3>
                   <Info className="w-4 h-4 text-gray-400" />
                 </div>
                 {maintenanceComplianceData.totalCompleted > 0 ? (
-                  <div className="flex items-center justify-center">
-                    <div
-                      className="h-48 w-48 rounded-full flex items-center justify-center relative"
-                      style={{
-                        background: `conic-gradient(#10b981 0deg ${maintenanceComplianceData.complianceRate * 3.6}deg, #ef4444 ${maintenanceComplianceData.complianceRate * 3.6}deg 360deg)`,
-                      }}
-                    >
-                      <div className="w-32 h-32 bg-white rounded-full flex items-center justify-center">
-                        <span className="text-4xl font-black text-gray-900">{maintenanceComplianceData.complianceRate}%</span>
-                      </div>
+                  <div className="space-y-5">
+                    <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-6 text-center">
+                      <p className="text-5xl font-black text-emerald-700">{maintenanceComplianceData.complianceRate}%</p>
+                      <p className="mt-2 text-sm font-semibold text-emerald-700">Completed work orders on time</p>
+                    </div>
+                    <div className="space-y-3">
+                      {[
+                        { label: 'Compliant', value: maintenanceComplianceData.totalCompliant, color: '#10b981' },
+                        { label: 'Non-Compliant', value: maintenanceComplianceData.totalNonCompliant, color: '#ef4444' },
+                      ].map((item) => {
+                        const share = maintenanceComplianceData.totalCompleted
+                          ? Math.round((item.value / maintenanceComplianceData.totalCompleted) * 100)
+                          : 0;
+                        return (
+                          <div key={item.label}>
+                            <div className="mb-1.5 flex items-center justify-between text-sm">
+                              <span className="font-semibold text-gray-700">{item.label}</span>
+                              <span className="font-black" style={{ color: item.color }}>{item.value} ({share}%)</span>
+                            </div>
+                            <div className="h-3 overflow-hidden rounded-full bg-gray-100">
+                              <div className="h-full rounded-full" style={{ width: `${share}%`, backgroundColor: item.color }} />
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 ) : (
@@ -39179,23 +39640,26 @@ const ClientAnalyticsTab = ({
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Schedule Compliance */}
-              <div className="bg-white border border-gray-100 rounded-2xl p-8 shadow-sm flex flex-col items-center justify-center">
+              <div className="bg-white border border-gray-100 rounded-2xl p-8 shadow-sm">
                 <div className="flex items-center justify-center gap-2 mb-10">
                   <h3 className="text-base font-bold text-gray-800">Schedule Compliance</h3>
                   <Info className="w-4 h-4 text-gray-400" />
                 </div>
                 {maintenanceComplianceData.scheduleComplianceRate !== undefined ? (
-                  <div className="flex items-center justify-center">
-                    <div
-                      className="h-48 w-48 rounded-full flex items-center justify-center relative"
-                      style={{
-                        background: `conic-gradient(#06b6d4 0deg ${maintenanceComplianceData.scheduleComplianceRate * 3.6}deg, #e5e7eb ${maintenanceComplianceData.scheduleComplianceRate * 3.6}deg 360deg)`,
-                      }}
-                    >
-                      <div className="w-32 h-32 bg-white rounded-full flex items-center justify-center">
-                        <span className="text-4xl font-black text-gray-900">{maintenanceComplianceData.scheduleComplianceRate}%</span>
+                  <div className="space-y-5">
+                    <div className="rounded-2xl border border-cyan-100 bg-cyan-50 p-6 text-center">
+                      <p className="text-5xl font-black text-cyan-700">{maintenanceComplianceData.scheduleComplianceRate}%</p>
+                      <p className="mt-2 text-sm font-semibold text-cyan-700">Preventive work completed on schedule</p>
+                    </div>
+                    <div>
+                      <div className="mb-1.5 flex items-center justify-between text-sm">
+                        <span className="font-semibold text-gray-700">Schedule adherence</span>
+                        <span className="font-black text-cyan-700">{maintenanceComplianceData.scheduleComplianceRate}%</span>
                       </div>
+                      <div className="h-3 overflow-hidden rounded-full bg-gray-100">
+                        <div className="h-full rounded-full bg-cyan-500" style={{ width: `${maintenanceComplianceData.scheduleComplianceRate}%` }} />
+                      </div>
+                      <p className="mt-2 text-xs text-gray-500">Based on completed preventive maintenance work orders in the selected range.</p>
                     </div>
                   </div>
                 ) : (
@@ -40077,22 +40541,19 @@ const ClientAnalyticsTab = ({
                   <p className="text-sm font-bold text-gray-700">Request Status Mix</p>
                   <span className="text-xs font-semibold text-gray-400">{requestStatusTotal} requests</span>
                 </div>
-                <div className="flex flex-col items-center gap-5 py-4">
-                  <div className="h-44 w-44 rounded-full" style={{ background: requestStatusDonut }}>
-                    <div className="m-7 flex h-[120px] w-[120px] items-center justify-center rounded-full bg-white text-center">
-                      <div>
-                        <p className="text-3xl font-black text-gray-900">{requestAnalytics.submitted}</p>
-                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-400">Requests</p>
-                      </div>
-                    </div>
+                <div className="space-y-4 py-2">
+                  <div className="rounded-2xl border border-gray-100 bg-gray-50 p-5 text-center">
+                    <p className="text-4xl font-black text-gray-900">{requestAnalytics.submitted}</p>
+                    <p className="mt-2 text-xs font-semibold uppercase tracking-[0.16em] text-gray-400">Requests Submitted</p>
                   </div>
-                  <div className="flex flex-wrap items-center justify-center gap-4 text-xs font-medium text-gray-500">
-                    {requestStatusChart.map((item) => (
-                      <span key={item.label} className="flex items-center gap-2">
-                        <span className="h-3 w-3 rounded-full" style={{ backgroundColor: item.color }} />
-                        {item.label}
-                      </span>
-                    ))}
+                  <div className="h-[220px]">
+                    <Chart
+                      type="bar"
+                      data={requestStatusChartData}
+                      options={requestStatusChartOptions}
+                      className="h-full w-full"
+                      pt={{ canvas: { role: 'img', 'aria-label': 'Request status mix chart' } }}
+                    />
                   </div>
                 </div>
               </div>
@@ -40101,23 +40562,14 @@ const ClientAnalyticsTab = ({
                   <p className="text-sm font-bold text-gray-700">Requests Over Time</p>
                   <span className="text-xs font-semibold text-gray-400">{labels.length} buckets</span>
                 </div>
-                <div className="overflow-x-auto">
-                  <svg viewBox={`0 0 ${lineChartWidth} ${lineChartHeight}`} className="w-full min-w-[620px] h-[230px]">
-                    {[0, 1, 2, 3, 4].map((step) => {
-                      const y = linePadding + (linePlotHeight / 4) * step;
-                      return <line key={step} x1={linePadding} y1={y} x2={lineChartWidth - linePadding} y2={y} stroke="#e5e7eb" strokeDasharray="4 4" />;
-                    })}
-                    <path d={buildMetricPath(labels.map((_, index) => requestAnalytics.rows.filter((row) => {
-                      const dt = row.submittedAt;
-                      const bucket = chartBuckets[index];
-                      return dt && dt >= bucket.start && dt <= bucket.end;
-                    }).length))} fill="none" stroke="#2563eb" strokeWidth="3" strokeLinecap="round" />
-                    {labels.map((label, index) => (
-                      <text key={label} x={linePadding + index * xStep} y={lineChartHeight - 6} textAnchor="middle" className="fill-gray-400 text-[10px]">
-                        {label}
-                      </text>
-                    ))}
-                  </svg>
+                <div className="h-[230px]">
+                  <Chart
+                    type="line"
+                    data={requestsOverTimeChartData}
+                    options={teamCompletionChartOptions}
+                    className="h-full w-full"
+                    pt={{ canvas: { role: 'img', 'aria-label': 'Requests over time chart' } }}
+                  />
                 </div>
               </div>
             </div>
@@ -40401,7 +40853,7 @@ const ClientAnalyticsTab = ({
             </div>
           </div>
         )}
-          </>
+          </div>
         )}
       </div>
 
