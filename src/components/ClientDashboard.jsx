@@ -13870,8 +13870,19 @@ function ClientDashboard() {
       const cmp = String(companyName).toLowerCase();
       return items.filter(issue => {
         const issueCompany = String(issue.companyName || '').toLowerCase();
-        // Strict matching: if user has a company, only show issues for that company.
-        return issueCompany === cmp;
+        const issuePropertyId = issue.propertyId || issue.property?._id || issue.property?.id;
+        const issueAssetId = issue.assetId || issue.asset?._id || issue.asset?.id;
+        return (
+          issueCompany === cmp ||
+          matchesUser(issue.userId, userId) ||
+          matchesUser(issue.clientId, userId) ||
+          matchesUser(issue.requestedBy, userId) ||
+          matchesUser(issue.createdBy, userId) ||
+          matchesUser(issue.reporterId, userId) ||
+          matchesUser(issue.requestorId, userId) ||
+          (propertyIds || []).includes(String(issuePropertyId)) ||
+          (assetIds || []).includes(String(issueAssetId))
+        );
       });
     }
     // If we have no way to scope (anonymous client creating first request), show all so the user sees their submission.
@@ -14675,9 +14686,11 @@ function ClientDashboard() {
     };
 
     refreshIssues();
+    const intervalId = window.setInterval(refreshIssues, 30000);
     if (typeof window !== 'undefined') window.addEventListener('focus', refreshIssues);
     if (typeof document !== 'undefined') document.addEventListener('visibilitychange', refreshIssues);
     return () => {
+      window.clearInterval(intervalId);
       if (typeof window !== 'undefined') window.removeEventListener('focus', refreshIssues);
       if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', refreshIssues);
     };
