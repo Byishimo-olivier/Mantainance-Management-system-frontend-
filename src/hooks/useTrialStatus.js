@@ -14,11 +14,19 @@ let trialStatusPendingPromise = null;
 const useTrialStatus = () => {
   const [trialStatus, setTrialStatus] = useState(trialStatusCache);
   const [loading, setLoading] = useState(!trialStatusCache);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
 
   const fetchTrialStatus = useCallback(async () => {
+    const hasCachedStatus = Boolean(trialStatusCache);
+
     try {
-      setLoading(true);
+      if (hasCachedStatus) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+
       if (!trialStatusPendingPromise) {
         trialStatusPendingPromise = subscriptionAPI.getTrialStatus();
       }
@@ -31,11 +39,16 @@ const useTrialStatus = () => {
     } catch (err) {
       console.error('Failed to fetch trial status:', err);
       setError(err?.message || 'Failed to fetch trial status');
-      setTrialStatus(null);
-      trialStatusCache = null;
+      if (!hasCachedStatus) {
+        setTrialStatus(null);
+        trialStatusCache = null;
+      }
     } finally {
       trialStatusPendingPromise = null;
-      setLoading(false);
+      setRefreshing(false);
+      if (!hasCachedStatus) {
+        setLoading(false);
+      }
     }
   }, []);
 
@@ -58,6 +71,7 @@ const useTrialStatus = () => {
     hasExpired: trialStatus?.trialExceeded === true,
     daysRemaining: trialStatus?.daysRemaining || 0,
     loading,
+    refreshing,
     error,
     refetch: fetchTrialStatus,
   };

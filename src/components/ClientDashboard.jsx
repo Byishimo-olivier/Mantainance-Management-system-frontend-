@@ -7239,16 +7239,6 @@ function ClientDashboard() {
   }, [location.search]);
 
   useEffect(() => {
-    if (trialStatusLoading || subscriptionVisibilityLoading) {
-      return;
-    }
-
-    if (!isInTrial && !hasPaidSubscription) {
-      navigate('/subscription', { replace: true });
-    }
-  }, [hasPaidSubscription, isInTrial, navigate, subscriptionVisibilityLoading, trialStatusLoading]);
-
-  useEffect(() => {
     if (activeTab === 'subscription') {
       setHasVisitedSubscriptionTab(true);
     }
