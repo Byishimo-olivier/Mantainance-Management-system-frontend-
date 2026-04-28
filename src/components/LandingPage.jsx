@@ -13,6 +13,7 @@ import ChristianImage from '../assets/Mugisha king christian.jpeg';
 import PatrickImage from '../assets/Mbabazi Patrick.jpeg';
 import MirellieImage from '../assets/Umugwaneza mirellie.jpeg';
 import LauretteImage from '../assets/Kazenga Laurette.jpeg';
+import KelliaImage from '../assets/Kellia.jpeg';
 import DashboardScreenshot from '../assets/Dashboard.png';
 import RequestScreenshot from '../assets/Request.png';
 import AssetScreenshot from '../assets/Asset55.png';
@@ -35,6 +36,13 @@ const teamMembers = [
     bio: 'Expert software engineer building the robust technical foundation of Fixnest.',
     image: OlivierImage,
     accent: 'text-purple-600',
+  },
+  {
+    name: 'Kellia Ruzibiza',
+    role: 'Software Developer',
+    bio: 'Develops innovative features and maintains code quality, contributing to the technical excellence of Fixnest.',
+    image: KelliaImage,
+    accent: 'text-cyan-600',
   },
   {
     name: 'Byaruhanga Shema',
@@ -71,6 +79,7 @@ const teamMembers = [
     image: LauretteImage,
     accent: 'text-amber-600',
   },
+  
 ];
 
 const products = [
