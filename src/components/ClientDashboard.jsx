@@ -14982,10 +14982,13 @@ function ClientDashboard() {
       tone: 'danger',
       onConfirm: async () => {
         try {
-          await api.delete(`/api/users/invites/${id}`);
+          console.log('Deleting invite with id:', id);
+          const response = await api.delete(`/api/users/invites/${id}`);
+          console.log('Delete invite response:', response);
           await refreshPeople();
           closeDashboardConfirmDialog();
         } catch (err) {
+          console.error('Delete invite error:', err);
           alert('Delete failed: ' + (err?.response?.data?.error || err?.response?.data?.message || err.message));
         }
       },
@@ -15012,25 +15015,48 @@ function ClientDashboard() {
     });
   }, [closeDashboardConfirmDialog, openDashboardConfirmDialog, refreshTeams]);
 
-  const handleRemovePerson = useCallback(async (id) => {
+  const handleRemovePerson = useCallback(async (id, personObj = null) => {
     if (!id) return;
+    
+    // Check if this is an invite
+    const isInvite = personObj && (
+      personObj.kind === 'invite' || 
+      String(personObj.status || '').toLowerCase() === 'invited' ||
+      personObj.token !== undefined || 
+      personObj.used !== undefined
+    );
+    
+    const title = isInvite ? 'Delete Invitation?' : 'Delete Person?';
+    const message = isInvite 
+      ? 'Deleting this invitation removes it permanently. This action cannot be undone.'
+      : 'Deleting this person removes them permanently. This action cannot be undone.';
+    
     openDashboardConfirmDialog({
-      title: 'Delete Person?',
-      message: 'Deleting this person removes them permanently. This action cannot be undone.',
+      title,
+      message,
       confirmLabel: 'Delete',
       cancelLabel: 'Cancel',
       tone: 'danger',
       onConfirm: async () => {
         try {
-          // Try deleting as technician first, then as user if that fails
-          try {
-            await api.delete(`/api/technicians/${id}`);
-          } catch (err) {
-            await api.delete(`/api/users/${id}`);
+          console.log('Deleting person:', { id, isInvite });
+          
+          if (isInvite) {
+            // Delete from invites collection
+            await api.delete(`/api/users/invites/${id}`);
+          } else {
+            // Try deleting as technician first, then as user if that fails
+            try {
+              await api.delete(`/api/technicians/${id}`);
+            } catch (err) {
+              await api.delete(`/api/users/${id}`);
+            }
           }
+          
           await refreshPeople();
           closeDashboardConfirmDialog();
         } catch (err) {
+          console.error('Delete person error:', err);
           alert('Delete failed: ' + (err?.response?.data?.error || err?.response?.data?.message || err.message));
         }
       },
@@ -28738,7 +28764,7 @@ function ClientDashboard() {
                                     {visiblePeopleDirectoryColumns.dateCreated && <td className="px-6 py-5 text-[1.05rem] text-gray-900">{person.createdAt ? new Date(person.createdAt).toLocaleDateString() : '—'}</td>}
                                     {visiblePeopleDirectoryColumns.categories && <td className="px-6 py-5 text-[1.05rem] text-gray-900">{categories}</td>}
                                     <td className="px-6 py-5 text-right">
-                                      <button type="button" onClick={(event) => { event.stopPropagation(); handleRemovePerson(person._id || person.id); }} className="rounded-xl border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50">
+                                      <button type="button" onClick={(event) => { event.stopPropagation(); handleRemovePerson(person._id || person.id, person); }} className="rounded-xl border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50">
                                         Delete
                                       </button>
                                     </td>
@@ -29000,7 +29026,27 @@ function ClientDashboard() {
                                   type="button"
                                   onClick={async () => {
                                     const personId = selectedDirectoryPerson._id || selectedDirectoryPerson.id;
-                                    if (selectedDirectoryPerson.kind === 'invite') {
+                                    // Debug: log the person object
+                                    console.log('Selected person for deletion:', {
+                                      id: personId,
+                                      kind: selectedDirectoryPerson.kind,
+                                      status: selectedDirectoryPerson.status,
+                                      token: selectedDirectoryPerson.token,
+                                      used: selectedDirectoryPerson.used,
+                                      email: selectedDirectoryPerson.email
+                                    });
+                                    
+                                    // Check if this is an invite record
+                                    const isInvite = (
+                                      selectedDirectoryPerson.kind === 'invite' || 
+                                      String(selectedDirectoryPerson.status || '').toLowerCase() === 'invited' ||
+                                      selectedDirectoryPerson.token !== undefined || 
+                                      selectedDirectoryPerson.used !== undefined
+                                    );
+                                    
+                                    console.log('Is invite?', isInvite);
+                                    
+                                    if (isInvite) {
                                       handleDeletePerson(personId);
                                       closeDirectoryPersonDetails();
                                       return;
