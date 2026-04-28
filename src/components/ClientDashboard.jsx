@@ -46905,8 +46905,11 @@ function CalendarScheduleModal({ open, onClose, scheduleConfig, setScheduleConfi
   const [recurrenceMaxOccurrences, setRecurrenceMaxOccurrences] = React.useState(scheduleConfig?.calendarRule?.recurrenceMaxOccurrences || '');
   const [selectedWeekDays, setSelectedWeekDays] = React.useState(scheduleConfig?.calendarRule?.selectedWeekDays || []);
   const [selectedMonthDay, setSelectedMonthDay] = React.useState(scheduleConfig?.calendarRule?.selectedMonthDay || '1');
+  const [selectedYearMonth, setSelectedYearMonth] = React.useState(scheduleConfig?.calendarRule?.selectedYearMonth || '1');
+  const [selectedYearDay, setSelectedYearDay] = React.useState(scheduleConfig?.calendarRule?.selectedYearDay || '1');
   
   const weekDays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const monthOptions = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
   React.useEffect(() => {
     if (!open) return;
@@ -46922,6 +46925,8 @@ function CalendarScheduleModal({ open, onClose, scheduleConfig, setScheduleConfi
     setRecurrenceMaxOccurrences(scheduleConfig?.calendarRule?.recurrenceMaxOccurrences || '');
     setSelectedWeekDays(scheduleConfig?.calendarRule?.selectedWeekDays || []);
     setSelectedMonthDay(scheduleConfig?.calendarRule?.selectedMonthDay || '1');
+    setSelectedYearMonth(scheduleConfig?.calendarRule?.selectedYearMonth || '1');
+    setSelectedYearDay(scheduleConfig?.calendarRule?.selectedYearDay || '1');
   }, [open, scheduleConfig, resetKey]);
 
   const toggleWeekDay = (dayIndex) => {
@@ -46934,11 +46939,22 @@ function CalendarScheduleModal({ open, onClose, scheduleConfig, setScheduleConfi
   };
 
   const saveAndClose = () => {
+    const normalizedEvery = Math.max(1, Number(every) || 1);
+    const normalizedUnit = recurrenceType === 'yearly'
+      ? 'year'
+      : recurrenceType === 'monthly'
+        ? 'month'
+        : recurrenceType === 'weekly'
+          ? 'week'
+          : recurrenceType === 'daily'
+            ? 'day'
+            : unit;
+
     setScheduleConfig?.({
       scheduleType: 'calendar',
       calendarRule: {
-        every: Number(every) || 1,
-        unit,
+        every: normalizedEvery,
+        unit: normalizedUnit,
         time,
         leadDays: Number(leadDays) || 0,
         inactivePeriods,
@@ -46949,6 +46965,8 @@ function CalendarScheduleModal({ open, onClose, scheduleConfig, setScheduleConfi
         recurrenceMaxOccurrences: recurrenceEndType === 'occurrences' ? Number(recurrenceMaxOccurrences) || null : null,
         selectedWeekDays: recurrenceType === 'weekly' ? selectedWeekDays : [],
         selectedMonthDay: recurrenceType === 'monthly' ? selectedMonthDay : null,
+        selectedYearMonth: recurrenceType === 'yearly' ? selectedYearMonth : null,
+        selectedYearDay: recurrenceType === 'yearly' ? selectedYearDay : null,
       },
       meterRule: null,
       combinedRule: null,
@@ -46996,6 +47014,7 @@ function CalendarScheduleModal({ open, onClose, scheduleConfig, setScheduleConfi
                   <option value="day">Day(s)</option>
                   <option value="week">Week(s)</option>
                   <option value="month">Month(s)</option>
+                  <option value="year">Year(s)</option>
                 </select>
               </div>
               <div>
@@ -47017,7 +47036,32 @@ function CalendarScheduleModal({ open, onClose, scheduleConfig, setScheduleConfi
                 <option value="daily">Daily</option>
                 <option value="weekly">Weekly</option>
                 <option value="monthly">Monthly</option>
+                <option value="yearly">Yearly</option>
               </select>
+
+              {recurrenceType !== 'none' && (
+                <div className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4 md:grid-cols-2">
+                  <div>
+                    <p className="mb-2 text-sm font-semibold text-gray-800">Repeat every</p>
+                    <input
+                      type="number"
+                      min="1"
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                      value={every}
+                      onChange={(e) => setEvery(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <p className="mb-2 text-sm font-semibold text-gray-800">Range unit</p>
+                    <div className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700">
+                      {recurrenceType === 'daily' && 'Day(s)'}
+                      {recurrenceType === 'weekly' && 'Week(s)'}
+                      {recurrenceType === 'monthly' && 'Month(s)'}
+                      {recurrenceType === 'yearly' && 'Year(s)'}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Weekly Day Selection */}
               {recurrenceType === 'weekly' && (
@@ -47054,6 +47098,32 @@ function CalendarScheduleModal({ open, onClose, scheduleConfig, setScheduleConfi
                       </option>
                     ))}
                   </select>
+                </div>
+              )}
+
+              {recurrenceType === 'yearly' && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <p className="text-sm font-semibold text-gray-800 mb-3">Repeat every year on:</p>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <select
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                      value={selectedYearMonth}
+                      onChange={(e) => setSelectedYearMonth(e.target.value)}
+                    >
+                      {monthOptions.map((month, idx) => (
+                        <option key={month} value={String(idx + 1)}>{month}</option>
+                      ))}
+                    </select>
+                    <select
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                      value={selectedYearDay}
+                      onChange={(e) => setSelectedYearDay(e.target.value)}
+                    >
+                      {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
+                        <option key={day} value={String(day)}>Day {day}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               )}
 
@@ -47469,6 +47539,7 @@ function CombinedScheduleModal({ open, onClose, scheduleConfig, setScheduleConfi
                   <option value="day">Day(s)</option>
                   <option value="week">Week(s)</option>
                   <option value="month">Month(s)</option>
+                  <option value="year">Year(s)</option>
                 </select>
               </div>
               <input type="time" className="w-40 border border-gray-300 rounded-lg px-3 py-2 text-sm" value={time} onChange={(e) => setTime(e.target.value)} />
