@@ -428,6 +428,7 @@ export default function AuthHeader() {
             <Link to="/subscription" className="nav-link nav-link--upgrade" style={{ color: '#0F172A', fontWeight: 600 }}>Upgrade</Link>
           )}
           <Link to="/login" className="nav-link">Log in</Link>
+          <Link to="/request-demo" className="nav-link">Request Demo</Link>
           <Link to="/register" className="auth-cta">Start a Free Trial</Link>
         </div>
       </div>

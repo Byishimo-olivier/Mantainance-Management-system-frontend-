@@ -234,6 +234,140 @@ const WEBHOOK_EVENT_OPTIONS = [
 ];
 const CHECKLIST_TEMPLATE_LIBRARY_SEED = [
   {
+    id: 'default-fire-pump-daily',
+    name: 'Fire Fighting Pump Daily Checks',
+    description: 'Daily visual and operating checks for fire pump readiness.',
+    industry: 'Facility Maintenance',
+    useCase: 'Inspection',
+    tags: ['Fire Safety', 'Pump'],
+    items: [
+      { id: 'fire-pump-1', text: 'Pump Visual Inspection: Check for proper alignment of pump and motor shafts.', type: 'Status', options: ['Pass', 'Fail', 'N/A'] },
+      { id: 'fire-pump-2', text: 'Pressure Gauges: Confirm system pressure is within the recommended range.', type: 'Status', options: ['Pass', 'Fail', 'N/A'] },
+      { id: 'fire-pump-3', text: 'Diesel Engine: Verify fuel level and check for any leaks.', type: 'Status', options: ['Pass', 'Fail', 'N/A'] },
+      { id: 'fire-pump-4', text: 'Controller Panel: Check power, alarms, and automatic start readiness.', type: 'Status', options: ['Pass', 'Fail', 'N/A'] },
+      { id: 'fire-pump-5', text: 'Valves: Confirm suction and discharge valves are open and secured.', type: 'Checkbox' },
+      { id: 'fire-pump-6', text: 'Pump Room: Confirm room is clean, dry, and access is clear.', type: 'Inspection' },
+    ],
+  },
+  {
+    id: 'default-ughe-gardens-landscaping',
+    name: 'UGHE Gardens and Landscaping Inspection Checklist',
+    description: 'Grounds, irrigation, paths, and landscape condition inspection.',
+    industry: 'Grounds',
+    useCase: 'Inspection',
+    tags: ['Landscaping', 'UGHE'],
+    items: Array.from({ length: 38 }, (_, index) => ({
+      id: `ughe-landscape-${index + 1}`,
+      text: [
+        'Inspect lawn areas for dry patches, weeds, and uneven growth.',
+        'Check irrigation heads for blockage, leaks, or poor coverage.',
+        'Confirm walkways are clear of debris and trip hazards.',
+        'Inspect trees and shrubs for pruning needs or disease signs.',
+        'Verify waste bins, garden edges, and outdoor seating are clean.',
+        'Record any drainage, erosion, or standing-water concern.',
+      ][index % 6],
+      type: index % 5 === 0 ? 'Inspection' : 'Status',
+      options: ['Good', 'Needs Attention', 'N/A'],
+    })),
+  },
+  {
+    id: 'default-roof-inspection',
+    name: 'Roof Inspection Checklist',
+    description: 'Conducting a thorough inspection of an iron roof is essential to identify leaks, corrosion, fastener issues, and drainage concerns.',
+    industry: 'Facility Maintenance',
+    useCase: 'Inspection',
+    tags: ['Roof', 'Building'],
+    items: Array.from({ length: 24 }, (_, index) => ({
+      id: `roof-inspection-${index + 1}`,
+      text: [
+        'Inspect iron sheets for rust, punctures, lifted edges, or deformation.',
+        'Check roof fasteners, washers, and overlaps for looseness or gaps.',
+        'Inspect gutters and downpipes for blockage, damage, or overflow marks.',
+        'Check flashings, ridges, and penetrations for signs of water ingress.',
+      ][index % 4],
+      type: index % 6 === 0 ? 'Photo' : 'Status',
+      options: ['Pass', 'Fail', 'N/A'],
+    })),
+  },
+  {
+    id: 'default-washing-machine-monthly',
+    name: 'Monthly Washing Machine Preventative Maintenance Checklist',
+    description: 'Monthly preventive maintenance for commercial washing machines.',
+    industry: 'Laundry',
+    useCase: 'Maintenance',
+    tags: ['Laundry', 'Monthly'],
+    items: Array.from({ length: 12 }, (_, index) => ({
+      id: `washer-monthly-${index + 1}`,
+      text: [
+        'Inspect inlet hoses, drain hose, and visible fittings for leaks.',
+        'Clean detergent drawer, lint traps, and door gasket.',
+        'Run vibration and noise check during spin cycle.',
+        'Verify electrical plug, grounding, and machine leveling.',
+      ][index % 4],
+      type: index % 4 === 1 ? 'Checkbox' : 'Status',
+      options: ['Complete', 'Needs Repair', 'N/A'],
+    })),
+  },
+  {
+    id: 'default-washing-machine-daily',
+    name: 'Daily Washing Machine Preventative Maintenance',
+    description: 'Daily operator checks before and after laundry cycles.',
+    industry: 'Laundry',
+    useCase: 'Maintenance',
+    tags: ['Laundry', 'Daily'],
+    items: Array.from({ length: 8 }, (_, index) => ({
+      id: `washer-daily-${index + 1}`,
+      text: [
+        'Wipe door seal and inspect for trapped items or tears.',
+        'Confirm machine is level and free from unusual vibration.',
+        'Check water supply and drain area for leaks.',
+        'Clean external surfaces and leave door open for ventilation.',
+      ][index % 4],
+      type: 'Status',
+      options: ['Done', 'Issue Found', 'N/A'],
+    })),
+  },
+  {
+    id: 'default-elevator-quarterly',
+    name: 'Elevator Quarterly Preventative Maintenance Checklist',
+    description: 'Quarterly checks for elevator safety, operation, and housekeeping.',
+    industry: 'Vertical Transport',
+    useCase: 'Maintenance',
+    tags: ['Elevator', 'Quarterly'],
+    items: Array.from({ length: 10 }, (_, index) => ({
+      id: `elevator-quarterly-${index + 1}`,
+      text: [
+        'Test door open/close operation and safety edge response.',
+        'Inspect car lighting, buttons, indicators, and emergency communication.',
+        'Check machine room housekeeping and visible oil leaks.',
+        'Verify ride quality, leveling accuracy, and abnormal noise.',
+        'Review inspection certificate and service log status.',
+      ][index % 5],
+      type: index % 5 === 4 ? 'Text' : 'Status',
+      options: ['Pass', 'Fail', 'N/A'],
+    })),
+  },
+  {
+    id: 'default-distribution-boards-monthly',
+    name: 'MONTHLY DISTRIBUTION BOARDS MAINTENANCE',
+    description: 'Distribution Boards Routine Maintenance Schedule',
+    industry: 'Electrical',
+    useCase: 'Maintenance',
+    tags: ['Electrical', 'Monthly'],
+    items: Array.from({ length: 11 }, (_, index) => ({
+      id: `distribution-board-${index + 1}`,
+      text: [
+        'Inspect board cover, labels, locks, and access clearance.',
+        'Check for overheating signs, burning smell, or discoloration.',
+        'Verify breaker positions and identify nuisance trips.',
+        'Clean dust from external surfaces and surrounding area.',
+        'Record voltage/current readings where applicable.',
+      ][index % 5],
+      type: index % 5 === 4 ? 'Number' : 'Status',
+      options: ['Normal', 'Attention Required', 'N/A'],
+    })),
+  },
+  {
     id: 'seed-fleet-preuse',
     name: 'Truck/Bus/Van/Pickup Pre-Use Inspection',
     description: 'Daily pre-use inspection for commercial vehicles before dispatch.',
@@ -299,6 +433,47 @@ const CHECKLIST_TEMPLATE_LIBRARY_SEED = [
       { id: 'mfg-3', text: 'Capture image of any unsafe condition.', type: 'Inspection' },
     ],
   },
+  ...[
+    ['generator-weekly', 'Generator Weekly Preventive Maintenance', 'Weekly checks for standby generator readiness.', 'Electrical', 'Maintenance', 9],
+    ['boiler-monthly', 'Boiler Monthly Safety Inspection', 'Monthly inspection for boiler safety devices and visible condition.', 'Mechanical', 'Inspection', 14],
+    ['water-pump-weekly', 'Water Pump Weekly Inspection', 'Routine inspection for domestic and transfer water pumps.', 'Plumbing', 'Inspection', 7],
+    ['septic-monthly', 'Septic System Monthly Inspection', 'Monthly checks for septic tanks, pumps, covers, and drainage signs.', 'Plumbing', 'Inspection', 8],
+    ['kitchen-equipment-daily', 'Kitchen Equipment Daily Checks', 'Daily readiness checks for commercial kitchen equipment.', 'Food Service', 'Inspection', 13],
+    ['cold-room-daily', 'Cold Room Daily Temperature Checklist', 'Temperature and condition checks for cold rooms and freezers.', 'Food Service', 'Inspection', 6],
+    ['vehicle-monthly', 'Vehicle Monthly Maintenance Inspection', 'Monthly inspection for fleet vehicles and service readiness.', 'Fleet Management', 'Maintenance', 15],
+    ['fire-extinguisher-monthly', 'Fire Extinguisher Monthly Inspection', 'Monthly fire extinguisher location, pressure, and condition checks.', 'Safety', 'Inspection', 10],
+    ['emergency-lighting-monthly', 'Emergency Lighting Monthly Test', 'Monthly test for emergency lighting and exit signage.', 'Safety', 'Inspection', 8],
+    ['pool-weekly', 'Swimming Pool Weekly Maintenance', 'Weekly pool chemistry, pump, and deck condition checks.', 'Hospitality', 'Maintenance', 12],
+    ['gym-equipment-weekly', 'Gym Equipment Weekly Inspection', 'Weekly checks for fitness equipment safety and condition.', 'Fitness', 'Inspection', 11],
+    ['solar-monthly', 'Solar PV Monthly Inspection', 'Monthly inspection for panels, inverters, batteries, and cabling.', 'Energy', 'Inspection', 12],
+    ['cctv-monthly', 'CCTV Monthly System Check', 'Monthly camera, recording, storage, and visibility verification.', 'Security', 'Inspection', 9],
+    ['access-control-monthly', 'Access Control Monthly Test', 'Monthly access reader, lock, and override checks.', 'Security', 'Inspection', 8],
+    ['plumbing-weekly', 'Plumbing Weekly Inspection', 'Weekly leak, fixture, valve, and drainage inspection.', 'Plumbing', 'Inspection', 10],
+    ['painting-turnover', 'Painting and Wall Finish Turnover Checklist', 'Wall finish checks for turnover and repair work.', 'Property Management', 'Inspection', 9],
+    ['classroom-readiness', 'Classroom Readiness Inspection', 'Inspection for furniture, lighting, outlets, and learning-space readiness.', 'Education', 'Inspection', 10],
+    ['hospital-bed-monthly', 'Hospital Bed Monthly Inspection', 'Monthly checks for bed controls, rails, casters, and accessories.', 'Healthcare', 'Maintenance', 10],
+    ['air-compressor-weekly', 'Air Compressor Weekly Maintenance', 'Weekly checks for compressor pressure, oil, drains, and leaks.', 'Mechanical', 'Maintenance', 9],
+    ['warehouse-racking-monthly', 'Warehouse Racking Monthly Inspection', 'Monthly rack, aisle, pallet, and safety-condition inspection.', 'Warehouse', 'Inspection', 12],
+    ['janitorial-daily', 'Janitorial Daily Area Checklist', 'Daily cleaning completion checks for shared facility areas.', 'Facility Maintenance', 'Inspection', 8],
+  ].map(([id, name, description, industry, useCase, count]) => ({
+    id: `default-${id}`,
+    name,
+    description,
+    industry,
+    useCase,
+    tags: [industry, useCase],
+    items: Array.from({ length: count }, (_, index) => ({
+      id: `${id}-${index + 1}`,
+      text: [
+        `Inspect ${name.toLowerCase()} item ${index + 1} and record visible condition.`,
+        'Confirm equipment or area is clean, accessible, and safe to use.',
+        'Check for leaks, damage, abnormal noise, missing labels, or loose parts.',
+        'Record any corrective action, photo, or follow-up work required.',
+      ][index % 4],
+      type: index % 7 === 0 ? 'Inspection' : index % 5 === 0 ? 'Text' : 'Status',
+      options: ['Pass', 'Fail', 'N/A'],
+    })),
+  })),
 ];
 const WORK_ORDER_CONFIGURATION_CREATE_FIELDS = [
   ['description', 'Description'],
@@ -8360,9 +8535,6 @@ function ClientDashboard() {
     refreshChecklists();
   }, [refreshChecklists]);
 
-  const filteredChecklistLibrary = (pmChecklistLibrary || []).filter((tpl) => (
-    (tpl.name || '').toLowerCase().includes((searchText || '').toLowerCase())
-  ));
   const checklistTemplateCatalog = React.useMemo(() => {
     const mappedSaved = (pmChecklistLibrary || []).map((tpl, index) => ({
       ...tpl,
@@ -8374,10 +8546,26 @@ function ClientDashboard() {
     }));
     const merged = [...CHECKLIST_TEMPLATE_LIBRARY_SEED];
     mappedSaved.forEach((tpl) => {
-      if (!merged.some((entry) => String(entry.id) === String(tpl.id))) merged.push(tpl);
+      const existingIndex = merged.findIndex((entry) => String(entry.id) === String(tpl.id));
+      if (existingIndex >= 0) {
+        merged[existingIndex] = { ...merged[existingIndex], ...tpl };
+      } else {
+        merged.push(tpl);
+      }
     });
     return merged;
   }, [pmChecklistLibrary]);
+  const filteredChecklistLibrary = checklistTemplateCatalog.filter((tpl) => {
+    const query = String(searchText || '').trim().toLowerCase();
+    if (!query) return true;
+    return [
+      tpl.name,
+      tpl.description,
+      tpl.industry,
+      tpl.useCase,
+      ...(Array.isArray(tpl.tags) ? tpl.tags : []),
+    ].filter(Boolean).some((value) => String(value).toLowerCase().includes(query));
+  });
   const checklistLibraryIndustryOptions = React.useMemo(() => (
     ['All', ...Array.from(new Set(checklistTemplateCatalog.map((tpl) => tpl.industry).filter(Boolean))).sort((a, b) => a.localeCompare(b))]
   ), [checklistTemplateCatalog]);
@@ -8440,7 +8628,7 @@ function ClientDashboard() {
       alert(err?.response?.data?.error || 'Saved locally for this session.');
     }
   }, [refreshChecklists]);
-  const checklistTemplateTypeOptions = ['Status', 'Text', 'Number', 'Inspection', 'Multiple Choice', 'Meter', 'Signature', 'Checkbox', 'Warning', 'Multiselect'];
+  const checklistTemplateTypeOptions = ['Status', 'Text', 'Number', 'Inspection', 'Multiple Choice', 'Meter', 'Signature', 'Checkbox', 'Warning', 'Multiselect', 'Photo', 'Section'];
   const normalizeChecklistTemplateItems = useCallback((items = []) => (
     (Array.isArray(items) ? items : []).map((item, index) => ({
       id: item.id || item._id || `${Date.now()}-${index}`,
@@ -8474,7 +8662,7 @@ function ClientDashboard() {
     setSavingChecklistTemplate(true);
     try {
       const checklistId = editingChecklistTemplate.id || editingChecklistTemplate._id;
-      await api.put(`/api/checklists/${checklistId}`, {
+      const payload = {
         name: checklistEditForm.name,
         title: checklistEditForm.name,
         description: checklistEditForm.description || '',
@@ -8486,8 +8674,20 @@ function ClientDashboard() {
           meter: item.meter || '',
           required: !!item.required,
         })),
-      });
-      await refreshChecklists();
+      };
+      const isLocalTemplate = String(checklistId || '').startsWith('seed-') || String(checklistId || '').startsWith('default-') || String(checklistId || '').startsWith('local-');
+      if (isLocalTemplate) {
+        setPmChecklistLibrary((prev) => {
+          const nextTemplate = { ...editingChecklistTemplate, ...payload, id: checklistId };
+          const exists = prev.some((tpl) => String(tpl.id || tpl._id || '') === String(checklistId));
+          return exists
+            ? prev.map((tpl) => String(tpl.id || tpl._id || '') === String(checklistId) ? nextTemplate : tpl)
+            : [...prev, nextTemplate];
+        });
+      } else {
+        await api.put(`/api/checklists/${checklistId}`, payload);
+        await refreshChecklists();
+      }
       setSelectedChecklistTemplate((current) => current ? {
         ...current,
         name: checklistEditForm.name,
@@ -22977,7 +23177,7 @@ function ClientDashboard() {
                               className="cursor-pointer border-t border-gray-200 transition hover:bg-gray-50/80"
                               onClick={() => {
                                 setSelectedChecklistTemplate(tpl);
-                                setChecklistDetailOpen(true);
+                                openChecklistTemplateEditor(tpl);
                               }}
                             >
                               <td className="px-6 py-6 align-top">
@@ -23003,7 +23203,7 @@ function ClientDashboard() {
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setSelectedChecklistTemplate(tpl);
-                                    setChecklistDetailOpen(true);
+                                    openChecklistTemplateEditor(tpl);
                                   }}
                                 >
                                   <MoreHorizontal className="h-5 w-5" />
@@ -23104,126 +23304,207 @@ function ClientDashboard() {
               )}
 
               {editingChecklistTemplate && (
-                <div className="fixed inset-0 z-[95] overflow-y-auto bg-black/60 backdrop-blur-sm p-4">
-                  <div className="flex min-h-full items-center justify-center">
-                  <div className="my-6 w-full max-w-4xl rounded-3xl border border-gray-200 bg-white shadow-2xl overflow-hidden">
-                    <div className="flex items-start justify-between border-b border-gray-100 px-6 py-5">
-                      <div>
-                        <h3 className="text-2xl font-bold text-gray-900">Edit Checklist</h3>
-                        <p className="mt-1 text-sm text-gray-500">Update checklist details and tasks.</p>
+                <div className="fixed inset-0 z-[95] overflow-hidden bg-[#f7f8fa]">
+                  <div className="flex h-screen flex-col">
+                    <div className="flex h-14 items-center justify-between border-b border-gray-200 bg-white">
+                      <div className="flex h-full items-center">
+                        <button
+                          type="button"
+                          onClick={() => setEditingChecklistTemplate(null)}
+                          className="flex h-full w-12 items-center justify-center border-r border-gray-200 text-gray-500 hover:bg-gray-50"
+                          aria-label="Close checklist editor"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                        <div className="flex items-center gap-3 px-5 text-sm text-gray-500">
+                          <span>Checklists</span>
+                          <ChevronRight className="h-4 w-4" />
+                          <span className="font-bold text-gray-900">Edit Checklist</span>
+                        </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setEditingChecklistTemplate(null)}
-                        className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-                      >
-                        <X className="w-5 h-5" />
-                      </button>
+                      <div className="flex items-center gap-3 px-4">
+                        <button
+                          type="button"
+                          onClick={() => setEditingChecklistTemplate(null)}
+                          className="rounded-md bg-gray-100 px-4 py-2 text-xs font-bold text-gray-600 hover:bg-gray-200"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={saveChecklistTemplateChanges}
+                          disabled={savingChecklistTemplate}
+                          className="rounded-md bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
+                        >
+                          {savingChecklistTemplate ? 'Saving...' : 'Save Checklist'}
+                        </button>
+                      </div>
                     </div>
 
-                    <div className="max-h-[calc(100vh-220px)] overflow-y-auto px-6 py-6">
-                    <div className="space-y-5">
-                      <div className="grid gap-4 md:grid-cols-2">
-                        <div>
-                          <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-500">Checklist Name</label>
-                          <input
-                            className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none focus:border-blue-500"
-                            value={checklistEditForm.name}
-                            onChange={(e) => setChecklistEditForm((prev) => ({ ...prev, name: e.target.value }))}
-                          />
-                        </div>
-                        <div>
-                          <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-500">Tags</label>
-                          <input
-                            className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none focus:border-blue-500"
-                            value={(checklistEditForm.tags || []).join(', ')}
-                            onChange={(e) => setChecklistEditForm((prev) => ({ ...prev, tags: String(e.target.value || '').split(/[;,|]/).map((tag) => tag.trim()).filter(Boolean) }))}
-                            placeholder="Separate tags with commas"
-                          />
-                        </div>
-                      </div>
+                    <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_170px]">
+                      <div className="min-h-0 overflow-y-auto px-4 py-6 sm:px-8 lg:px-12">
+                        <div className="mx-auto max-w-3xl space-y-5">
+                          <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+                            <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_180px]">
+                              <div>
+                                <label className="mb-2 block text-xs font-bold uppercase tracking-wide text-gray-500">Checklist Name</label>
+                                <input
+                                  className="h-10 w-full rounded-md border border-gray-300 px-3 text-sm font-semibold text-gray-900 outline-none focus:border-blue-500"
+                                  value={checklistEditForm.name}
+                                  onChange={(e) => setChecklistEditForm((prev) => ({ ...prev, name: e.target.value }))}
+                                />
+                              </div>
+                              <div>
+                                <label className="mb-2 block text-xs font-bold uppercase tracking-wide text-gray-500">Tags</label>
+                                <input
+                                  className="h-10 w-full rounded-md border border-gray-300 px-3 text-sm text-gray-900 outline-none focus:border-blue-500"
+                                  value={(checklistEditForm.tags || []).join(', ')}
+                                  onChange={(e) => setChecklistEditForm((prev) => ({ ...prev, tags: String(e.target.value || '').split(/[;,|]/).map((tag) => tag.trim()).filter(Boolean) }))}
+                                  placeholder="Separate tags with commas"
+                                />
+                              </div>
+                            </div>
+                            <textarea
+                              className="mt-4 min-h-[70px] w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-800 outline-none focus:border-blue-500"
+                              value={checklistEditForm.description}
+                              onChange={(e) => setChecklistEditForm((prev) => ({ ...prev, description: e.target.value }))}
+                              placeholder="Description"
+                            />
+                          </div>
 
-                      <div>
-                        <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-500">Description</label>
-                        <textarea
-                          className="min-h-[96px] w-full rounded-xl border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none focus:border-blue-500"
-                          value={checklistEditForm.description}
-                          onChange={(e) => setChecklistEditForm((prev) => ({ ...prev, description: e.target.value }))}
-                        />
-                      </div>
+                          {(checklistEditForm.items || []).map((item, index) => (
+                            <div key={item.id || index} className="grid grid-cols-[24px_minmax(0,1fr)] gap-3">
+                              <div className="flex items-center justify-center pt-10 text-gray-400">
+                                <GripVertical className="h-4 w-4" />
+                              </div>
+                              <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+                                <input
+                                  className="w-full border-0 p-0 text-sm font-bold text-gray-900 outline-none"
+                                  placeholder={`Task ${index + 1}`}
+                                  value={item.text || ''}
+                                  onChange={(e) => setChecklistEditForm((prev) => ({
+                                    ...prev,
+                                    items: prev.items.map((entry, itemIndex) => itemIndex === index ? { ...entry, text: e.target.value } : entry),
+                                  }))}
+                                />
+                                <div className="relative mt-3">
+                                  <select
+                                    className="h-10 w-full appearance-none rounded-md border border-gray-300 bg-white px-3 pr-9 text-sm text-gray-500 outline-none focus:border-blue-500"
+                                    value={item.type || 'Status'}
+                                    onChange={(e) => setChecklistEditForm((prev) => ({
+                                      ...prev,
+                                      items: prev.items.map((entry, itemIndex) => itemIndex === index ? { ...entry, type: e.target.value } : entry),
+                                    }))}
+                                  >
+                                    <option>Select a status</option>
+                                    {checklistTemplateTypeOptions.map((option) => (
+                                      <option key={option} value={option}>{option}</option>
+                                    ))}
+                                  </select>
+                                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                                </div>
+                                <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-gray-500">
+                                  <div className="flex flex-wrap items-center gap-3">
+                                    <button type="button" className="inline-flex items-center gap-1 hover:text-gray-800">
+                                      <ImageIcon className="h-3.5 w-3.5" />
+                                      Photo
+                                    </button>
+                                    <button type="button" className="inline-flex items-center gap-1 hover:text-gray-800">
+                                      <FileText className="h-3.5 w-3.5" />
+                                      Notes
+                                    </button>
+                                    <button type="button" className="inline-flex items-center gap-1 hover:text-gray-800">
+                                      <Link2 className="h-3.5 w-3.5" />
+                                      URL
+                                    </button>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    className="inline-flex items-center gap-1 text-rose-600 hover:text-rose-700"
+                                    onClick={() => setChecklistEditForm((prev) => ({
+                                      ...prev,
+                                      items: prev.items.filter((_, itemIndex) => itemIndex !== index),
+                                    }))}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                    Remove
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
 
-                      <div>
-                        <div className="mb-3 flex items-center justify-between">
-                          <label className="block text-xs font-bold uppercase tracking-wider text-gray-500">Checklist Items</label>
                           <button
                             type="button"
-                            className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-blue-600 hover:bg-blue-50"
+                            className="ml-9 flex h-9 w-[calc(100%-2.25rem)] items-center justify-center gap-2 rounded-md bg-blue-50 text-sm font-semibold text-blue-600 hover:bg-blue-100"
                             onClick={() => setChecklistEditForm((prev) => ({
                               ...prev,
                               items: [...(prev.items || []), { id: `${Date.now()}`, text: '', type: 'Status', meter: '', required: false }],
                             }))}
                           >
-                            Add Item
+                            <Plus className="h-4 w-4" />
+                            Add Task
+                          </button>
+                        </div>
+                      </div>
+
+                      <aside className="hidden min-h-0 border-l border-gray-200 bg-white px-5 py-5 text-sm lg:block">
+                        <div className="text-[11px] font-bold uppercase tracking-wide text-gray-500">Add Items</div>
+                        <div className="mt-3 space-y-3">
+                          <button
+                            type="button"
+                            className="flex items-center gap-3 text-blue-600 hover:text-blue-700"
+                            onClick={() => setChecklistEditForm((prev) => ({
+                              ...prev,
+                              items: [...(prev.items || []), { id: `${Date.now()}`, text: '', type: 'Status', meter: '', required: false }],
+                            }))}
+                          >
+                            <Plus className="h-4 w-4" />
+                            Add Task
+                          </button>
+                          <button
+                            type="button"
+                            className="flex items-center gap-3 text-blue-600 hover:text-blue-700"
+                            onClick={() => setChecklistEditForm((prev) => ({
+                              ...prev,
+                              items: [...(prev.items || []), { id: `section-${Date.now()}`, text: 'New Section', type: 'Section', meter: '', required: false }],
+                            }))}
+                          >
+                            <LayoutDashboard className="h-4 w-4" />
+                            Add Section
                           </button>
                         </div>
 
-                        <div className="space-y-3">
-                          {(checklistEditForm.items || []).map((item, index) => (
-                            <div key={item.id || index} className="grid gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-4 md:grid-cols-[1fr_180px_180px_auto]">
-                              <input
-                                className="rounded-xl border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none focus:border-blue-500"
-                                placeholder={`Item ${index + 1}`}
-                                value={item.text || ''}
-                                onChange={(e) => setChecklistEditForm((prev) => ({
-                                  ...prev,
-                                  items: prev.items.map((entry, itemIndex) => itemIndex === index ? { ...entry, text: e.target.value } : entry),
-                                }))}
-                              />
-                              <select
-                                className="rounded-xl border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none focus:border-blue-500"
-                                value={item.type || 'Status'}
-                                onChange={(e) => setChecklistEditForm((prev) => ({
-                                  ...prev,
-                                  items: prev.items.map((entry, itemIndex) => itemIndex === index ? { ...entry, type: e.target.value } : entry),
-                                }))}
-                              >
-                                {checklistTemplateTypeOptions.map((option) => (
-                                  <option key={option} value={option}>{option}</option>
-                                ))}
-                              </select>
-                              <input
-                                className="rounded-xl border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none focus:border-blue-500"
-                                placeholder="Meter name"
-                                value={item.meter || ''}
-                                onChange={(e) => setChecklistEditForm((prev) => ({
-                                  ...prev,
-                                  items: prev.items.map((entry, itemIndex) => itemIndex === index ? { ...entry, meter: e.target.value } : entry),
-                                }))}
-                              />
-                              <button
-                                type="button"
-                                className="rounded-xl border border-rose-200 px-4 py-3 text-sm font-semibold text-rose-600 hover:bg-rose-50"
-                                onClick={() => setChecklistEditForm((prev) => ({
-                                  ...prev,
-                                  items: prev.items.filter((_, itemIndex) => itemIndex !== index),
-                                }))}
-                              >
-                                Remove
-                              </button>
-                            </div>
+                        <div className="mt-7 text-[11px] font-bold uppercase tracking-wide text-gray-500">Task Types</div>
+                        <div className="mt-3 space-y-3">
+                          {[
+                            ['Status', Flag],
+                            ['Text', FileText],
+                            ['Number', Plus],
+                            ['Inspection', Search],
+                            ['Multiple Choice', MoreHorizontal],
+                            ['Meter', Gauge],
+                            ['Signature', Pencil],
+                            ['Checkbox', CheckCircle],
+                            ['Warning', AlertCircle],
+                            ['Multiselect', SlidersHorizontal],
+                          ].map(([label, TaskIcon]) => (
+                            <button
+                              key={label}
+                              type="button"
+                              className="flex items-center gap-3 text-left text-xs font-semibold text-slate-600 hover:text-blue-700"
+                              onClick={() => setChecklistEditForm((prev) => ({
+                                ...prev,
+                                items: [...(prev.items || []), { id: `${Date.now()}-${label}`, text: '', type: label, meter: '', required: false }],
+                              }))}
+                            >
+                              <TaskIcon className="h-4 w-4 text-blue-500" />
+                              {label}
+                            </button>
                           ))}
                         </div>
-                      </div>
+                      </aside>
                     </div>
-                    </div>
-
-                    <div className="flex items-center justify-end gap-3 border-t border-gray-100 bg-gray-50 px-6 py-4">
-                      <Btn variant="outline" onClick={() => setEditingChecklistTemplate(null)}>Cancel</Btn>
-                      <Btn variant="primary" onClick={saveChecklistTemplateChanges} disabled={savingChecklistTemplate}>
-                        {savingChecklistTemplate ? 'Saving...' : 'Save Changes'}
-                      </Btn>
-                    </div>
-                  </div>
                   </div>
                 </div>
               )}

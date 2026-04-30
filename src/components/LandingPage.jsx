@@ -412,7 +412,7 @@ const LandingPage = () => {
           </p>
           <div className="landing-cta-row">
             <a className="landing-cta" href="/register">Start a Free Trial</a>
-            <a className="landing-cta landing-cta--ghost" href="/pricing">Request a Demo</a>
+            <a className="landing-cta landing-cta--ghost" href="/request-demo">Request a Demo</a>
           </div>
         </div>
         <div className="landing-hero-media">
@@ -788,7 +788,7 @@ const LandingPage = () => {
       <section className="landing-section landing-products">
         <div className="landing-section-header">
           <div className="landing-section-title">Our Products</div>
-          <a className="landing-section-cta" href="/pricing">Request a Demo</a>
+          <a className="landing-section-cta" href="/request-demo">Request a Demo</a>
         </div>
         <div className="product-grid">
           {products.map((product) => (
@@ -1095,7 +1095,7 @@ const LandingPage = () => {
             </p>
             <div className="ai-cta-row">
               <a className="landing-cta" href="/register">Start a Free Trial</a>
-              <a className="landing-cta landing-cta--ghost" href="/pricing">Request a Demo</a>
+              <a className="landing-cta landing-cta--ghost" href="/request-demo">Request a Demo</a>
             </div>
           </div>
           <div className="ai-visual">
@@ -1154,7 +1154,7 @@ const LandingPage = () => {
           </p>
           <div className="landing-cta-row">
             <a className="landing-cta px-10 py-4 text-lg" href="/register">Start Your Free Trial</a>
-            <a className="landing-cta landing-cta--ghost px-10 py-4 text-lg border-white/20 text-white" href="/pricing">Schedule a Tour</a>
+            <a className="landing-cta landing-cta--ghost px-10 py-4 text-lg border-white/20 text-white" href="/request-demo">Schedule a Tour</a>
           </div>
         </div>
       </section>
@@ -1168,7 +1168,7 @@ const LandingPage = () => {
           </p>
           <div className="landing-cta-row">
             <a className="landing-cta" href="/register">Start a Free Trial</a>
-            <a className="landing-cta landing-cta--ghost" href="/pricing">Request a Demo</a>
+            <a className="landing-cta landing-cta--ghost" href="/request-demo">Request a Demo</a>
           </div>
           <div className="landing-badges">
             <span className="badge-pill">IDC CMMS Leader 2021</span>

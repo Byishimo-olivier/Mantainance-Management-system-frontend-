@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import backgroundVideo from "../assets/136906-765457769_small.mp4";
 import api from "../api/axios";
 import { getImageUrl } from "../utils/imageUrl";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import Header from "./Header";
@@ -11,6 +11,7 @@ import TeamDetailsModal from './TeamDetailsModal';
 import { WorkOrderForm } from './WorkOrder';
 import PreventiveMaintenanceDetail from './PreventiveMaintenanceDetail';
 import AdminChat from './AdminChat';
+import AdminGrowthPanel from './AdminGrowthPanel';
 import { useLanguage, useTranslation } from "../i18n/LanguageContext";
 import {
   Shield,
@@ -671,6 +672,7 @@ const combinePeopleUsers = (peopleArr = [], usersArr = []) => {
 function ManagerDashboard() {
   const { language, setLanguage } = useLanguage();
   const { t } = useTranslation();
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState('overview');
   const [issues, setIssues] = useState([]);
   const [allIssues, setAllIssues] = useState([]);
@@ -739,6 +741,13 @@ function ManagerDashboard() {
   const [recsError, setRecsError] = useState(null);
   const [summaryError, setSummaryError] = useState(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const tab = new URLSearchParams(location.search).get('tab');
+    if (tab) {
+      setActiveTab(tab);
+    }
+  }, [location.search]);
 
   // Load logged-in user from localStorage for sidebar display
   let loggedUser = null;
@@ -1468,6 +1477,12 @@ function ManagerDashboard() {
             icon={CreditCard}
             label={t("manager.sidebar.subscriptions")}
           />
+          <NavItem
+            active={activeTab === 'sales-requests'}
+            onClick={() => setActiveTab('sales-requests')}
+            icon={TrendingUp}
+            label="Sales Requests"
+          />
 
           <SectionLabel>{t("manager.sidebar.dataAnalytics")}</SectionLabel>
           <NavItem
@@ -1962,6 +1977,8 @@ function ManagerDashboard() {
               />
             ) : activeTab === 'subscriptions' ? (
               <SubscriptionManagement />
+            ) : activeTab === 'sales-requests' ? (
+              <AdminGrowthPanel />
             ) : activeTab === 'settings' ? (
               <SystemSettingsTab />
             ) : activeTab === 'issues' ? (

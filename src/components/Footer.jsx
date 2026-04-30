@@ -60,7 +60,7 @@ const Footer = () => {
               <div className="footer-contact-info">
                 <div className="footer-contact-item"><a href="tel:+250785230859">+250 785 230 859</a></div>
                 <div className="footer-contact-item"><a href="tel:+250783227490">+250 783 227 490</a></div>
-                <div className="footer-contact-item"><Link to="/pricing">Schedule a Tour</Link></div>
+                <div className="footer-contact-item"><Link to="/request-demo">Schedule a Tour</Link></div>
                 <div className="footer-contact-item" style={{ marginTop: '12px', fontSize: '13px' }}>
               Norrsken House Kigali<br />
                1 KN 78 St, Kigali<br />

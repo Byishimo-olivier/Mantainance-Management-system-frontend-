@@ -15,6 +15,7 @@ import PaymentSelection from './components/PaymentSelection';
 import PaymentConfirmation from './components/PaymentConfirmation';
 import SubscriptionPlan from './components/SubscriptionPlan';
 import LandingPage from './components/LandingPage';
+import DemoRequestPage from './components/DemoRequestPage';
 import AllIssues from './components/AllIssues';
 import NewIssue from './components/NewIssue';
 import WorkOrder from './components/WorkOrder';
@@ -208,6 +209,7 @@ function App() {
       <div className="glass-app glass-theme-blue">
         <Routes>
           <Route path="/" element={<LandingPage />} />
+          <Route path="/request-demo" element={<DemoRequestPage />} />
           <Route path="/dashboard" element={renderPrivateRoute(<Dashboard user={auth?.user} />)} />
           <Route path="/login" element={<Login onLogin={handleLogin} />} />
           <Route path="/sso-login" element={<SsoLogin />} />
