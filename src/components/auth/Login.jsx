@@ -37,7 +37,7 @@ export default function Login({ onLogin }) {
   const isSubmitDisabled = isSubmitting || !email || !password;
 
   const handleGoogleLogin = () => {
-    window.location.href = getBackendAuthUrl('/auth/google');
+    window.location.href = getBackendAuthUrl('/api/auth/google');
   };
 
   const handleSubmit = async (e) => {

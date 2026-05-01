@@ -45,7 +45,7 @@ export default function SsoLogin({ onLogin }) {
   const isSubmitDisabled = isSubmitting || (useCompanyId ? !companyId.trim() : !email.trim());
 
   const handleGoogleLogin = () => {
-    window.location.href = getBackendAuthUrl('/auth/google');
+    window.location.href = getBackendAuthUrl('/api/auth/google');
   };
 
   useEffect(() => {
