@@ -17248,7 +17248,19 @@ function ClientDashboard() {
     }
 
     try {
-      await navigator.clipboard.writeText(publicRequestLink);
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(publicRequestLink);
+      } else {
+        const textArea = document.createElement('textarea');
+        textArea.value = publicRequestLink;
+        textArea.setAttribute('readonly', '');
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-9999px';
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+      }
       setPublicRequestLinkCopied(true);
       window.setTimeout(() => setPublicRequestLinkCopied(false), 2400);
     } catch (err) {
@@ -25203,6 +25215,20 @@ function ClientDashboard() {
                 <h2 className="text-[22px] font-bold text-gray-900">Requests</h2>
                 <div className="flex items-center gap-4">
                   <button
+                    type="button"
+                    onClick={copyPublicRequestLink}
+                    disabled={!publicRequestLink}
+                    className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-semibold shadow-sm transition ${
+                      publicRequestLink
+                        ? 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100'
+                        : 'cursor-not-allowed border-gray-200 bg-gray-100 text-gray-400'
+                    }`}
+                    title={publicRequestLink || 'Company name is required to create a public request link'}
+                  >
+                    <Copy className="h-4 w-4" />
+                    {publicRequestLinkCopied ? 'Link Copied' : 'Copy Request Link'}
+                  </button>
+                  <button
                     onClick={handleNewRequest}
                     className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
                   >
@@ -25224,6 +25250,16 @@ function ClientDashboard() {
                       className="w-[220px]"
                       bodyClassName="p-2"
                     >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowRequestActionsMenu(false);
+                          copyPublicRequestLink();
+                        }}
+                        className="flex w-full items-center rounded-xl px-4 py-3 text-left text-[15px] font-medium text-gray-700 transition hover:bg-gray-50"
+                      >
+                        Copy Public Link
+                      </button>
                       <button
                         type="button"
                         onClick={() => {

@@ -12,13 +12,16 @@ let trialStatusPendingPromise = null;
  *   const { trialStatus, isInTrial, hasExpired, daysRemaining, loading, refetch } = useTrialStatus();
  */
 const useTrialStatus = () => {
-  const [trialStatus, setTrialStatus] = useState(trialStatusCache);
-  const [loading, setLoading] = useState(!trialStatusCache);
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') || '' : '';
+  const cacheKey = token ? token.slice(-16) : '';
+  const cachedForUser = trialStatusCache?.cacheKey === cacheKey ? trialStatusCache.data : null;
+  const [trialStatus, setTrialStatus] = useState(cachedForUser);
+  const [loading, setLoading] = useState(!cachedForUser);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
 
   const fetchTrialStatus = useCallback(async () => {
-    const hasCachedStatus = Boolean(trialStatusCache);
+    const hasCachedStatus = Boolean(trialStatusCache?.cacheKey === cacheKey && trialStatusCache?.data);
 
     try {
       if (hasCachedStatus) {
@@ -32,8 +35,8 @@ const useTrialStatus = () => {
       }
 
       const response = await trialStatusPendingPromise;
-      trialStatusCache = response?.data || null;
-      setTrialStatus(trialStatusCache);
+      trialStatusCache = { cacheKey, data: response?.data || null };
+      setTrialStatus(trialStatusCache.data);
       setError(null);
       return trialStatusCache;
     } catch (err) {
@@ -50,13 +53,13 @@ const useTrialStatus = () => {
         setLoading(false);
       }
     }
-  }, []);
+  }, [cacheKey]);
 
   useEffect(() => {
-    if (!trialStatusCache) {
+    if (!trialStatusCache || trialStatusCache.cacheKey !== cacheKey) {
       fetchTrialStatus();
     } else {
-      setTrialStatus(trialStatusCache);
+      setTrialStatus(trialStatusCache.data);
       setLoading(false);
     }
 

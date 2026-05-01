@@ -8,12 +8,15 @@ let companySubscriptionPendingPromise = null;
  * Hook to check user's company subscription status
  */
 export const useCompanySubscription = () => {
-  const [subscription, setSubscription] = useState(companySubscriptionCache?.subscription || null);
-  const [hasActive, setHasActive] = useState(companySubscriptionCache?.hasActive || false);
-  const [company, setCompany] = useState(companySubscriptionCache?.company || null);
-  const [teamMembers, setTeamMembers] = useState(companySubscriptionCache?.teamMembers || []);
-  const [isAdmin, setIsAdmin] = useState(companySubscriptionCache?.isAdmin || false);
-  const [loading, setLoading] = useState(!companySubscriptionCache);
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') || '' : '';
+  const cacheKey = token ? token.slice(-16) : '';
+  const cachedForUser = companySubscriptionCache?.cacheKey === cacheKey ? companySubscriptionCache : null;
+  const [subscription, setSubscription] = useState(cachedForUser?.subscription || null);
+  const [hasActive, setHasActive] = useState(cachedForUser?.hasActive || false);
+  const [company, setCompany] = useState(cachedForUser?.company || null);
+  const [teamMembers, setTeamMembers] = useState(cachedForUser?.teamMembers || []);
+  const [isAdmin, setIsAdmin] = useState(cachedForUser?.isAdmin || false);
+  const [loading, setLoading] = useState(!cachedForUser);
   const [error, setError] = useState(null);
 
   const checkSubscription = useCallback(async () => {
@@ -28,6 +31,7 @@ export const useCompanySubscription = () => {
       if (response?.data) {
         const data = response.data;
         companySubscriptionCache = {
+          cacheKey,
           hasActive: data.hasActiveSubscription || false,
           subscription: data.subscription || null,
           company: data.company || null,
@@ -49,10 +53,10 @@ export const useCompanySubscription = () => {
       companySubscriptionPendingPromise = null;
       setLoading(false);
     }
-  }, []);
+  }, [cacheKey]);
 
   useEffect(() => {
-    if (!companySubscriptionCache) {
+    if (!companySubscriptionCache || companySubscriptionCache.cacheKey !== cacheKey) {
       checkSubscription();
       return;
     }

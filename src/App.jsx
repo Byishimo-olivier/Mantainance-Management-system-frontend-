@@ -212,7 +212,7 @@ function App() {
           <Route path="/request-demo" element={<DemoRequestPage />} />
           <Route path="/dashboard" element={renderPrivateRoute(<Dashboard user={auth?.user} />)} />
           <Route path="/login" element={<Login onLogin={handleLogin} />} />
-          <Route path="/sso-login" element={<SsoLogin />} />
+          <Route path="/sso-login" element={<SsoLogin onLogin={handleLogin} />} />
           <Route path="/register" element={<Register />} />
           <Route path="/activate/:token" element={<Activation />} />
           <Route path="/activation-pending" element={<ActivationPending />} />

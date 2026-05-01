@@ -1104,7 +1104,22 @@
     font-weight: 600;
     cursor: pointer;
     min-height: 48px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .auth-provider-icon {
+    width: 20px;
+    height: 20px;
+    flex: 0 0 auto;
+  }
+
+  .auth-provider-stack {
+    display: grid;
+    gap: 10px;
   }
 
   .auth-ghost-link {

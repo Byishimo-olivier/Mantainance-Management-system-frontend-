@@ -17,6 +17,12 @@ export default function Activation() {
     verifyActivationToken();
   }, [token]);
 
+  useEffect(() => {
+    if (status === 'verified' && activationData?.activationMode === 'email') {
+      completeActivation();
+    }
+  }, [status, activationData]);
+
   const verifyActivationToken = async () => {
     try {
       if (!token) {
@@ -137,8 +143,8 @@ export default function Activation() {
           </div>
         )}
 
-        {/* Verified - Ready for Payment */}
-        {status === 'verified' && activationData && (
+        {/* Verified - Ready for Payment or Email Activation */}
+        {status === 'verified' && activationData && activationData.activationMode !== 'email' && (
           <div className="bg-white rounded-lg shadow-lg p-8">
             <div className="text-center mb-6">
               <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
@@ -207,6 +213,20 @@ export default function Activation() {
           </div>
         )}
 
+        {status === 'verified' && activationData?.activationMode === 'email' && (
+          <div className="bg-white rounded-lg shadow-lg p-8">
+            <div className="flex justify-center mb-6">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+            </div>
+            <h2 className="text-center text-xl font-semibold text-gray-800 mb-2">
+              Activating Your Account
+            </h2>
+            <p className="text-center text-gray-600">
+              Your email was verified. We are activating your account now...
+            </p>
+          </div>
+        )}
+
         {/* Completed - Success State */}
         {status === 'completed' && (
           <div className="bg-white rounded-lg shadow-lg p-8">
@@ -220,7 +240,7 @@ export default function Activation() {
                 Account Activated!
               </h2>
               <p className="text-gray-600 mb-6">
-                Thank you for completing your payment. Your account is now active.
+                Your email is verified and your account is now active.
               </p>
               <p className="text-sm text-gray-500 mb-6">
                 Redirecting to login page...

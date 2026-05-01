@@ -13,6 +13,21 @@ const getHomeRouteForRole = (role) => {
   return '/dashboard';
 };
 
+const getBackendAuthUrl = (path) => {
+  const apiUrl = (import.meta.env.VITE_API_URL || '').replace(/\/+$/, '');
+  const apiOrigin = apiUrl.replace(/\/api$/i, '');
+  return `${apiOrigin || window.location.origin}${path}`;
+};
+
+const GoogleLogo = () => (
+  <svg className="auth-provider-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+    <path fill="#4285F4" d="M23.49 12.27c0-.79-.07-1.54-.19-2.27H12v4.29h6.47c-.28 1.5-1.12 2.77-2.39 3.62v3.01h3.87c2.26-2.08 3.54-5.15 3.54-8.65z" />
+    <path fill="#34A853" d="M12 24c3.24 0 5.96-1.07 7.95-2.91l-3.87-3.01c-1.07.72-2.44 1.14-4.08 1.14-3.13 0-5.78-2.11-6.73-4.96H1.27v3.1C3.25 21.29 7.31 24 12 24z" />
+    <path fill="#FBBC05" d="M5.27 14.26c-.24-.72-.38-1.49-.38-2.26s.14-1.54.38-2.26v-3.1H1.27C.46 8.25 0 10.07 0 12s.46 3.75 1.27 5.36l4-3.1z" />
+    <path fill="#EA4335" d="M12 4.78c1.76 0 3.34.61 4.58 1.8l3.44-3.44C17.94 1.2 15.22 0 12 0 7.31 0 3.25 2.71 1.27 6.64l4 3.1C6.22 6.89 8.87 4.78 12 4.78z" />
+  </svg>
+);
+
 export default function Login({ onLogin }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -20,6 +35,10 @@ export default function Login({ onLogin }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
   const isSubmitDisabled = isSubmitting || !email || !password;
+
+  const handleGoogleLogin = () => {
+    window.location.href = getBackendAuthUrl('/auth/google');
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -109,7 +128,14 @@ export default function Login({ onLogin }) {
 
         <div className="auth-divider-with-text"><span>or</span></div>
 
-        <Link to="/sso-login" className="auth-ghost-btn auth-ghost-link">Continue with SSO</Link>
+        <div className="auth-provider-stack">
+          <button type="button" className="auth-ghost-btn" onClick={handleGoogleLogin}>
+            <GoogleLogo />
+            Continue with Google
+          </button>
+
+          <Link to="/sso-login" className="auth-ghost-btn auth-ghost-link">Continue with company SSO</Link>
+        </div>
 
         <div className="auth-footer" style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
           <div>New to Fixnest? <Link to="/register" className="auth-link">Sign up</Link></div>

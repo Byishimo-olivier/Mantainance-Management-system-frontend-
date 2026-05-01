@@ -66,7 +66,7 @@ export default function ActivationPending() {
               </p>
             </div>
             <p className="text-gray-600 text-sm">
-              Click the link in the email to activate your account and complete payment.
+              Click the link in the email to activate your account.
             </p>
           </div>
 
@@ -92,19 +92,19 @@ export default function ActivationPending() {
                 <span className="inline-flex items-center justify-center w-6 h-6 bg-blue-600 text-white rounded-full text-xs font-bold mr-3 flex-shrink-0">
                   3
                 </span>
-                <span>Review your subscription plan and proceed to payment</span>
+                <span>Your account will be activated after email verification</span>
               </li>
               <li className="flex items-start">
                 <span className="inline-flex items-center justify-center w-6 h-6 bg-blue-600 text-white rounded-full text-xs font-bold mr-3 flex-shrink-0">
                   4
                 </span>
-                <span>Complete payment via PesaPal</span>
+                <span>Log in with your credentials to access the system</span>
               </li>
               <li className="flex items-start">
                 <span className="inline-flex items-center justify-center w-6 h-6 bg-blue-600 text-white rounded-full text-xs font-bold mr-3 flex-shrink-0">
                   5
                 </span>
-                <span>Log in with your credentials to access the system</span>
+                <span>Start managing your maintenance from the dashboard</span>
               </li>
             </ol>
           </div>
@@ -161,7 +161,7 @@ export default function ActivationPending() {
             Why Two Steps?
           </h3>
           <p className="text-sm text-gray-600">
-            We require email verification and payment to ensure account security and prevent fraud. This protects your account and our system.
+            We require email verification to ensure account security and prevent fraud. This protects your account and our system.
           </p>
         </div>
       </div>
