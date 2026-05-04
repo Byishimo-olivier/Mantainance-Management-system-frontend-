@@ -736,6 +736,7 @@ const createEmptyAssetForm = () => ({
   blocks: [],
   room: '',
   purchasePrice: '',
+  purchaseCurrency: 'RWF',
   purchaseDate: '',
   residualPrice: '',
   usefulLife: '',
@@ -2344,6 +2345,34 @@ const RequestFormSettingsModal = ({
     if (result?.assets) {
       setAssetSettingsState(result.assets);
     }
+  };
+
+  const handleCreateAssetOperatingSchedule = async () => {
+    setAssetScheduleSaving(true);
+    const result = await onCreateAssetOperatingSchedule?.({
+      name: assetOperatingScheduleForm.name.trim(),
+      scheduleType: assetOperatingScheduleForm.scheduleType || 'daily',
+    });
+    setAssetScheduleSaving(false);
+    
+    if (result?.id || result?._id) {
+      // Auto-select the newly created schedule
+      setAssetForm((prev) => ({ ...prev, operatingScheduleId: result.id || result._id }));
+      setShowAssetOperatingHoursBuilder(false);
+      setAssetOperatingScheduleForm({ name: '', scheduleType: 'daily' });
+    }
+  };
+
+  const handleAssetScheduleDayChange = (day, patch) => {
+    // No longer needed - keeping for compatibility
+  };
+
+  const handleAssetScheduleBlockChange = (day, index, key, value) => {
+    // No longer needed - keeping for compatibility
+  };
+
+  const handleAssetAddScheduleBlock = (day) => {
+    // No longer needed - keeping for compatibility
   };
 
   const handleCreatePartGroup = async () => {
@@ -4974,6 +5003,74 @@ const RequestFormSettingsModal = ({
         </div>
       )}
 
+      {showAssetOperatingHoursBuilder && (
+        <div className="fixed inset-0 z-[1500] flex items-center justify-center bg-black/45 p-6">
+          <div className="w-full max-w-[600px] rounded-[20px] bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-gray-200 px-8 py-7">
+              <h3 className="text-[22px] font-bold text-gray-900">Create Operating Hours Schedule</h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAssetOperatingHoursBuilder(false);
+                  setAssetOperatingScheduleForm({ name: '', scheduleType: 'daily' });
+                }}
+                className="text-gray-500 hover:text-gray-800"
+              >
+                <X className="h-8 w-8" />
+              </button>
+            </div>
+
+            <div className="space-y-6 px-8 py-8">
+              <div>
+                <label className="mb-3 block text-[16px] font-semibold text-gray-900">Schedule Name</label>
+                <input
+                  value={assetOperatingScheduleForm.name}
+                  onChange={(e) => setAssetOperatingScheduleForm((prev) => ({ ...prev, name: e.target.value }))}
+                  placeholder="e.g., Business Hours, Maintenance Window"
+                  className="h-12 w-full rounded-lg border border-gray-300 px-4 text-[16px] text-gray-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                />
+              </div>
+
+              <div>
+                <label className="mb-3 block text-[16px] font-semibold text-gray-900">Schedule Frequency</label>
+                <select
+                  value={assetOperatingScheduleForm.scheduleType || 'daily'}
+                  onChange={(e) => setAssetOperatingScheduleForm((prev) => ({ ...prev, scheduleType: e.target.value }))}
+                  className="h-12 w-full rounded-lg border border-gray-300 px-4 text-[16px] text-gray-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                >
+                  <option value="hourly">Hourly</option>
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly</option>
+                  <option value="monthly">Monthly</option>
+                  <option value="yearly">Yearly</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 border-t border-gray-200 px-8 py-5">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAssetOperatingHoursBuilder(false);
+                  setAssetOperatingScheduleForm({ name: '', scheduleType: 'daily' });
+                }}
+                className="rounded-md border border-gray-300 bg-white px-5 py-2.5 text-[15px] font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleCreateAssetOperatingSchedule}
+                disabled={assetScheduleSaving || !assetOperatingScheduleForm.name.trim() || !assetOperatingScheduleForm.scheduleType}
+                className="rounded-md bg-blue-600 px-5 py-2.5 text-[15px] font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500"
+              >
+                {assetScheduleSaving ? 'Creating...' : 'Create Schedule'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showPartGroupModal && (
         <div className="fixed inset-0 z-[1500] flex items-center justify-center bg-black/45 p-6">
           <div className="w-full max-w-[760px] rounded-[20px] bg-white shadow-2xl">
@@ -6923,7 +7020,18 @@ function AssetEditorModal({
                 <div className="mt-8 grid gap-5 sm:grid-cols-2">
                   <div>
                     <label className="mb-2 block text-[1.05rem] font-semibold text-gray-900">Purchase Price</label>
-                    <input type="number" min="0" step="0.01" value={assetForm.purchasePrice} onChange={(e) => setAssetForm((prev) => ({ ...prev, purchasePrice: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-4 py-3 text-lg outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+                    <div className="grid grid-cols-[120px_1fr] gap-3">
+                      <select value={assetForm.purchaseCurrency || 'RWF'} onChange={(e) => setAssetForm((prev) => ({ ...prev, purchaseCurrency: e.target.value }))} className="rounded-lg border border-gray-300 px-3 py-3 text-lg outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
+                        <option value="RWF">RWF</option>
+                        <option value="USD">USD</option>
+                        <option value="EUR">EUR</option>
+                        <option value="GBP">GBP</option>
+                        <option value="KES">KES</option>
+                        <option value="UGX">UGX</option>
+                        <option value="TZS">TZS</option>
+                      </select>
+                      <input type="number" min="0" step="0.01" value={assetForm.purchasePrice} onChange={(e) => setAssetForm((prev) => ({ ...prev, purchasePrice: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-4 py-3 text-lg outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+                    </div>
                   </div>
                   <div>
                     <label className="mb-2 block text-[1.05rem] font-semibold text-gray-900">Purchase Date</label>
@@ -7430,6 +7538,7 @@ function ClientDashboard() {
   // â”€â”€ State â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const location = useLocation();
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [featureResetNonce, setFeatureResetNonce] = useState(0);
   const [hasVisitedSubscriptionTab, setHasVisitedSubscriptionTab] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -7487,6 +7596,9 @@ function ClientDashboard() {
   const [propertyFiles, setPropertyFiles] = useState(null);
   const [editingAsset, setEditingAsset] = useState(null);
   const [assetForm, setAssetForm] = useState(createEmptyAssetForm);
+  const [showAssetOperatingHoursBuilder, setShowAssetOperatingHoursBuilder] = useState(false);
+  const [assetOperatingScheduleForm, setAssetOperatingScheduleForm] = useState({ name: '', scheduleType: 'daily' });
+  const [assetScheduleSaving, setAssetScheduleSaving] = useState(false);
   const [originalAssetBlocks, setOriginalAssetBlocks] = useState([]);
   const [selectedAsset, setSelectedAsset] = useState(null);
   const [assetModalOpen, setAssetModalOpen] = useState(false);
@@ -7974,7 +8086,7 @@ function ClientDashboard() {
   const [showCreatePm, setShowCreatePm] = useState(false);
   const [pmModalMode, setPmModalMode] = useState('create');
   const [editingPmScheduleId, setEditingPmScheduleId] = useState('');
-  const [pmAssetRowsSeed, setPmAssetRowsSeed] = useState([{ id: 1, assetId: '', locationId: '', startDate: '', endDate: '', timezone: '(UTC+02:00) Africa/Kigali', assignee: '' }]);
+  const [pmAssetRowsSeed, setPmAssetRowsSeed] = useState([{ id: 1, assetId: '', locationId: '', startDate: '', startTime: '', endDate: '', endTime: '', timezone: '(UTC+02:00) Africa/Kigali', assignee: '' }]);
   const [showWorkOrderDetails, setShowWorkOrderDetails] = useState(false);
   const [showStandaloneWorkOrderCreate, setShowStandaloneWorkOrderCreate] = useState(false);
   const [standaloneWorkOrderDraft, setStandaloneWorkOrderDraft] = useState({
@@ -8092,7 +8204,7 @@ function ClientDashboard() {
     setPmChecklist([{ id: Date.now() + 1, text: '', type: 'Status', meter: '' }]);
     // keep library across sessions
     setPmSchedule({ scheduleType: null, calendarRule: null, meterRule: null, combinedRule: null, reminderLeadMinutes: 60 });
-    setPmAssetRowsSeed([{ id: 1, assetId: '', locationId: '', startDate: '', endDate: '', timezone: '(UTC+02:00) Africa/Kigali', assignee: '' }]);
+    setPmAssetRowsSeed([{ id: 1, assetId: '', locationId: '', startDate: '', startTime: '', endDate: '', endTime: '', timezone: '(UTC+02:00) Africa/Kigali', assignee: '' }]);
     setPmSessionId((n) => n + 1);
     setShowCreatePm(true);
   };
@@ -8346,8 +8458,10 @@ function ClientDashboard() {
           id: row?.id || idx + 1,
           assetId: String(extractId(row?.assetId || row?.asset) || ''),
           locationId: String(extractId(row?.locationId || row?.location) || row?.propertyId || ''),
-          startDate: row?.startDate || '',
-          endDate: row?.endDate || '',
+          startDate: row?.startDate ? String(row.startDate).split('T')[0] : '',
+          startTime: row?.startTime || (row?.startDate && String(row.startDate).includes('T') ? String(row.startDate).split('T')[1]?.slice(0, 5) || '' : ''),
+          endDate: row?.endDate ? String(row.endDate).split('T')[0] : '',
+          endTime: row?.endTime || (row?.endDate && String(row.endDate).includes('T') ? String(row.endDate).split('T')[1]?.slice(0, 5) || '' : ''),
           timezone: row?.timezone || '(UTC+02:00) Africa/Kigali',
           assignee: row?.assignee || row?.assignedTo || row?.technicianId || '',
         }))
@@ -8355,8 +8469,10 @@ function ClientDashboard() {
           id: 1,
           assetId: String(extractId(schedule?.assetId || schedule?.asset) || ''),
           locationId: '',
-          startDate: schedule?.startDate || '',
-          endDate: schedule?.nextDate || schedule?.date || '',
+          startDate: schedule?.startDate ? String(schedule.startDate).split('T')[0] : '',
+          startTime: schedule?.startTime || schedule?.calendarRule?.time || '',
+          endDate: (schedule?.nextDate || schedule?.date) ? String(schedule?.nextDate || schedule?.date).split('T')[0] : '',
+          endTime: schedule?.endTime || '',
           timezone: '(UTC+02:00) Africa/Kigali',
           assignee: String(schedule?.assignedTo || ''),
         }];
@@ -17685,7 +17801,10 @@ function ClientDashboard() {
   const isPmLinkedIssue = (issue) => {
     return Boolean(
       issue?.scheduleId ||
+      issue?.parentScheduleId ||
+      issue?.maintenanceScheduleId ||
       issue?.pmId ||
+      issue?.pmInstanceId ||
       issue?.pmTrigger ||
       issue?.preventiveMaintenanceName ||
       issue?.scheduleName ||
@@ -17703,6 +17822,41 @@ function ClientDashboard() {
       || st === 'OPEN'
       || st.includes('IN PROGRESS')
       || st.includes('COMPLETE');
+  };
+
+  const getPmWorkOrderOccurrenceKey = (issue) => {
+    if (!isPmLinkedIssue(issue)) return '';
+    const scheduleKey = String(
+      issue?.parentScheduleId ||
+      issue?.maintenanceScheduleId ||
+      issue?.scheduleId ||
+      issue?.pmId ||
+      issue?.pmTrigger ||
+      issue?.preventiveMaintenanceName ||
+      ''
+    ).trim().toLowerCase();
+    const due = normalizeDate(issue?.dueDate || issue?.fixDeadline || issue?.createdAt);
+    const dueKey = due ? due.toISOString().slice(0, 10) : '';
+    const occurrenceKey = String(
+      issue?.pmOccurrenceKey ||
+      issue?.pmInstanceId ||
+      issue?.pmInstanceNumber ||
+      dueKey ||
+      issue?.title ||
+      ''
+    ).trim().toLowerCase();
+    return scheduleKey && occurrenceKey ? `${scheduleKey}:${occurrenceKey}` : '';
+  };
+
+  const dedupePmWorkOrders = (items = []) => {
+    const seen = new Set();
+    return (items || []).filter((issue) => {
+      const key = getPmWorkOrderOccurrenceKey(issue);
+      if (!key) return true;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
   };
 
   const isRequestRecord = (issue) => {
@@ -17879,7 +18033,7 @@ function ClientDashboard() {
     selectedRequestStatuses,
   ]);
   const requestBulkSelection = useBulkSelection(filteredRequests, (request) => request?._id || request?.id);
-  const workOrders = allIssues.filter(issue => isApprovedWorkOrder(issue));
+  const workOrders = dedupePmWorkOrders(allIssues.filter(issue => isApprovedWorkOrder(issue)));
   const resolveRequestWorkOrderLabel = React.useCallback((request) => {
     const rawRequestStatus = String(request?.status || '').toUpperCase().replace(/_/g, ' ').trim();
     const requestRefs = Array.from(new Set([
@@ -18788,7 +18942,9 @@ function ClientDashboard() {
           rowId: row?.id || row?.locationId || row?.assetId || '—',
           meter: assetMatch?.meter || assetMatch?.meterReading || assetMatch?.meterValue || '—',
           startDate: row?.startDate || '',
+          startTime: row?.startTime || '',
           endDate: row?.endDate || '',
+          endTime: row?.endTime || '',
           assigneeName: assigneeMatch?.name || row?.assigneeName || row?.assignee || '—',
         };
       });
@@ -18856,7 +19012,15 @@ function ClientDashboard() {
     return Array.from(new Set(names.filter(Boolean)));
   })() : [];
 
-  const selectedScheduleWorkOrders = selectedSchedule ? allIssues.filter((issue) => {
+  const selectedScheduleWorkOrders = selectedSchedule ? dedupePmWorkOrders(allIssues.filter((issue) => {
+    const selectedScheduleId = String(selectedSchedule?._id || selectedSchedule?.id || '');
+    const issueScheduleIds = [
+      issue?.scheduleId,
+      issue?.parentScheduleId,
+      issue?.maintenanceScheduleId,
+      issue?.pmId,
+    ].filter(Boolean).map((value) => String(value));
+    const matchesScheduleId = selectedScheduleId && issueScheduleIds.includes(selectedScheduleId);
     const issueAssetId = extractId(issue.assetId || issue.asset);
     const matchesAsset = issueAssetId && selectedScheduleAssetIds.includes(String(issueAssetId));
     const scheduleName = String(selectedSchedule.name || '').toLowerCase();
@@ -18867,8 +19031,8 @@ function ClientDashboard() {
     const matchesWorkOrderTitle = scheduleWorkOrderTitle
       ? String(issue.title || '').toLowerCase().includes(scheduleWorkOrderTitle)
       : false;
-    return matchesAsset || matchesName || matchesWorkOrderTitle;
-  }) : [];
+    return matchesScheduleId || matchesAsset || matchesName || matchesWorkOrderTitle;
+  })) : [];
   const selectedScheduleFrequency = selectedSchedule ? formatScheduleFrequency(selectedSchedule) : '';
   const selectedScheduleNextDate = selectedSchedule ? normalizeDate(selectedSchedule.nextDate || selectedSchedule.date) : null;
   const selectedScheduleStatus = selectedSchedule ? (selectedSchedule.status || 'Scheduled') : '';
@@ -19326,6 +19490,7 @@ function ClientDashboard() {
       blocks: isBranchAsset ? [] : blocksArr,
       room: asset.room || asset.location?.room || '',
       purchasePrice: asset.purchaseCost ?? '',
+      purchaseCurrency: identifiers.purchaseCurrency || asset.purchaseCurrency || 'RWF',
       purchaseDate: asset.purchaseDate ? new Date(asset.purchaseDate).toISOString().slice(0, 10) : '',
       residualPrice: identifiers.residualValue ?? asset.currentValue ?? '',
       usefulLife: identifiers.usefulLife?.value ?? '',
@@ -20251,6 +20416,7 @@ function ClientDashboard() {
           manufacturer: assetForm.manufacturer,
           category: assetForm.category,
           area: assetForm.area,
+          purchaseCurrency: assetForm.purchaseCurrency || 'RWF',
           residualValue: assetForm.residualPrice,
           usefulLife: assetForm.usefulLife ? { value: assetForm.usefulLife, unit: assetForm.usefulLifeUnit } : null,
           workerId: assetForm.workerId,
@@ -20607,10 +20773,7 @@ function ClientDashboard() {
   ];
 
   const handleSidebarTabNavigation = useCallback((nextTab) => {
-    if (nextTab === activeTab) {
-      setIsMobileMenuOpen(false);
-      return;
-    }
+    setFeatureResetNonce((value) => value + 1);
 
     // Reset Work Order & Request Modals
     setModalData({ open: false, type: '', item: null });
@@ -20627,6 +20790,15 @@ function ClientDashboard() {
     setScheduleDetailTab('assets');
     setShowSelectedScheduleMenu(false);
     setEditingSchedule(null);
+    setSelectedScheduleAssetPopover(null);
+    setSelectedScheduleAssetLocationSearch('');
+    setSelectedScheduleAssetAssignedSearch('');
+    setSelectedScheduleAssetLocations([]);
+    setSelectedScheduleAssetAssignedTo([]);
+    setSelectedScheduleAssetRowKeys([]);
+    setShowSelectedScheduleBulkAssign(false);
+    setSelectedScheduleBulkAssignee('');
+    setOpenSelectedScheduleRowMenuKey('');
 
     // Reset Requests states
     setShowRequestSettingsModal(false);
@@ -20641,25 +20813,47 @@ function ClientDashboard() {
     setPropertyDetailTab('details');
     setShowAddFloorplanModal(false);
     setShowPropertyActionsMenu(false);
+    setPropertyOpenPopover(null);
+    setOpenPropertyRowMenuKey('');
 
     // Reset Asset Details
     setAssetModalOpen(false);
     setSelectedAsset(null);
     setAssetDetailTab('workOrders');
+    setAssetDetailSearchQuery('');
+    setAssetDetailOpenPopover(null);
+    setSelectedAssetWorkOrderStatuses([]);
+    setSelectedAssetWorkOrderPriorities([]);
+    setSelectedAssetWorkOrderLocations([]);
+    setShowAssetWorkOrderSortMenu(false);
+    setShowAssetDetailColumnsMenu(false);
     setShowSelectedAssetActionsMenu(false);
     setShowAssetActivityModal(false);
     setShowAssetQrPopover(false);
     setShowAssetAddDowntimeModal(false);
     setShowAssetDowntimeLogModal(false);
 
-    // Reset Checklist & PO Editors
+    // Reset People, Tasks, Checklists, and Editors
+    setSelectedDirectoryPerson(null);
+    setPersonDetailTab('details');
+    setShowSelectedPersonActionsMenu(false);
+    setIsEditingDirectoryPerson(false);
+    setSelectedDirectoryTeam(null);
+    setPeopleDirectoryOpenPopover(null);
+    setSelectedTaskDetail(null);
+    setShowTaskDetailModal(false);
+    setTaskDetailChatInput('');
+    setSelectedChecklistTemplate(null);
+    setChecklistDetailOpen(false);
+    setSelectedChecklistLibraryTemplateId('');
     setEditingChecklistTemplate(null);
+
     // Reset Miscellaneous
     setEditingTech(null);
     setShowUserProfileModal(false);
     setIsMobileMenuOpen(false);
     setActiveTab(nextTab);
-  }, [activeTab]);
+  }, []);
 
   useEffect(() => {
     if ((activeTab === 'branches' || activeTab === 'assets') && currentUser?.companyName) {
@@ -22917,6 +23111,7 @@ function ClientDashboard() {
 
           {activeTab === 'intelligence' && (
             <ClientIntelligenceTab
+              key={`intelligence-${featureResetNonce}`}
               assets={assets}
               issues={allIssues}
               technicians={internalTechnicians}
@@ -24787,6 +24982,7 @@ function ClientDashboard() {
           )}
           {activeTab === 'scheduler' && (
             <ClientSchedulerTab
+              key={`scheduler-${featureResetNonce}`}
               workOrders={schedulerWorkOrders}
               technicians={allWorkers}
               assignableTechnicians={assignableSchedulerPeople}
@@ -24802,8 +24998,8 @@ function ClientDashboard() {
             />
           )}
 
-          {activeTab === 'vendors' && <ClientContactsTab type="vendor" />}
-          {activeTab === 'customers' && <ClientContactsTab type="customer" />}
+          {activeTab === 'vendors' && <ClientContactsTab key={`vendors-${featureResetNonce}`} type="vendor" />}
+          {activeTab === 'customers' && <ClientContactsTab key={`customers-${featureResetNonce}`} type="customer" />}
 
           {/* â”€â”€ Work Orders â”€â”€ */}
           {activeTab === 'workOrders' && (
@@ -28293,7 +28489,7 @@ function ClientDashboard() {
                             <div className="flex items-center justify-between text-sm"><span className="text-gray-500">Rate</span><span className="font-semibold text-gray-900">{selectedAsset.depreciationRate ? `$${selectedAsset.depreciationRate}/Year` : '—'}</span></div>
                             <div className="flex items-center justify-between text-sm"><span className="text-gray-500">Ends</span><span className="font-semibold text-gray-900">{selectedAsset.warrantyUntil ? new Date(selectedAsset.warrantyUntil).toLocaleDateString() : '—'}</span></div>
                             <div className="flex items-center justify-between text-sm"><span className="text-gray-500">Current Value</span><span className="font-semibold text-gray-900">{selectedAsset.currentValue ?? selectedAsset.identifiers?.residualValue ?? '—'}</span></div>
-                            <div className="flex items-center justify-between text-sm"><span className="text-gray-500">Purchase Price</span><span className="font-semibold text-gray-900">{renderValue(selectedAsset.purchaseCost)}</span></div>
+                            <div className="flex items-center justify-between text-sm"><span className="text-gray-500">Purchase Price</span><span className="font-semibold text-gray-900">{selectedAsset.purchaseCost || selectedAsset.purchaseCost === 0 ? `${selectedAsset.identifiers?.purchaseCurrency || selectedAsset.purchaseCurrency || 'RWF'} ${Number(selectedAsset.purchaseCost).toLocaleString()}` : '—'}</span></div>
                             <div className="flex items-center justify-between text-sm"><span className="text-gray-500">Useful Life</span><span className="font-semibold text-gray-900">{selectedAsset.identifiers?.usefulLife?.value ? `${selectedAsset.identifiers.usefulLife.value} ${selectedAsset.identifiers.usefulLife.unit || ''}`.trim() : '—'}</span></div>
                           </div>
                         </div>
@@ -30114,6 +30310,7 @@ function ClientDashboard() {
           {/* â”€â”€ Parts & Inventory â”€â”€ */}
           {activeTab === 'parts' && (
             <ClientPartsTab
+              key={`parts-${featureResetNonce}`}
               properties={properties}
               branches={branches}
               people={people}
@@ -30122,12 +30319,13 @@ function ClientDashboard() {
 
           {/* â”€â”€ Purchase Orders â”€â”€ */}
           {activeTab === 'purchaseOrders' && (
-            <ClientPurchaseOrdersTab />
+            <ClientPurchaseOrdersTab key={`purchaseOrders-${featureResetNonce}`} />
           )}
 
           {/* â”€â”€ Analytics â”€â”€ */}
           {activeTab === 'analytics' && (
             <ClientAnalyticsTab
+              key={`analytics-${featureResetNonce}`}
               allIssues={allIssues}
               technicians={[...(allWorkers || []), ...(internalTechnicians || []), ...(people || []), ...(technicians || [])]}
               assets={assets}
@@ -30204,6 +30402,7 @@ function ClientDashboard() {
               workOrders={issues}
               assets={assets}
               properties={properties}
+              currentUser={currentUser}
               onImportLocations={handleImportPropertiesFile}
               onImportAssets={handleImportAssetsFile}
             />
@@ -32339,6 +32538,12 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
   const getFilterButtonClasses = (active) => `inline-flex h-11 items-center gap-2 rounded-xl border px-4 text-sm font-medium transition ${
     active ? 'border-blue-200 bg-blue-50 text-blue-700 shadow-sm' : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
   }`;
+  const PART_STATUS_FILTER_OPTIONS = [
+    { key: 'IN_STOCK', label: 'In stock' },
+    { key: 'LOW_STOCK', label: 'Low stock' },
+    { key: 'OUT_OF_STOCK', label: 'Out of stock' },
+    { key: 'NON_STOCK', label: 'Non-stock' },
+  ];
 
   const [items, setItems] = React.useState([]);
   const [inventorySets, setInventorySets] = React.useState([]);
@@ -32346,9 +32551,12 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
   const [inventoryAssets, setInventoryAssets] = React.useState([]);
   const [search, setSearch] = React.useState('');
   const [statusFilter, setStatusFilter] = React.useState('');
+  const [partStatusFilters, setPartStatusFilters] = React.useState([]);
+  const [excludeIncomingInventory, setExcludeIncomingInventory] = React.useState(false);
   const [locationFilter, setLocationFilter] = React.useState('');
   const [tagFilter, setTagFilter] = React.useState('');
   const [sortField, setSortField] = React.useState('incomingDesc');
+  const [openPartFilterPopover, setOpenPartFilterPopover] = React.useState(null);
   const [activeInventoryTab, setActiveInventoryTab] = React.useState('parts');
   const fileRef = React.useRef(null);
   const partFileInputRef = React.useRef(null);
@@ -32557,6 +32765,23 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
     () => Array.from(new Set((items || []).map((item) => String(item?.status || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
     [items]
   );
+  const getPartStatusFilterKey = React.useCallback((part) => {
+    if (part?.nonStock) return 'NON_STOCK';
+    const rawStatus = String(part?.status || '').trim().toUpperCase().replace(/[\s-]+/g, '_');
+    const availableQty = Number(part?.available ?? part?.availableQty ?? part?.quantity ?? 0);
+    const minQty = Number(part?.minQtyThreshold ?? part?.minQty ?? 0);
+
+    if (rawStatus.includes('NON_STOCK')) return 'NON_STOCK';
+    if (rawStatus.includes('OUT')) return 'OUT_OF_STOCK';
+    if (rawStatus.includes('LOW')) return 'LOW_STOCK';
+    if (rawStatus.includes('IN_STOCK') || rawStatus.includes('STOCK_IN') || rawStatus.includes('AVAILABLE')) return 'IN_STOCK';
+    if (availableQty <= 0) return 'OUT_OF_STOCK';
+    if (minQty > 0 && availableQty <= minQty) return 'LOW_STOCK';
+    return 'IN_STOCK';
+  }, []);
+  const getPartStatusFilterLabel = React.useCallback((part) => (
+    PART_STATUS_FILTER_OPTIONS.find((option) => option.key === getPartStatusFilterKey(part))?.label || 'In stock'
+  ), [getPartStatusFilterKey]);
   const setStatusOptions = React.useMemo(
     () => Array.from(new Set((inventorySets || []).map((item) => String(item?.status || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
     [inventorySets]
@@ -32610,6 +32835,13 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
     () => Array.from(new Set(locationOptions.map((location) => String(location?.name || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
     [locationOptions]
   );
+  const partLocationFilterOptions = React.useMemo(
+    () => Array.from(new Set([
+      ...companyLocationOptions,
+      ...inventoryLocationOptions,
+    ].map((location) => String(location || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    [companyLocationOptions, inventoryLocationOptions]
+  );
   const inventoryTagOptions = React.useMemo(
     () => Array.from(new Set([
       ...(items || []).flatMap((item) => getTagList(item)),
@@ -32622,9 +32854,11 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
   const filteredParts = React.useMemo(() => {
     const query = String(search || '').trim().toLowerCase();
     const next = (items || []).filter((it) => {
-      const status = String(it?.status || '').trim();
+      const statusKey = getPartStatusFilterKey(it);
       const location = String(it?.location || it?.warehouse || '').trim();
-      if (statusFilter && status !== statusFilter) return false;
+      const incomingQty = Number(it?.incoming || it?.incomingQty || 0);
+      if (partStatusFilters.length > 0 && !partStatusFilters.includes(statusKey)) return false;
+      if (excludeIncomingInventory && incomingQty > 0) return false;
       if (locationFilter && location !== locationFilter) return false;
       if (tagFilter && !getTagList(it).includes(tagFilter)) return false;
       if (!query) return true;
@@ -32633,7 +32867,8 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
         it?.partName,
         it?.partNumber,
         it?.category,
-        status,
+        getPartStatusFilterLabel(it),
+        it?.status,
         location,
         getTagList(it).join(' '),
         it?._id,
@@ -32648,7 +32883,7 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
       if (sortField === 'nameAsc') return String(left?.name || '').localeCompare(String(right?.name || ''));
       return Number(right?.incoming || 0) - Number(left?.incoming || 0);
     });
-  }, [items, locationFilter, search, sortField, statusFilter, tagFilter]);
+  }, [excludeIncomingInventory, getPartStatusFilterKey, getPartStatusFilterLabel, items, locationFilter, partStatusFilters, search, sortField, tagFilter]);
   const filteredSets = React.useMemo(() => {
     const query = String(search || '').trim().toLowerCase();
     return (inventorySets || []).filter((entry) => {
@@ -32863,9 +33098,12 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
   const resetFilters = () => {
     setSearch('');
     setStatusFilter('');
+    setPartStatusFilters([]);
+    setExcludeIncomingInventory(false);
     setLocationFilter('');
     setTagFilter('');
     setSortField('incomingDesc');
+    setOpenPartFilterPopover(null);
   };
 
   return (
@@ -32922,6 +33160,9 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
                   setShowAddSet(false);
                   setShowAddCycleCount(false);
                   setStatusFilter('');
+                  setPartStatusFilters([]);
+                  setExcludeIncomingInventory(false);
+                  setOpenPartFilterPopover(null);
                 }}
                 className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition ${
                   activeInventoryTab === key ? 'bg-blue-50 text-blue-700 shadow-sm' : 'text-gray-600 hover:bg-gray-50'
@@ -33497,7 +33738,7 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
       )}
       {activeInventoryTab === 'parts' && (
       <>
-      <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+      <div className="relative z-40 overflow-visible rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
         <div className="mb-3 flex items-center justify-between gap-4">
           <div className="text-sm font-semibold text-gray-700">{activeRows.length} {activeSummaryLabel} returned</div>
           <div className="flex items-center gap-3 text-sm text-gray-600">
@@ -33518,34 +33759,140 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
               className="h-11 w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-4 text-sm text-gray-700 outline-none focus:border-blue-500"
             />
           </div>
-          <button type="button" className={getFilterButtonClasses(Boolean(statusFilter))}>
-            <SlidersHorizontal className="h-4 w-4" />
-            Status: {statusFilter ? formatLabel(statusFilter) : 'All'}
-            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="bg-transparent outline-none">
-              <option value="">All</option>
-              {activeStatusOptions.map((status) => <option key={status} value={status}>{formatLabel(status)}</option>)}
-            </select>
-          </button>
-          {activeInventoryTab === 'parts' && (
-            <button type="button" className={getFilterButtonClasses(sortField !== 'incomingDesc')}>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setOpenPartFilterPopover((prev) => prev === 'status' ? null : 'status')}
+              className={getFilterButtonClasses(partStatusFilters.length > 0)}
+            >
               <SlidersHorizontal className="h-4 w-4" />
-              {sortField === 'incomingDesc' ? 'Incoming Qty' : sortField === 'availableDesc' ? 'Available Qty' : sortField === 'onHandDesc' ? 'On Hand Qty' : sortField === 'statusAsc' ? 'Status' : 'Name'}
-              <select value={sortField} onChange={(e) => setSortField(e.target.value)} className="bg-transparent outline-none">
-                <option value="incomingDesc">Incoming Qty</option>
-                <option value="availableDesc">Available Qty</option>
-                <option value="onHandDesc">On Hand Qty</option>
-                <option value="statusAsc">Status</option>
-                <option value="nameAsc">Name</option>
-              </select>
+              Status{partStatusFilters.length ? `: ${partStatusFilters.map((key) => PART_STATUS_FILTER_OPTIONS.find((option) => option.key === key)?.label).filter(Boolean).join(', ')}` : ''}
+              <ChevronDown className="h-4 w-4" />
             </button>
+            {openPartFilterPopover === 'status' && (
+              <div className="absolute left-0 top-[calc(100%+10px)] z-[120] w-80 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl">
+                <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+                  <div className="text-base font-bold text-gray-900">Status</div>
+                  <button type="button" onClick={() => setOpenPartFilterPopover(null)} className="rounded-lg p-1 text-gray-500 hover:bg-gray-100">
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+                <div className="space-y-3 px-5 py-4">
+                  {PART_STATUS_FILTER_OPTIONS.map((option) => (
+                    <label key={option.key} className="flex items-center gap-3 text-sm text-gray-800">
+                      <input
+                        type="checkbox"
+                        checked={partStatusFilters.includes(option.key)}
+                        onChange={() => setPartStatusFilters((prev) => prev.includes(option.key) ? prev.filter((key) => key !== option.key) : [...prev, option.key])}
+                        className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span>{option.label}</span>
+                    </label>
+                  ))}
+                </div>
+                <div className="flex items-center justify-between border-t border-gray-100 px-5 py-4">
+                  <button type="button" onClick={() => setPartStatusFilters([])} className="text-sm font-semibold text-blue-600 hover:text-blue-700">Clear</button>
+                  <div className="flex items-center gap-2">
+                    <button type="button" onClick={() => setOpenPartFilterPopover(null)} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">Cancel</button>
+                    <button type="button" onClick={() => setOpenPartFilterPopover(null)} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Save</button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          {activeInventoryTab === 'parts' && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setOpenPartFilterPopover((prev) => prev === 'incoming' ? null : 'incoming')}
+                className={getFilterButtonClasses(excludeIncomingInventory || sortField !== 'incomingDesc')}
+              >
+                <SlidersHorizontal className="h-4 w-4" />
+                Incoming Qty
+                <ChevronDown className="h-4 w-4" />
+              </button>
+              {openPartFilterPopover === 'incoming' && (
+                <div className="absolute left-0 top-[calc(100%+10px)] z-[120] w-80 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl">
+                  <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+                    <div className="text-base font-bold text-gray-900">Incoming Qty</div>
+                    <button type="button" onClick={() => setOpenPartFilterPopover(null)} className="rounded-lg p-1 text-gray-500 hover:bg-gray-100">
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+                  <div className="space-y-4 px-5 py-5">
+                    <label className="flex items-center gap-3 text-sm text-gray-800">
+                      <input
+                        type="checkbox"
+                        checked={excludeIncomingInventory}
+                        onChange={(e) => setExcludeIncomingInventory(e.target.checked)}
+                        className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span>Exclude Incoming Inventory</span>
+                    </label>
+                    <label className="block">
+                      <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-500">Sort By</span>
+                      <select value={sortField} onChange={(e) => setSortField(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500">
+                        <option value="incomingDesc">Incoming Qty</option>
+                        <option value="availableDesc">Available Qty</option>
+                        <option value="onHandDesc">On Hand Qty</option>
+                        <option value="statusAsc">Status</option>
+                        <option value="nameAsc">Name</option>
+                      </select>
+                    </label>
+                  </div>
+                  <div className="flex items-center justify-between border-t border-gray-100 px-5 py-4">
+                    <button type="button" onClick={() => { setExcludeIncomingInventory(false); setSortField('incomingDesc'); }} className="text-sm font-semibold text-blue-600 hover:text-blue-700">Clear</button>
+                    <div className="flex items-center gap-2">
+                      <button type="button" onClick={() => setOpenPartFilterPopover(null)} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">Cancel</button>
+                      <button type="button" onClick={() => setOpenPartFilterPopover(null)} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Save</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
-          <button type="button" className={getFilterButtonClasses(Boolean(locationFilter))}>
-            Location
-            <select value={locationFilter} onChange={(e) => setLocationFilter(e.target.value)} className="bg-transparent outline-none">
-              <option value="">All</option>
-              {inventoryLocationOptions.map((location) => <option key={location} value={location}>{location}</option>)}
-            </select>
-          </button>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setOpenPartFilterPopover((prev) => prev === 'location' ? null : 'location')}
+              className={getFilterButtonClasses(Boolean(locationFilter))}
+            >
+              Location{locationFilter ? `: ${locationFilter}` : ''}
+              <ChevronDown className="h-4 w-4" />
+            </button>
+            {openPartFilterPopover === 'location' && (
+              <div className="absolute left-0 top-[calc(100%+10px)] z-[120] w-80 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl">
+                <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+                  <div className="text-base font-bold text-gray-900">Location</div>
+                  <button type="button" onClick={() => setOpenPartFilterPopover(null)} className="rounded-lg p-1 text-gray-500 hover:bg-gray-100">
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+                <div className="max-h-72 space-y-2 overflow-y-auto px-5 py-4">
+                  <label className="flex items-center gap-3 text-sm text-gray-800">
+                    <input type="radio" name="part-location-filter" checked={!locationFilter} onChange={() => setLocationFilter('')} className="h-4 w-4 text-blue-600 focus:ring-blue-500" />
+                    <span>All company locations</span>
+                  </label>
+                  {partLocationFilterOptions.map((location) => (
+                    <label key={location} className="flex items-center gap-3 text-sm text-gray-800">
+                      <input type="radio" name="part-location-filter" checked={locationFilter === location} onChange={() => setLocationFilter(location)} className="h-4 w-4 text-blue-600 focus:ring-blue-500" />
+                      <span>{location}</span>
+                    </label>
+                  ))}
+                  {partLocationFilterOptions.length === 0 && (
+                    <div className="py-4 text-sm text-gray-500">No company locations found.</div>
+                  )}
+                </div>
+                <div className="flex items-center justify-between border-t border-gray-100 px-5 py-4">
+                  <button type="button" onClick={() => setLocationFilter('')} className="text-sm font-semibold text-blue-600 hover:text-blue-700">Clear</button>
+                  <div className="flex items-center gap-2">
+                    <button type="button" onClick={() => setOpenPartFilterPopover(null)} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">Cancel</button>
+                    <button type="button" onClick={() => setOpenPartFilterPopover(null)} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Save</button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
           <button type="button" className={getFilterButtonClasses(Boolean(tagFilter))}>
             Tags
             <select value={tagFilter} onChange={(e) => setTagFilter(e.target.value)} className="bg-transparent outline-none">
@@ -33562,7 +33909,7 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
           </button>
         </div>
       </div>
-      <div className="glass-surface rounded-lg overflow-hidden">
+      <div className="relative z-0 glass-surface rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead className="bg-[#fcfcfd] border-b border-gray-100">
@@ -34422,21 +34769,18 @@ const ClientVendorsTab = () => {
       )}
 
       {showAddCustomer && (
-        <form onSubmit={saveCustomer} className="glass-surface rounded-lg border border-white/10 p-4 flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-lg font-bold text-gray-900">Create Customer</div>
-              <div className="text-xs text-gray-500">Details</div>
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <form onSubmit={saveCustomer} className="w-full max-w-2xl h-[90vh] flex flex-col bg-white rounded-lg shadow-2xl border border-white/10">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 flex-shrink-0">
+              <div>
+                <div className="text-lg font-bold text-gray-900">Create Customer</div>
+                <div className="text-xs text-gray-500">Details</div>
+              </div>
+              <button type="button" onClick={() => setShowAddCustomer(false)} className="text-gray-500 hover:text-gray-700 text-2xl leading-none">×</button>
             </div>
-            <div className="flex gap-2">
-              <button type="button" onClick={() => setShowAddCustomer(false)} className="px-3 py-2 text-sm border rounded-lg">Cancel</button>
-              <button type="submit" disabled={saving} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold disabled:opacity-60">
-                {saving ? 'Saving...' : 'Create Customer'}
-              </button>
-            </div>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="flex-1 overflow-y-scroll p-4 space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             {[
               ['Customer Name *', 'name', 'text', true],
               ['Address', 'address', 'text', false],
@@ -34512,6 +34856,10 @@ const ClientVendorsTab = () => {
                   <option value="USD">USD - United States Dollar - $</option>
                   <option value="EUR">EUR - Euro - €</option>
                   <option value="GBP">GBP - British Pound - £</option>
+                  <option value="RWF">RWF - Rwandan Franc - Rwf</option>
+                  <option value="UGX">UGX - Ugandan Shilling - USh</option>
+                  <option value="TZS">TZS - Tanzanian Shilling - TSh</option>
+                  <option value="KES">KES - Kenyan Shilling - KSh</option>
                 </select>
               </div>
             </div>
@@ -34569,8 +34917,17 @@ const ClientVendorsTab = () => {
                 </div>
               ))}
             </div>
-          </div>
-        </form>
+            </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 p-4 border-t border-gray-200 flex-shrink-0 bg-gray-50">
+              <button type="button" onClick={() => setShowAddCustomer(false)} className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-100">Cancel</button>
+              <button type="submit" disabled={saving} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold disabled:opacity-60 hover:bg-blue-700">
+                {saving ? 'Saving...' : 'Create Customer'}
+              </button>
+            </div>
+          </form>
+        </div>
       )}
 
       <div className="glass-surface rounded-lg overflow-hidden">
@@ -35051,15 +35408,15 @@ const ClientContactsTab = ({ type = 'vendor' }) => {
       </div>
 
       {showAddEntry && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <form onSubmit={handleCreateEntry} className="bg-white rounded-2xl w-full max-w-lg p-6 shadow-2xl">
-            <div className="flex items-center justify-between mb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-4">
+          <form onSubmit={handleCreateEntry} className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex flex-shrink-0 items-center justify-between border-b border-gray-100 px-6 py-5">
               <h3 className="text-lg font-bold text-gray-900">{type === 'vendor' ? 'Create Vendor' : 'Create Customer'}</h3>
               <button type="button" onClick={() => setShowAddEntry(false)} className="p-2 hover:bg-gray-100 rounded-lg">
                 <X className="w-4 h-4 text-gray-400" />
               </button>
             </div>
-            <div className="space-y-3">
+            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-6 py-5">
               <input className="w-full border border-gray-200 rounded-lg p-2 text-sm" placeholder="Name / Company" value={newEntry.name} onChange={(e) => setNewEntry({ ...newEntry, name: e.target.value })} />
               <input className="w-full border border-gray-200 rounded-lg p-2 text-sm" placeholder="Address" value={newEntry.address} onChange={(e) => setNewEntry({ ...newEntry, address: e.target.value })} />
               <div className="grid grid-cols-2 gap-3">
@@ -35106,6 +35463,10 @@ const ClientContactsTab = ({ type = 'vendor' }) => {
                       <option value="USD">USD - United States Dollar - $</option>
                       <option value="EUR">EUR - Euro - EUR</option>
                       <option value="GBP">GBP - British Pound - GBP</option>
+                      <option value="RWF">RWF - Rwandan Franc - Rwf</option>
+                      <option value="UGX">UGX - Ugandan Shilling - USh</option>
+                      <option value="TZS">TZS - Tanzanian Shilling - TSh</option>
+                      <option value="KES">KES - Kenyan Shilling - KSh</option>
                     </select>
                   </div>
 
@@ -35165,7 +35526,7 @@ const ClientContactsTab = ({ type = 'vendor' }) => {
                 </div>
               )}
             </div>
-            <div className="flex items-center justify-end gap-2 mt-5">
+            <div className="flex flex-shrink-0 items-center justify-end gap-2 border-t border-gray-100 bg-gray-50 px-6 py-4">
               <button type="button" onClick={() => setShowAddEntry(false)} className="px-4 py-2 border rounded-lg text-sm">Cancel</button>
               <button type="submit" disabled={creatingEntry} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold disabled:opacity-60">
                 {creatingEntry ? 'Saving...' : 'Save'}
@@ -35379,8 +35740,10 @@ const ClientAnalyticsTab = ({
   };
   const isPmLinkedIssue = (issue) => Boolean(
     issue?.scheduleId ||
+    issue?.parentScheduleId ||
     issue?.pmId ||
     issue?.maintenanceScheduleId ||
+    issue?.pmInstanceId ||
     issue?.pmTrigger ||
     issue?.preventiveMaintenanceName ||
     issue?.scheduleName ||
@@ -44588,6 +44951,7 @@ const ClientSchedulerTab = ({ workOrders = [], technicians = [], assignableTechn
           </div>
         </div>
       )}
+      {/* Damaged duplicate Smart Schedule modal retained as a JSX comment until the UI can be reconciled:
       {smartScheduleOpen && (
         <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
           <div className="flex max-h-[92vh] w-full max-w-7xl flex-col overflow-hidden rounded-[28px] bg-white shadow-2xl">
@@ -44772,7 +45136,220 @@ const ClientSchedulerTab = ({ workOrders = [], technicians = [], assignableTechn
                                 <div className="flex items-center gap-2 text-sm text-gray-700">
                                   <Clock className="h-4 w-4 text-gray-400" />
                                   {issue.expectedHours || '1'} hours
+            <div className="flex items-center justify-end gap-4 px-8 py-6">
+              <button type="button" onClick={closeScheduleSettings} className="rounded-xl border border-gray-300 bg-white px-6 py-3 text-base font-medium text-gray-700 hover:bg-gray-50">
+                Cancel
+              </button>
+              <button type="button" onClick={saveScheduleSettings} className="rounded-xl bg-blue-600 px-6 py-3 text-base font-semibold text-white hover:bg-blue-700">
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      */}
+      {smartScheduleOpen && (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+          <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-[28px] bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-5">
+              <h2 className="text-xl font-bold text-gray-900">Smart Schedule</h2>
+              <button type="button" onClick={closeSmartSchedule} className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            <div className="flex-1 space-y-6 overflow-y-auto bg-gray-50 px-6 py-6">
+              {smartScheduleError && (
+                <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                  {smartScheduleError}
+                </div>
+              )}
+
+              <div className="grid gap-5 rounded-3xl border border-gray-200 bg-white p-6 md:grid-cols-3">
+                <label className="block text-sm font-medium text-gray-700">
+                  Start date
+                  <input type="date" value={smartScheduleForm.startDate} onChange={(e) => setSmartScheduleForm((prev) => ({ ...prev, startDate: e.target.value }))} className="mt-2 w-full rounded-xl border border-gray-300 px-4 py-3 text-sm text-gray-700 focus:outline-none" />
+                </label>
+                <label className="block text-sm font-medium text-gray-700">
+                  End date
+                  <input type="date" value={smartScheduleForm.endDate} onChange={(e) => setSmartScheduleForm((prev) => ({ ...prev, endDate: e.target.value }))} className="mt-2 w-full rounded-xl border border-gray-300 px-4 py-3 text-sm text-gray-700 focus:outline-none" />
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Start
+                    <input type="time" value={smartScheduleForm.workdayStart} onChange={(e) => setSmartScheduleForm((prev) => ({ ...prev, workdayStart: e.target.value }))} className="mt-2 w-full rounded-xl border border-gray-300 px-4 py-3 text-sm text-gray-700 focus:outline-none" />
+                  </label>
+                  <label className="block text-sm font-medium text-gray-700">
+                    End
+                    <input type="time" value={smartScheduleForm.workdayEnd} onChange={(e) => setSmartScheduleForm((prev) => ({ ...prev, workdayEnd: e.target.value }))} className="mt-2 w-full rounded-xl border border-gray-300 px-4 py-3 text-sm text-gray-700 focus:outline-none" />
+                  </label>
+                </div>
+              </div>
+
+              <div className="grid gap-6 lg:grid-cols-2">
+                <div className="rounded-3xl border border-gray-200 bg-white p-6">
+                  <div className="mb-4 flex items-center justify-between">
+                    <h3 className="text-base font-semibold text-gray-900">Team members</h3>
+                    <span className="text-sm text-gray-500">{smartScheduleSelections.techs.length} selected</span>
+                  </div>
+                  <div className="grid max-h-72 gap-3 overflow-y-auto sm:grid-cols-2">
+                    {smartScheduleTeamMembers.map((tech, idx) => {
+                      const techId = String(tech._id || tech.id || tech.userId || `tech-${idx}`);
+                      const isSelected = smartScheduleSelections.techs.includes(techId);
+                      return (
+                        <button key={techId} type="button" onClick={() => toggleSmartScheduleSelection('techs', techId)} className={`flex items-center justify-between rounded-2xl border p-4 text-left transition ${isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
+                          <span className="text-sm font-medium text-gray-800">{tech.name || tech.fullName || `Technician ${idx + 1}`}</span>
+                          <input type="checkbox" readOnly checked={isSelected} className="h-5 w-5 rounded border-gray-300 text-blue-600" />
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="rounded-3xl border border-gray-200 bg-white p-6">
+                  <div className="mb-4 flex items-center justify-between">
+                    <h3 className="text-base font-semibold text-gray-900">Work orders</h3>
+                    <span className="text-sm text-gray-500">{smartScheduleSelections.workOrders.length} selected</span>
+                  </div>
+                  <div className="grid max-h-72 gap-3 overflow-y-auto">
+                    {smartScheduleIssues.map((issue) => {
+                      const issueId = String(issue._id || issue.id);
+                      const isSelected = smartScheduleSelections.workOrders.includes(issueId);
+                      const due = getIssueDueDate(issue);
+                      return (
+                        <button key={issueId} type="button" onClick={() => toggleSmartScheduleSelection('workOrders', issueId)} className={`rounded-2xl border p-4 text-left transition ${isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <div className="text-sm font-semibold text-gray-900">{issue.title || 'Work Order'}</div>
+                              <div className="mt-2 flex flex-wrap gap-3 text-xs text-gray-500">
+                                <span>{issue.priority || 'No priority'}</span>
+                                <span>{due ? formatShortDate(due) : 'No date'}</span>
+                                <span>{issue.expectedHours || '1'} hours</span>
+                              </div>
+                            </div>
+                            <input type="checkbox" readOnly checked={isSelected} className="mt-1 h-5 w-5 rounded border-gray-300 text-blue-600" />
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-4 border-t border-gray-200 px-6 py-5">
+              <button type="button" onClick={closeSmartSchedule} className="rounded-xl border border-gray-300 bg-white px-5 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                Cancel
+              </button>
+              <button type="button" onClick={handleSmartScheduleGenerate} disabled={smartScheduleSaving} className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300">
+                {smartScheduleSaving ? 'Scheduling...' : 'Generate schedule'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Damaged duplicate Smart Schedule modal retained as a JSX comment until the UI can be reconciled:
+      {smartScheduleOpen && (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+          <div className="flex max-h-[92vh] w-full max-w-7xl flex-col overflow-hidden rounded-[28px] bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-5">
+              <h2 className="text-xl font-bold text-gray-900">Smart Schedule</h2>
+              <button type="button" onClick={closeSmartSchedule} className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto bg-gray-50 px-6 py-8">
+              {smartScheduleError && (
+                <div className="mb-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                  {smartScheduleError}
+                </div>
+              )}
+
+              <div className="space-y-5">
+                <div className="rounded-3xl border border-gray-200 bg-white">
+                  <button type="button" onClick={() => toggleSmartScheduleSection('when')} className="flex w-full items-center justify-between px-6 py-5 text-left">
+                    <div className="flex items-center gap-3">
+                      <ChevronDown className={`h-5 w-5 text-gray-500 transition-transform ${smartScheduleSections.when ? 'rotate-180' : ''}`} />
+                      <span className="text-base font-semibold text-gray-900">When should the work be scheduled?</span>
+                    </div>
+                    <div className="text-right text-sm text-gray-500">
+                      {formatShortDate(smartScheduleForm.startDate)} - {formatShortDate(smartScheduleForm.endDate)} ({formatTimeLabel(smartScheduleForm.workdayStart)} - {formatTimeLabel(smartScheduleForm.workdayEnd)})
+                    </div>
+                  </button>
+                  {smartScheduleSections.when && (
+                    <div className="grid gap-5 border-t border-gray-200 px-6 py-6 md:grid-cols-3">
+                      <div>
+                        <label className="mb-2 block text-sm font-medium text-gray-700">Date Range</label>
+                        <div className="flex items-center gap-3 rounded-xl border border-gray-300 bg-white px-4 py-3">
+                          <Calendar className="h-4 w-4 text-gray-400" />
+                          <input type="date" value={smartScheduleForm.startDate} onChange={(e) => setSmartScheduleForm((prev) => ({ ...prev, startDate: e.target.value }))} className="w-full text-sm text-gray-700 focus:outline-none" />
+                          <span className="text-gray-400">-</span>
+                          <input type="date" value={smartScheduleForm.endDate} onChange={(e) => setSmartScheduleForm((prev) => ({ ...prev, endDate: e.target.value }))} className="w-full text-sm text-gray-700 focus:outline-none" />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="mb-2 block text-sm font-medium text-gray-700">Workday Start Time</label>
+                        <div className="flex items-center gap-3 rounded-xl border border-gray-300 bg-white px-4 py-3">
+                          <Clock className="h-4 w-4 text-gray-400" />
+                          <input type="time" value={smartScheduleForm.workdayStart} onChange={(e) => setSmartScheduleForm((prev) => ({ ...prev, workdayStart: e.target.value }))} className="w-full text-sm text-gray-700 focus:outline-none" />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="mb-2 block text-sm font-medium text-gray-700">Workday End Time</label>
+                        <div className="flex items-center gap-3 rounded-xl border border-gray-300 bg-white px-4 py-3">
+                          <Clock className="h-4 w-4 text-gray-400" />
+                          <input type="time" value={smartScheduleForm.workdayEnd} onChange={(e) => setSmartScheduleForm((prev) => ({ ...prev, workdayEnd: e.target.value }))} className="w-full text-sm text-gray-700 focus:outline-none" />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-3xl border border-gray-200 bg-white">
+                  <button type="button" onClick={() => toggleSmartScheduleSection('team')} className="flex w-full items-center justify-between px-6 py-5 text-left">
+                    <div className="flex items-center gap-3">
+                      <ChevronDown className={`h-5 w-5 text-gray-500 transition-transform ${smartScheduleSections.team ? 'rotate-180' : ''}`} />
+                      <span className="text-base font-semibold text-gray-900">Who should be considered for the schedule?</span>
+                    </div>
+                    <div className="text-sm text-gray-500">{smartScheduleSelections.techs.length} team member(s) selected</div>
+                  </button>
+                  {smartScheduleSections.team && (
+                    <div className="border-t border-gray-200 px-6 py-6">
+                      <div className="mb-4 flex items-center justify-between">
+                        <div className="text-sm text-gray-500">Team Members <span className="ml-2 rounded-lg bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-600">{smartScheduleTeamMembers.length}</span></div>
+                        <button
+                          type="button"
+                          onClick={() => setSmartScheduleSelections((prev) => ({
+                            ...prev,
+                            techs: prev.techs.length === smartScheduleTeamMembers.length
+                              ? []
+                              : smartScheduleTeamMembers.map((tech, idx) => String(tech._id || tech.id || tech.userId || `tech-${idx}`))
+                          }))}
+                          className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                        >
+                          Select page
+                        </button>
+                      </div>
+                      <div className="min-h-[220px] rounded-2xl border border-gray-200 bg-gray-50 p-5">
+                        <div className="flex flex-wrap gap-4">
+                          {smartScheduleTeamMembers.map((tech, idx) => {
+                            const techId = String(tech._id || tech.id || tech.userId || `tech-${idx}`);
+                            const isSelected = smartScheduleSelections.techs.includes(techId);
+                            return (
+                              <button
+                                key={techId}
+                                type="button"
+                                onClick={() => toggleSmartScheduleSelection('techs', techId)}
+                                className={`flex w-[136px] flex-col items-start gap-3 rounded-2xl border bg-white p-4 text-left transition ${isSelected ? 'border-blue-500 ring-2 ring-blue-100' : 'border-gray-200 hover:border-gray-300'}`}
+                              >
+                                <div className="flex w-full items-start justify-between">
+                                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-indigo-50 text-xl font-semibold text-indigo-600">
+                                    {(tech.name || tech.fullName || 'T').charAt(0).toUpperCase()}
+                                  </div>
+                                  <input type="checkbox" readOnly checked={isSelected} className="mt-1 h-5 w-5 rounded border-gray-300 text-blue-600" />
                                 </div>
+                                <div className="text-sm font-medium text-gray-800">{tech.name || tech.fullName || `Technician ${idx + 1}`}</div>
                               </button>
                             );
                           })}
@@ -44781,56 +45358,68 @@ const ClientSchedulerTab = ({ workOrders = [], technicians = [], assignableTechn
                     </div>
                   )}
                 </div>
-              </div>
-            </div>
 
-            <div className="flex items-center justify-between border-t border-gray-200 bg-white px-6 py-5">
-              <button type="button" onClick={closeSmartSchedule} className="rounded-xl border border-gray-300 bg-white px-5 py-3 text-base font-medium text-gray-700 hover:bg-gray-50">
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleSmartScheduleGenerate}
-                disabled={smartScheduleSaving || !smartScheduleSelections.workOrders.length || !smartScheduleSelections.techs.length}
-                className="rounded-xl bg-blue-600 px-8 py-3 text-base font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
-              >
-                {smartScheduleSaving ? 'Generating...' : 'Generate'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
+                <div className="rounded-3xl border border-gray-200 bg-white">
+                  <button type="button" onClick={() => toggleSmartScheduleSection('orders')} className="flex w-full items-center justify-between px-6 py-5 text-left">
+                    <div className="flex items-center gap-3">
+                      <ChevronDown className={`h-5 w-5 text-gray-500 transition-transform ${smartScheduleSections.orders ? 'rotate-180' : ''}`} />
+                      <span className="text-base font-semibold text-gray-900">Which work orders should be scheduled?</span>
+                    </div>
+                    <div className="text-sm text-gray-500">{smartScheduleSelections.workOrders.length} work order(s) selected</div>
+                  </button>
+                  {smartScheduleSections.orders && (
+                    <div className="border-t border-gray-200 px-6 py-6">
+                      <div className="mb-4 flex items-center justify-between">
+                        <div className="text-sm text-gray-500">Work Orders <span className="ml-2 rounded-lg bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-600">{filteredUnscheduled.length}</span></div>
+                        <div className="flex items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setSmartScheduleSelections((prev) => ({
+                              ...prev,
+                              workOrders: prev.workOrders.length === smartScheduleIssues.length
+                                ? []
+                                : smartScheduleIssues.map((issue) => String(issue._id || issue.id))
+                            }))}
+                            className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                          >
+                            Select page
+                          </button>
+                          <button type="button" onClick={() => setSmartSchedulePage(1)} className="inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                            <RotateCcw className="h-4 w-4" />
+                            Back to First
+                          </button>
+                          <div className="flex items-center gap-3 text-sm text-gray-600">
+                            <button type="button" onClick={() => setSmartSchedulePage((page) => Math.max(1, page - 1))} className="text-gray-400 hover:text-gray-600">
+                              <ChevronLeft className="h-4 w-4" />
+                            </button>
+                            Page {smartSchedulePage} / {smartScheduleTotalPages}
+                            <button type="button" onClick={() => setSmartSchedulePage((page) => Math.min(smartScheduleTotalPages, page + 1))} className="text-gray-400 hover:text-gray-600">
+                              <ChevronRight className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
 
-const ImportExportPanel = () => {
-  const [dataset, setDataset] = React.useState('Work Orders');
-  const datasets = ['Work Orders', 'Assets', 'Properties', 'Technicians', 'Parts', 'Vendors', 'Customers'];
-  return (
-    <div className="min-h-screen bg-gray-50 flex flex-col items-center py-12 px-6">
-      <div className="w-full max-w-5xl bg-white border border-gray-200 rounded-2xl shadow-sm px-8 py-10">
-        <h1 className="text-2xl font-bold text-gray-900 mb-8">Import Data</h1>
-        <div className="max-w-md">
-          <label className="block text-sm font-bold text-gray-700 mb-2">Data Set</label>
-          <select value={dataset} onChange={(e) => setDataset(e.target.value)} className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm text-gray-900 shadow-sm">
-            {datasets.map(d => <option key={d}>{d}</option>)}
-          </select>
-          <button className="mt-6 w-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-lg px-4 py-3 shadow-sm">
-            {`Start ${dataset} Import Process`}
-          </button>
-        </div>
-
-        <div className="mt-10 border-t border-gray-200 pt-6 flex flex-wrap gap-4 text-sm font-semibold text-blue-700">
-          <button className="hover:underline">Download Template</button>
-          <button className="hover:underline">Export Current {dataset}</button>
-          <button className="hover:underline">See Examples & Tutorials ↗</button>
-        </div>
-
-        <div className="mt-4 text-sm text-gray-600">
-          <span className="font-bold text-gray-700">Tip:</span> If you are assigning any people, teams, assets, locations, parts or purchase orders, ensure they are already created in your account.
-        </div>
-      </div>
+                      <div className="min-h-[360px] rounded-2xl border border-gray-200 bg-gray-50 p-5">
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                          {smartScheduleIssues.map((issue) => {
+                            const issueId = String(issue._id || issue.id);
+                            const isSelected = smartScheduleSelections.workOrders.includes(issueId);
+                            const due = getIssueDueDate(issue);
+                            const priorityTone = String(issue.priority || '').toUpperCase() === 'HIGH'
+                              ? 'text-red-500'
+                              : String(issue.priority || '').toUpperCase() === 'MEDIUM'
+                                ? 'text-amber-500'
+                                : 'text-green-600';
+                            return (
+                              <button
+                                key={issueId}
+                                type="button"
+                                onClick={() => toggleSmartScheduleSelection('workOrders', issueId)}
+                                className={`rounded-2xl border bg-white p-5 text-left transition ${isSelected ? 'border-blue-500 ring-2 ring-blue-100' : 'border-gray-200 hover:border-gray-300'}`}
+                              >
+                                <div className="mb-4 flex items-start justify-between gap-3">
+      */}
     </div>
   );
 };
@@ -44839,20 +45428,51 @@ const ImportExportTabs = ({
   workOrders = [],
   assets = [],
   properties = [],
-  onImportLocations,
-  onImportAssets,
+  setProperties,
+  setAssets,
+  currentUser = null,
 }) => {
   const tabOptions = ['import', 'export'];
-  const importDatasets = ['Locations', 'Assets', 'Parts', 'Vendors', 'Customers'];
-  const exportDatasets = ['Work Orders', 'Assets', 'Locations', 'Parts', 'Vendors', 'Customers'];
+  const importDatasets = ['Locations', 'Assets', 'Preventive Maintenance', 'Parts', 'Vendors', 'Customers', 'Work Orders'];
+  const exportDatasets = ['Work Orders', 'Assets', 'Locations', 'Preventive Maintenance', 'Parts', 'Vendors', 'Customers'];
   const [activeTab, setActiveTab] = React.useState('import');
   const [dataset, setDataset] = React.useState('Locations');
   const [busy, setBusy] = React.useState(false);
   const fileInputRef = React.useRef(null);
+  
+  const [importStep, setImportStep] = React.useState(1);
+  const [importHeaders, setImportHeaders] = React.useState([]);
+  const [importRawRows, setImportRawRows] = React.useState([]);
+  const [columnMap, setColumnMap] = React.useState({});
+  const [importRows, setImportRows] = React.useState([]);
+  const [importErrors, setImportErrors] = React.useState([]);
+  const importUser = React.useMemo(() => {
+    if (currentUser) return currentUser;
+    try {
+      return JSON.parse(localStorage.getItem('user') || '{}');
+    } catch {
+      return {};
+    }
+  }, [currentUser]);
+  const importUserId = importUser?._id || importUser?.id || importUser?.userId || '';
+  const importCompanyName = importUser?.companyName
+    || importUser?.company?.companyName
+    || importUser?.company?.name
+    || '';
 
   React.useEffect(() => {
     setDataset(activeTab === 'import' ? 'Locations' : 'Work Orders');
   }, [activeTab]);
+
+  React.useEffect(() => {
+    setImportStep(1);
+    setImportHeaders([]);
+    setImportRawRows([]);
+    setColumnMap({});
+    setImportRows([]);
+    setImportErrors([]);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }, [dataset, activeTab]);
 
   const buildCsv = React.useCallback((rows) => {
     if (!Array.isArray(rows) || rows.length === 0) return '';
@@ -44915,132 +45535,417 @@ const ImportExportTabs = ({
       Latitude: item?.latitude ?? '',
       Longitude: item?.longitude ?? '',
     })),
+    'Preventive Maintenance': [],
   }), [assets, properties, workOrders]);
 
-  const templateRows = React.useMemo(() => ({
-    Locations: [{
-      Name: 'Kigali HQ',
-      Type: 'Office',
-      Address: 'KG 7 Ave',
-      Hierarchy: 'Rwanda / Kigali',
-      Latitude: '-1.9441',
-      Longitude: '30.0619',
-    }],
-    Assets: [{
-      Name: 'Generator A',
-      Type: 'Power',
-      Description: 'Backup generator',
-      Quantity: '1',
-      Location: 'Kigali HQ',
-      Building: 'Main Block',
-      Blocks: 'A',
-      Room: 'Power Room',
-    }],
-    Parts: [{
-      Name: 'Air Filter',
-      SKU: 'AF-100',
-      Category: 'Filters',
-      Unit: 'pcs',
-      Cost: '25',
-      Quantity: '10',
-      MinStock: '2',
-      Vendor: 'Prime Supplies',
-    }],
-    Vendors: [{
-      Name: 'Prime Supplies',
-      Email: 'purchasing@example.com',
-      Phone: '+250700000000',
-      Address: 'Kigali',
-      Notes: 'Preferred vendor',
-    }],
-    Customers: [{
-      Name: 'Acme Rwanda',
-      Email: 'ops@example.com',
-      Phone: '+250700000001',
-      Address: 'Kigali',
-      Company: 'Acme Rwanda',
-    }],
-  }), []);
-
-  const importInstructions = React.useMemo(() => ({
-    Locations: 'Upload a CSV with location names and optional address, hierarchy, and coordinates.',
-    Assets: 'Upload an Excel or CSV file with asset name and a matching location name.',
-    Parts: 'Upload a CSV with part name, SKU, category, stock levels, and optional vendor.',
-    Vendors: 'Upload a CSV with vendor contact information.',
-    Customers: 'Upload a CSV with customer contact and company details.',
-  }), []);
-
-  const normalizeImportRows = React.useCallback((rows, selectedDataset) => {
-    if (!Array.isArray(rows)) return [];
-    if (selectedDataset === 'Parts') {
-      return rows.map((row) => ({
-        name: row.name || row.part || row.partname || '',
-        sku: row.sku || row.code || '',
-        category: row.category || '',
-        unit: row.unit || '',
-        cost: Number(row.cost || row.price || 0) || 0,
-        quantity: Number(row.quantity || row.qty || row.stock || 0) || 0,
-        minStock: Number(row.minstock || row.minimumstock || 0) || 0,
-        vendor: row.vendor || row.vendorname || '',
-      })).filter((row) => row.name);
+  const DATASET_CONFIGS = React.useMemo(() => ({
+    'Locations': {
+      columns: [
+        { key: 'name', label: 'Location Name', aliases: ['name', 'location', 'site'], required: true },
+        { key: 'type', label: 'Type', aliases: ['type', 'category'], required: false },
+        { key: 'address', label: 'Address', aliases: ['address'], required: false },
+        { key: 'hierarchy', label: 'Hierarchy', aliases: ['hierarchy', 'parent'], required: false },
+        { key: 'latitude', label: 'Latitude', aliases: ['latitude', 'lat'], required: false },
+        { key: 'longitude', label: 'Longitude', aliases: ['longitude', 'lng'], required: false },
+      ],
+      templateRows: [{
+        'Location Name': 'Kigali HQ',
+        Type: 'Office',
+        Address: 'KG 7 Ave',
+        Hierarchy: 'Rwanda / Kigali',
+        Latitude: '-1.9441',
+        Longitude: '30.0619',
+      }],
+      apiEndpoint: '/api/properties',
+      bulk: false,
+      tips: [
+        'Ensure location names are unique.',
+        'Hierarchy should follow "Country / City / Site" format.',
+        'Address and coordinates are optional but helpful for mapping.'
+      ]
+    },
+    'Assets': {
+      columns: [
+        { key: 'name', label: 'Asset Name', aliases: ['name', 'asset'], required: true },
+        { key: 'type', label: 'Type', aliases: ['type', 'category'], required: false },
+        { key: 'description', label: 'Description', aliases: ['description', 'notes'], required: false },
+        { key: 'quantity', label: 'Quantity', aliases: ['quantity', 'qty'], required: false },
+        { key: 'location', label: 'Location', aliases: ['location', 'site', 'property'], required: true },
+        { key: 'building', label: 'Building', aliases: ['building'], required: false },
+        { key: 'blocks', label: 'Blocks', aliases: ['blocks'], required: false },
+        { key: 'room', label: 'Room', aliases: ['room'], required: false },
+      ],
+      templateRows: [{
+        'Asset Name': 'Generator A',
+        Type: 'Power',
+        Description: 'Backup generator',
+        Quantity: '1',
+        Location: properties?.[0]?.name || 'Kigali HQ',
+        Building: 'Main Block',
+        Blocks: 'A',
+        Room: 'Power Room',
+      }],
+      apiEndpoint: '/api/assets',
+      bulk: false,
+      tips: [
+        'Location name must match an existing location exactly.',
+        'Asset names should be unique and descriptive.',
+        'Spreadsheets (.xlsx, .xls) are supported for asset imports.'
+      ]
+    },
+    'Preventive Maintenance': {
+      columns: [
+        { key: 'templateId', label: 'Template ID', aliases: ['template id', 'templateid', 'pm id', 'id'], required: false },
+        { key: 'pmName', label: 'PM Name', aliases: ['pm name', 'preventive maintenance name', 'name', 'title'], required: true },
+        { key: 'workOrderName', label: 'Work Order Name', aliases: ['work order name', 'workorder name', 'work order title', 'wo name', 'title'], required: true },
+        { key: 'workOrderDescription', label: 'Work Order Description', aliases: ['work order description', 'description', 'wo description'], required: false },
+        { key: 'workOrderPriority', label: 'Work Order Priority', aliases: ['work order priority', 'priority'], required: false },
+        { key: 'workOrderCategory', label: 'Work Order Category', aliases: ['work order category', 'category'], required: false },
+        { key: 'scheduleType', label: 'Schedule Type', aliases: ['schedule type', 'type'], required: false },
+        { key: 'frequency', label: 'Frequency', aliases: ['frequency', 'repeat every', 'interval'], required: false },
+        { key: 'frequencyUnit', label: 'Frequency Unit', aliases: ['frequency unit', 'unit', 'repeat unit'], required: false },
+        { key: 'startDate', label: 'Start Date', aliases: ['start date', 'date', 'next date'], required: false },
+        { key: 'startTime', label: 'Start Time', aliases: ['start time', 'time'], required: false },
+        { key: 'location', label: 'Location', aliases: ['location', 'site', 'property'], required: false },
+        { key: 'assetName', label: 'Asset Name', aliases: ['asset name', 'asset'], required: false },
+        { key: 'assignedTo', label: 'Assigned To', aliases: ['assigned to', 'assignee', 'worker', 'technician'], required: false },
+      ],
+      templateRows: [{
+        'PM Name': 'Generator Weekly PM',
+        'Work Order Name': 'Inspect generator',
+        'Work Order Description': 'Check oil, coolant, etc.',
+        'Work Order Priority': 'Medium',
+        'Work Order Category': 'Preventive',
+        'Schedule Type': 'calendar',
+        'Frequency': '1',
+        'Frequency Unit': 'week',
+        'Start Date': new Date().toISOString().slice(0, 10),
+        'Start Time': '09:00',
+        Location: properties?.[0]?.name || 'Kigali HQ',
+        'Asset Name': assets?.[0]?.name || 'Generator A',
+      }],
+      apiEndpoint: '/api/maintenance-schedules',
+      bulk: false,
+      tips: [
+        'Frequency should be a number (e.g., 1).',
+        'Frequency Unit can be day, week, month, or year.',
+        'Start Date should follow YYYY-MM-DD format.'
+      ]
+    },
+    'Parts': {
+      columns: [
+        { key: 'name', label: 'Part Name', aliases: ['name', 'part', 'title'], required: true },
+        { key: 'sku', label: 'SKU', aliases: ['sku', 'code', 'part number'], required: false },
+        { key: 'category', label: 'Category', aliases: ['category'], required: false },
+        { key: 'unit', label: 'Unit', aliases: ['unit', 'uom'], required: false },
+        { key: 'cost', label: 'Cost', aliases: ['cost', 'price', 'unit cost'], required: false },
+        { key: 'quantity', label: 'Quantity', aliases: ['quantity', 'qty', 'stock'], required: false },
+        { key: 'minStock', label: 'Min Stock', aliases: ['min stock', 'minimum stock', 'reorder point'], required: false },
+        { key: 'vendor', label: 'Vendor', aliases: ['vendor', 'supplier'], required: false },
+      ],
+      templateRows: [{
+        'Part Name': 'Air Filter',
+        SKU: 'AF-100',
+        Category: 'Filters',
+        Unit: 'pcs',
+        Cost: '25',
+        Quantity: '10',
+        'Min Stock': '2',
+        Vendor: 'Prime Supplies',
+      }],
+      apiEndpoint: '/api/parts/bulk',
+      bulk: true,
+      tips: [
+        'Use SKU to avoid duplicate parts.',
+        'Cost and Quantity should be numbers.',
+        'Min Stock helps with low inventory alerts.'
+      ]
+    },
+    'Vendors': {
+      columns: [
+        { key: 'name', label: 'Vendor Name', aliases: ['name', 'vendor', 'company'], required: true },
+        { key: 'email', label: 'Email', aliases: ['email', 'email address'], required: false },
+        { key: 'phone', label: 'Phone', aliases: ['phone', 'phone number', 'tel'], required: false },
+        { key: 'address', label: 'Address', aliases: ['address'], required: false },
+        { key: 'notes', label: 'Notes', aliases: ['notes', 'description'], required: false },
+      ],
+      templateRows: [{
+        'Vendor Name': 'Prime Supplies',
+        Email: 'purchasing@example.com',
+        Phone: '+250700000000',
+        Address: 'Kigali',
+        Notes: 'Preferred vendor',
+      }],
+      apiEndpoint: '/api/vendors/bulk',
+      bulk: true,
+      tips: [
+        'Vendor name is required.',
+        'Provide an email for sending purchase orders directly.'
+      ]
+    },
+    'Customers': {
+      columns: [
+        { key: 'name', label: 'Customer Name', aliases: ['name', 'customer', 'client'], required: true },
+        { key: 'email', label: 'Email', aliases: ['email', 'email address'], required: false },
+        { key: 'phone', label: 'Phone', aliases: ['phone', 'phone number', 'tel'], required: false },
+        { key: 'address', label: 'Address', aliases: ['address'], required: false },
+        { key: 'company', label: 'Company', aliases: ['company'], required: false },
+      ],
+      templateRows: [{
+        'Customer Name': 'Acme Rwanda',
+        Email: 'ops@example.com',
+        Phone: '+250700000001',
+        Address: 'Kigali',
+        Company: 'Acme Rwanda',
+      }],
+      apiEndpoint: '/api/clients/bulk',
+      bulk: true,
+      tips: [
+        'Enter the full name of the primary contact.',
+        'Company field is useful for B2B relationships.'
+      ]
+    },
+    'Work Orders': {
+      columns: [
+        { key: 'title', label: 'Work Order Title', aliases: ['title', 'name', 'work order'], required: true },
+        { key: 'description', label: 'Description', aliases: ['description'], required: false },
+        { key: 'status', label: 'Status', aliases: ['status'], required: false },
+        { key: 'priority', label: 'Priority', aliases: ['priority'], required: false },
+        { key: 'category', label: 'Category', aliases: ['category'], required: false },
+        { key: 'location', label: 'Location', aliases: ['location', 'site', 'property'], required: false },
+        { key: 'asset', label: 'Asset', aliases: ['asset'], required: false },
+        { key: 'assignee', label: 'Assignee', aliases: ['assignee', 'worker', 'technician'], required: false },
+      ],
+      templateRows: [{
+        'Work Order Title': 'Repair AC',
+        Description: 'AC is making noise',
+        Status: 'Open',
+        Priority: 'High',
+        Category: 'Repair',
+        Location: properties?.[0]?.name || 'Kigali HQ',
+      }],
+      apiEndpoint: '/api/issues',
+      bulk: false,
+      tips: [
+        'Titles should be actionable (e.g., "Repair Sink").',
+        'Status defaults to "Open" if not specified.',
+        'Priorities: Low, Medium, High, Critical.'
+      ]
     }
-    if (selectedDataset === 'Vendors') {
-      return rows.map((row) => ({
-        name: row.name || row.vendor || '',
-        email: row.email || '',
-        phone: row.phone || '',
-        address: row.address || '',
-        notes: row.notes || '',
-      })).filter((row) => row.name);
-    }
-    return rows.map((row) => ({
-      name: row.name || row.customer || row.client || row.company || '',
-      email: row.email || '',
-      phone: row.phone || '',
-      address: row.address || '',
-      company: row.company || row.name || '',
-    })).filter((row) => row.name);
+  }), [properties, assets]);
+
+  const normalizeHeaderKey = React.useCallback((value) => (
+    String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+  ), []);
+
+  const parseImportTableText = React.useCallback((text) => {
+    const lines = String(text || '').replace(/\r/g, '').split('\n').filter((line) => line.trim());
+    if (!lines.length) return { headers: [], rows: [] };
+    const delimiter = lines[0].includes('\t') ? '\t' : ',';
+    const parseLine = (line) => {
+      const out = [];
+      let current = '';
+      let inQuotes = false;
+      for (let index = 0; index < line.length; index += 1) {
+        const char = line[index];
+        if (char === '"' && line[index + 1] === '"') {
+          current += '"';
+          index += 1;
+        } else if (char === '"') {
+          inQuotes = !inQuotes;
+        } else if (char === delimiter && !inQuotes) {
+          out.push(current.trim());
+          current = '';
+        } else {
+          current += char;
+        }
+      }
+      out.push(current.trim());
+      return out;
+    };
+    const headers = parseLine(lines[0]).map((header) => header || 'Unnamed Column');
+    const rows = lines.slice(1).map((line) => {
+      const cells = parseLine(line);
+      const row = {};
+      headers.forEach((header, index) => {
+        row[header] = cells[index] ?? '';
+      });
+      return row;
+    }).filter((row) => Object.values(row).some((value) => String(value || '').trim()));
+    return { headers, rows };
   }, []);
 
-  const handleTemplateDownload = React.useCallback(() => {
-    downloadCsvFile(`${dataset.toLowerCase().replace(/\s+/g, '-')}-template.csv`, templateRows[dataset] || []);
-  }, [dataset, downloadCsvFile, templateRows]);
+  const buildAutoMap = React.useCallback((headers, configColumns) => {
+    const normalizedHeaders = (headers || []).map((header) => ({ header, normalized: normalizeHeaderKey(header) }));
+    return (configColumns || []).reduce((map, column) => {
+      const aliases = [column.label, ...(column.aliases || [])].map(normalizeHeaderKey);
+      const match = normalizedHeaders.find((entry) => aliases.includes(entry.normalized));
+      return { ...map, [column.key]: match?.header || '' };
+    }, {});
+  }, [normalizeHeaderKey]);
 
-  const handleImportAction = React.useCallback(async (file) => {
+  const buildRowsFromMap = React.useCallback((sourceRows, colMap, currentDataset) => {
+    const getValue = (row, key) => String(row?.[colMap?.[key]] ?? '').trim();
+    const errors = [];
+    const rows = (sourceRows || []).map((row, index) => {
+      const mapped = {};
+      const config = DATASET_CONFIGS[currentDataset];
+      if (!config) return null;
+      
+      config.columns.forEach(col => {
+        mapped[col.key] = getValue(row, col.key);
+      });
+
+      if (currentDataset === 'Preventive Maintenance') {
+        if (!mapped.pmName) errors.push(`Row ${index + 2}: PM Name is required.`);
+        if (!mapped.workOrderName) errors.push(`Row ${index + 2}: Work Order Name is required.`);
+      } else if (!mapped.name && !mapped.title) {
+        errors.push(`Row ${index + 2}: Name/Title is required.`);
+      }
+      
+      if (currentDataset === 'Assets') {
+        const prop = properties.find(p => String(p.name).toLowerCase() === String(mapped.location || '').toLowerCase());
+        if (!prop) errors.push(`Row ${index + 2}: Location "${mapped.location}" not found.`);
+        mapped.propertyId = prop?.id || prop?._id || '';
+      }
+
+      return { ...mapped, rowNumber: index + 2 };
+    }).filter(Boolean);
+    return { rows, errors };
+  }, [DATASET_CONFIGS, properties]);
+
+  const validateAndSetRows = React.useCallback((sourceRows = importRawRows, colMap = columnMap, currentDataset = dataset) => {
+    const config = DATASET_CONFIGS[currentDataset];
+    if (!config) return { rows: [], errors: [] };
+    
+    const missing = config.columns
+      .filter((column) => column.required && !colMap?.[column.key])
+      .map((column) => `${column.label} column is required.`);
+      
+    const result = buildRowsFromMap(sourceRows, colMap, currentDataset);
+    const nextErrors = [...missing, ...result.errors];
+    setImportRows(result.rows);
+    setImportErrors(nextErrors);
+    return { rows: result.rows, errors: nextErrors };
+  }, [buildRowsFromMap, columnMap, importRawRows, dataset, DATASET_CONFIGS]);
+
+  const handleFileUpload = React.useCallback(async (file) => {
     if (!file) return;
-    if (dataset === 'Locations') {
-      await onImportLocations?.(file);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      return;
-    }
-    if (dataset === 'Assets') {
-      await onImportAssets?.(file);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      return;
-    }
-
     setBusy(true);
     try {
-      const rawText = await file.text();
-      const rows = normalizeImportRows(parseCsvText(rawText), dataset);
-      if (!rows.length) {
-        alert(`No valid ${dataset.toLowerCase()} rows were found.`);
+      let parsed;
+      const isSpreadsheet = /\.(xlsx|xls)$/i.test(file.name || '');
+      if (isSpreadsheet) {
+        const { read, utils } = await import('xlsx');
+        const workbook = read(await file.arrayBuffer(), { type: 'array' });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const matrix = utils.sheet_to_json(sheet, { header: 1, defval: '' })
+          .filter((row) => Array.isArray(row) && row.some((cell) => String(cell || '').trim()));
+        const headers = (matrix[0] || []).map((header) => String(header || '').trim() || 'Unnamed Column');
+        const rows = matrix.slice(1).map((cells) => {
+          const row = {};
+          headers.forEach((header, index) => {
+            row[header] = cells[index] ?? '';
+          });
+          return row;
+        }).filter((row) => Object.values(row).some((value) => String(value || '').trim()));
+        parsed = { headers, rows };
+      } else {
+        parsed = parseImportTableText(await file.text());
+      }
+      if (!parsed.headers.length || !parsed.rows.length) {
+        alert('No rows were found in the file.');
         return;
       }
-      const endpoint = dataset === 'Parts'
-        ? '/api/parts/bulk'
-        : dataset === 'Vendors'
-          ? '/api/vendors/bulk'
-          : '/api/clients/bulk';
-      await api.post(endpoint, { items: rows });
-      alert(`Imported ${rows.length} ${dataset.toLowerCase()} record(s).`);
+      const config = DATASET_CONFIGS[dataset];
+      const autoMap = buildAutoMap(parsed.headers, config.columns);
+      setImportHeaders(parsed.headers);
+      setImportRawRows(parsed.rows);
+      setColumnMap(autoMap);
+      const result = validateAndSetRows(parsed.rows, autoMap, dataset);
+      setImportStep(result.errors.length ? 3 : 5);
     } catch (error) {
-      alert(error?.response?.data?.error || error?.message || `Failed to import ${dataset.toLowerCase()}.`);
+      alert(error?.message || 'Failed to read import file.');
     } finally {
       setBusy(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
-  }, [dataset, normalizeImportRows, onImportAssets, onImportLocations]);
+  }, [buildAutoMap, parseImportTableText, validateAndSetRows, dataset, DATASET_CONFIGS]);
+
+  const handleReviewFromMapping = React.useCallback(() => {
+    const result = validateAndSetRows();
+    setImportStep(result.errors.length ? 4 : 5);
+  }, [validateAndSetRows]);
+
+  const runBulkImport = React.useCallback(async () => {
+    const result = validateAndSetRows();
+    if (result.errors.length) {
+      setImportStep(4);
+      return;
+    }
+    if (!result.rows.length) return;
+
+    setBusy(true);
+    try {
+      const config = DATASET_CONFIGS[dataset];
+      if (config.bulk) {
+        await api.post(config.apiEndpoint, { items: result.rows });
+      } else {
+        for (const row of result.rows) {
+          let payload = { ...row };
+          if (dataset === 'Preventive Maintenance') {
+            payload = {
+              name: row.pmName,
+              workOrderTitle: row.workOrderName,
+              workOrderDescription: row.workOrderDescription || '',
+              priority: row.workOrderPriority || 'Medium',
+              category: row.workOrderCategory || 'Preventive',
+              scheduleType: row.scheduleType || 'calendar',
+              calendarRule: {
+                every: parseInt(row.frequency) || 1,
+                unit: row.frequencyUnit || 'day',
+                time: row.startTime || '09:00',
+              },
+              assetsRows: [{
+                id: 1,
+                assetName: row.assetName || '',
+                locationName: row.location || '',
+                startDate: row.startDate || new Date().toISOString(),
+                startTime: row.startTime || '09:00',
+                timezone: '(UTC+02:00) Africa/Kigali',
+                assignee: row.assignedTo || '',
+                assigneeName: row.assignedTo || '',
+              }],
+              status: 'Pending',
+              routine: false,
+              importTemplateId: row.templateId || undefined,
+              createdBy: importUserId,
+              companyName: importCompanyName,
+            };
+          } else {
+            payload.createdBy = importUserId;
+            payload.companyName = importCompanyName;
+          }
+          await api.post(config.apiEndpoint, payload);
+        }
+      }
+      alert(`Imported ${result.rows.length} ${dataset.toLowerCase()} record(s).`);
+      setImportStep(1);
+      setImportHeaders([]);
+      setImportRawRows([]);
+      setColumnMap({});
+      setImportRows([]);
+      setImportErrors([]);
+    } catch (error) {
+      alert(error?.response?.data?.error || error?.message || `Failed to import ${dataset.toLowerCase()}.`);
+    } finally {
+      setBusy(false);
+    }
+  }, [validateAndSetRows, dataset, DATASET_CONFIGS, importUserId, importCompanyName]);
+
+  const handleTemplateDownload = React.useCallback(() => {
+    downloadCsvFile(`${dataset.toLowerCase().replace(/\s+/g, '-')}-template.csv`, DATASET_CONFIGS[dataset]?.templateRows || []);
+  }, [dataset, downloadCsvFile, DATASET_CONFIGS]);
 
   const handleExportAction = React.useCallback(async () => {
     if (dataset === 'Work Orders' || dataset === 'Assets' || dataset === 'Locations') {
@@ -45050,29 +45955,48 @@ const ImportExportTabs = ({
 
     setBusy(true);
     try {
-      const endpoint = dataset === 'Parts'
-        ? '/api/parts'
-        : dataset === 'Vendors'
-          ? '/api/vendors'
-          : '/api/clients';
+      const endpoint = dataset === 'Preventive Maintenance'
+        ? '/api/maintenance-schedules'
+        : dataset === 'Parts'
+          ? '/api/parts'
+          : dataset === 'Vendors'
+            ? '/api/vendors'
+            : '/api/clients';
       const response = await api.get(endpoint);
       const records = Array.isArray(response?.data)
         ? response.data
         : Array.isArray(response?.data?.data)
           ? response.data.data
           : [];
-      const rows = records.map((item) => ({
-        Name: item?.name || '',
-        Email: item?.email || '',
-        Phone: item?.phone || '',
-        Address: item?.address || '',
-        Category: item?.category || '',
-        SKU: item?.sku || '',
-        Quantity: item?.quantity ?? '',
-        Cost: item?.cost ?? '',
-        Company: item?.company || '',
-        Notes: item?.notes || '',
-      }));
+      const rows = dataset === 'Preventive Maintenance'
+        ? records.map((item) => ({
+          'Template ID': item?.importTemplateId || item?._id || item?.id || '',
+          'PM Name': item?.name || item?.title || '',
+          'Work Order Name': item?.workOrderTitle || item?.title || '',
+          'Work Order Description': item?.workOrderDescription || item?.description || '',
+          'Work Order Priority': item?.priority || '',
+          'Work Order Category': item?.category || '',
+          'Schedule Type': item?.scheduleType || '',
+          Frequency: item?.calendarRule?.every ?? '',
+          'Frequency Unit': item?.calendarRule?.unit || '',
+          'Start Date': item?.date || item?.nextDate || '',
+          'Start Time': item?.time || item?.calendarRule?.time || '',
+          Location: item?.location || item?.locationName || item?.assetsRows?.[0]?.locationName || '',
+          'Asset Name': item?.assetName || item?.assetsRows?.[0]?.assetName || '',
+          'Assigned To': item?.assignedToName || item?.assetsRows?.[0]?.assigneeName || '',
+        }))
+        : records.map((item) => ({
+          Name: item?.name || '',
+          Email: item?.email || '',
+          Phone: item?.phone || '',
+          Address: item?.address || '',
+          Category: item?.category || '',
+          SKU: item?.sku || '',
+          Quantity: item?.quantity ?? '',
+          Cost: item?.cost ?? '',
+          Company: item?.company || '',
+          Notes: item?.notes || '',
+        }));
       downloadCsvFile(`${dataset.toLowerCase().replace(/\s+/g, '-')}.csv`, rows);
     } catch (error) {
       alert(error?.response?.data?.error || error?.message || `Failed to export ${dataset.toLowerCase()}.`);
@@ -45082,6 +46006,11 @@ const ImportExportTabs = ({
   }, [dataset, downloadCsvFile, exportRowsByDataset]);
 
   const tabDatasets = activeTab === 'import' ? importDatasets : exportDatasets;
+  const importSteps = ['Upload', 'Set header', 'Match columns', 'Bulk fix', 'Review and edit'];
+  const selectedDatasetTips = DATASET_CONFIGS[dataset]?.tips || [];
+  const selectedImportInstruction = selectedDatasetTips.length
+    ? selectedDatasetTips.join(' ')
+    : `Upload a CSV or spreadsheet file with the required ${dataset.toLowerCase()} columns.`;
 
   return (
     <div className="min-h-screen bg-gray-50 px-6 py-12">
@@ -45122,11 +46051,247 @@ const ImportExportTabs = ({
 
             <p className="mt-4 text-sm text-gray-600">
               {activeTab === 'import'
-                ? importInstructions[dataset]
+                ? selectedImportInstruction
                 : `Download the current ${dataset.toLowerCase()} records as a CSV file.`}
             </p>
 
             {activeTab === 'import' ? (
+              <div className="mt-6 space-y-6">
+                <div className="flex flex-wrap items-center gap-3">
+                  {importSteps.map((step, index) => {
+                    const stepNumber = index + 1;
+                    const isActive = importStep === stepNumber;
+                    const isDone = importStep > stepNumber;
+                    return (
+                      <button
+                        key={step}
+                        type="button"
+                        onClick={() => {
+                          if (stepNumber === 1 || importHeaders.length) setImportStep(stepNumber);
+                        }}
+                        disabled={stepNumber > 1 && !importHeaders.length}
+                        className={`inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs font-bold transition ${
+                          isActive
+                            ? 'bg-blue-600 text-white shadow-sm'
+                            : isDone
+                              ? 'bg-blue-50 text-blue-700'
+                              : 'bg-white text-gray-500 ring-1 ring-gray-200 disabled:cursor-not-allowed disabled:opacity-60'
+                        }`}
+                      >
+                        <span className={`grid h-5 w-5 place-items-center rounded-full text-[11px] ${
+                          isActive ? 'bg-white text-blue-700' : 'bg-gray-900 text-white'
+                        }`}
+                        >
+                          {stepNumber}
+                        </span>
+                        {step}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">Add {dataset}</h2>
+                  <p className="mt-1 text-sm text-gray-600">
+                    Follow the steps to cleanly import your {dataset.toLowerCase()} data.
+                  </p>
+                </div>
+
+                {importStep === 1 && (
+                  <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-6 text-center">
+                    <div className="mx-auto max-w-3xl overflow-hidden rounded-xl border border-gray-200 bg-gray-50 opacity-75">
+                      <div className="overflow-x-auto">
+                        <table className="min-w-[920px] w-full text-left text-xs">
+                          <thead className="bg-white text-gray-500">
+                            <tr>
+                              {DATASET_CONFIGS[dataset]?.columns.slice(0, 7).map((column) => (
+                                <th key={column.key} className="whitespace-nowrap border-b border-gray-200 px-4 py-3 font-bold">
+                                  {column.label}
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {[0, 1, 2].map((rowIndex) => (
+                              <tr key={rowIndex}>
+                                {DATASET_CONFIGS[dataset]?.columns.slice(0, 7).map((column) => (
+                                  <td key={column.key} className="border-b border-gray-100 px-4 py-3">
+                                    <span className="block h-2.5 w-20 rounded-full bg-gray-200" />
+                                  </td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                    <div className="mt-8 text-base font-bold text-gray-900">Drag and drop a file here</div>
+                    <div className="mt-2 text-sm text-gray-500">You can upload .csv, .tsv, .txt, .xls, or .xlsx</div>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".csv,.tsv,.txt,.xls,.xlsx"
+                      onChange={(e) => handleFileUpload(e.target.files?.[0])}
+                      disabled={busy}
+                      className="hidden"
+                    />
+                    <div className="mt-5 flex flex-wrap justify-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={busy}
+                        className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+                      >
+                        Choose a file
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleTemplateDownload}
+                        className="rounded-xl border border-blue-200 bg-blue-50 px-5 py-3 text-sm font-bold text-blue-700 hover:bg-blue-100"
+                      >
+                        Download Template
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {importStep === 2 && (
+                  <div className="rounded-2xl border border-gray-200 bg-white p-5">
+                    <div className="text-sm font-bold text-gray-900">Header row detected</div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {importHeaders.map((header) => (
+                        <span key={header} className="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700">
+                          {header}
+                        </span>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setImportStep(3)}
+                      className="mt-5 rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white hover:bg-blue-700"
+                    >
+                      Continue to match columns
+                    </button>
+                  </div>
+                )}
+
+                {importStep === 3 && (
+                  <div className="rounded-2xl border border-gray-200 bg-white p-5">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-bold text-gray-900">Match columns</div>
+                        <p className="mt-1 text-xs text-gray-500">Required fields must be matched before importing.</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setImportStep(2)}
+                        className="text-sm font-semibold text-blue-700 hover:text-blue-800"
+                      >
+                        View headers
+                      </button>
+                    </div>
+                    <div className="mt-5 grid gap-3">
+                      {DATASET_CONFIGS[dataset]?.columns.map((column) => (
+                        <label key={column.key} className="grid gap-2 rounded-xl border border-gray-100 bg-gray-50 p-3 md:grid-cols-[190px_minmax(0,1fr)] md:items-center">
+                          <span className="text-sm font-semibold text-gray-800">
+                            {column.label}
+                            {column.required && <span className="ml-1 text-red-500">*</span>}
+                          </span>
+                          <select
+                            value={columnMap[column.key] || ''}
+                            onChange={(e) => setColumnMap((prev) => ({ ...prev, [column.key]: e.target.value }))}
+                            className="rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500"
+                          >
+                            <option value="">Do not import</option>
+                            {importHeaders.map((header) => (
+                              <option key={header} value={header}>{header}</option>
+                            ))}
+                          </select>
+                        </label>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleReviewFromMapping}
+                      className="mt-5 rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white hover:bg-blue-700"
+                    >
+                      Validate columns
+                    </button>
+                  </div>
+                )}
+
+                {importStep === 4 && (
+                  <div className="rounded-2xl border border-red-200 bg-red-50 p-5">
+                    <div className="text-sm font-bold text-red-800">Fix these before importing</div>
+                    <ul className="mt-3 space-y-2 text-sm text-red-700">
+                      {importErrors.map((error, idx) => <li key={idx}>{error}</li>)}
+                    </ul>
+                    <button
+                      type="button"
+                      onClick={() => setImportStep(3)}
+                      className="mt-5 rounded-xl bg-white px-5 py-3 text-sm font-bold text-red-700 ring-1 ring-red-200 hover:bg-red-100"
+                    >
+                      Match columns again
+                    </button>
+                  </div>
+                )}
+
+                {importStep === 5 && (
+                  <div className="rounded-2xl border border-gray-200 bg-white p-5">
+                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <div className="text-sm font-bold text-gray-900">Review and edit</div>
+                        <p className="mt-1 text-xs text-gray-500">
+                          {importRows.length} {dataset.toLowerCase()} record(s) ready to import.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={runBulkImport}
+                        disabled={busy || !importRows.length}
+                        className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-200"
+                      >
+                        {busy ? 'Importing...' : `Import ${dataset}`}
+                      </button>
+                    </div>
+                    <div className="mt-5 overflow-x-auto rounded-xl border border-gray-200">
+                      <table className="min-w-[900px] w-full text-left text-xs">
+                        <thead className="bg-gray-50 text-gray-600">
+                          <tr>
+                            {(DATASET_CONFIGS[dataset]?.columns || []).slice(0, 8).map((col) => (
+                              <th key={col.key} className="px-4 py-3 font-bold">{col.label}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {importRows.slice(0, 10).map((row, idx) => (
+                            <tr key={idx}>
+                              {(DATASET_CONFIGS[dataset]?.columns || []).slice(0, 8).map((col) => (
+                                <td key={col.key} className="px-4 py-3 text-gray-700">
+                                  {String(row[col.key] || '-')}
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    {pmImportRows.length > 10 && (
+                      <div className="mt-3 text-xs font-semibold text-gray-500">
+                        Showing first 10 rows. All {pmImportRows.length} rows will be imported.
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setPmImportStep(3)}
+                      className="mt-5 text-sm font-semibold text-blue-700 hover:text-blue-800"
+                    >
+                      Change column matching
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : activeTab === 'import' ? (
               <div className="mt-6">
                 <input
                   ref={fileInputRef}
@@ -45205,7 +46370,7 @@ function CreatePmModal({
 }) {
   const [showScheduleMenu, setShowScheduleMenu] = React.useState(false);
   const [showExistingSchedulePicker, setShowExistingSchedulePicker] = React.useState(false);
-  const [assetRows, setAssetRows] = React.useState([{ id: 1, assetId: '', locationId: '', startDate: '', endDate: '', timezone: '(UTC+02:00) Africa/Kigali', assignee: '' }]);
+  const [assetRows, setAssetRows] = React.useState([{ id: 1, assetId: '', locationId: '', startDate: '', startTime: '', endDate: '', endTime: '', timezone: '(UTC+02:00) Africa/Kigali', assignee: '' }]);
   const [creating, setCreating] = React.useState(false);
   const [error, setError] = React.useState('');
   const hasCombinedSchedule = !!scheduleConfig?.combinedRule || scheduleConfig?.scheduleType === 'combined';
@@ -45258,6 +46423,12 @@ function CreatePmModal({
     return 'Saved schedule';
   }, []);
   const isAssetMode = mode === 'assets';
+  const toAssetDateInput = React.useCallback((value) => (value ? String(value).split('T')[0] : ''), []);
+  const toAssetTimeInput = React.useCallback((value, fallback = '') => {
+    if (fallback) return fallback;
+    const raw = String(value || '');
+    return raw.includes('T') ? raw.split('T')[1]?.slice(0, 5) || '' : '';
+  }, []);
   React.useEffect(() => {
     if (!open) return;
     if (Array.isArray(initialAssetRows) && initialAssetRows.length) {
@@ -45265,18 +46436,20 @@ function CreatePmModal({
         id: row?.id || idx + 1,
         assetId: String(row?.assetId || ''),
         locationId: String(row?.locationId || ''),
-        startDate: row?.startDate || '',
-        endDate: row?.endDate || '',
+        startDate: toAssetDateInput(row?.startDate),
+        startTime: toAssetTimeInput(row?.startDate, row?.startTime || ''),
+        endDate: toAssetDateInput(row?.endDate),
+        endTime: toAssetTimeInput(row?.endDate, row?.endTime || ''),
         timezone: row?.timezone || '(UTC+02:00) Africa/Kigali',
         assignee: row?.assignee || '',
       })));
       return;
     }
-    setAssetRows([{ id: 1, assetId: '', locationId: '', startDate: '', endDate: '', timezone: '(UTC+02:00) Africa/Kigali', assignee: '' }]);
-  }, [editingScheduleId, initialAssetRows, open]);
+    setAssetRows([{ id: 1, assetId: '', locationId: '', startDate: '', startTime: '', endDate: '', endTime: '', timezone: '(UTC+02:00) Africa/Kigali', assignee: '' }]);
+  }, [editingScheduleId, initialAssetRows, open, toAssetDateInput, toAssetTimeInput]);
 
   const addAssetRow = () => {
-    setAssetRows((rows) => [...rows, { id: rows.length + 1, assetId: '', locationId: '', startDate: '', endDate: '', timezone: '(UTC+02:00) Africa/Kigali', assignee: '' }]);
+    setAssetRows((rows) => [...rows, { id: rows.length + 1, assetId: '', locationId: '', startDate: '', startTime: '', endDate: '', endTime: '', timezone: '(UTC+02:00) Africa/Kigali', assignee: '' }]);
   };
 
   const getDefaultLocationIdForAsset = React.useCallback((assetId) => {
@@ -45298,6 +46471,12 @@ function CreatePmModal({
     setAssetRows((rows) => rows.filter((_, i) => i !== idx));
   };
 
+  const combineDateAndTime = React.useCallback((dateValue, timeValue) => {
+    if (!dateValue) return '';
+    const dateString = String(dateValue).includes('T') ? String(dateValue).split('T')[0] : String(dateValue);
+    return timeValue ? `${dateString}T${timeValue}` : dateString;
+  }, []);
+
   const handleCreate = async () => {
     setError('');
     if (!isAssetMode && !workOrderDetails?.title?.trim()) {
@@ -45306,7 +46485,8 @@ function CreatePmModal({
     }
     setCreating(true);
     try {
-      const nextDate = assetRows[0]?.startDate || new Date().toISOString();
+      const firstAssetStart = combineDateAndTime(assetRows[0]?.startDate, assetRows[0]?.startTime);
+      const nextDate = firstAssetStart || new Date().toISOString();
       const resolvedPmTitle = workOrderDetails?.pmTitle || existingSchedule?.name || existingSchedule?.title || workOrderDetails?.title || 'Preventive Maintenance';
       const resolvedWorkOrderTitle = workOrderDetails?.title || existingSchedule?.workOrderTitle || existingSchedule?.title || resolvedPmTitle;
       const rawAssignedTo = String(workOrderDetails?.assignedTo || existingSchedule?.assignedToName || existingSchedule?.assignedTo || '').trim();
@@ -45324,6 +46504,8 @@ function CreatePmModal({
           : resolvedAssigneeName;
         return {
           ...row,
+          startDate: combineDateAndTime(row?.startDate, row?.startTime),
+          endDate: combineDateAndTime(row?.endDate, row?.endTime),
           assignee: effectiveAssigneeId,
           assignedTo: effectiveAssigneeId,
           technicianId: effectiveAssigneeId,
@@ -45364,7 +46546,10 @@ function CreatePmModal({
           : [],
         employees: resolvedAssigneeId || resolvedAssigneeName || '',
         scheduleType: resolvedScheduleType,
-        calendarRule: resolvedCalendarRule,
+        calendarRule: resolvedCalendarRule ? {
+          ...resolvedCalendarRule,
+          time: assetRows[0]?.startTime || resolvedCalendarRule.time || '09:00',
+        } : resolvedCalendarRule,
         meterRule: resolvedMeterRule,
         combinedRule: resolvedCombinedRule,
         reminderLeadMinutes: Number(scheduleConfig?.reminderLeadMinutes || existingSchedule?.reminderLeadMinutes || 60),
@@ -45671,6 +46856,8 @@ function CreatePmModal({
                   <th className="px-4 py-3 text-left">#</th>
                   <th className="px-4 py-3 text-left">Asset</th>
                   <th className="px-4 py-3 text-left">Location</th>
+                  <th className="px-4 py-3 text-left">Start Date</th>
+                  <th className="px-4 py-3 text-left">Start Time</th>
                   <th className="px-4 py-3 text-left">Timezone</th>
                   <th className="px-4 py-3 text-left">Assigned To</th>
                   <th className="px-4 py-3 text-left"></th>
@@ -45701,6 +46888,22 @@ function CreatePmModal({
                           </option>
                         ))}
                       </select>
+                    </td>
+                    <td className="px-4 py-3">
+                      <input
+                        type="date"
+                        className="w-40 border border-gray-300 rounded-lg px-2 py-2 text-sm text-gray-700"
+                        value={row.startDate}
+                        onChange={(e) => updateAssetRow(idx, 'startDate', e.target.value)}
+                      />
+                    </td>
+                    <td className="px-4 py-3">
+                      <input
+                        type="time"
+                        className="w-32 border border-gray-300 rounded-lg px-2 py-2 text-sm text-gray-700"
+                        value={row.startTime}
+                        onChange={(e) => updateAssetRow(idx, 'startTime', e.target.value)}
+                      />
                     </td>
                     <td className="px-4 py-3">
                       <select
