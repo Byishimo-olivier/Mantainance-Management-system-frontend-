@@ -18,7 +18,7 @@
     "react-router-dom": "^6.22.0",
     "react-select": "^5.10.2",
     "recharts": "^2.6.2",
-    "xlsx": "^0.18.13"
+    "xlsx": "^0.18.5"
   },
   "optionalDependencies": {
     "html2canvas": "^1.4.1",
