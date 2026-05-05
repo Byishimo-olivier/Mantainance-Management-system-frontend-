@@ -4,6 +4,11 @@ import subscriptionAPI from '../api/subscription';
 let companySubscriptionCache = null;
 let companySubscriptionPendingPromise = null;
 
+export const clearCompanySubscriptionCache = () => {
+  companySubscriptionCache = null;
+  companySubscriptionPendingPromise = null;
+};
+
 /**
  * Hook to check user's company subscription status
  */
@@ -48,7 +53,7 @@ export const useCompanySubscription = () => {
       console.error('Error checking subscription:', err);
       setError(err.message);
       setHasActive(false);
-      companySubscriptionCache = null;
+      clearCompanySubscriptionCache();
     } finally {
       companySubscriptionPendingPromise = null;
       setLoading(false);

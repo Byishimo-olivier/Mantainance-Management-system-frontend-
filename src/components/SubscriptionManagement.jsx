@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import subscriptionAPI from '../api/subscription';
+import { clearCompanySubscriptionCache } from '../hooks/useCompanySubscription';
 import paymentAPI from '../api/payment';
 import {
   CreditCard,
@@ -205,6 +206,7 @@ const SubscriptionManagement = () => {
     setLoading(true);
     try {
       const response = await subscriptionAPI.cancelSubscription(subscriptionId);
+      clearCompanySubscriptionCache();
       setSubscriptions(subscriptions.map(sub => 
         sub.id === subscriptionId ? response.data : sub
       ));

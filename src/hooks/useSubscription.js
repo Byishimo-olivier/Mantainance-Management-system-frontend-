@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import subscriptionAPI from '../api/subscription';
+import { clearCompanySubscriptionCache } from './useCompanySubscription';
 
 const subscriptionCache = new Map();
 const subscriptionPendingPromises = new Map();
@@ -123,6 +124,7 @@ export const useSubscription = (lookupValue) => {
     try {
       setLoading(true);
       const response = await subscriptionAPI.cancelSubscription(subscription.id);
+      clearCompanySubscriptionCache();
       setSubscription(response.data);
       setError(null);
       return response.data;
