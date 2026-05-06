@@ -24,12 +24,19 @@ import ScheduleScreenshot from '../assets/schedule3.png';
 
 const teamMembers = [
   {
-    name: 'Ndagano Thierry',
+    name: 'MBABAZI Patrick',
     role: 'Leadership',
     bio: 'Visionary leader driving the strategic direction and mission of Fixnest CMMS.',
-    image: ThierryImage,
+    image: PatrickImage,
     accent: 'text-indigo-600',
   },
+  // {
+  //   name: 'Mbabazi Patrick',
+  //   role: 'Operations Manager',
+  //   bio: 'Keeps delivery moving smoothly across teams and helps translate field needs into reliable execution.',
+  //   image: PatrickImage,
+  //   accent: 'text-emerald-600',
+  // },
   {
     name: 'Byishimo Olivier',
     role: 'Software Engineer',
@@ -58,13 +65,7 @@ const teamMembers = [
     image: ChristianImage,
     accent: 'text-sky-600',
   },
-  {
-    name: 'Mbabazi Patrick',
-    role: 'Operations Manager',
-    bio: 'Keeps delivery moving smoothly across teams and helps translate field needs into reliable execution.',
-    image: PatrickImage,
-    accent: 'text-emerald-600',
-  },
+  
   {
     name: 'Umugwaneza Mirellie',
     role: 'Innovation Lead',
