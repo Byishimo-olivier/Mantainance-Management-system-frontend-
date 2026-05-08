@@ -20,10 +20,19 @@ const subscriptionAPI = {
       const resolvedCompanyName = metadata?.companyName || currentUser?.companyName || currentUser?.company?.name || currentUser?.company || '';
       const resolvedCompanyId = metadata?.companyId || currentUser?.company?.id || currentUser?.companyId || '';
       const resolvedEmail = email || metadata?.managerEmail || currentUser?.email || '';
+      const resolvedEmployeeCount = Number(
+        metadata?.employeeCount ||
+        metadata?.employeeLimit ||
+        metadata?.maxUsers ||
+        10
+      );
       const resolvedMetadata = {
         ...metadata,
         companyName: resolvedCompanyName,
         companyId: resolvedCompanyId,
+        employeeCount: resolvedEmployeeCount,
+        employeeLimit: resolvedEmployeeCount,
+        maxUsers: resolvedEmployeeCount,
         companyType: metadata?.companyType || currentUser?.companyType || '',
         branchName: metadata?.branchName || currentUser?.branchName || '',
         branchDetails: metadata?.branchDetails || currentUser?.branchDetails || '',
@@ -40,6 +49,8 @@ const subscriptionAPI = {
         clientId: CLIENT_ID,
         secretId: SECRET_ID,
         paymentMethod,
+        employeeCount: resolvedEmployeeCount,
+        employeeLimit: resolvedEmployeeCount,
         companyId: resolvedCompanyId || undefined,
         managerEmail: resolvedEmail,
         metadata: resolvedMetadata,
@@ -423,6 +434,38 @@ const subscriptionAPI = {
   canAccessFeatures: async () => {
     try {
       const response = await api.get(`${BASE}/trial/can-access`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  // Get user's subscription info (plan + features)
+  getUserSubscriptionInfo: async () => {
+    try {
+      const response = await api.get(`${BASE}/features/subscription-info`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  // Get user's accessible features
+  getAccessibleFeatures: async () => {
+    try {
+      const response = await api.get(`${BASE}/features/accessible`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  // Check if user has access to specific feature
+  hasFeatureAccess: async (feature) => {
+    try {
+      const response = await api.get(`${BASE}/features/has-access`, {
+        params: { feature },
+      });
       return response.data;
     } catch (error) {
       throw error.response?.data || error.message;

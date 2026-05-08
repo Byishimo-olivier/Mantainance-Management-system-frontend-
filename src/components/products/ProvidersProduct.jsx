@@ -18,39 +18,18 @@ const features = [
     alt: 'Vendor Directory Management',
   },
   {
-    icon: '📄',
-    title: 'Contract Management',
-    desc: 'Store, track, and set alerts for contract expirations, SLA terms, and renewal windows so you never miss a critical deadline or overspend on expired terms.',
-    img: 'https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=480&h=280&fit=crop',
-    alt: 'Contract Management',
-  },
-  {
-    icon: '📊',
-    title: 'Performance Scorecards',
-    desc: ' Score vendors on response time, quality, cost, and compliance. Use objective data to negotiate better rates and retire underperforming suppliers.',
-    img: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=480&h=280&fit=crop',
-    alt: 'Vendor Performance Scorecard',
-  },
-  {
     icon: '🔗',
     title: 'Work Order Assignment',
-    desc: 'Dispatch work orders directly to external contractors from your CMMS. Providers receive, update, and close tasks in a dedicated portal — no phone tag.',
+    desc: 'Dispatch work orders directly to external contractors from your CMMS. Providers receive, update, and close tasks in a dedicated portal so there is no phone tag.',
     img: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=480&h=280&fit=crop',
     alt: 'Work Order Contractor Assignment',
   },
   {
     icon: '🧾',
     title: 'Purchase Order Integration',
-    desc: 'Convert approved service requests into POs in one click. Route POs through your approval chain and track spending against budget in real-time.',
+    desc: 'Convert approved service requests into POs in one click. Route POs through your approval chain and track spending against budget in real time.',
     img: 'https://images.unsplash.com/photo-1568234928966-359c35dd8327?w=480&h=280&fit=crop',
     alt: 'Purchase Order Integration',
-  },
-  {
-    icon: '🔒',
-    title: 'Compliance & Insurance',
-    desc: 'Automatically flag contractors with expired certifications or insurance before they can be assigned a work order — protecting your operations and liability.',
-    img: 'https://images.unsplash.com/photo-1563986768609-7f64142e38de?w=480&h=280&fit=crop',
-    alt: 'Compliance and Insurance Tracking',
   },
 ];
 
@@ -61,7 +40,6 @@ export default function ProvidersProduct() {
     <div style={{ minHeight: '100vh', backgroundColor: '#f9fafb', fontFamily: 'Inter, sans-serif' }}>
       <AuthHeader />
 
-      {/* Hero */}
       <div style={{ position: 'relative', width: '100%', height: '460px', overflow: 'hidden' }}>
         <img
           src="https://images.unsplash.com/photo-1521791136064-7986c2920216?w=1400&h=460&fit=crop"
@@ -74,7 +52,7 @@ export default function ProvidersProduct() {
             Manage Every Partner. Control Every Contract.
           </h1>
           <p style={{ fontSize: '20px', color: '#e2e8f0', maxWidth: '600px', lineHeight: '1.6' }}>
-            Vendor and contractor management integrated with your maintenance workflow — from onboarding to PO processing.
+            Vendor and contractor management integrated with your maintenance workflow from onboarding to PO processing.
           </p>
           <div style={{ display: 'flex', gap: '16px', marginTop: '32px', flexWrap: 'wrap', justifyContent: 'center' }}>
             <button onClick={() => navigate('/register')} style={{ padding: '14px 32px', background: 'linear-gradient(135deg, #d97706, #b45309)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '16px', fontWeight: '700', cursor: 'pointer', boxShadow: '0 4px 15px rgba(217,119,6,0.4)' }}>
@@ -87,7 +65,6 @@ export default function ProvidersProduct() {
         </div>
       </div>
 
-      {/* Stats */}
       <div style={{ background: 'linear-gradient(135deg, #78350f, #92400e)', padding: '32px 24px' }}>
         <div style={{ maxWidth: '900px', margin: '0 auto', display: 'flex', justifyContent: 'space-around', flexWrap: 'wrap', gap: '24px' }}>
           {stats.map((s) => (
@@ -105,7 +82,7 @@ export default function ProvidersProduct() {
             Your external workforce, fully in view
           </h2>
           <p style={{ fontSize: '18px', color: '#6b7280', maxWidth: '760px', lineHeight: '1.7', margin: '0 auto' }}>
-            Providers eliminates the friction of managing contractors. From onboarding to invoicing, every external interaction is tracked, measured, and visible — so you spend less time chasing and more time building.
+            Providers eliminates the friction of managing contractors. From onboarding to invoicing, every external interaction is tracked, measured, and visible so you spend less time chasing and more time building.
           </p>
         </div>
 
@@ -122,13 +99,12 @@ export default function ProvidersProduct() {
           ))}
         </div>
 
-        {/* Testimonial */}
         <div style={{ background: 'linear-gradient(135deg, #fffbeb, #fef3c7)', borderRadius: '20px', padding: '48px', marginBottom: '60px', textAlign: 'center' }}>
           <div style={{ fontSize: '36px', marginBottom: '16px' }}>💬</div>
           <p style={{ fontSize: '20px', fontStyle: 'italic', color: '#92400e', maxWidth: '700px', margin: '0 auto 24px', lineHeight: '1.7' }}>
             "We cut vendor onboarding from weeks to 48 hours and now have full visibility into every contract and SLA. Providers paid for itself in month one."
           </p>
-          <div style={{ fontWeight: '700', color: '#78350f' }}>Fatima O. — Procurement Manager</div>
+          <div style={{ fontWeight: '700', color: '#78350f' }}>Fatima O. · Procurement Manager</div>
         </div>
 
         <div style={{ textAlign: 'center', paddingTop: '20px' }}>

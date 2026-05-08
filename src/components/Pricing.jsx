@@ -10,31 +10,24 @@ const planMetadata = {
   basic: {
     displayName: 'Basic',
     description: 'Small teams or single-site operations getting off spreadsheets and paper for the first time.',
-    features: ['Unlimited work orders', 'Unlimited locations', 'Over AI']
+    features: ['Unlimited Work order', 'Request', 'AI']
   },
   professional: {
     displayName: 'Professional',
     badge: 'Most Popular',
     description: 'Departments managing multiple asset types, needing field mobility and deeper analytics.',
-    features: ['Mobile offline mode', 'External request portal', 'Full analytics history', 'Asset lifecycle tracking', 'Signature capture for compliance']
+    features: ['Unlimited work Order', 'Requests', 'Asset', 'Location', 'PM', 'Over AI']
   },
   enterprise: {
     displayName: 'Enterprise',
     description: 'Multi-site organizations needing automation, integrations, and governance controls.',
-    features: ['Multi-site module support', 'Workflow automation', 'Reliability & downtime tracking', 'PO management', 'API & custom integrations', 'SSO & custom roles', 'Custom dashboards']
+    features: ['Unlimited work Order', 'Requests', 'Asset', 'Location', 'PM', 'Over AI', 'Analytics', 'Material Request']
   },
   premium: {
     displayName: 'Premium',
     badge: 'Custom Quote',
     description: 'Growing maintenance teams ready to move from reactive to preventive maintenance.',
-    features: [
-      'FixNestStudio',
-      'PM scheduling',
-      'Custom checklists',
-      'Parts & inventory with costing',
-      'Time & labor tracking',
-      '30-day analytics history'
-    ],
+    features: ['Unlimited work Order', 'Requests', 'Asset', 'Location', 'PM', 'Over AI', 'Analytics', 'Material Request', 'Purchase Order'],
     cta: 'Request Quotation',
     isPremium: true
   }

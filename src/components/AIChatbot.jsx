@@ -91,34 +91,81 @@ const buildAssistantActionResponse = (query) => {
     });
 
     if (/\b(assigned requests|requests assigned|issues assigned|assigned issues)\b/.test(q)) {
-        return actionForEntity('Open the Requests tab to review and manage assigned requests.', 'Open Requests', 'openRequestsTab');
+        return actionForEntity(
+            'To review assigned requests, open the Requests area and scan the status, assignee, and due-date columns first. That will show which requests already have owners, which ones are waiting, and which ones need reassignment or follow-up.\n\nUse the button below to jump straight to the Requests tab.',
+            'Open Requests',
+            'openRequestsTab'
+        );
     }
     if (/\b(request|requests|issue request|issues requests|ticket|tickets)\b/.test(q)) {
-        return actionForEntity('Open the request form to add a new request.', 'Open Request Form', 'openRequestForm');
+        return actionForEntity(
+            'To create a request, open the request form, choose the property or location, describe the issue clearly, set the priority, and include any useful details like photos, contact information, or timing notes. Once you submit it, the request can be reviewed, assigned, and converted into a work order if needed.\n\nUse the button below to open the request form.',
+            'Open Request Form',
+            'openRequestForm'
+        );
     }
     if (/\btechnician|technicians|worker|workers|staff\b/.test(q)) {
-        return actionForEntity('Open People & Teams to add a technician.', 'Add Technician', 'openAddTechnician');
+        return actionForEntity(
+            'To add a technician, go to the team management area, enter the technician details, assign contact information, and set the right specialties or responsibilities. That helps the system and your managers route work to the right person later.\n\nUse the button below to open the technician setup flow.',
+            'Add Technician',
+            'openAddTechnician'
+        );
     }
     if (/\bwork\s*order|workorders|wo\b/.test(q)) {
-        return actionForEntity('Open the full work order form to create a new work order.', 'Create Work Order', 'openWorkOrderDetailsForm');
+        return actionForEntity(
+            'To create a work order, open the full work order form, select the asset or location involved, describe the maintenance task, set the priority and due date, then assign the technician or team. You can also add notes, attachments, or checklist details so execution is clear from the start.\n\nUse the button below to open the work order form.',
+            'Create Work Order',
+            'openWorkOrderDetailsForm'
+        );
     }
     if (/\basset|assets\b/.test(q)) {
-        return actionForEntity('Open the Assets area to add a new asset.', 'Add Asset', 'openAddAsset');
+        return actionForEntity(
+            'To add an asset, open the asset form and enter the equipment name, type, location, status, and any identifying details like serial number, vendor, or purchase information. A complete asset record makes scheduling, history tracking, and reporting much easier later.\n\nUse the button below to open the asset form.',
+            'Add Asset',
+            'openAddAsset'
+        );
     }
     if (/\blocation|locations|property|properties|site|sites\b/.test(q)) {
-        return actionForEntity('Open Locations to add a new site or property.', 'Add Location', 'openAddLocation');
+        return actionForEntity(
+            'To add a location or property, create the site record first with its name, address, and any structure details your team uses. Once the location exists, you can link requests, assets, schedules, and technicians to it more accurately.\n\nUse the button below to open the location form.',
+            'Add Location',
+            'openAddLocation'
+        );
     }
     if (/\bpreventive|preventive maintenance|pm\b/.test(q)) {
-        return actionForEntity('Open preventive maintenance to create a new PM item.', 'Create Preventive', 'openCreatePm');
+        return actionForEntity(
+            'To set up preventive maintenance, open the PM form, choose the asset or area, define the maintenance task, set the frequency, and assign who should carry it out. This creates a repeatable routine so the system can remind your team before work becomes overdue.\n\nUse the button below to create a preventive maintenance item.',
+            'Create Preventive',
+            'openCreatePm'
+        );
     }
-    if (/\bschedule|schedules|maintenance schedule|maintenance schedules\b/.test(q)) {
-        return actionForEntity('Open the schedule form to add a new maintenance schedule.', 'Add Schedule', 'openAddSchedule');
+    if (/\bschedule|schedules|schedul|schedula|maintenance schedule|maintenance schedules\b/.test(q)) {
+        if (/\btask|job|work\b/.test(q)) {
+            return actionForEntity(
+                'To schedule a task, open the scheduler, choose the relevant property, asset, or work item, then set the date, time, and frequency if it should repeat. After that, assign the technician or team so the task appears in the right workflow.\n\nUse the button below to open the schedule form.',
+                'Add Schedule',
+                'openAddSchedule'
+            );
+        }
+        return actionForEntity(
+            'To add a maintenance schedule, open the scheduler, define what should happen, choose when it should happen, and attach the right people or assets. Schedules are best when you want planned work to happen on a routine calendar or timeline.\n\nUse the button below to create the schedule.',
+            'Add Schedule',
+            'openAddSchedule'
+        );
     }
     if (/\bmeter|meters\b/.test(q)) {
-        return actionForEntity('Open the Meters tab and use the Add Meter button there.', 'Open Meters', 'openMetersTab');
+        return actionForEntity(
+            'To add a meter, open the Meters tab, create a meter record, enter the meter name, type, unit, and where it belongs, then start recording readings. This helps you track consumption, thresholds, and abnormal changes over time.\n\nUse the button below to go to the Meters area.',
+            'Open Meters',
+            'openMetersTab'
+        );
     }
     if (/\bedge|device|devices|edge device|edge devices\b/.test(q)) {
-        return actionForEntity('Open the Edge tab and use the Add Device button there.', 'Open Edge', 'openEdgeTab');
+        return actionForEntity(
+            'To add an edge device, open the Edge section, register the device, and connect it to the right site, asset, or measurement source. Once configured, it can feed operational data back into your maintenance workflow.\n\nUse the button below to open the Edge area.',
+            'Open Edge',
+            'openEdgeTab'
+        );
     }
 
     return null;

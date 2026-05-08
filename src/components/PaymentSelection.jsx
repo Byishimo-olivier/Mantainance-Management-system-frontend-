@@ -31,6 +31,8 @@ export default function PaymentSelection() {
   const companyPhone = searchParams.get('phone') || '';
   const subscriptionId = searchParams.get('subscriptionId');
   const amount = searchParams.get('amount') || '0';
+  const employees = Math.max(1, Math.ceil(Number(searchParams.get('employees') || '10')));
+  const includedEmployees = Math.max(1, Math.ceil(Number(searchParams.get('includedEmployees') || '10')));
   const paymentMethod = searchParams.get('paymentMethod') || 'card';
   const provider = searchParams.get('provider') || 'mtn';
 
@@ -64,7 +66,7 @@ export default function PaymentSelection() {
       const email = managerEmail || user.email || '';
       const company = companyName || user.companyName || user.company || 'Unknown';
       const userId = user.id || user._id;
-      const finalAmount = parseFloat(amount);
+      let finalAmount = parseFloat(amount);
 
       console.log('Payment details:', { plan, cycle, currency, finalAmount, amount });
 
@@ -93,6 +95,9 @@ export default function PaymentSelection() {
         branchDetails: user.branchDetails || '',
         companyType: user.companyType || '',
         countryCode: user.countryCode || '',
+        employeeCount: employees,
+        employeeLimit: employees,
+        maxUsers: employees,
       };
 
       // If no subscriptionId, create a subscription first
@@ -109,6 +114,9 @@ export default function PaymentSelection() {
           );
           const createdSubscription = createSubResponse?.data || createSubResponse;
           subId = createdSubscription?.id || createdSubscription?._id;
+          if (Number(createdSubscription?.amount) > 0) {
+            finalAmount = Number(createdSubscription.amount);
+          }
           console.log('Subscription created:', subId);
           
           if (!subId) {
@@ -289,6 +297,12 @@ export default function PaymentSelection() {
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
               <span style={{ color: '#666' }}>Company:</span>
               <span style={{ fontWeight: '600' }}>{companyName}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
+              <span style={{ color: '#666' }}>Employees Covered:</span>
+              <span style={{ fontWeight: '600' }}>
+                {employees} {employees > includedEmployees ? `(${employees - includedEmployees} above included ${includedEmployees})` : `(included ${includedEmployees})`}
+              </span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
               <span style={{ color: '#666' }}>Payment Method:</span>

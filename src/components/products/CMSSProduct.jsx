@@ -58,7 +58,7 @@ export default function CMSSProduct() {
 
           <div style={{ padding: '24px', backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
             <img 
-              src="https://images.unsplash.com/photo-1578926078328-123456789012?w=400&h=250&fit=crop" 
+              src="https://images.unsplash.com/photo-1581092921461-eab62e97a780?auto=format&fit=crop&w=400&h=250&q=80" 
               alt="Preventive Maintenance"
               style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: '8px', marginBottom: '16px' }}
             />
@@ -91,7 +91,7 @@ export default function CMSSProduct() {
 
           <div style={{ padding: '24px', backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
             <img 
-              src="https://images.unsplash.com/photo-1563986768609-7f64142e38de?w=400&h=250&fit=crop" 
+              src="https://images.unsplash.com/photo-1510511459019-5dda7724fd87?auto=format&fit=crop&w=400&h=250&q=80" 
               alt="Security & Compliance"
               style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: '8px', marginBottom: '16px' }}
             />

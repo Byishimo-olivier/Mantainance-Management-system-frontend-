@@ -1,4 +1,4 @@
-import React, { useState } from 'react'; // Deployment trigger commit
+import React, { useEffect, useState } from 'react'; // Deployment trigger commit
 import { Routes, Route, useNavigate, Navigate } from 'react-router-dom';
 import Login from './components/auth/Login';
 import Register from './components/auth/Register';
@@ -111,6 +111,7 @@ import { legalDocuments, sitemapSections } from './data/legalPages';
 
 import useTrialStatus from './hooks/useTrialStatus';
 import useCompanySubscription from './hooks/useCompanySubscription';
+import { SUBSCRIPTION_PLAN_NOTICE_EVENT, SUBSCRIPTION_PLAN_NOTICE_MESSAGE } from './api/axios';
 
 const getHomeRouteForRole = (role) => {
   const normalizedRole = String(role || '').trim().toLowerCase();
@@ -169,8 +170,21 @@ function App() {
     return token && user ? { token, user: JSON.parse(user) } : null;
   });
   const [issues, setIssues] = useState([]); // State for issues, required by ManagementIssues
+  const [subscriptionPlanNotice, setSubscriptionPlanNotice] = useState(null);
   const navigate = useNavigate();
   const location = useLocation();
+
+  useEffect(() => {
+    const handleSubscriptionPlanNotice = (event) => {
+      setSubscriptionPlanNotice({
+        message: event.detail?.message || SUBSCRIPTION_PLAN_NOTICE_MESSAGE,
+        feature: event.detail?.feature || '',
+      });
+    };
+
+    window.addEventListener(SUBSCRIPTION_PLAN_NOTICE_EVENT, handleSubscriptionPlanNotice);
+    return () => window.removeEventListener(SUBSCRIPTION_PLAN_NOTICE_EVENT, handleSubscriptionPlanNotice);
+  }, []);
 
   const handleLogin = (token, user) => {
     localStorage.setItem('token', token);
@@ -338,6 +352,39 @@ function App() {
           location.pathname.includes('/requests') ||
           location.pathname.includes('/subscription')
         ) && <AIChatbot />}
+        {subscriptionPlanNotice && (
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 px-4">
+            <div className="w-full max-w-md rounded-lg bg-white shadow-2xl border border-gray-200">
+              <div className="border-b border-gray-100 px-6 py-5">
+                <h2 className="text-xl font-bold text-gray-900">Subscription plan required</h2>
+              </div>
+              <div className="px-6 py-5">
+                <p className="text-[15px] leading-6 text-gray-700">
+                  {subscriptionPlanNotice.message}
+                </p>
+              </div>
+              <div className="flex flex-col-reverse gap-3 border-t border-gray-100 px-6 py-4 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => setSubscriptionPlanNotice(null)}
+                  className="rounded-md border border-gray-300 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSubscriptionPlanNotice(null);
+                    navigate('/subscription');
+                  }}
+                  className="rounded-md bg-[#6b4b8a] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#5d407b]"
+                >
+                  Check subscription plan
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </LanguageProvider>
   );

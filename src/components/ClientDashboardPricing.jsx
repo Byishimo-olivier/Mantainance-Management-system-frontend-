@@ -9,24 +9,24 @@ const planMetadata = {
   basic: {
     displayName: 'Essential',
     description: 'Small teams or single-site operations getting started',
-    features: ['Unlimited work orders', 'Unlimited locations', 'AI assistance']
+    features: ['Unlimited Work order', 'Request', 'AI']
   },
   professional: {
     displayName: 'Professional',
     badge: 'Most Popular',
     description: 'Departments managing multiple asset types with deeper analytics',
-    features: ['Mobile offline mode', 'External request portal', 'Full analytics history', 'Asset lifecycle tracking', 'Signature capture']
+    features: ['Unlimited work Order', 'Requests', 'Asset', 'Location', 'PM', 'Over AI']
   },
   enterprise: {
     displayName: 'Enterprise',
     description: 'Multi-site organizations needing automation and integrations',
-    features: ['Multi-site module support', 'Workflow automation', 'Reliability tracking', 'PO management', 'API & custom integrations', 'SSO & custom roles']
+    features: ['Unlimited work Order', 'Requests', 'Asset', 'Location', 'PM', 'Over AI', 'Analytics', 'Material Request']
   },
   premium: {
     displayName: 'Premium',
     badge: 'Custom Quote',
     description: 'Growing teams ready for preventive maintenance',
-    features: ['FixNestStudio', 'PM scheduling', 'Custom checklists', 'Parts & inventory', 'Time & labor tracking', 'Extended analytics'],
+    features: ['Unlimited work Order', 'Requests', 'Asset', 'Location', 'PM', 'Over AI', 'Analytics', 'Material Request', 'Purchase Order'],
     cta: 'Request Quotation',
     isPremium: true
   }
@@ -36,9 +36,17 @@ export default function ClientDashboardPricing({ currentUser = null }) {
   const [pricing, setPricing] = useState(null);
   const [currency, setCurrency] = useState('USD');
   const [billingCycle, setBillingCycle] = useState('monthly');
+  const [includedEmployees, setIncludedEmployees] = useState(10);
+  const [employeeCount, setEmployeeCount] = useState(10);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const { hasActive: hasActiveCompanySubscription, subscription: companySubscription, loading: subscriptionLoading } = useCompanySubscription();
+  const {
+    hasActive: hasActiveCompanySubscription,
+    subscription: companySubscription,
+    company,
+    teamMembers,
+    loading: subscriptionLoading
+  } = useCompanySubscription();
 
   const navigate = useNavigate();
 
@@ -75,7 +83,8 @@ export default function ClientDashboardPricing({ currentUser = null }) {
     
     // Calculate the amount based on plan and billing cycle
     const planPrices = pricing[planKey];
-    const amount = planPrices[billingCycle] || 0;
+    const baseAmount = planPrices[billingCycle] || 0;
+    const amount = calculateEmployeeAdjustedAmount(baseAmount, employeeCount, includedEmployees);
     
     // Get user data from currentUser or localStorage
     const user = currentUser || JSON.parse(localStorage.getItem('user') || '{}');
@@ -94,6 +103,8 @@ export default function ClientDashboardPricing({ currentUser = null }) {
       currency: currency,
       cycle: billingCycle,
       amount: amount,
+      employees: employeeCount,
+      includedEmployees,
       userId: userId,
       companyId: companyId,
       email: email,
@@ -107,6 +118,14 @@ export default function ClientDashboardPricing({ currentUser = null }) {
     navigate(`/payment-selection?${params.toString()}`);
   };
 
+  const calculateEmployeeAdjustedAmount = (baseAmount, employees = includedEmployees, included = includedEmployees) => {
+    const safeBase = Number(baseAmount || 0);
+    const safeIncluded = Math.max(1, Number(included || 10));
+    const safeEmployees = Math.max(1, Math.ceil(Number(employees || safeIncluded)));
+    const multiplier = Math.max(1, safeEmployees / safeIncluded);
+    return Number((safeBase * multiplier).toFixed(2));
+  };
+
   useEffect(() => {
     const fetchPricingData = async () => {
       try {
@@ -114,6 +133,7 @@ export default function ClientDashboardPricing({ currentUser = null }) {
         const response = await subscriptionAPI.getPricing();
         setPricing(response.data?.pricing || response.pricing);
         setCurrency(response.data?.currency || 'USD');
+        setIncludedEmployees(Number(response.data?.pricingPolicy?.includedEmployees || 10));
       } catch (err) {
         console.error('Error fetching pricing:', err);
         setError(err?.message || 'Failed to fetch pricing');
@@ -124,6 +144,20 @@ export default function ClientDashboardPricing({ currentUser = null }) {
 
     fetchPricingData();
   }, []);
+
+  useEffect(() => {
+    const existingLimit = Number(
+      companySubscription?.metadata?.employeeLimit ||
+      companySubscription?.metadata?.employeeCount ||
+      company?.maxUsers ||
+      teamMembers?.length ||
+      currentUser?.techniciansCount ||
+      10
+    );
+    if (Number.isFinite(existingLimit) && existingLimit > 0) {
+      setEmployeeCount(Math.max(10, Math.ceil(existingLimit)));
+    }
+  }, [companySubscription, company, teamMembers, currentUser]);
 
   if (loading) {
     return (
@@ -183,7 +217,7 @@ export default function ClientDashboardPricing({ currentUser = null }) {
           <h1 style={{ fontSize: '28px', fontWeight: '800', color: '#111827', margin: 0 }}>Subscription Plans</h1>
         </div>
         <p style={{ fontSize: '14px', color: '#6B7280', margin: '4px 0 0' }}>
-          Choose the perfect plan to manage your maintenance operations
+          Choose the perfect plan to manage your maintenance operations. Each plan includes up to {includedEmployees} employees.
         </p>
       </div>
 
@@ -237,14 +271,39 @@ export default function ClientDashboardPricing({ currentUser = null }) {
               ))}
             </div>
           </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            <label style={{ fontWeight: '600', color: '#374151', fontSize: '14px' }}>Employees:</label>
+            <input
+              type="number"
+              min={1}
+              value={employeeCount}
+              onChange={(e) => setEmployeeCount(Math.max(1, Math.ceil(Number(e.target.value || includedEmployees))))}
+              style={{
+                width: '110px',
+                padding: '8px 12px',
+                borderRadius: '8px',
+                border: '1px solid #D1D5DB',
+                backgroundColor: 'white',
+                fontSize: '14px',
+                fontWeight: '500',
+                color: '#111827'
+              }}
+            />
+            <span style={{ fontSize: '13px', color: '#6B7280' }}>
+              First {includedEmployees} employees are included. Extra employees increase the plan price proportionally.
+            </span>
+          </div>
         </div>
       </div>
 
       {/* Pricing Cards Grid */}
       <div className="responsive-grid-auto gap-6" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
         {pricingPlans.map((plan) => {
-          const cyclePrice = plan.billingCycles[billingCycle];
+          const baseCyclePrice = plan.billingCycles[billingCycle];
+          const cyclePrice = calculateEmployeeAdjustedAmount(baseCyclePrice, employeeCount, includedEmployees);
           const displayPrice = cyclePrice ? `${symbol}${cyclePrice.toFixed(2)}` : 'Custom';
+          const extraEmployees = Math.max(0, employeeCount - includedEmployees);
           const isCurrentPlan = hasActiveCompanySubscription && String(companySubscription?.plan || '').toLowerCase() === String(plan.key || '').toLowerCase();
           
           return (
@@ -304,7 +363,13 @@ export default function ClientDashboardPricing({ currentUser = null }) {
                   </div>
                   {cyclePrice && (
                     <div style={{ fontSize: '13px', color: '#6B7280', marginTop: '4px' }}>
-                      per user / {billingCycle}
+                      per {billingCycle}
+                    </div>
+                  )}
+                  {cyclePrice && (
+                    <div style={{ fontSize: '12px', color: '#6B7280', marginTop: '6px', lineHeight: '1.5' }}>
+                      Covers {employeeCount} employee{employeeCount === 1 ? '' : 's'}
+                      {extraEmployees > 0 ? ` (${extraEmployees} above included ${includedEmployees})` : ` (included ${includedEmployees})`}
                     </div>
                   )}
                 </div>

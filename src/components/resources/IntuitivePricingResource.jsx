@@ -3,10 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import AuthHeader from '../auth/AuthHeader';
 
 const plans = [
-  { name: 'Essential', price: 'Free to Try', color: '#6b7280', features: ['Unlimited work orders', 'Asset tracking', 'Mobile app access', 'Basic reporting', 'Email support'], img: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=480&h=200&fit=crop', cta: 'Start Free' },
-  { name: 'Premium', price: 'From $45/mo', color: '#2563EB', features: ['Everything in Essential', 'Preventive maintenance', 'Custom checklists', 'Parts & inventory', 'Analytics history'], img: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=480&h=200&fit=crop', cta: 'Try Free', popular: false },
-  { name: 'Professional', price: 'From $75/mo', color: '#7c3aed', features: ['Everything in Premium', 'Mobile offline mode', 'External request portal', 'Full analytics', 'Asset lifecycle'], img: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=480&h=200&fit=crop', cta: 'Schedule Demo', popular: true },
-  { name: 'Enterprise', price: 'Custom Pricing', color: '#111827', features: ['Everything in Professional', 'Multi-site management', 'Workflow automation', 'API & integrations', 'SSO & custom roles'], img: 'https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d?w=480&h=200&fit=crop', cta: 'Contact Sales' },
+  { name: 'Essential', price: 'Free to Try', color: '#6b7280', features: ['Unlimited Work order', 'Request', 'AI'], img: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=480&h=200&fit=crop', cta: 'Start Free' },
+  { name: 'Premium', price: 'From $45/mo', color: '#2563EB', features: ['Unlimited work Order', 'Requests', 'Asset', 'Location', 'PM', 'Over AI', 'Analytics', 'Material Request', 'Purchase Order'], img: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=480&h=200&fit=crop', cta: 'Try Free', popular: false },
+  { name: 'Professional', price: 'From $75/mo', color: '#7c3aed', features: ['Unlimited work Order', 'Requests', 'Asset', 'Location', 'PM', 'Over AI'], img: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=480&h=200&fit=crop', cta: 'Schedule Demo', popular: true },
+  { name: 'Enterprise', price: 'Custom Pricing', color: '#111827', features: ['Unlimited work Order', 'Requests', 'Asset', 'Location', 'PM', 'Over AI', 'Analytics', 'Material Request'], img: 'https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d?w=480&h=200&fit=crop', cta: 'Contact Sales' },
 ];
 
 export default function IntuitivePricingResource() {

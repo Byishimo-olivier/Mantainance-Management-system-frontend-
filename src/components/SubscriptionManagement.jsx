@@ -346,9 +346,10 @@ const SubscriptionManagement = () => {
 
   const getPlanFeatures = (plan) => {
     const features = {
-      basic: ['Dashboard Access', 'Basic Reports', 'Email Support'],
-      professional: ['All Basic Features', 'Advanced Reports', 'API Access', 'Priority Support'],
-      enterprise: ['All Professional Features', 'Dedicated Support', 'Custom Training', 'SLA'],
+      basic: ['Unlimited Work order', 'Request', 'AI'],
+      professional: ['Unlimited work Order', 'Requests', 'Asset', 'Location', 'PM', 'Over AI'],
+      enterprise: ['Unlimited work Order', 'Requests', 'Asset', 'Location', 'PM', 'Over AI', 'Analytics', 'Material Request'],
+      premium: ['Unlimited work Order', 'Requests', 'Asset', 'Location', 'PM', 'Over AI', 'Analytics', 'Material Request', 'Purchase Order'],
     };
     return features[plan] || [];
   };

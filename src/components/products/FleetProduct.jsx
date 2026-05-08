@@ -18,25 +18,11 @@ const features = [
     alt: 'Fleet Vehicle Tracking',
   },
   {
-    icon: '📍',
-    title: 'Telematics Integration',
-    desc: 'Connect real-time GPS and telematics data directly to work orders. Mileage-based PMs trigger automatically — no manual tracking required.',
-    img: 'https://images.unsplash.com/photo-1617788138017-80ad40651399?w=480&h=280&fit=crop',
-    alt: 'Fleet Telematics GPS',
-  },
-  {
     icon: '📋',
     title: 'Digital Inspections',
     desc: 'Replace paper DVIRs with digital checklists built in minutes. Drivers submit from any phone, photos attach automatically, and defects become work orders instantly.',
     img: 'https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?w=480&h=280&fit=crop',
     alt: 'Digital Vehicle Inspections',
-  },
-  {
-    icon: '🔍',
-    title: 'Instant VIN Lookup',
-    desc: 'Scan a VIN or license plate and pull up the vehicle\'s full profile, maintenance backlog, and parts compatibility within seconds.',
-    img: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=480&h=280&fit=crop',
-    alt: 'VIN Lookup',
   },
   {
     icon: '⚙️',
@@ -61,7 +47,6 @@ export default function FleetProduct() {
     <div style={{ minHeight: '100vh', backgroundColor: '#f9fafb', fontFamily: 'Inter, sans-serif' }}>
       <AuthHeader />
 
-      {/* Hero */}
       <div style={{ position: 'relative', width: '100%', height: '460px', overflow: 'hidden' }}>
         <img
           src="https://images.unsplash.com/photo-1464219789935-c2d9d9aba644?w=1400&h=460&fit=crop"
@@ -87,7 +72,6 @@ export default function FleetProduct() {
         </div>
       </div>
 
-      {/* Stats */}
       <div style={{ background: 'linear-gradient(135deg, #064e3b, #065f46)', padding: '32px 24px' }}>
         <div style={{ maxWidth: '900px', margin: '0 auto', display: 'flex', justifyContent: 'space-around', flexWrap: 'wrap', gap: '24px' }}>
           {stats.map((s) => (
@@ -102,10 +86,10 @@ export default function FleetProduct() {
       <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '70px 24px' }}>
         <div style={{ marginBottom: '60px', textAlign: 'center' }}>
           <h2 style={{ fontSize: '38px', fontWeight: '800', color: '#111827', marginBottom: '16px' }}>
-            From the garage to the open road — all in one system
+            From the garage to the open road all in one system
           </h2>
           <p style={{ fontSize: '18px', color: '#6b7280', maxWidth: '760px', lineHeight: '1.7', margin: '0 auto' }}>
-            Fleet connects telematics data, digital inspections, VIN lookups, and preventive maintenance into a single workflow — eliminating spreadsheets, paperwork, and missed service windows.
+            Fleet connects telematics data, digital inspections, VIN lookups, and preventive maintenance into a single workflow, eliminating spreadsheets, paperwork, and missed service windows.
           </p>
         </div>
 
@@ -122,13 +106,12 @@ export default function FleetProduct() {
           ))}
         </div>
 
-        {/* Testimonial */}
         <div style={{ background: 'linear-gradient(135deg, #ecfdf5, #d1fae5)', borderRadius: '20px', padding: '48px', marginBottom: '60px', textAlign: 'center' }}>
           <div style={{ fontSize: '36px', marginBottom: '16px' }}>💬</div>
           <p style={{ fontSize: '20px', fontStyle: 'italic', color: '#065f46', maxWidth: '700px', margin: '0 auto 24px', lineHeight: '1.7' }}>
             "We manage 120 vehicles across 5 depots. Fleet keeps every vehicle serviced on time and has cut our unplanned breakdowns by half."
           </p>
-          <div style={{ fontWeight: '700', color: '#064e3b' }}>Sarah M. — Fleet Operations Manager</div>
+          <div style={{ fontWeight: '700', color: '#064e3b' }}>Sarah M. · Fleet Operations Manager</div>
         </div>
 
         <div style={{ textAlign: 'center', paddingTop: '20px' }}>

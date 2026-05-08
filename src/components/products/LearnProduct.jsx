@@ -13,23 +13,9 @@ const features = [
   {
     icon: '📚',
     title: 'Job-Relevant Training',
-    desc: 'Deliver bite-sized training modules directly linked to each technician\'s role, asset type, and upcoming work orders — right on their phone.',
+    desc: "Deliver bite-sized training modules directly linked to each technician's role, asset type, and upcoming work orders right on their phone.",
     img: 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=480&h=280&fit=crop',
     alt: 'Online Learning Training',
-  },
-  {
-    icon: '🏅',
-    title: 'Certification Tracking',
-    desc: 'Track every certification, expiry date, and renewal requirement automatically. Get alerts before certifications lapse so you stay audit-ready.',
-    img: 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=480&h=280&fit=crop',
-    alt: 'Certification Tracking',
-  },
-  {
-    icon: '🎓',
-    title: 'Custom Course Builder',
-    desc: 'Create courses tailored to your SOPs using videos, quizzes, and interactive checklists — no instructional design background required.',
-    img: 'https://images.unsplash.com/photo-1488190211105-8b0e65b80b4e?w=480&h=280&fit=crop',
-    alt: 'Custom Course Building',
   },
   {
     icon: '📊',
@@ -48,7 +34,7 @@ const features = [
   {
     icon: '🔗',
     title: 'Integrated with Work Orders',
-    desc: 'Assign mandatory training before a technician can close a work order — ensuring compliance is baked into the workflow, not added after.',
+    desc: 'Assign mandatory training before a technician can close a work order so compliance is baked into the workflow, not added after.',
     img: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=480&h=280&fit=crop',
     alt: 'Work Order Learning Integration',
   },
@@ -61,7 +47,6 @@ export default function LearnProduct() {
     <div style={{ minHeight: '100vh', backgroundColor: '#f9fafb', fontFamily: 'Inter, sans-serif' }}>
       <AuthHeader />
 
-      {/* Hero */}
       <div style={{ position: 'relative', width: '100%', height: '460px', overflow: 'hidden' }}>
         <img
           src="https://images.unsplash.com/photo-1524178232363-1fb2b075b655?w=1400&h=460&fit=crop"
@@ -74,7 +59,7 @@ export default function LearnProduct() {
             Upskill Your Team. Prove Your Compliance.
           </h1>
           <p style={{ fontSize: '20px', color: '#e2e8f0', maxWidth: '600px', lineHeight: '1.6' }}>
-            Enable your frontline team to access job-relevant training, track certifications, and stay compliant — no spreadsheets.
+            Enable your frontline team to access job-relevant training, track certifications, and stay compliant without spreadsheets.
           </p>
           <div style={{ display: 'flex', gap: '16px', marginTop: '32px', flexWrap: 'wrap', justifyContent: 'center' }}>
             <button onClick={() => navigate('/register')} style={{ padding: '14px 32px', background: 'linear-gradient(135deg, #16a34a, #15803d)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '16px', fontWeight: '700', cursor: 'pointer', boxShadow: '0 4px 15px rgba(22,163,74,0.4)' }}>
@@ -87,7 +72,6 @@ export default function LearnProduct() {
         </div>
       </div>
 
-      {/* Stats */}
       <div style={{ background: 'linear-gradient(135deg, #14532d, #166534)', padding: '32px 24px' }}>
         <div style={{ maxWidth: '900px', margin: '0 auto', display: 'flex', justifyContent: 'space-around', flexWrap: 'wrap', gap: '24px' }}>
           {stats.map((s) => (
@@ -122,13 +106,12 @@ export default function LearnProduct() {
           ))}
         </div>
 
-        {/* Testimonial */}
         <div style={{ background: 'linear-gradient(135deg, #f0fdf4, #dcfce7)', borderRadius: '20px', padding: '48px', marginBottom: '60px', textAlign: 'center' }}>
           <div style={{ fontSize: '36px', marginBottom: '16px' }}>💬</div>
           <p style={{ fontSize: '20px', fontStyle: 'italic', color: '#166534', maxWidth: '700px', margin: '0 auto 24px', lineHeight: '1.7' }}>
             "We used to hire a trainer every quarter. Now the FixNest Learn library covers everything and our team completes modules during slow shifts."
           </p>
-          <div style={{ fontWeight: '700', color: '#14532d' }}>Priya N. — Training & Development Lead</div>
+          <div style={{ fontWeight: '700', color: '#14532d' }}>Priya N. · Training & Development Lead</div>
         </div>
 
         <div style={{ textAlign: 'center', paddingTop: '20px' }}>

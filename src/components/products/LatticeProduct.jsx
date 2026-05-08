@@ -11,16 +11,9 @@ const stats = [
 
 const features = [
   {
-    icon: '🔗',
-    title: 'Universal Data Layer',
-    desc: 'Lattice serves as the single source of truth that unifies maintenance, safety, IoT, and ERP data across your entire technology stack.',
-    img: 'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=480&h=280&fit=crop',
-    alt: 'Data Integration Layer',
-  },
-  {
     icon: '🔄',
     title: 'Real-Time Data Sync',
-    desc: 'Changes in any connected system propagate instantly through Lattice — no stale dashboards, no mismatched reports, no manual reconciliation.',
+    desc: 'Changes in any connected system propagate instantly through Lattice so you avoid stale dashboards, mismatched reports, and manual reconciliation.',
     img: 'https://images.unsplash.com/photo-1504868584819-f8e8b4b6d7e3?w=480&h=280&fit=crop',
     alt: 'Real-time Data Sync',
   },
@@ -35,13 +28,13 @@ const features = [
     icon: '🛡️',
     title: 'Data Governance',
     desc: 'Role-based field-level access control, full audit logs, and GDPR/SOC 2 compliance built into every data flow so your team never exposes sensitive information.',
-    img: 'https://images.unsplash.com/photo-1563986768609-7f64142e38de?w=480&h=280&fit=crop',
+    img: 'https://images.unsplash.com/photo-1563013544-824ae1b704d3?auto=format&fit=crop&w=480&h=280&q=80',
     alt: 'Data Governance Security',
   },
   {
     icon: '📐',
     title: 'Custom Data Models',
-    desc: 'Extend the standard schema with custom fields, relationships, and entities that reflect how your business actually works — without writing a line of code.',
+    desc: 'Extend the standard schema with custom fields, relationships, and entities that reflect how your business actually works without writing a line of code.',
     img: 'https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d?w=480&h=280&fit=crop',
     alt: 'Custom Data Models',
   },
@@ -61,7 +54,6 @@ export default function LatticeProduct() {
     <div style={{ minHeight: '100vh', backgroundColor: '#f9fafb', fontFamily: 'Inter, sans-serif' }}>
       <AuthHeader />
 
-      {/* Hero */}
       <div style={{ position: 'relative', width: '100%', height: '460px', overflow: 'hidden' }}>
         <img
           src="https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1400&h=460&fit=crop"
@@ -87,7 +79,6 @@ export default function LatticeProduct() {
         </div>
       </div>
 
-      {/* Stats */}
       <div style={{ background: 'linear-gradient(135deg, #0c4a6e, #0284c7)', padding: '32px 24px' }}>
         <div style={{ maxWidth: '900px', margin: '0 auto', display: 'flex', justifyContent: 'space-around', flexWrap: 'wrap', gap: '24px' }}>
           {stats.map((s) => (
@@ -105,7 +96,7 @@ export default function LatticeProduct() {
             Connect everything. Silo nothing.
           </h2>
           <p style={{ fontSize: '18px', color: '#6b7280', maxWidth: '760px', lineHeight: '1.7', margin: '0 auto' }}>
-            Lattice breaks down data silos by connecting your CMMS, ERP, sensor networks, and business intelligence tools into a single governed data layer — giving every team accurate, real-time information they can trust.
+            Lattice breaks down data silos by connecting your CMMS, ERP, sensor networks, and business intelligence tools into a single governed data layer, giving every team accurate, real-time information they can trust.
           </p>
         </div>
 
@@ -122,13 +113,12 @@ export default function LatticeProduct() {
           ))}
         </div>
 
-        {/* Testimonial */}
         <div style={{ background: 'linear-gradient(135deg, #f0f9ff, #e0f2fe)', borderRadius: '20px', padding: '48px', marginBottom: '60px', textAlign: 'center' }}>
           <div style={{ fontSize: '36px', marginBottom: '16px' }}>💬</div>
           <p style={{ fontSize: '20px', fontStyle: 'italic', color: '#0369a1', maxWidth: '700px', margin: '0 auto 24px', lineHeight: '1.7' }}>
             "Lattice connected our SAP and FixNest environments in a single weekend. Our maintenance reports are now 5x faster to produce and always accurate."
           </p>
-          <div style={{ fontWeight: '700', color: '#0c4a6e' }}>Byishimo O. — IT Director, Regional Manufacturing Group</div>
+          <div style={{ fontWeight: '700', color: '#0c4a6e' }}>Byishimo O. · IT Director, Regional Manufacturing Group</div>
         </div>
 
         <div style={{ textAlign: 'center', paddingTop: '20px' }}>

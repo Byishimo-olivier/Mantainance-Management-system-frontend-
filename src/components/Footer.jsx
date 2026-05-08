@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { MessageCircle } from 'lucide-react';
 import './Footer.css';
 import { footerMainSections } from '../data/footerNavigation';
 
@@ -59,7 +60,19 @@ const Footer = () => {
               <h4>Contact</h4>
               <div className="footer-contact-info">
                 <div className="footer-contact-item"><a href="tel:+250785230859">+250 785 230 859</a></div>
+                <div className="footer-contact-item footer-contact-item--whatsapp">
+                  <a href="https://wa.me/250785230859" target="_blank" rel="noreferrer">
+                    <MessageCircle size={16} />
+                    <span>Text us on WhatsApp</span>
+                  </a>
+                </div>
                 <div className="footer-contact-item"><a href="tel:+250783227490">+250 783 227 490</a></div>
+                <div className="footer-contact-item footer-contact-item--whatsapp">
+                  <a href="https://wa.me/250783227490" target="_blank" rel="noreferrer">
+                    <MessageCircle size={16} />
+                    <span>WhatsApp support</span>
+                  </a>
+                </div>
                 <div className="footer-contact-item"><Link to="/request-demo">Schedule a Tour</Link></div>
                 <div className="footer-contact-item" style={{ marginTop: '12px', fontSize: '13px' }}>
               Norrsken House Kigali<br />

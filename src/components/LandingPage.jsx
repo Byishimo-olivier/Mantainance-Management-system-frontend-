@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, CheckCircle2, ArrowRight, Shield, Zap, Layout, Globe, Truck, GraduationCap, Building2, Factory, Utensils, Lightbulb } from 'lucide-react';
+import { X, CheckCircle2, ArrowRight, Zap, Layout, Globe, Truck, GraduationCap, Building2, Factory, HeartPulse, Lightbulb } from 'lucide-react';
 import AuthHeader from './auth/AuthHeader';
 import ContactWidget from './ContactWidget';
 import subscriptionAPI from '../api/subscription';
@@ -21,6 +21,7 @@ import AnalyticsScreenshot from '../assets/analytics.png';
 import PMScreenshot from '../assets/PM.png';
 import WorkOrderScreenshot from '../assets/Workorder4.png';
 import ScheduleScreenshot from '../assets/schedule3.png';
+import SignupScreenshot from '../assets/Signup.png';
 
 const teamMembers = [
   {
@@ -101,17 +102,9 @@ const products = [
     details: 'From smart scheduling to predictive recommendations, Intelligence helps you work faster and smarter without extra setup. Features AI-powered triage and automated incident root cause analysis.'
   },
   {
-    name: 'Safety',
-    label: 'Safety',
-    image: 'https://images.unsplash.com/photo-1504328345606-18bbc8c9d7d1?w=800&q=80',
-    icon: <Shield className="w-5 h-5" />,
-    description: 'Environment, Health, & Safety Software. Capture safety events in seconds with voice-to-text.',
-    details: 'Automated OSHA logs, AI-powered CAPAs, and instant audit trails. Scan QR codes for instant safety reporting without requiring an account.'
-  },
-  {
     name: 'Providers',
     label: 'Providers',
-    image: 'https://images.unsplash.com/photo-1521791136064-7986c2959443?w=800&q=80',
+    image: 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=800&q=80',
     icon: <Globe className="w-5 h-5" />,
     description: 'Vendor and contractor management integrated with your maintenance workflow.',
     details: 'Track contracts, performance, and communications all in one place. Streamline invoicing and external work order dispatching.'
@@ -119,7 +112,7 @@ const products = [
   {
     name: 'Lattice',
     label: 'Lattice',
-    image: 'https://images.unsplash.com/photo-1558494949-ef010cbdcc48?w=800&q=80',
+    image: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&q=80',
     icon: <Layout className="w-5 h-5" />,
     description: 'Data integration layer that unifies maintenance, safety, and asset information.',
     details: 'Connect your ERP, PLC, and third-party tools into one unified data foundation for your entire operation.'
@@ -145,31 +138,35 @@ const products = [
 const industries = [
   {
     name: 'Manufacturing & Plants',
-    image: 'https://images.unsplash.com/photo-1565373679107-344d3c173348?w=800&q=80',
+    image: 'https://images.unsplash.com/photo-1567789884554-0b844b597180?auto=format&fit=crop&w=900&q=80',
     icon: <Factory className="w-5 h-5" />,
     description: 'Reduce unplanned downtime and optimize OEE with predictive maintenance.',
-    details: 'Connect shop-floor data to work orders. Monitor assembly lines 24/7 and manage spare parts inventory across multiple plants.'
+    details: 'Connect shop-floor data to work orders. Monitor assembly lines 24/7 and manage spare parts inventory across multiple plants.',
+    route: '/solution/industry/manufacturing-plants',
   },
   {
-    name: 'Food & Beverage',
-    image: 'https://images.unsplash.com/photo-1556761175-5973bc0f22b8?w=800&q=80',
-    icon: <Utensils className="w-5 h-5" />,
-    description: 'Streamline food safety compliance and sanitation specialized workflows.',
-    details: 'Automated compliance logging, sanitation schedule tracking, and chilled storage monitoring to ensure regulatory standards are met every day.'
+    name: 'Healthcare & Clinics',
+    image: 'https://images.unsplash.com/photo-1576091160550-2173dba999ef?auto=format&fit=crop&w=900&q=80',
+    icon: <HeartPulse className="w-5 h-5" />,
+    description: 'Keep critical medical facilities reliable with preventive maintenance and compliance tracking.',
+    details: 'Manage generators, HVAC, lab equipment, and patient-facing spaces with scheduled inspections, asset histories, and fast-response work orders.',
+    route: '/solution/industry/healthcare',
   },
   {
     name: 'Energy & Utilities',
     image: 'https://images.unsplash.com/photo-1473341304170-971dccb5ac1e?w=800&q=80',
     icon: <Lightbulb className="w-5 h-5" />,
     description: 'Maintain critical infrastructure with field-ready mobile tools and GIS.',
-    details: 'Remote asset monitoring, substation inspections, and grid reliability tracking. Empower field crews with offline-capable mobile access.'
+    details: 'Remote asset monitoring, substation inspections, and grid reliability tracking. Empower field crews with offline-capable mobile access.',
+    route: '/solution/industry/energy-utilities',
   },
   {
     name: 'Government & Public Works',
     image: 'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?w=800&q=80',
     icon: <Building2 className="w-5 h-5" />,
     description: 'Public-facing request portals and infrastructure lifecycle management.',
-    details: 'Allow citizens to report issues via QR codes. Manage public assets, parks, and city buildings with transparent audit trails and budget oversight.'
+    details: 'Allow citizens to report issues via QR codes. Manage public assets, parks, and city buildings with transparent audit trails and budget oversight.',
+    route: '/solution/industry/government-public-works',
   }
 ];
 
@@ -178,21 +175,14 @@ const planMetadata = {
   basic: {
     displayName: 'Basic',
     description: 'Small teams or single-site operations getting off spreadsheets and paper for the first time.',
-    features: ['Unlimited work orders', 'Unlimited locations', 'Over AI'],
+    features: ['Unlimited Work order', 'Request', 'AI'],
     cta: 'Try for free'
   },
   premium: {
     displayName: 'Premium',
     badge: 'Custom Quote',
     description: 'Growing maintenance teams ready to move from reactive to preventive maintenance.',
-    features: [
-      'Daily Reporting & Insights',
-      'PM scheduling',
-      'Custom checklists',
-      'Parts & inventory with costing',
-      'Time & labor tracking',
-      '30-day analytics history'
-    ],
+    features: ['Unlimited work Order', 'Requests', 'Asset', 'Location', 'PM', 'Over AI', 'Analytics', 'Material Request', 'Purchase Order'],
     cta: 'Request Quotation',
     isPremium: true
   },
@@ -200,27 +190,13 @@ const planMetadata = {
     displayName: 'Professional',
     badge: 'Most Popular',
     description: 'Departments managing multiple asset types, needing field mobility and deeper analytics.',
-    features: [
-      'Mobile offline mode',
-      'External request portal',
-      'Full analytics history',
-      'Asset lifecycle tracking',
-      'Signature capture for compliance'
-    ],
+    features: ['Unlimited work Order', 'Requests', 'Asset', 'Location', 'PM', 'Over AI'],
     cta: 'Schedule a Demo'
   },
   enterprise: {
     displayName: 'Enterprise',
     description: 'Multi-site organizations needing automation, integrations, and governance controls.',
-    features: [
-      'Multi-site module support',
-      'Workflow automation',
-      'Reliability & downtime tracking',
-      'PO management',
-      'API & custom integrations',
-      'SSO & custom roles',
-      'Custom dashboards'
-    ],
+    features: ['Unlimited work Order', 'Requests', 'Asset', 'Location', 'PM', 'Over AI', 'Analytics', 'Material Request'],
     cta: 'Schedule a Demo'
   }
 };
@@ -292,12 +268,122 @@ const platformScreenshots = [
   },
 ];
 
+const liveDemoSteps = [
+  {
+    label: 'Signup',
+    title: 'Start with a fast Fixnest signup',
+    description: 'Create your workspace, add your company details, and get your maintenance team into one system from day one.',
+    image: SignupScreenshot,
+    accent: '#1769ff',
+    cardPosition: 'right-top',
+    points: ['Create your account', 'Set up your workspace', 'Bring your team into one flow'],
+  },
+  {
+    label: 'Requests',
+    title: 'Capture every maintenance request clearly',
+    description: 'Users can log a request with the issue, priority, and location so the team has everything needed before work begins.',
+    image: RequestScreenshot,
+    accent: '#0f766e',
+    cardPosition: 'left-bottom',
+    points: ['Centralized request intake', 'Priority and location details', 'Ready for approval and assignment'],
+  },
+  {
+    label: 'Work Orders',
+    title: 'Turn approved requests into work orders',
+    description: 'Create, assign, and track work orders with one clean workflow so technicians always know what to do next.',
+    image: WorkOrderScreenshot,
+    accent: '#7c3aed',
+    cardPosition: 'right-center',
+    points: ['Convert requests into jobs', 'Assign the right technician', 'Track status from open to done'],
+  },
+  {
+    label: 'PM',
+    title: 'Build a preventive maintenance rhythm',
+    description: 'Set recurring maintenance plans, attach procedures, and stay ahead of downtime before it becomes urgent.',
+    image: PMScreenshot,
+    accent: '#ea580c',
+    cardPosition: 'center-top',
+    points: ['Recurring PM schedules', 'Standard procedures and checklists', 'Less reactive maintenance'],
+  },
+  {
+    label: 'Assets',
+    title: 'Keep every asset organized in one place',
+    description: 'Track asset history, ownership, condition, and service context so every maintenance decision has the full picture.',
+    image: AssetScreenshot,
+    accent: '#1d4ed8',
+    cardPosition: 'left-top',
+    points: ['Asset history at a glance', 'Location and ownership tracking', 'Cleaner lifecycle visibility'],
+  },
+  {
+    label: 'Analytics',
+    title: 'Finish with reports your team can act on',
+    description: 'Review workload, performance, and trends through dashboards that make operational decisions easier to explain.',
+    image: AnalyticsScreenshot,
+    accent: '#0f172a',
+    cardPosition: 'center-bottom',
+    points: ['Live KPI dashboards', 'Export-ready reporting', 'Clear performance visibility'],
+  },
+];
+
+const liveDemoCardMotion = {
+  'right-top': { initial: { opacity: 0, x: 48, y: -30, scale: 0.98 }, exit: { opacity: 0, x: 24, y: -18 } },
+  'right-bottom': { initial: { opacity: 0, x: 40, y: 28, scale: 0.98 }, exit: { opacity: 0, x: 24, y: 18 } },
+  'left-top': { initial: { opacity: 0, x: -48, y: -30, scale: 0.98 }, exit: { opacity: 0, x: -24, y: -18 } },
+  'left-center': { initial: { opacity: 0, x: -40, y: 0, scale: 0.98 }, exit: { opacity: 0, x: -24, y: 0 } },
+  'right-center': { initial: { opacity: 0, x: 40, y: 0, scale: 0.98 }, exit: { opacity: 0, x: 24, y: 0 } },
+  'center-top': { initial: { opacity: 0, x: 0, y: -36, scale: 0.98 }, exit: { opacity: 0, x: 0, y: -18 } },
+  'left-bottom': { initial: { opacity: 0, x: -40, y: 28, scale: 0.98 }, exit: { opacity: 0, x: -24, y: 18 } },
+  'center-bottom': { initial: { opacity: 0, x: 0, y: 36, scale: 0.98 }, exit: { opacity: 0, x: 0, y: 18 } },
+  intro: { initial: { opacity: 0, x: 0, y: -12, scale: 0.96 }, exit: { opacity: 0, x: 0, y: 12 } },
+};
+
+const landingAgentStarters = [
+  'Show overdue work orders',
+  'Build a PM schedule',
+  'Summarize site performance',
+];
+
+const getLandingAgentReply = (message) => {
+  const normalized = String(message || '').toLowerCase();
+
+  if (normalized.includes('work order') || normalized.includes('request')) {
+    return 'I can organize incoming requests by priority, assign the right technician, and surface stalled work orders that need attention.';
+  }
+
+  if (normalized.includes('pm') || normalized.includes('preventive') || normalized.includes('schedule')) {
+    return 'I can turn recurring maintenance needs into a preventive schedule with due dates, owners, and reminders based on asset usage or calendar rules.';
+  }
+
+  if (normalized.includes('report') || normalized.includes('analytics') || normalized.includes('dashboard')) {
+    return 'I can draft a dashboard view with MTTR, completion rates, asset downtime, and team workload so managers can review performance quickly.';
+  }
+
+  if (normalized.includes('safety') || normalized.includes('incident') || normalized.includes('compliance')) {
+    return 'I can connect safety events to corrective actions, highlight recurring risks, and prepare a compliance-friendly summary for your team.';
+  }
+
+  if (normalized.includes('asset') || normalized.includes('inventory')) {
+    return 'I can help structure assets, maintenance history, and parts visibility so teams always know what they own and what needs service next.';
+  }
+
+  return 'I can help with work orders, preventive maintenance, analytics, safety follow-up, and asset planning. Try asking for a dashboard, PM schedule, or overdue summary.';
+};
+
 const LandingPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [pricing, setPricing] = useState(null);
   const [currency, setCurrency] = useState('USD');
   const [changingCurrency, setChangingCurrency] = useState(false);
+  const [activeDemoIndex, setActiveDemoIndex] = useState(0);
+  const [isLiveDemoOpen, setIsLiveDemoOpen] = useState(false);
+  const [isLiveDemoStarted, setIsLiveDemoStarted] = useState(false);
+  const [demoDirection, setDemoDirection] = useState(1);
+
+  const activeDemo = liveDemoSteps[activeDemoIndex];
+  const activeDemoMotion = liveDemoCardMotion[activeDemo.cardPosition] || liveDemoCardMotion['right-center'];
+  const nextDemo = liveDemoSteps[(activeDemoIndex + 1) % liveDemoSteps.length];
+  const isLastDemoStep = activeDemoIndex === liveDemoSteps.length - 1;
 
   const currencySymbols = {
     'USD': '$',
@@ -334,7 +420,23 @@ const LandingPage = () => {
     }
   };
 
+  const handleIndustryClick = (industry) => {
+    if (industry?.route) {
+      navigate(industry.route);
+      return;
+    }
+    setSelectedItem(industry);
+  };
+
   const [selectedItem, setSelectedItem] = useState(null);
+  const [agentPrompt, setAgentPrompt] = useState('Create a dashboard to display analytics...');
+  const [agentSubmitting, setAgentSubmitting] = useState(false);
+  const [agentConversation, setAgentConversation] = useState([
+    {
+      role: 'assistant',
+      text: 'I can help you plan work orders, PM schedules, analytics, and safety follow-up.',
+    },
+  ]);
 
   const fetchPricingData = async () => {
     try {
@@ -369,6 +471,89 @@ const LandingPage = () => {
 
   const handleUpgrade = (planKey) => {
     window.location.href = `/subscription?plan=${planKey}&currency=${currency}`;
+  };
+
+  const handleOpenLiveDemo = () => {
+    setActiveDemoIndex(0);
+    setDemoDirection(1);
+    setIsLiveDemoStarted(false);
+    setIsLiveDemoOpen(true);
+  };
+
+  const handleCloseLiveDemo = () => {
+    setIsLiveDemoStarted(false);
+    setIsLiveDemoOpen(false);
+  };
+
+  const handleStartLiveDemo = () => {
+    setIsLiveDemoStarted(true);
+  };
+
+  const handleDemoNext = () => {
+    if (isLastDemoStep) {
+      setIsLiveDemoOpen(false);
+      return;
+    }
+
+    setDemoDirection(1);
+    setActiveDemoIndex((current) => (current + 1) % liveDemoSteps.length);
+  };
+
+  const handleDemoPrevious = () => {
+    setDemoDirection(-1);
+    setActiveDemoIndex((current) => (current === 0 ? 0 : current - 1));
+  };
+
+  const handleDemoStepSelect = (index) => {
+    setDemoDirection(index >= activeDemoIndex ? 1 : -1);
+    setActiveDemoIndex(index);
+  };
+
+  const handleLandingAgentSubmit = (event) => {
+    event.preventDefault();
+    const nextPrompt = agentPrompt.trim();
+    if (!nextPrompt || agentSubmitting) return;
+
+    const nextHistory = agentConversation.map((entry) => ({
+      role: entry.role === 'user' ? 'user' : 'model',
+      content: entry.text,
+    }));
+
+    setAgentConversation((current) => [...current, { role: 'user', text: nextPrompt }]);
+    setAgentPrompt('');
+    setAgentSubmitting(true);
+
+    api.post('/api/ai/chat', {
+      message: nextPrompt,
+      history: nextHistory,
+    }).then((response) => {
+      const payload = response.data?.response;
+      const responseText = typeof payload === 'string'
+        ? payload
+        : payload?.content || getLandingAgentReply(nextPrompt);
+
+      setAgentConversation((current) => [
+        ...current,
+        { role: 'assistant', text: responseText },
+      ]);
+    }).catch((error) => {
+      console.error('Landing agent error:', error);
+      const fallbackText = getLandingAgentReply(nextPrompt);
+      const errorMessage = error.response?.data?.message
+        ? `${error.response.data.message} ${fallbackText}`
+        : fallbackText;
+
+      setAgentConversation((current) => [
+        ...current,
+        { role: 'assistant', text: errorMessage },
+      ]);
+    }).finally(() => {
+      setAgentSubmitting(false);
+    });
+  };
+
+  const handleLandingStarterClick = (starter) => {
+    setAgentPrompt(starter);
   };
 
   useEffect(() => {
@@ -416,6 +601,109 @@ const LandingPage = () => {
             <a className="landing-cta landing-cta--ghost" href="/request-demo">Request a Demo</a>
           </div>
         </div>
+        <div className="landing-hero-media hidden">
+          <div className="live-demo-shell">
+            <div className="hero-photo live-demo-stage" style={{ background: 'linear-gradient(145deg, #0f172a 0%, #1e293b 100%)', padding: '18px' }}>
+              <div className="live-demo-topbar">
+                <div className="live-demo-badge">Live Demo</div>
+                <div className="live-demo-counter">
+                  {String(activeDemoIndex + 1).padStart(2, '0')} / {String(liveDemoSteps.length).padStart(2, '0')}
+                </div>
+              </div>
+
+              <div className="live-demo-progress" aria-label="Live demo steps">
+                {liveDemoSteps.map((step, index) => (
+                  <button
+                    key={step.title}
+                    type="button"
+                    className={`live-demo-progress-step ${index === activeDemoIndex ? 'is-active' : ''}`}
+                    onClick={() => handleDemoStepSelect(index)}
+                    aria-label={`Show ${step.label}`}
+                  >
+                    <span
+                      className="live-demo-progress-fill"
+                      style={{
+                        backgroundColor: step.accent,
+                        transform: index <= activeDemoIndex ? 'scaleX(1)' : 'scaleX(0)',
+                      }}
+                    />
+                  </button>
+                ))}
+              </div>
+
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.img
+                  key={activeDemo.title}
+                  src={activeDemo.image}
+                  alt={activeDemo.title}
+                  className="live-demo-image"
+                  initial={{ opacity: 0, scale: 1.04, y: 18 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.98, y: -16 }}
+                  transition={{ duration: 0.55, ease: 'easeOut' }}
+                />
+              </AnimatePresence>
+
+              <div className="absolute inset-0 bg-gradient-to-tr from-slate-950/45 via-transparent to-slate-900/10" />
+
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.div
+                  key={`${activeDemo.title}-card`}
+                  className="live-demo-card"
+                  initial={{ opacity: 0, y: 22 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 16 }}
+                  transition={{ duration: 0.4, ease: 'easeOut' }}
+                >
+                  <div className="live-demo-card-label" style={{ color: activeDemo.accent }}>
+                    {activeDemo.label}
+                  </div>
+                  <h3 className="live-demo-card-title">{activeDemo.title}</h3>
+                  <p className="live-demo-card-description">{activeDemo.description}</p>
+
+                  <div className="live-demo-point-list">
+                    {activeDemo.points.map((point) => (
+                      <div key={point} className="live-demo-point">
+                        <CheckCircle2 className="h-4 w-4 shrink-0" style={{ color: activeDemo.accent }} />
+                        <span>{point}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="live-demo-actions">
+                    <button
+                      type="button"
+                      className="live-demo-next"
+                      onClick={handleDemoNext}
+                      style={{ backgroundColor: activeDemo.accent }}
+                    >
+                      <span>{isLastDemoStep ? 'Start free trial' : 'Next'}</span>
+                      <ArrowRight className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  <p className="live-demo-next-label">
+                    {isLastDemoStep ? 'Continue into Fixnest and launch your own workspace.' : `Next: ${nextDemo.label}`}
+                  </p>
+                </motion.div>
+              </AnimatePresence>
+            </div>
+
+            <div className="live-demo-step-tabs">
+              {liveDemoSteps.map((step, index) => (
+                <button
+                  key={step.label}
+                  type="button"
+                  className={`live-demo-step-tab ${index === activeDemoIndex ? 'is-active' : ''}`}
+                  onClick={() => handleDemoStepSelect(index)}
+                  style={index === activeDemoIndex ? { borderColor: step.accent, color: step.accent } : undefined}
+                >
+                  {step.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
         <div className="landing-hero-media">
           <div className="hero-photo group" style={{ background: 'linear-gradient(145deg, #0f172a 0%, #1e293b 100%)', padding: '18px' }}>
             <img 
@@ -442,6 +730,53 @@ const LandingPage = () => {
               <div className="hero-card-title" style={{ marginTop: '10px', color: '#cbd5e1' }}>Analytics Snapshot</div>
               <div className="hero-card-metric">Live charts and export-ready reports</div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="landing-live-demo-section">
+        <div className="landing-live-demo-wrap">
+          <div className="landing-live-demo-preview">
+            <div className="landing-live-demo-screen">
+              <img
+                src={WorkOrderScreenshot}
+                alt="Fixnest live demo preview"
+                className="landing-live-demo-screen-image"
+              />
+              <div className="landing-live-demo-screen-overlay" />
+              <motion.div
+                className="landing-live-demo-screen-card"
+                animate={{ y: [0, -6, 0], scale: [1, 1.01, 1] }}
+                transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
+              >
+                <div className="landing-live-demo-screen-label">Fixnest Product Tour</div>
+                <h3>See the workflow step by step</h3>
+                <p>Open a guided demo that moves from signup to requests, work orders, PMs, assets, and reporting.</p>
+                <button
+                  type="button"
+                  className="landing-live-demo-screen-button"
+                  onClick={handleOpenLiveDemo}
+                >
+                  View a Live Demo
+                </button>
+              </motion.div>
+            </div>
+          </div>
+
+          <div className="landing-live-demo-copy">
+            <div className="landing-kicker">Product Tour</div>
+            <h2>From work orders to asset intelligence</h2>
+            <p>
+              Show new users how Fixnest moves from request intake to work orders, preventive maintenance, asset tracking,
+              and reporting with a guided walkthrough built from your real screenshots.
+            </p>
+            <button
+              type="button"
+              className="landing-live-demo-trigger"
+              onClick={handleOpenLiveDemo}
+            >
+              View a Live Demo
+            </button>
           </div>
         </div>
       </section>
@@ -835,7 +1170,7 @@ const LandingPage = () => {
               key={industry.name}
               className="industry-card relative rounded-2xl overflow-hidden h-72 cursor-pointer group"
               whileHover={{ scale: 1.02 }}
-              onClick={() => setSelectedItem(industry)}
+              onClick={() => handleIndustryClick(industry)}
             >
               <img 
                 src={industry.image} 
@@ -859,6 +1194,134 @@ const LandingPage = () => {
           ))}
         </div>
       </section>
+
+      <AnimatePresence>
+        {isLiveDemoOpen && (
+          <div className="live-demo-modal-backdrop">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="live-demo-modal-overlay"
+              onClick={handleCloseLiveDemo}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.98, y: 10 }}
+              transition={{ duration: 0.25, ease: 'easeOut' }}
+              className="live-demo-modal"
+            >
+              <button
+                type="button"
+                className="live-demo-modal-close"
+                onClick={handleCloseLiveDemo}
+                aria-label="Close live demo"
+              >
+                <X className="h-5 w-5" />
+              </button>
+
+              <AnimatePresence mode="sync" initial={false}>
+                <motion.img
+                  key={activeDemo.title}
+                  custom={demoDirection}
+                  src={activeDemo.image}
+                  alt={activeDemo.title}
+                  className="live-demo-modal-image"
+                  initial={(direction) => ({ opacity: 0, x: direction * 36, scale: 1.02 })}
+                  animate={{ opacity: 1, x: 0, scale: 1 }}
+                  exit={(direction) => ({ opacity: 0, x: direction * -24, scale: 1.01 })}
+                  transition={{ duration: 0.42, ease: 'easeOut' }}
+                />
+              </AnimatePresence>
+
+              <div className="live-demo-modal-video-wash" />
+              <div className="live-demo-modal-film" />
+
+              {!isLiveDemoStarted ? (
+                <motion.div
+                  key="live-demo-intro"
+                  initial={liveDemoCardMotion.intro.initial}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={liveDemoCardMotion.intro.exit}
+                  transition={{ duration: 0.3, ease: 'easeOut' }}
+                  className="live-demo-modal-story-card live-demo-card-pos--center"
+                >
+                  <div className="live-demo-modal-story-title">Fixnest Product Tour</div>
+                  <p className="live-demo-modal-story-copy">
+                    See how a maintenance request moves from signup through requests, work orders, preventive maintenance,
+                    asset tracking, and reporting.
+                  </p>
+                  <button
+                    type="button"
+                    className="live-demo-modal-start"
+                    onClick={handleStartLiveDemo}
+                  >
+                    Get Started
+                  </button>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key={activeDemo.title}
+                  initial={activeDemoMotion.initial}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={activeDemoMotion.exit}
+                  transition={{ duration: 0.3, ease: 'easeOut' }}
+                  className={`live-demo-modal-story-card live-demo-card-pos--${activeDemo.cardPosition}`}
+                >
+                  <div className="live-demo-modal-step">
+                    {String(activeDemoIndex + 1).padStart(2, '0')} / {String(liveDemoSteps.length).padStart(2, '0')} · {activeDemo.label}
+                  </div>
+                  <h3>{activeDemo.title}</h3>
+                  <p>{activeDemo.description}</p>
+
+                  <div className="live-demo-modal-points">
+                    {activeDemo.points.map((point) => (
+                      <div key={point} className="live-demo-modal-point">
+                        <CheckCircle2 className="h-4 w-4 shrink-0" style={{ color: activeDemo.accent }} />
+                        <span>{point}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="live-demo-modal-progress">
+                    {liveDemoSteps.map((step, index) => (
+                      <button
+                        key={step.label}
+                        type="button"
+                        className={`live-demo-modal-dot ${index === activeDemoIndex ? 'is-active' : ''}`}
+                        style={index === activeDemoIndex ? { backgroundColor: step.accent } : undefined}
+                        onClick={() => handleDemoStepSelect(index)}
+                        aria-label={`Go to ${step.label}`}
+                      />
+                    ))}
+                  </div>
+
+                  <div className="live-demo-modal-actions">
+                    <button
+                      type="button"
+                      className="live-demo-modal-secondary"
+                      onClick={handleDemoPrevious}
+                      disabled={activeDemoIndex === 0}
+                    >
+                      Previous
+                    </button>
+                    <button
+                      type="button"
+                      className="live-demo-modal-primary"
+                      onClick={handleDemoNext}
+                      style={{ backgroundColor: activeDemo.accent }}
+                    >
+                      {isLastDemoStep ? 'Finish Demo' : 'Next'}
+                      <ArrowRight className="h-4 w-4" />
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Expansion Detail Modal/Overlay */}
       <AnimatePresence>
@@ -1100,15 +1563,45 @@ const LandingPage = () => {
             </div>
           </div>
           <div className="ai-visual">
-            <div className="ai-orb">Hi</div>
-            <div className="ai-chat">
+            <div className="ai-orb">AI</div>
+            <div className="ai-chat" id="landing-agent">
               <div className="ai-chat-title">How can I help?</div>
-              <div className="ai-input">Create a dashboard to display analytics...</div>
-              <div className="ai-actions">
-                <span className="ai-chip" />
-                <span className="ai-chip" />
-                <span className="ai-chip ai-chip--send" />
+              <div className="ai-thread">
+                {agentConversation.slice(-4).map((entry, index) => (
+                  <div
+                    key={`${entry.role}-${index}-${entry.text}`}
+                    className={`ai-message ${entry.role === 'user' ? 'ai-message--user' : 'ai-message--assistant'}`}
+                  >
+                    {entry.text}
+                  </div>
+                ))}
               </div>
+              {agentSubmitting ? <div className="ai-loading">Thinking...</div> : null}
+              <div className="ai-starters">
+                {landingAgentStarters.map((starter) => (
+                  <button
+                    key={starter}
+                    type="button"
+                    className="ai-starter"
+                    onClick={() => handleLandingStarterClick(starter)}
+                    disabled={agentSubmitting}
+                  >
+                    {starter}
+                  </button>
+                ))}
+              </div>
+              <form onSubmit={handleLandingAgentSubmit} className="ai-input-form">
+                <input
+                  className="ai-input"
+                  value={agentPrompt}
+                  onChange={(event) => setAgentPrompt(event.target.value)}
+                  placeholder="Ask the agent to help with maintenance work..."
+                  disabled={agentSubmitting}
+                />
+                <div className="ai-actions">
+                  <button type="submit" className="ai-chip ai-chip--send" aria-label="Send prompt" disabled={agentSubmitting} />
+                </div>
+              </form>
             </div>
           </div>
         </div>
@@ -1155,7 +1648,7 @@ const LandingPage = () => {
           </p>
           <div className="landing-cta-row">
             <a className="landing-cta px-10 py-4 text-lg" href="/register">Start Your Free Trial</a>
-            <a className="landing-cta landing-cta--ghost px-10 py-4 text-lg border-white/20 text-white" href="/request-demo">Schedule a Tour</a>
+            <a className="landing-cta landing-cta--ghost px-10 py-4 text-lg border-white/20 text-black" href="/request-demo">Schedule a Tour</a>
           </div>
         </div>
       </section>
@@ -1171,10 +1664,10 @@ const LandingPage = () => {
             <a className="landing-cta" href="/register">Start a Free Trial</a>
             <a className="landing-cta landing-cta--ghost" href="/request-demo">Request a Demo</a>
           </div>
-          <div className="landing-badges">
+          {/* <div className="landing-badges">
             <span className="badge-pill">IDC CMMS Leader 2021</span>
             <span className="badge-pill">Gartner Peer Insights</span>
-          </div>
+          </div> */}
         </div>
       </section>
 

@@ -15471,7 +15471,12 @@ function ClientDashboard() {
           setAssets(scopedAssets);
         }
       } catch (err) {
-        setErrors(e => ({ ...e, properties: err?.response?.data?.message || err.message }));
+        if (err.__silentSubscriptionPlanNotice) {
+          setProperties([]);
+          setErrors(e => ({ ...e, properties: null }));
+        } else {
+          setErrors(e => ({ ...e, properties: err?.response?.data?.message || err.message }));
+        }
       } finally {
         setLoading(l => ({ ...l, properties: false }));
       }
@@ -15485,7 +15490,12 @@ function ClientDashboard() {
           scopedAssetIds = assetsData.map(a => a._id || a.id).filter(Boolean).map(String);
           setAssets(assetsData);
         } catch (err) {
-          setErrors(e => ({ ...e, assets: err?.response?.data?.message || err.message }));
+          if (err.__silentSubscriptionPlanNotice) {
+            setAssets([]);
+            setErrors(e => ({ ...e, assets: null }));
+          } else {
+            setErrors(e => ({ ...e, assets: err?.response?.data?.message || err.message }));
+          }
         } finally {
           setLoading(l => ({ ...l, assets: false }));
         }
@@ -20456,6 +20466,7 @@ function ClientDashboard() {
       setAssets(r.data || []);
     } catch (error) {
       console.error('Failed to save asset', error);
+      if (error.__subscriptionPlanNoticeShown) return;
       alert(error.response?.data?.error || 'Failed to save asset.');
     }
   }, [assetForm, assetVendorOptions, branches, closeAssetEditor, editingAsset, originalAssetBlocks]);

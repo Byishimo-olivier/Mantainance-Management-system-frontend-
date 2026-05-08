@@ -28,7 +28,7 @@ const features = [
     icon: '🗣️',
     title: 'Natural Language Reports',
     desc: 'Ask questions in plain English: "What was our MTTR last month?" and get instant charts and summaries — no SQL, no BI tools needed.',
-    img: 'https://images.unsplash.com/photo-1526628953301-3cd25d7ef046?w=480&h=280&fit=crop',
+    img: 'https://images.unsplash.com/photo-1516321165247-4aa89a48be28?auto=format&fit=crop&w=480&h=280&q=80',
     alt: 'Natural Language AI Reports',
   },
   {
