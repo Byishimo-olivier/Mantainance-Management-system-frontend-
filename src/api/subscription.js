@@ -24,7 +24,7 @@ const subscriptionAPI = {
         metadata?.employeeCount ||
         metadata?.employeeLimit ||
         metadata?.maxUsers ||
-        10
+        2
       );
       const resolvedMetadata = {
         ...metadata,

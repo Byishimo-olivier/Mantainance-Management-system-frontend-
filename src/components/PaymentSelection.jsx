@@ -31,8 +31,21 @@ export default function PaymentSelection() {
   const companyPhone = searchParams.get('phone') || '';
   const subscriptionId = searchParams.get('subscriptionId');
   const amount = searchParams.get('amount') || '0';
-  const employees = Math.max(1, Math.ceil(Number(searchParams.get('employees') || '10')));
-  const includedEmployees = Math.max(1, Math.ceil(Number(searchParams.get('includedEmployees') || '10')));
+  const employees = Math.max(1, Math.ceil(Number(searchParams.get('employees') || '2')));
+  const includedEmployees = Math.max(1, Math.ceil(Number(searchParams.get('includedEmployees') || '2')));
+  const extraEmployees = Math.max(0, employees - includedEmployees);
+  const extraEmployeeAmount = Number(searchParams.get('extraEmployeeAmount') || 0);
+  const seatUpgradeOnly = searchParams.get('seatUpgradeOnly') === 'true';
+  const targetEmployeeLimit = Math.max(employees, Math.ceil(Number(searchParams.get('targetEmployeeLimit') || employees)));
+  const pendingInvites = (() => {
+    try {
+      const raw = searchParams.get('pendingInvites');
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  })();
   const paymentMethod = searchParams.get('paymentMethod') || 'card';
   const provider = searchParams.get('provider') || 'mtn';
 
@@ -98,6 +111,13 @@ export default function PaymentSelection() {
         employeeCount: employees,
         employeeLimit: employees,
         maxUsers: employees,
+        includedEmployees,
+        extraEmployees,
+        extraEmployeeAmount,
+        seatUpgradeOnly,
+        targetEmployeeLimit,
+        pendingSeatInvites: pendingInvites,
+        invitedByUserId: userId,
       };
 
       // If no subscriptionId, create a subscription first
@@ -301,9 +321,19 @@ export default function PaymentSelection() {
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
               <span style={{ color: '#666' }}>Employees Covered:</span>
               <span style={{ fontWeight: '600' }}>
-                {employees} {employees > includedEmployees ? `(${employees - includedEmployees} above included ${includedEmployees})` : `(included ${includedEmployees})`}
+                {seatUpgradeOnly
+                  ? `${extraEmployees} new paid seat${extraEmployees === 1 ? '' : 's'}`
+                  : `${employees} ${extraEmployees > 0 ? `(${extraEmployees} extra x ${currency === 'USD' ? '$' : 'FRw'} ${extraEmployeeAmount.toFixed(2)})` : `(${includedEmployees} included)`}`}
               </span>
             </div>
+            {pendingInvites.length > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
+                <span style={{ color: '#666' }}>Invite Email:</span>
+                <span style={{ fontWeight: '600' }}>
+                  {pendingInvites.map((invite) => invite.email).join(', ')}
+                </span>
+              </div>
+            )}
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
               <span style={{ color: '#666' }}>Payment Method:</span>
               <span style={{ fontWeight: '600' }}>{paymentMethod === 'mobile_money' ? 'Mobile Money' : 'Card'}</span>

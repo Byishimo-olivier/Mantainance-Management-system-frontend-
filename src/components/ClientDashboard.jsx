@@ -3,6 +3,8 @@ import backgroundVideo from "../assets/136906-765457769_small.mp4";
 import companyLogoAsset from "../assets/company logo.jpeg";
 import { createPortal } from "react-dom";
 import api from "../api/axios";
+import subscriptionAPI from "../api/subscription";
+import MobileMoneyPendingModal from './payments/MobileMoneyPendingModal';
 import { useNavigate, Link, useLocation } from "react-router-dom";
 import 'chart.js/auto';
 import { Chart } from 'primereact/chart';
@@ -15,7 +17,7 @@ import useTrialStatus from '../hooks/useTrialStatus';
 import { useSubscription } from '../hooks/useSubscription';
 import { getImageUrl } from '../utils/imageUrl';
 import { useLanguage, useTranslation } from "../i18n/LanguageContext";
-import { Clock, Calendar, CheckCircle, ClipboardCheck, X, Bell, Download, Package, ShoppingCart, Gauge, Plus, Search, Eye, MapPin, AlertCircle, Repeat, Edit, Pencil, ChevronLeft, ChevronRight, ChevronDown, SlidersHorizontal, Flag, MoreHorizontal, MoreVertical, Trash2, Image as ImageIcon, Tag, Paperclip, MessageSquare, Send, Navigation, DollarSign, Bookmark, Link2, FileText, Copy, Archive, ArrowUpDown, ArrowRight, ArrowLeft, LayoutDashboard, Settings, Users, RotateCcw, Zap, Globe, Activity, QrCode, GripVertical, Info, Box } from 'lucide-react';
+import { Clock, Calendar, CheckCircle, ClipboardCheck, X, Bell, Download, Package, ShoppingCart, Gauge, Plus, Search, Eye, MapPin, AlertCircle, Repeat, Edit, Pencil, ChevronLeft, ChevronRight, ChevronDown, SlidersHorizontal, Flag, MoreHorizontal, MoreVertical, Trash2, Image as ImageIcon, Tag, Paperclip, MessageSquare, Send, Navigation, DollarSign, Bookmark, Link2, FileText, Copy, Archive, ArrowUpDown, ArrowRight, ArrowLeft, LayoutDashboard, Settings, Users, RotateCcw, Zap, Globe, Activity, QrCode, GripVertical, Info, Box, CreditCard, Smartphone, Loader } from 'lucide-react';
 
 const ASSISTANT_ACTION_STORAGE_KEY = 'mms_assistant_action';
 const REQUEST_FORM_SETTINGS_STORAGE_KEY = 'mms_request_form_settings';
@@ -6493,6 +6495,32 @@ const INVITE_ROLE_OPTIONS = [
 ];
 
 const getInviteRole = (value) => INVITE_ROLE_OPTIONS.find((r) => r.value === value) || INVITE_ROLE_OPTIONS[0];
+const isPaidInviteRole = (value) => !!getInviteRole(value)?.paidSeat;
+
+const getPaidSeatLimit = (subscription, company = null) => {
+  const metadata = subscription?.metadata || {};
+  const pricingModel = String(metadata.pricingModel || '').toLowerCase();
+  const usesCurrentSeatPricing =
+    pricingModel.includes('base_includes_2') ||
+    pricingModel.includes('seat_upgrade') ||
+    metadata.seatUpgradeOnly === true ||
+    metadata.seatUpgradeOnly === 'true';
+
+  if (!usesCurrentSeatPricing) {
+    return 2;
+  }
+
+  const explicitLimit = Number(
+    metadata.targetEmployeeLimit ||
+    metadata.employeeLimit ||
+    metadata.employeeCount ||
+    metadata.maxUsers ||
+    company?.maxUsers ||
+    2
+  );
+
+  return Number.isFinite(explicitLimit) && explicitLimit > 0 ? Math.max(2, Math.ceil(explicitLimit)) : 2;
+};
 
 function InviteUsersModal({ open, onClose, onInvite, unusedSeats = '—', busy = false }) {
   const [rows, setRows] = React.useState([{ email: '', role: 'administrator' }]);
@@ -6716,6 +6744,134 @@ function InviteUsersModal({ open, onClose, onInvite, unusedSeats = '—', busy =
             className="px-6 py-2.5 rounded-lg bg-blue-600 text-white font-bold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {busy ? 'Inviting…' : 'Invite'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SeatPaymentModal({ open, data, error, busy, onClose, onChange, onContinue }) {
+  if (!open || !data) return null;
+
+  const symbol = data.currency === 'USD' ? '$' : 'FRw';
+  const amount = Number(data.amount || 0);
+  const extraSeats = Number(data.extraSeatsNeeded || data.extraEmployees || 0);
+  const inviteEmails = Array.isArray(data.pendingInvites)
+    ? data.pendingInvites.map((invite) => invite.email).filter(Boolean)
+    : [];
+
+  return (
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/50 p-4">
+      <div className="w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+        <div className="flex items-start justify-between border-b border-gray-200 px-6 py-5">
+          <div>
+            <h3 className="text-2xl font-black text-gray-900">Pay for Additional Seat</h3>
+            <p className="mt-1 text-sm text-gray-500">Complete payment before the invite email is sent.</p>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-lg p-2 text-gray-500 hover:bg-gray-100" aria-label="Close seat payment">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="space-y-5 px-6 py-6">
+          {error && (
+            <div className="flex gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+              <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+              <div>{error}</div>
+            </div>
+          )}
+
+          <div className="rounded-2xl border border-blue-100 bg-blue-50 px-5 py-4">
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div>
+                <div className="text-xs font-bold uppercase tracking-wide text-blue-700">Plan</div>
+                <div className="mt-1 text-base font-black text-gray-900">{String(data.plan || 'basic').charAt(0).toUpperCase() + String(data.plan || 'basic').slice(1)}</div>
+              </div>
+              <div>
+                <div className="text-xs font-bold uppercase tracking-wide text-blue-700">New Seats</div>
+                <div className="mt-1 text-base font-black text-gray-900">{extraSeats}</div>
+              </div>
+              <div className="sm:text-right">
+                <div className="text-xs font-bold uppercase tracking-wide text-blue-700">Amount</div>
+                <div className="mt-1 text-2xl font-black text-gray-900">{symbol}{amount.toFixed(2)}</div>
+                <div className="text-xs text-gray-500">per {data.cycle}</div>
+              </div>
+            </div>
+          </div>
+
+          {inviteEmails.length > 0 && (
+            <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+              <div className="text-xs font-bold uppercase tracking-wide text-gray-500">Invite after payment</div>
+              <div className="mt-1 text-sm font-semibold text-gray-900">{inviteEmails.join(', ')}</div>
+            </div>
+          )}
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => onChange({ paymentMethod: 'card' })}
+              className={`rounded-2xl border p-5 text-left transition ${data.paymentMethod === 'card' ? 'border-blue-600 bg-blue-50 shadow-sm' : 'border-gray-200 bg-white hover:border-blue-200'}`}
+            >
+              <div className="flex items-center gap-3">
+                <CreditCard className="h-5 w-5 text-blue-600" />
+                <div className="text-base font-bold text-slate-900">Card Payment</div>
+              </div>
+              <p className="mt-3 text-sm leading-6 text-slate-500">Pay using Visa, Mastercard, or another supported card.</p>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onChange({ paymentMethod: 'mobile_money' })}
+              className={`rounded-2xl border p-5 text-left transition ${data.paymentMethod === 'mobile_money' ? 'border-blue-600 bg-blue-50 shadow-sm' : 'border-gray-200 bg-white hover:border-blue-200'}`}
+            >
+              <div className="flex items-center gap-3">
+                <Smartphone className="h-5 w-5 text-blue-600" />
+                <div className="text-base font-bold text-slate-900">Mobile Money</div>
+              </div>
+              <p className="mt-3 text-sm leading-6 text-slate-500">Pay with MTN Rwanda or Airtel Rwanda through InTouchPay.</p>
+            </button>
+          </div>
+
+          {data.paymentMethod === 'mobile_money' && (
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="block">
+                <span className="mb-2 block text-sm font-semibold text-slate-700">Provider</span>
+                <select
+                  value={data.provider || 'mtn'}
+                  onChange={(e) => onChange({ provider: e.target.value })}
+                  className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm text-slate-900 outline-none focus:border-blue-500"
+                >
+                  <option value="mtn">MTN Money</option>
+                  <option value="airtel">Airtel Money</option>
+                </select>
+              </label>
+              <label className="block">
+                <span className="mb-2 block text-sm font-semibold text-slate-700">Phone Number</span>
+                <input
+                  type="tel"
+                  value={data.phoneNumber || ''}
+                  onChange={(e) => onChange({ phoneNumber: e.target.value })}
+                  placeholder="e.g. 25078xxxxxxx"
+                  className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm text-slate-900 outline-none focus:border-blue-500"
+                />
+              </label>
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-col-reverse gap-3 border-t border-gray-200 px-6 py-5 sm:flex-row sm:justify-end">
+          <button type="button" onClick={onClose} className="rounded-xl border border-gray-300 px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-gray-50">
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onContinue}
+            disabled={busy}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+          >
+            {busy && <Loader size={16} className="animate-spin" />}
+            {busy ? 'Preparing Payment...' : 'Continue to Payment'}
           </button>
         </div>
       </div>
@@ -6970,6 +7126,17 @@ function AssetEditorModal({
                   <div>
                     <label className="mb-2 block text-[1.05rem] font-semibold text-gray-900">Serial Number</label>
                     <input value={assetForm.serialNumber} onChange={(e) => setAssetForm((prev) => ({ ...prev, serialNumber: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-4 py-3 text-lg outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-[1.05rem] font-semibold text-gray-900">Total number of assets</label>
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={assetForm.quantity}
+                      onChange={(e) => setAssetForm((prev) => ({ ...prev, quantity: e.target.value }))}
+                      className="w-full rounded-lg border border-gray-300 px-4 py-3 text-lg outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    />
                   </div>
                   <div className="grid gap-5 sm:grid-cols-2">
                     <div>
@@ -7447,7 +7614,13 @@ function AssetEditorModal({
 function ClientDashboard() {
   const navigate = useNavigate();
   const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
-  const { hasActive: hasActiveCompanySubscription, loading: companySubscriptionLoading } = useCompanySubscription();
+  const {
+    hasActive: hasActiveCompanySubscription,
+    subscription: companySubscription,
+    company: subscribedCompany,
+    loading: companySubscriptionLoading,
+    refresh: refreshCompanySubscription,
+  } = useCompanySubscription();
   const { trialStatus, isInTrial, hasExpired, daysRemaining, loading: trialStatusLoading } = useTrialStatus();
   const { language, setLanguage } = useLanguage();
   const { t } = useTranslation();
@@ -8046,6 +8219,21 @@ function ClientDashboard() {
   const [createTeamOpen, setCreateTeamOpen] = useState(false);
   const [inviteUsersBusy, setInviteUsersBusy] = useState(false);
   const [createTeamBusy, setCreateTeamBusy] = useState(false);
+  const [seatPaymentModal, setSeatPaymentModal] = useState({ open: false });
+  const [seatPaymentBusy, setSeatPaymentBusy] = useState(false);
+  const [seatPaymentError, setSeatPaymentError] = useState('');
+  const [seatPendingPaymentModal, setSeatPendingPaymentModal] = useState({
+    open: false,
+    paymentId: '',
+    requestTransactionId: '',
+    transactionId: '',
+    provider: 'mtn',
+    phoneNumber: '',
+    amount: 0,
+    currency: 'RWF',
+    planId: 'basic',
+    message: '',
+  });
   const [pmTasks, setPmTasks] = useState([{ id: 1, title: '', status: 'Open' }]);
   const [pmWorkOrder, setPmWorkOrder] = useState({
     pmTitle: '',
@@ -15259,18 +15447,186 @@ function ClientDashboard() {
     if (!Array.isArray(invites) || invites.length === 0) return;
     try {
       setInviteUsersBusy(true);
+      const paidInvites = invites.filter((invite) => isPaidInviteRole(invite.role));
+      if (paidInvites.length > 0) {
+        const existingPaidSeats = (people || []).filter((person) => {
+          const role = String(person?.role || '').toLowerCase();
+          const accessLevel = String(person?.accessLevel || '').toLowerCase();
+          if (role === 'requestor' || role === 'client') return false;
+          return ['admin', 'manager', 'technician', 'staff'].includes(role) || accessLevel === 'limited';
+        }).length;
+        const currentSeatLimit = getPaidSeatLimit(companySubscription, subscribedCompany);
+        const requiredPaidSeats = existingPaidSeats + paidInvites.length;
+        const extraSeatsNeeded = Math.max(0, requiredPaidSeats - currentSeatLimit);
+
+        if (extraSeatsNeeded > 0) {
+          const pricingResponse = await subscriptionAPI.getPricing();
+          const pricingData = pricingResponse?.data || pricingResponse || {};
+          const pricing = pricingData.pricing || {};
+          const currency = pricingData.currency || 'RWF';
+          const plan = String(companySubscription?.plan || 'basic').toLowerCase();
+          const cycle = companySubscription?.billingCycle || 'monthly';
+          const seatAmount = Number(pricing?.[plan]?.[cycle] || 0);
+
+          if (!seatAmount || seatAmount <= 0) {
+            throw new Error('Unable to calculate the seat price. Please check subscription pricing settings.');
+          }
+
+          const user = currentUser || storedUser || {};
+          setSeatPaymentError('');
+          setSeatPaymentModal({
+            open: true,
+            plan,
+            currency,
+            cycle,
+            amount: Number((seatAmount * extraSeatsNeeded).toFixed(2)),
+            employees: currentSeatLimit + extraSeatsNeeded,
+            includedEmployees: 2,
+            extraEmployees: extraSeatsNeeded,
+            extraSeatsNeeded,
+            extraEmployeeAmount: seatAmount,
+            seatUpgradeOnly: 'true',
+            targetEmployeeLimit: currentSeatLimit + extraSeatsNeeded,
+            pendingInvites: invites,
+            userId: user.id || user._id || '',
+            companyId: user.companyId || companySubscription?.companyId || subscribedCompany?.id || '',
+            email: user.email || '',
+            companyName: user.companyName || subscribedCompany?.name || '',
+            phone: user.phone || user.phoneNumber || '',
+            phoneNumber: user.phone || user.phoneNumber || '',
+            paymentMethod: 'card',
+            provider: 'mtn',
+          });
+
+          setInviteUsersOpen(false);
+          return;
+        }
+      }
+
       for (const invite of invites) {
         await api.post('/api/users/invite', { email: invite.email, role: invite.role });
       }
       setInviteUsersOpen(false);
       await refreshPeople();
+      await refreshCompanySubscription?.();
       alert(`Invited ${invites.length} user${invites.length === 1 ? '' : 's'}.`);
     } catch (err) {
       alert('Invite failed: ' + (err?.response?.data?.error || err?.response?.data?.message || err.message));
     } finally {
       setInviteUsersBusy(false);
     }
-  }, [refreshPeople]);
+  }, [companySubscription, currentUser, people, refreshCompanySubscription, refreshPeople, storedUser, subscribedCompany]);
+
+  const closeSeatPaymentModal = useCallback(() => {
+    if (seatPaymentBusy) return;
+    setSeatPaymentModal({ open: false });
+    setSeatPaymentError('');
+  }, [seatPaymentBusy]);
+
+  const handleSeatPaymentContinue = useCallback(async () => {
+    const data = seatPaymentModal;
+    if (!data?.open) return;
+
+    const trimmedPhone = String(data.phoneNumber || data.phone || '').trim();
+    if (data.paymentMethod === 'mobile_money' && !trimmedPhone) {
+      setSeatPaymentError('Phone number is required for mobile money payments.');
+      return;
+    }
+    if (data.paymentMethod === 'mobile_money' && String(data.currency || '').toUpperCase() !== 'RWF') {
+      setSeatPaymentError('Mobile money supports RWF only. Use card payment or switch subscription currency to RWF.');
+      return;
+    }
+
+    try {
+      setSeatPaymentBusy(true);
+      setSeatPaymentError('');
+      const user = currentUser || storedUser || {};
+      const metadata = {
+        companyName: data.companyName || user.companyName || '',
+        phone: trimmedPhone || user.phone || user.phoneNumber || '',
+        employeeCount: data.employees,
+        employeeLimit: data.employees,
+        maxUsers: data.employees,
+        includedEmployees: data.includedEmployees,
+        extraEmployees: data.extraEmployees,
+        extraEmployeeAmount: data.extraEmployeeAmount,
+        seatUpgradeOnly: true,
+        targetEmployeeLimit: data.targetEmployeeLimit,
+        pendingSeatInvites: data.pendingInvites || [],
+        invitedByUserId: data.userId || user.id || user._id || '',
+        companyId: data.companyId || user.companyId || companySubscription?.companyId || '',
+      };
+
+      const createSubResponse = await subscriptionAPI.createSubscription(
+        data.userId || user.id || user._id,
+        data.email || user.email || '',
+        data.plan,
+        data.cycle,
+        data.paymentMethod === 'mobile_money' ? 'mobile_money' : 'card',
+        metadata
+      );
+      const createdSubscription = createSubResponse?.data || createSubResponse;
+      const subId = createdSubscription?.id || createdSubscription?._id;
+      const finalAmount = Number(createdSubscription?.amount || data.amount || 0);
+
+      if (!subId || !finalAmount) {
+        throw new Error('Failed to prepare the seat payment.');
+      }
+
+      if (data.paymentMethod === 'mobile_money') {
+        const mobileMoneyResponse = await subscriptionAPI.initiateMobileMoneyPayment(
+          subId,
+          finalAmount,
+          data.provider || 'mtn',
+          trimmedPhone,
+          data.currency,
+          data.email || user.email || '',
+          data.userId || user.id || user._id || null
+        );
+        const createdPayment = mobileMoneyResponse?.data || {};
+        if (createdPayment?.status === 'failed') {
+          throw new Error(createdPayment?.failureReason || createdPayment?.metadata?.intouchpayMessage || 'Mobile money payment was rejected by the gateway.');
+        }
+
+        setSeatPaymentModal({ open: false });
+        setSeatPendingPaymentModal({
+          open: true,
+          paymentId: createdPayment.id || '',
+          requestTransactionId: createdPayment?.metadata?.requestTransactionId || createdPayment?.transactionId || '',
+          transactionId: createdPayment?.metadata?.intouchpayTransactionId || '',
+          provider: data.provider || 'mtn',
+          phoneNumber: trimmedPhone,
+          amount: finalAmount,
+          currency: data.currency,
+          planId: data.plan,
+          message:
+            createdPayment?.metadata?.intouchpayMessage ||
+            createdPayment?.message ||
+            'Approve the payment request on your phone. The invite email will be sent after payment.',
+        });
+        return;
+      }
+
+      setSeatPaymentModal({ open: false });
+      const paymentResponse = await subscriptionAPI.initiatePesaPalPayment(
+        subId,
+        finalAmount,
+        null,
+        data.email || user.email || ''
+      );
+      const redirectUrl = paymentResponse?.redirectUrl || paymentResponse?.data?.redirectUrl;
+      if (redirectUrl) {
+        window.location.href = redirectUrl;
+        return;
+      }
+
+      throw new Error('Failed to start the card payment. Please try again.');
+    } catch (err) {
+      setSeatPaymentError(err?.response?.data?.error || err?.response?.data?.message || err?.error || err?.message || 'Failed to process seat payment.');
+    } finally {
+      setSeatPaymentBusy(false);
+    }
+  }, [companySubscription, currentUser, seatPaymentModal, storedUser]);
 
   const handleCreateTeam = useCallback(async ({ name, members }) => {
     const trimmedName = String(name || '').trim();
@@ -20398,12 +20754,13 @@ function ClientDashboard() {
       const barcodeValue = assetForm.barcodeMode === 'random' && !String(assetForm.barcode || '').trim()
         ? `${Date.now()}${Math.floor(Math.random() * 1000)}`
         : String(assetForm.barcode || '').trim();
+      const normalizedAssetQuantity = Math.max(1, parseInt(assetForm.quantity, 10) || 1);
       const payload = {
         name: assetForm.name,
         type: assetForm.category || assetForm.model || assetForm.type || 'General',
         description: assetForm.description,
         serialNumber: assetForm.serialNumber,
-        quantity: assetForm.quantity,
+        quantity: normalizedAssetQuantity,
         propertyId: assetForm.locationType === 'property' ? assetForm.propertyId || null : null,
         building: assetForm.building,
         blocks: assetForm.locationType === 'property' ? assetForm.blocks : [],
@@ -28975,11 +29332,40 @@ function ClientDashboard() {
                 onClose={() => setInviteUsersOpen(false)}
                 onInvite={handleInviteUsers}
                 unusedSeats={(() => {
-                  const total = Number(currentUser?.techniciansCount || currentUser?.seats || currentUser?.seatCount);
+                  const total = getPaidSeatLimit(companySubscription, subscribedCompany);
                   if (!Number.isFinite(total) || total <= 0) return '—';
                   return Math.max(0, total - (people?.length || 0));
                 })()}
                 busy={inviteUsersBusy}
+              />
+
+              <SeatPaymentModal
+                open={!!seatPaymentModal.open}
+                data={seatPaymentModal}
+                error={seatPaymentError}
+                busy={seatPaymentBusy}
+                onClose={closeSeatPaymentModal}
+                onChange={(patch) => setSeatPaymentModal((prev) => ({ ...prev, ...patch }))}
+                onContinue={handleSeatPaymentContinue}
+              />
+
+              <MobileMoneyPendingModal
+                open={seatPendingPaymentModal.open}
+                paymentId={seatPendingPaymentModal.paymentId}
+                requestTransactionId={seatPendingPaymentModal.requestTransactionId}
+                transactionId={seatPendingPaymentModal.transactionId}
+                provider={seatPendingPaymentModal.provider}
+                phoneNumber={seatPendingPaymentModal.phoneNumber}
+                amount={seatPendingPaymentModal.amount}
+                currency={seatPendingPaymentModal.currency}
+                planName={seatPendingPaymentModal.planId}
+                initialMessage={seatPendingPaymentModal.message}
+                onClose={() => setSeatPendingPaymentModal((prev) => ({ ...prev, open: false }))}
+                onSuccess={async () => {
+                  setSeatPendingPaymentModal((prev) => ({ ...prev, open: false }));
+                  await Promise.allSettled([refreshPeople(), refreshCompanySubscription?.()]);
+                  alert('Seat payment received. Invite email sent.');
+                }}
               />
 
               <CreateTeamModal

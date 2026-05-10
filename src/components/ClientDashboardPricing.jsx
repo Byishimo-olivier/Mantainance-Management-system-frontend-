@@ -36,8 +36,8 @@ export default function ClientDashboardPricing({ currentUser = null }) {
   const [pricing, setPricing] = useState(null);
   const [currency, setCurrency] = useState('USD');
   const [billingCycle, setBillingCycle] = useState('monthly');
-  const [includedEmployees, setIncludedEmployees] = useState(10);
-  const [employeeCount, setEmployeeCount] = useState(10);
+  const [includedEmployees, setIncludedEmployees] = useState(2);
+  const [employeeCount, setEmployeeCount] = useState(2);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const {
@@ -105,6 +105,8 @@ export default function ClientDashboardPricing({ currentUser = null }) {
       amount: amount,
       employees: employeeCount,
       includedEmployees,
+      extraEmployees: Math.max(0, employeeCount - includedEmployees),
+      extraEmployeeAmount: getExtraEmployeeAmount(baseAmount, includedEmployees),
       userId: userId,
       companyId: companyId,
       email: email,
@@ -120,10 +122,15 @@ export default function ClientDashboardPricing({ currentUser = null }) {
 
   const calculateEmployeeAdjustedAmount = (baseAmount, employees = includedEmployees, included = includedEmployees) => {
     const safeBase = Number(baseAmount || 0);
-    const safeIncluded = Math.max(1, Number(included || 10));
+    const safeIncluded = Math.max(1, Number(included || 2));
     const safeEmployees = Math.max(1, Math.ceil(Number(employees || safeIncluded)));
-    const multiplier = Math.max(1, safeEmployees / safeIncluded);
-    return Number((safeBase * multiplier).toFixed(2));
+    const extraEmployees = Math.max(0, safeEmployees - safeIncluded);
+    return Number((safeBase + (extraEmployees * getExtraEmployeeAmount(safeBase, safeIncluded))).toFixed(2));
+  };
+
+  const getExtraEmployeeAmount = (baseAmount, included = includedEmployees) => {
+    const safeBase = Number(baseAmount || 0);
+    return Number(safeBase.toFixed(2));
   };
 
   useEffect(() => {
@@ -133,7 +140,9 @@ export default function ClientDashboardPricing({ currentUser = null }) {
         const response = await subscriptionAPI.getPricing();
         setPricing(response.data?.pricing || response.pricing);
         setCurrency(response.data?.currency || 'USD');
-        setIncludedEmployees(Number(response.data?.pricingPolicy?.includedEmployees || 10));
+        const policyIncludedEmployees = Number(response.data?.pricingPolicy?.includedEmployees || 2);
+        setIncludedEmployees(policyIncludedEmployees);
+        setEmployeeCount((currentCount) => Math.max(policyIncludedEmployees, currentCount));
       } catch (err) {
         console.error('Error fetching pricing:', err);
         setError(err?.message || 'Failed to fetch pricing');
@@ -152,12 +161,12 @@ export default function ClientDashboardPricing({ currentUser = null }) {
       company?.maxUsers ||
       teamMembers?.length ||
       currentUser?.techniciansCount ||
-      10
+      2
     );
     if (Number.isFinite(existingLimit) && existingLimit > 0) {
-      setEmployeeCount(Math.max(10, Math.ceil(existingLimit)));
+      setEmployeeCount(Math.max(includedEmployees, Math.ceil(existingLimit)));
     }
-  }, [companySubscription, company, teamMembers, currentUser]);
+  }, [companySubscription, company, teamMembers, currentUser, includedEmployees]);
 
   if (loading) {
     return (
@@ -217,7 +226,7 @@ export default function ClientDashboardPricing({ currentUser = null }) {
           <h1 style={{ fontSize: '28px', fontWeight: '800', color: '#111827', margin: 0 }}>Subscription Plans</h1>
         </div>
         <p style={{ fontSize: '14px', color: '#6B7280', margin: '4px 0 0' }}>
-          Choose the perfect plan to manage your maintenance operations. Each plan includes up to {includedEmployees} employees.
+          Choose the perfect plan to manage your maintenance operations. Each admin-set plan price includes up to {includedEmployees} employees.
         </p>
       </div>
 
@@ -291,7 +300,7 @@ export default function ClientDashboardPricing({ currentUser = null }) {
               }}
             />
             <span style={{ fontSize: '13px', color: '#6B7280' }}>
-              First {includedEmployees} employees are included. Extra employees increase the plan price proportionally.
+              First {includedEmployees} employees are included. Each extra employee adds the full admin-set plan amount.
             </span>
           </div>
         </div>
@@ -302,6 +311,7 @@ export default function ClientDashboardPricing({ currentUser = null }) {
         {pricingPlans.map((plan) => {
           const baseCyclePrice = plan.billingCycles[billingCycle];
           const cyclePrice = calculateEmployeeAdjustedAmount(baseCyclePrice, employeeCount, includedEmployees);
+          const extraEmployeeAmount = getExtraEmployeeAmount(baseCyclePrice, includedEmployees);
           const displayPrice = cyclePrice ? `${symbol}${cyclePrice.toFixed(2)}` : 'Custom';
           const extraEmployees = Math.max(0, employeeCount - includedEmployees);
           const isCurrentPlan = hasActiveCompanySubscription && String(companySubscription?.plan || '').toLowerCase() === String(plan.key || '').toLowerCase();
@@ -369,7 +379,9 @@ export default function ClientDashboardPricing({ currentUser = null }) {
                   {cyclePrice && (
                     <div style={{ fontSize: '12px', color: '#6B7280', marginTop: '6px', lineHeight: '1.5' }}>
                       Covers {employeeCount} employee{employeeCount === 1 ? '' : 's'}
-                      {extraEmployees > 0 ? ` (${extraEmployees} above included ${includedEmployees})` : ` (included ${includedEmployees})`}
+                      {extraEmployees > 0
+                        ? ` (${extraEmployees} extra x ${symbol}${extraEmployeeAmount.toFixed(2)})`
+                        : ` (${includedEmployees} included)`}
                     </div>
                   )}
                 </div>
