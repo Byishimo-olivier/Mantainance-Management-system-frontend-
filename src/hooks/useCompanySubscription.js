@@ -43,6 +43,13 @@ export const useCompanySubscription = () => {
           teamMembers: data.teamMembers || [],
           isAdmin: data.isCompanyAdmin || false,
         };
+        
+        // Log subscription status for debugging
+        console.log('Company subscription status:', {
+          hasActive: data.hasActiveSubscription,
+          subscriptionStatus: data.subscription?.status,
+        });
+        
         setHasActive(data.hasActiveSubscription || false);
         setSubscription(data.subscription);
         setCompany(data.company);
@@ -72,7 +79,7 @@ export const useCompanySubscription = () => {
     setTeamMembers(companySubscriptionCache.teamMembers || []);
     setIsAdmin(companySubscriptionCache.isAdmin || false);
     setLoading(false);
-  }, [checkSubscription]);
+  }, [checkSubscription, cacheKey]);
 
   return {
     hasActive,

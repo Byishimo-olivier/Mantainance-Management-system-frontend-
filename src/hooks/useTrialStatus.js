@@ -5,6 +5,14 @@ let trialStatusCache = null;
 let trialStatusPendingPromise = null;
 
 /**
+ * Clear trial status cache - call this when user logs in/out
+ */
+export const clearTrialStatusCache = () => {
+  trialStatusCache = null;
+  trialStatusPendingPromise = null;
+};
+
+/**
  * Custom hook to manage trial status
  * Provides trial state and update functions for components
  * 
@@ -35,8 +43,18 @@ const useTrialStatus = () => {
       }
 
       const response = await trialStatusPendingPromise;
-      trialStatusCache = { cacheKey, data: response?.data || null };
-      setTrialStatus(trialStatusCache.data);
+      const trialData = response?.data || null;
+      
+      // Log trial status for debugging
+      console.log('Trial status fetched:', {
+        isInTrial: trialData?.isInTrial,
+        daysRemaining: trialData?.daysRemaining,
+        trialExceeded: trialData?.trialExceeded,
+        subscriptionStatus: trialData?.subscriptionStatus,
+      });
+      
+      trialStatusCache = { cacheKey, data: trialData };
+      setTrialStatus(trialData);
       setError(null);
       return trialStatusCache;
     } catch (err) {
@@ -66,7 +84,7 @@ const useTrialStatus = () => {
     // Refresh trial status regularly so expiry redirects happen without a manual refresh.
     const interval = setInterval(fetchTrialStatus, 30000);
     return () => clearInterval(interval);
-  }, [fetchTrialStatus]);
+  }, [fetchTrialStatus, cacheKey]);
 
   return {
     trialStatus,

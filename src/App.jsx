@@ -109,8 +109,8 @@ import LegalDocumentPage from './components/legal/LegalDocumentPage';
 import SitemapPage from './components/legal/SitemapPage';
 import { legalDocuments, sitemapSections } from './data/legalPages';
 
-import useTrialStatus from './hooks/useTrialStatus';
-import useCompanySubscription from './hooks/useCompanySubscription';
+import useTrialStatus, { clearTrialStatusCache } from './hooks/useTrialStatus';
+import useCompanySubscription, { clearCompanySubscriptionCache } from './hooks/useCompanySubscription';
 import { SUBSCRIPTION_PLAN_NOTICE_EVENT, SUBSCRIPTION_PLAN_NOTICE_MESSAGE } from './api/axios';
 
 const getHomeRouteForRole = (role) => {
@@ -137,7 +137,7 @@ function ScrollToTop() {
 function SubscriptionGuard({ auth, onLogin, children }) {
   const normalizedRole = String(auth?.user?.role || '').toLowerCase();
   const isSuperAdmin = normalizedRole === 'superadmin' || normalizedRole === 'super-admin';
-  const { isInTrial, loading: trialLoading } = useTrialStatus();
+  const { isInTrial, loading: trialLoading, daysRemaining } = useTrialStatus();
   const { hasActive: hasActiveCompanySubscription, loading: subscriptionLoading } = useCompanySubscription();
   const privateRouteLoading = trialLoading || subscriptionLoading;
   const requiresSubscription = !privateRouteLoading && !isInTrial && !hasActiveCompanySubscription;
@@ -158,8 +158,41 @@ function SubscriptionGuard({ auth, onLogin, children }) {
     );
   }
 
-  if (requiresSubscription) return <Navigate to="/subscription" replace />;
+  if (requiresSubscription) {
+    console.warn('User requires subscription. Trial:', { isInTrial, daysRemaining }, 'Active subscription:', hasActiveCompanySubscription);
+    return <Navigate to="/subscription" replace />;
+  }
 
+  return children;
+}
+
+function TrialUserRedirect({ auth, children }) {
+  const { isInTrial, loading: trialLoading } = useTrialStatus();
+  const { hasActive: hasActiveCompanySubscription, loading: subscriptionLoading } = useCompanySubscription();
+  const loading = trialLoading || subscriptionLoading;
+
+  if (!auth) return children; // Not authenticated, show page as normal
+  
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gray-50">
+        <div className="text-center">
+          <div className="inline-flex items-center justify-center mb-4">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600"></div>
+          </div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // If user is in trial or has active subscription, redirect to dashboard
+  if (isInTrial || hasActiveCompanySubscription) {
+    console.log('User has trial or active subscription, redirecting from subscription page to dashboard');
+    return <Navigate to={getHomeRouteForRole(auth.user?.role)} replace />;
+  }
+
+  // Otherwise show the subscription page
   return children;
 }
 
@@ -187,6 +220,10 @@ function App() {
   }, []);
 
   const handleLogin = (token, user) => {
+    // Clear subscription caches to ensure fresh trial/subscription data
+    clearTrialStatusCache();
+    clearCompanySubscriptionCache();
+    
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(user));
     setAuth({ token, user });
@@ -238,7 +275,7 @@ function App() {
           <Route path="/subscription" element={auth ? (
             ['superadmin', 'super-admin'].includes(String(auth?.user?.role || '').toLowerCase())
               ? <Navigate to={getHomeRouteForRole(auth.user?.role)} replace />
-              : <SubscriptionPlan userId={auth.user?.id} />
+              : <TrialUserRedirect auth={auth}><SubscriptionPlan userId={auth.user?.id} /></TrialUserRedirect>
           ) : <Subscribe />} />
           <Route path="/dashboard" element={renderPrivateRoute(<Dashboard user={auth?.user} />)} />
           <Route path="/dashboard/:view" element={renderPrivateRoute(<Dashboard user={auth?.user} />)} />
