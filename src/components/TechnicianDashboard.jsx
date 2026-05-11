@@ -490,6 +490,7 @@ const TechnicianDashboard = () => {
   const [materialRequests, setMaterialRequests] = useState([]);
   const [companyAssets, setCompanyAssets] = useState([]);
   const [companyLocations, setCompanyLocations] = useState([]);
+  const [inventoryParts, setInventoryParts] = useState([]);
   const [user, setUser] = useState({ name: "", id: "" });
   const [showAfterForm, setShowAfterForm] = useState({});
   const [showBeforeForm, setShowBeforeForm] = useState({});
@@ -501,7 +502,8 @@ const TechnicianDashboard = () => {
     quantity: 1,
     urgency: "MEDIUM",
     linkedIssueId: "",
-    assetName: ""
+    assetName: "",
+    partId: ""
   });
   const [showPmForm, setShowPmForm] = useState(false);
   const [selectedPmSchedule, setSelectedPmSchedule] = useState(null);
@@ -632,22 +634,64 @@ const TechnicianDashboard = () => {
 
   const handleMaterialRequestChange = (e) => {
     const { name, value } = e.target;
-    setMaterialRequestData(prev => ({
-      ...prev,
-      [name]: name === 'quantity' ? parseInt(value) || 1 : value
-    }));
+    setMaterialRequestData(prev => {
+      const next = {
+        ...prev,
+        [name]: name === 'quantity' ? parseInt(value) || 1 : value
+      };
+      if (name === 'partId' && value) {
+        const selected = inventoryParts.find(p => String(p._id || p.id) === String(value));
+        if (selected) {
+          next.title = selected.name;
+          if (selected.assetName && !next.assetName) {
+            next.assetName = selected.assetName;
+          }
+        }
+      }
+      return next;
+    });
   };
 
   const handleMaterialRequestSubmit = async (e) => {
     e.preventDefault();
     try {
-      // Authorization handled by interceptor
+      const currentUserId = user._id || user.id;
+      const currentUserName = user.name || user.username || 'Technician';
 
+      // 1. Link to Parts & Inventory (Consolidated System)
+      if (materialRequestData.partId) {
+        try {
+          const partId = materialRequestData.partId;
+          const partRes = await api.get(`/api/parts/${partId}`);
+          const freshPart = partRes.data;
+          
+          const allocationRecord = {
+            id: Math.random().toString(36).substr(2, 9),
+            partId: partId,
+            partName: freshPart.name || materialRequestData.title,
+            quantity: materialRequestData.quantity,
+            requestedBy: currentUserId,
+            date: new Date().toISOString(),
+            status: 'PENDING',
+            notes: `Request from Technician for Work Order: ${selectedJob?.title || 'N/A'}. Details: ${materialRequestData.description}`,
+          };
+
+          await api.put(`/api/parts/${partId}`, {
+            allocationHistory: [allocationRecord, ...(freshPart.allocationHistory || [])],
+            allocated: (Number(freshPart.allocated) || 0) + materialRequestData.quantity
+          });
+          console.log('Allocation record created for inventory part');
+        } catch (allocErr) {
+          console.error('Failed to create allocation record in inventory', allocErr);
+        }
+      }
+
+      // 2. Submit Material Request (Legacy/Mirror)
       const requestData = {
         ...materialRequestData,
-        technicianId: user._id || user.id,
-        technicianName: user.name,
-        clientId: user._id || user.id,
+        technicianId: currentUserId,
+        technicianName: currentUserName,
+        clientId: currentUserId,
         issueId: materialRequestData.linkedIssueId || undefined,
         workOrderId: materialRequestData.linkedIssueId || undefined,
         assetName: materialRequestData.assetName || undefined
@@ -655,19 +699,20 @@ const TechnicianDashboard = () => {
 
       await api.post('/api/material-requests', requestData);
 
-      alert('Material request submitted successfully!');
+      alert('Request submitted! It is now visible in the Parts & Inventory pending requests for approval.');
       setMaterialRequestData({
         title: "",
         description: "",
         quantity: 1,
         urgency: "MEDIUM",
         linkedIssueId: "",
-        assetName: ""
+        assetName: "",
+        partId: ""
       });
       setShowMaterialRequestForm(false);
 
-      // Refresh material requests
       fetchMaterialRequests();
+      fetchInventoryParts();
     } catch (error) {
       console.error("Material request error:", error);
       alert('Failed to submit material request');
@@ -718,18 +763,10 @@ const TechnicianDashboard = () => {
       });
   };
 
-  const fetchMaterialRequests = () => {
-    const userStr = localStorage.getItem("user");
-    if (userStr) {
-      const u = JSON.parse(userStr);
-      // Authorization handled by interceptor
-      api.get(`/api/material-requests/tech/${u._id || u.id}`)
-        .then(res => setMaterialRequests(res.data))
-        .catch(err => {
-          console.warn('Material requests endpoint failed:', err?.response?.status || err.message);
-          setMaterialRequests([]);
-        });
-    }
+  const fetchInventoryParts = () => {
+    api.get('/api/parts')
+      .then(res => setInventoryParts(Array.isArray(res.data) ? res.data : []))
+      .catch(err => console.warn('Failed to fetch inventory parts:', err));
   };
 
   const [alerts, setAlerts] = useState([]);
@@ -1170,6 +1207,7 @@ const TechnicianDashboard = () => {
       setUser(u);
       fetchAssignedIssues();
       fetchMaterialRequests();
+      fetchInventoryParts();
     }
   }, []);
 
@@ -1930,6 +1968,23 @@ const TechnicianDashboard = () => {
             </div>
             <form onSubmit={handleMaterialRequestSubmit} className="px-6 py-5">
                 <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1">Link to Inventory Part (Optional)</label>
+                    <select
+                      name="partId"
+                      value={materialRequestData.partId}
+                      onChange={handleMaterialRequestChange}
+                      className="w-full rounded-xl glass-input px-3 py-2 text-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-300/60 outline-none"
+                    >
+                      <option value="">-- Select from Inventory --</option>
+                      {inventoryParts.map(part => (
+                        <option key={part._id || part.id} value={part._id || part.id}>
+                          {part.name} ({part.partNumber || 'No PN'}) - Stock: {part.quantity}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-[10px] text-slate-400 mt-1 italic">Selecting a part ensures it appears in the "Parts & Inventory" pending requests.</p>
+                  </div>
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1">{t("technician.modal.materialTitle")} *</label>
                     <input

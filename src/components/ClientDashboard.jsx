@@ -17,7 +17,7 @@ import useTrialStatus from '../hooks/useTrialStatus';
 import { useSubscription } from '../hooks/useSubscription';
 import { getImageUrl } from '../utils/imageUrl';
 import { useLanguage, useTranslation } from "../i18n/LanguageContext";
-import { Clock, Calendar, CheckCircle, ClipboardCheck, X, Bell, Download, Package, ShoppingCart, Gauge, Plus, Search, Eye, MapPin, AlertCircle, Repeat, Edit, Pencil, ChevronLeft, ChevronRight, ChevronDown, SlidersHorizontal, Flag, MoreHorizontal, MoreVertical, Trash2, Image as ImageIcon, Tag, Paperclip, MessageSquare, Send, Navigation, DollarSign, Bookmark, Link2, FileText, Copy, Archive, ArrowUpDown, ArrowRight, ArrowLeft, LayoutDashboard, Settings, Users, RotateCcw, Zap, Globe, Activity, QrCode, GripVertical, Info, Box, CreditCard, Smartphone, Loader } from 'lucide-react';
+import { Clock, Calendar, CheckCircle, ClipboardCheck, ClipboardList, X, Bell, Download, Package, ShoppingCart, Gauge, Plus, Search, Eye, MapPin, AlertCircle, Repeat, Edit, Pencil, ChevronLeft, ChevronRight, ChevronDown, SlidersHorizontal, Flag, MoreHorizontal, MoreVertical, Trash2, Image as ImageIcon, Tag, Paperclip, MessageSquare, Send, Navigation, DollarSign, Bookmark, Link2, FileText, Copy, Archive, ArrowUpDown, ArrowRight, ArrowLeft, LayoutDashboard, Settings, Users, RotateCcw, Zap, Globe, Activity, QrCode, GripVertical, Info, Box, CreditCard, Smartphone, Loader } from 'lucide-react';
 
 const ASSISTANT_ACTION_STORAGE_KEY = 'mms_assistant_action';
 const REQUEST_FORM_SETTINGS_STORAGE_KEY = 'mms_request_form_settings';
@@ -8099,7 +8099,15 @@ function ClientDashboard() {
     entries: [],
     vendorId: '',
   });
+  const [materialRequestDecisionModal, setMaterialRequestDecisionModal] = useState({
+    open: false,
+    requestId: '',
+    action: 'APPROVED',
+    title: '',
+    note: '',
+  });
   const [materialRequestAdjustSaving, setMaterialRequestAdjustSaving] = useState(false);
+  const [materialRequestDecisionSaving, setMaterialRequestDecisionSaving] = useState(false);
   const [showNotificationsMenu, setShowNotificationsMenu] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showUserProfileModal, setShowUserProfileModal] = useState(false);
@@ -11167,6 +11175,30 @@ function ClientDashboard() {
       fetchInventoryParts();
     };
 
+    const getPartRequestSource = () => {
+      const sourceText = `${item?.source || ''} ${item?.type || ''} ${item?.module || ''} ${item?.requestType || ''}`.toLowerCase();
+      const looksLikePm = item?.pmId || item?.scheduleId || item?.maintenanceScheduleId || item?.recurrenceRule || item?.isPreventive || item?.preventiveMaintenance || sourceText.includes('pm') || sourceText.includes('preventive');
+      return looksLikePm ? 'PM' : 'WORK_ORDER';
+    };
+
+    const createPartRequestForSelection = async (part, quantity, reasonText = '', requestedFrom = getPartRequestSource()) => {
+      const partId = part?._id || part?.id;
+      if (!partId) return null;
+      return api.post('/api/part-requests', {
+        partId,
+        partName: part.name || part.partNumber || 'Part',
+        partNumber: part.partNumber || '',
+        category: part.category || '',
+        quantityRequested: Math.max(1, Number(quantity) || 1),
+        requestedBy: currentUser?.name || currentUser?.email || currentUser?.userId || currentUser?.id || currentUser?._id || userName || '',
+        requestedFrom,
+        workOrderId: itemId || item?._id || item?.id || '',
+        pmId: requestedFrom === 'PM' ? (itemId || item?._id || item?.id || '') : '',
+        reason: reasonText || `Requested for ${requestedFrom === 'PM' ? 'preventive maintenance' : 'work order'}: ${item?.title || itemId || 'N/A'}`,
+        notes: `Auto-created from ${requestedFrom === 'PM' ? 'PM' : 'Work Order'} parts selection.`,
+      });
+    };
+
     const createPurchaseOrderForPartSelections = async (selections, reasonText = '') => {
       if (!Array.isArray(selections) || selections.length === 0) return null;
       const vendor = vendorContacts.find((entry) => String(entry?._id || entry?.id || '') === String(selectedPartVendorId || ''));
@@ -11207,62 +11239,7 @@ function ClientDashboard() {
     };
 
     const handleConfirmPart = async () => {
-      const selections = Object.values(selectedInventoryParts || {});
-      if (selections.length === 0) return;
-      try {
-        const shortageSelections = selections.filter((sel) => {
-          const part = sel.part || {};
-          const qty = Number(sel.quantity) || 1;
-          return qty > getAvailableQty(part);
-        });
-
-        if (shortageSelections.length > 0) {
-          const poResponse = await createPurchaseOrderForPartSelections(shortageSelections, partRequestReason?.trim());
-          window.dispatchEvent(new CustomEvent('purchase-order-created', { detail: poResponse?.data || null }));
-          setAddPartOpen(false);
-          alert('Requested quantity was higher than stock. A purchase order public link was sent to the selected vendor.');
-          return;
-        }
-
-        for (const sel of selections) {
-          const part = sel.part || {};
-          const qty = Number(sel.quantity) || 1;
-          const availableStock = getAvailableQty(part);
-          const payload = {
-            name: part.name || part.partNumber || 'Part',
-            status: part.status || 'In stock',
-            cost: Number(part.cost ?? part.unitCost ?? part.price ?? 0) || 0,
-            quantity: qty,
-            location: part.location || '',
-            inventoryPartId: part._id || part.id || null
-          };
-          if (itemId) {
-            const res = await api.post(`/api/issues/${itemId}/parts`, payload);
-            const saved = res?.data || { id: `part-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, ...payload };
-            setLocalParts(prev => [saved, ...prev]);
-          } else {
-            const entry = { id: `part-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, ...payload, source: 'local' };
-            setLocalParts(prev => [entry, ...prev]);
-          }
-
-          const selId = part._id || part.id;
-          if (selId) {
-            setInventoryParts(prev => prev.map(p => {
-              const pid = p._id || p.id;
-              if (pid && pid === selId) {
-                const current = Number(p.quantity ?? p.available ?? 0) || 0;
-                const remaining = Math.max(0, current - qty);
-                return { ...p, quantity: remaining, available: remaining };
-              }
-              return p;
-            }));
-          }
-        }
-        setAddPartOpen(false);
-        logActivity('Added parts', `${selections.length} part(s) added`);
-      } catch (err) {
-        console.error('Failed to save part', err);
-      }
+      await handleRequestSelectedParts();
     };
 
     const handleRequestSelectedParts = async () => {
@@ -11276,23 +11253,8 @@ function ClientDashboard() {
       try {
         setRequestPartsSubmitting(true);
         const reasonText = partRequestReason?.trim() || 'Requested from work order parts tab.';
-        const requestedItems = selections.map((sel) => {
-          const part = sel.part || {};
-          return {
-            materialId: part.name || part.partNumber || part._id || part.id || 'Part',
-            title: part.name || part.partNumber || 'Part',
-            quantity: Math.max(1, Number(sel.quantity) || 1),
-          };
-        });
-
-        const stockSummary = selections.map((sel) => {
-          const part = sel.part || {};
-          const qty = Math.max(1, Number(sel.quantity) || 1);
-          const availableStock = getAvailableQty(part);
-          return `${part.name || part.partNumber || 'Part'}: requested ${qty}, in stock ${availableStock}`;
-        }).join('\n');
-
         const requestedPartEntries = [];
+        const failedPartRequests = [];
         for (const sel of selections) {
           const part = sel.part || {};
           const qty = Math.max(1, Number(sel.quantity) || 1);
@@ -11311,19 +11273,25 @@ function ClientDashboard() {
             id: `part-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
             ...payload
           });
+
+          const selId = part._id || part.id;
+          if (selId) {
+            try {
+              const partRes = await api.get(`/api/parts/${selId}`);
+              const freshPart = partRes.data;
+              await createPartRequestForSelection(freshPart, qty, reasonText);
+            } catch (requestErr) {
+              console.error('Failed to create part request', requestErr);
+              failedPartRequests.push(part.name || part.partNumber || 'Part');
+            }
+          } else {
+            failedPartRequests.push(part.name || part.partNumber || 'Part');
+          }
         }
 
-        await api.post('/api/material-requests', {
-          title: `Parts request for ${item?.title || item?.requestId || item?.id || itemId}`,
-          description: `${reasonText}\n\nInventory snapshot:\n${stockSummary}`,
-          items: requestedItems,
-          issueId: itemId,
-          technicianId: currentUser?.userId || currentUser?.id || currentUser?._id || '',
-          technicianName: userName || currentUser?.name || currentUser?.email || 'User',
-          clientId: item?.clientId || currentUser?.userId || currentUser?.id || currentUser?._id || '',
-          urgency: item?.priority || 'MEDIUM',
-          status: 'PENDING',
-        });
+        if (failedPartRequests.length > 0) {
+          throw new Error(`Could not create part request for: ${failedPartRequests.join(', ')}`);
+        }
 
         if (typeof fetchMaterialRequests === 'function') {
           await fetchMaterialRequests();
@@ -11332,9 +11300,13 @@ function ClientDashboard() {
           setLocalParts(prev => [...requestedPartEntries, ...prev]);
         }
         setAddPartOpen(false);
+        if (typeof fetchInventoryParts === 'function') {
+          fetchInventoryParts();
+        }
+        window.dispatchEvent(new CustomEvent('refreshInventory'));
         setPartRequestReason('');
         logActivity('Requested parts', `${selections.length} part(s) requested for approval`);
-        alert('Parts request submitted and saved to the work order. The part cost now appears in the work order totals too.');
+        alert('Part request submitted. Approve or decline it from Parts & Inventory > Requests, then allocate it after approval.');
       } catch (err) {
         alert(err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Failed to submit parts request.');
       } finally {
@@ -14134,17 +14106,10 @@ function ClientDashboard() {
                   </button>
                   <button
                     onClick={handleConfirmPart}
-                    disabled={Object.keys(selectedInventoryParts).length === 0}
+                    disabled={Object.keys(selectedInventoryParts).length === 0 || requestPartsSubmitting}
                     className="rounded-md bg-blue-600 px-5 py-3 text-[16px] font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    Add
-                  </button>
-                  <button
-                    onClick={handleRequestSelectedParts}
-                    disabled={Object.keys(selectedInventoryParts).length === 0 || requestPartsSubmitting}
-                    className="rounded-md bg-emerald-600 px-5 py-3 text-[16px] font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {requestPartsSubmitting ? 'Requesting...' : 'Request Approval'}
+                    {requestPartsSubmitting ? 'Creating Request...' : 'Create Part Request'}
                   </button>
                 </div>
               </div>
@@ -16045,6 +16010,39 @@ function ClientDashboard() {
         return;
       }
 
+      const note = String(options.note || '').trim();
+      
+      // Use the new enhanced endpoint that checks stock
+      const approvalResponse = await api.post(`/api/material-requests/${id}/approve-with-stock-check`, { note });
+      
+      // Fetch updated requests
+      await fetchMaterialRequests();
+
+      // Approved material requests move to procurement as draft purchase orders.
+      if (approvalResponse?.data?.purchaseOrder) {
+        window.dispatchEvent(new CustomEvent('purchase-order-created', { detail: approvalResponse.data.purchaseOrder }));
+        await refreshPurchaseOrderCount();
+        alert('Material request approved. A procurement purchase order was created in the Purchase Orders tab.');
+        setActiveTab('purchaseOrders');
+      } else if (approvalResponse?.data?.requiresPO && approvalResponse?.data?.stockAnalysis?.items?.length > 0) {
+        alert('Material request approved. Procurement must create a purchase order to fulfill this request.');
+      } else {
+        alert('Material request approved. Sufficient stock is available in inventory.');
+      }
+    } catch (err) {
+      console.error('Approval error:', err);
+      alert('Failed to approve request: ' + (err.response?.data?.error || err.message));
+    }
+  }, [fetchMaterialRequests, materialRequests, refreshPurchaseOrderCount]);
+
+  const handleCreateMaterialPurchaseOrder = useCallback(async (id, options = {}) => {
+    try {
+      const targetRequest = (materialRequests || []).find((entry) => String(entry?.id || entry?._id || '') === String(id));
+      if (!targetRequest) {
+        alert('Material request not found.');
+        return;
+      }
+
       const partsResponse = await api.get('/api/parts');
       const partsList = Array.isArray(partsResponse?.data) ? partsResponse.data : [];
       const requestedItems = Array.isArray(targetRequest.items) && targetRequest.items.length > 0
@@ -16055,59 +16053,26 @@ function ClientDashboard() {
             quantity: targetRequest.quantity || 1,
           }];
 
-      const stockFulfilled = [];
       const shortageItems = [];
-      const forceCreatePo = Boolean(options.forceCreatePo);
 
       requestedItems.forEach((item) => {
         const quantityNeeded = Math.max(1, Number(item?.quantity || 1));
         const matchingPart = findInventoryPartMatch(partsList, item);
         const availableStock = matchingPart ? getPartAvailableStock(matchingPart) : 0;
 
-        if (matchingPart && availableStock >= quantityNeeded) {
-          stockFulfilled.push({ item, part: matchingPart, quantityNeeded, availableStock });
-        } else {
+        if (!matchingPart || availableStock < quantityNeeded) {
           shortageItems.push({
             item,
             part: matchingPart,
             quantityNeeded,
             availableStock,
-            shortage: Math.max(quantityNeeded - availableStock, quantityNeeded),
+            shortage: matchingPart ? Math.max(quantityNeeded - availableStock, 0) : quantityNeeded,
           });
         }
       });
 
-      if (shortageItems.length === 0 && !forceCreatePo) {
-        for (const entry of stockFulfilled) {
-          await api.post(`/api/parts/${entry.part._id || entry.part.id}/adjust`, {
-            quantity: -Math.abs(entry.quantityNeeded),
-            reason: `Issued to material request ${targetRequest.requestId || targetRequest.id || targetRequest._id}`,
-            createdBy: userName || currentUser?.name || currentUser?.email || 'User',
-          });
-        }
-
-        const linkedIssueId = targetRequest.issueId || targetRequest.workOrderId || targetRequest.issue?.id || targetRequest.issue?._id || '';
-        if (linkedIssueId) {
-          await api.post(`/api/issues/${linkedIssueId}/parts/reconcile`, {
-            entries: stockFulfilled.map((entry) => ({
-              name: entry.item?.title || entry.item?.materialId || entry.part?.name || 'Material',
-              status: 'Approved',
-              cost: Number(entry.part?.cost ?? entry.part?.unitCost ?? entry.part?.price ?? 0),
-              quantity: entry.quantityNeeded,
-              location: entry.part?.location || '',
-              notes: `Approved from material request ${targetRequest.requestId || targetRequest.id || targetRequest._id}. Stock available: ${entry.availableStock}.`,
-              source: 'approved',
-              inventoryPartId: entry.part?._id || entry.part?.id || null,
-            }))
-          });
-        }
-
-        await api.post(`/api/material-requests/${id}/respond`, { response: 'APPROVED' });
-        await fetchMaterialRequests();
-        if (linkedIssueId && typeof fetchIssues === 'function') {
-          await fetchIssues();
-        }
-        alert('Request approved and fulfilled from Parts & Inventory.');
+      if (shortageItems.length === 0) {
+        alert('All requested materials are already in stock. No purchase order is needed.');
         return;
       }
 
@@ -16119,26 +16084,9 @@ function ClientDashboard() {
         return;
       }
 
-      const poSourceEntries = forceCreatePo
-        ? requestedItems.map((item) => {
-            const quantityNeeded = Math.max(1, Number(item?.quantity || 1));
-            const matchingPart = findInventoryPartMatch(partsList, item);
-            const availableStock = matchingPart ? getPartAvailableStock(matchingPart) : 0;
-            return {
-              item,
-              part: matchingPart,
-              quantityNeeded,
-              availableStock,
-              shortage: Math.max(quantityNeeded - availableStock, 0),
-            };
-          })
-        : shortageItems;
-
-      const poItems = poSourceEntries.map((entry) => ({
+      const poItems = shortageItems.map((entry) => ({
         name: entry.item?.title || entry.item?.materialId || entry.part?.name || 'Material',
-        quantity: forceCreatePo
-          ? entry.quantityNeeded
-          : Math.max(1, Number(entry.shortage || entry.quantityNeeded || 1)),
+        quantity: Math.max(1, Number(entry.shortage || entry.quantityNeeded || 1)),
         unitCost: Number(entry.part?.inventoryLines?.[0]?.cost || entry.part?.cost || 0),
         partId: entry.part?._id || entry.part?.id || undefined,
         notes: `Raised from material request ${targetRequest.requestId || targetRequest.id || targetRequest._id}`,
@@ -16164,31 +16112,78 @@ function ClientDashboard() {
       window.dispatchEvent(new CustomEvent('purchase-order-created', { detail: poResponse?.data || null }));
 
       const poNumber = poResponse?.data?.poNumber || poResponse?.data?.number || 'Draft PO';
-      const shortageSummary = poSourceEntries
+      const shortageSummary = shortageItems
         .map((entry) => `${entry.item?.title || entry.item?.materialId || entry.part?.name || 'Material'} (needed ${entry.quantityNeeded}, available ${entry.availableStock || 0})`)
         .join(', ');
 
       await api.put(`/api/material-requests/${id}`, {
         status: 'WAITING_VENDOR_APPROVAL',
-        description: `${targetRequest.description || ''}${targetRequest.description ? '\n\n' : ''}Procurement required: ${shortageSummary}. Purchase order: ${poNumber}. Waiting for vendor approval.`,
+        description: `${targetRequest.description || ''}${targetRequest.description ? '\n\n' : ''}Admin approved. Procurement required: ${shortageSummary}. Purchase order: ${poNumber}. Waiting for vendor approval.`,
       });
       await fetchMaterialRequests();
 
-      alert(`Purchase order ${poNumber} was created and sent to the selected vendor. This request will be approved only after the vendor approves that purchase order.`);
+      alert(`Purchase order ${poNumber} was created and sent to the selected vendor.`);
     } catch (err) {
-      alert('Failed to approve request: ' + (err.response?.data?.error || err.message));
+      alert('Failed to create purchase order: ' + (err.response?.data?.error || err.message));
     }
-  }, [contactPeople, currentUser?.companyName, currentUser?.email, currentUser?.name, fetchIssues, fetchMaterialRequests, findInventoryPartMatch, getPartAvailableStock, materialRequests, userName]);
+  }, [contactPeople, currentUser?.companyName, fetchMaterialRequests, findInventoryPartMatch, getPartAvailableStock, materialRequests, userName]);
 
-  const handleDeclineMaterial = useCallback(async (id) => {
+  const handleDeclineMaterial = useCallback(async (id, options = {}) => {
     try {
+      const targetRequest = (materialRequests || []).find((entry) => String(entry?.id || entry?._id || '') === String(id));
+      const note = String(options.note || '').trim();
       await api.post(`/api/material-requests/${id}/respond`, { response: 'DECLINED' });
+      if (note && targetRequest) {
+        await api.put(`/api/material-requests/${id}`, {
+          description: `${targetRequest.description || ''}${targetRequest.description ? '\n\n' : ''}Admin decline note: ${note}`,
+          declineNote: note,
+          declinedBy: currentUser?.name || currentUser?.email || userName || 'Admin',
+          declinedAt: new Date().toISOString(),
+        });
+      }
       await fetchMaterialRequests();
       alert('Request declined.');
     } catch (err) {
       alert('Failed to decline request: ' + (err.response?.data?.error || err.message));
     }
-  }, [fetchMaterialRequests]);
+  }, [currentUser?.email, currentUser?.name, fetchMaterialRequests, materialRequests, userName]);
+
+  const openMaterialRequestDecisionModal = useCallback((request, action) => {
+    const firstItem = Array.isArray(request?.items) ? request.items[0] || {} : {};
+    setMaterialRequestDecisionModal({
+      open: true,
+      requestId: String(request?.id || request?._id || ''),
+      action,
+      title: firstItem.title || request?.title || firstItem.materialId || 'Material Request',
+      note: '',
+    });
+  }, []);
+
+  const closeMaterialRequestDecisionModal = useCallback(() => {
+    setMaterialRequestDecisionModal({
+      open: false,
+      requestId: '',
+      action: 'APPROVED',
+      title: '',
+      note: '',
+    });
+  }, []);
+
+  const submitMaterialRequestDecision = useCallback(async () => {
+    const requestId = materialRequestDecisionModal.requestId;
+    if (!requestId) return;
+    try {
+      setMaterialRequestDecisionSaving(true);
+      if (materialRequestDecisionModal.action === 'DECLINED') {
+        await handleDeclineMaterial(requestId, { note: materialRequestDecisionModal.note });
+      } else {
+        await handleApproveMaterial(requestId, { note: materialRequestDecisionModal.note });
+      }
+      closeMaterialRequestDecisionModal();
+    } finally {
+      setMaterialRequestDecisionSaving(false);
+    }
+  }, [closeMaterialRequestDecisionModal, handleApproveMaterial, handleDeclineMaterial, materialRequestDecisionModal]);
 
   const openMaterialRequestAdjustModal = useCallback(async (id) => {
     try {
@@ -16245,35 +16240,89 @@ function ClientDashboard() {
 
     try {
       setMaterialRequestAdjustSaving(true);
-      const createdBy = userName || currentUser?.name || currentUser?.email || 'User';
       if (!materialRequestAdjustModal.vendorId) {
         alert('Select a vendor before continuing to purchase order.');
         return;
       }
 
-      for (const entry of materialRequestAdjustModal.entries) {
-        const adjustmentValue = Number(entry.adjustmentQuantity || 0);
-        if (!entry.part?._id && !entry.part?.id) continue;
-        if (!adjustmentValue) continue;
-
-        await api.post(`/api/parts/${entry.part._id || entry.part.id}/adjust`, {
-          quantity: adjustmentValue,
-          reason: entry.reason || `Stock adjustment before creating PO for material request ${materialRequestAdjustModal.requestId}`,
-          createdBy,
-        });
-      }
-
       setMaterialRequestAdjustModal({ open: false, requestId: '', title: '', entries: [], vendorId: '' });
-      await handleApproveMaterial(materialRequestAdjustModal.requestId, {
+      await handleCreateMaterialPurchaseOrder(materialRequestAdjustModal.requestId, {
         vendorId: materialRequestAdjustModal.vendorId,
-        forceCreatePo: true,
       });
     } catch (err) {
-      alert(err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Failed to adjust stock quantity.');
+      alert(err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Failed to create purchase order.');
     } finally {
       setMaterialRequestAdjustSaving(false);
     }
-  }, [currentUser?.email, currentUser?.name, handleApproveMaterial, materialRequestAdjustModal, userName]);
+  }, [handleCreateMaterialPurchaseOrder, materialRequestAdjustModal]);
+
+  const handleReceiveMaterialRequestToInventory = useCallback(async (id) => {
+    try {
+      const targetRequest = (materialRequests || []).find((entry) => String(entry?.id || entry?._id || '') === String(id));
+      if (!targetRequest) {
+        alert('Material request not found.');
+        return;
+      }
+
+      const partsResponse = await api.get('/api/parts');
+      const partsList = Array.isArray(partsResponse?.data) ? partsResponse.data : [];
+      const requestedItems = Array.isArray(targetRequest.items) && targetRequest.items.length > 0
+        ? targetRequest.items
+        : [{
+            title: targetRequest.title || targetRequest.materialId || 'Material',
+            materialId: targetRequest.materialId || targetRequest.title || 'Material',
+            quantity: targetRequest.quantity || 1,
+          }];
+      const createdBy = userName || currentUser?.name || currentUser?.email || 'Admin';
+
+      for (const item of requestedItems) {
+        const quantity = Math.max(1, Number(item?.quantity || 1));
+        const matchingPart = findInventoryPartMatch(partsList, item);
+        if (matchingPart?._id || matchingPart?.id) {
+          await api.post(`/api/parts/${matchingPart._id || matchingPart.id}/adjust`, {
+            quantity,
+            reason: `Received from material request ${targetRequest.requestId || targetRequest.id || targetRequest._id}`,
+            createdBy,
+          });
+        } else {
+          await api.post('/api/parts', {
+            name: item?.title || item?.materialId || 'Material',
+            partNumber: item?.materialId || '',
+            category: 'Material Request',
+            description: `Received from material request ${targetRequest.requestId || targetRequest.id || targetRequest._id}`,
+            status: 'STOCK_IN',
+            available: quantity,
+            allocated: 0,
+            onHand: quantity,
+            incoming: 0,
+            location: targetRequest.location || '',
+            tags: ['material-request'],
+            nonStock: false,
+            critical: false,
+            inventoryLines: [{
+              location: targetRequest.location || '',
+              area: '',
+              minQty: '',
+              maxQty: '',
+              availQty: quantity,
+              cost: '',
+              barcode: '',
+            }],
+          });
+        }
+      }
+
+      await api.put(`/api/material-requests/${id}`, {
+        status: 'RECEIVED_IN_INVENTORY',
+        description: `${targetRequest.description || ''}${targetRequest.description ? '\n\n' : ''}Materials received and added into Parts & Inventory by ${createdBy}.`,
+      });
+      await fetchMaterialRequests();
+      window.dispatchEvent(new CustomEvent('refreshInventory'));
+      alert('Materials were added into Parts & Inventory.');
+    } catch (err) {
+      alert(err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Failed to add materials into inventory.');
+    }
+  }, [currentUser?.email, currentUser?.name, fetchMaterialRequests, findInventoryPartMatch, materialRequests, userName]);
 
   useEffect(() => {
     let isActive = true;
@@ -18292,7 +18341,7 @@ function ClientDashboard() {
     );
   }, [currentUser, getAssignedName, userName]);
 
-  const pendingRequests = allIssues.filter((issue) => isRequestIssue(issue));
+  const pendingRequests = allIssues.filter((issue) => !isPmLinkedIssue(issue) && isRequestIssue(issue));
   const combinedOpen = (statusCounts.open || statusCounts.Open || 0) + (maintenanceCounts.open || maintenanceCounts.Open || 0);
   const combinedPending = pendingRequests.filter((request) => getRequestDisplayState(request).statusLabel === 'Pending').length;
   const combinedInProgress = (statusCounts.inProgress || statusCounts['In Progress'] || 0) + (maintenanceCounts.inProgress || maintenanceCounts['In Progress'] || 0);
@@ -18399,7 +18448,7 @@ function ClientDashboard() {
     selectedRequestStatuses,
   ]);
   const requestBulkSelection = useBulkSelection(filteredRequests, (request) => request?._id || request?.id);
-  const workOrders = dedupePmWorkOrders(allIssues.filter(issue => isApprovedWorkOrder(issue)));
+  const workOrders = dedupePmWorkOrders(allIssues.filter(issue => isApprovedWorkOrder(issue) && !isPmLinkedIssue(issue)));
   const resolveRequestWorkOrderLabel = React.useCallback((request) => {
     const rawRequestStatus = String(request?.status || '').toUpperCase().replace(/_/g, ' ').trim();
     const requestRefs = Array.from(new Set([
@@ -18895,6 +18944,8 @@ function ClientDashboard() {
     const vendorApprovedPo = normalizedPoStatus === 'APPROVED';
     const vendorDeclinedPo = normalizedPoStatus === 'DECLINED';
     const awaitingVendorApproval = !!linkedPo && !vendorApprovedPo && !vendorDeclinedPo;
+    if (normalizedReqStatus === 'RECEIVED_IN_INVENTORY') return 'RECEIVED_IN_INVENTORY';
+    if (vendorApprovedPo) return 'READY_TO_RECEIVE';
     if (awaitingVendorApproval) return 'WAITING_VENDOR_APPROVAL';
     if (vendorDeclinedPo) return 'VENDOR_DECLINED';
     return normalizedReqStatus;
@@ -25133,7 +25184,10 @@ function ClientDashboard() {
               setShowCombinedSchedule(true);
             }}
             onCreated={async () => {
-              await refreshMaintenanceSummary();
+              await Promise.allSettled([
+                refreshMaintenanceSummary(),
+                fetchIssues(),
+              ]);
               setShowCreatePm(false);
             }}
             pmTasks={pmTasks}
@@ -26318,8 +26372,9 @@ function ClientDashboard() {
                     const awaitingVendorApproval = !!linkedPo && !vendorApprovedPo && !vendorDeclinedPo;
                     const effectiveStatus = getMaterialRequestEffectiveStatus(req);
                     const isPending = effectiveStatus === 'FORWARDED' || effectiveStatus === 'PENDING';
+                    const isAdminApproved = effectiveStatus === 'APPROVED';
+                    const isReadyToReceive = effectiveStatus === 'READY_TO_RECEIVE';
                     const stockInfo = materialRequestStockInfo[String(reqId || '')] || { requiresPo: false, shortages: [], fulfilled: [] };
-                    const primaryActionLabel = stockInfo.requiresPo ? 'Create PO' : 'Approve';
                     return (
                       <div key={reqId || idx} className="glass-surface rounded-2xl hover:shadow-md transition-all overflow-hidden flex flex-col">
                         <div className="p-5 flex-1">
@@ -26330,6 +26385,8 @@ function ClientDashboard() {
                             <span className={`px-2.5 py-1 rounded-full text-[10px] font-black border ${effectiveStatus === 'APPROVED' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
                               effectiveStatus === 'DECLINED' ? 'bg-rose-50 text-rose-700 border-rose-100' :
                               effectiveStatus === 'WAITING_VENDOR_APPROVAL' ? 'bg-blue-50 text-blue-700 border-blue-100' :
+                              effectiveStatus === 'READY_TO_RECEIVE' ? 'bg-cyan-50 text-cyan-700 border-cyan-100' :
+                              effectiveStatus === 'RECEIVED_IN_INVENTORY' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
                               effectiveStatus === 'VENDOR_DECLINED' ? 'bg-rose-50 text-rose-700 border-rose-100' :
                                 'bg-amber-50 text-amber-700 border-amber-200'
                               }`}>
@@ -26356,19 +26413,31 @@ function ClientDashboard() {
                             </p>
                             {awaitingVendorApproval ? (
                               <div className="mt-3 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-[11px] font-medium text-blue-700">
-                                Purchase order {linkedPo?.poNumber || ''} was created and emailed to the selected vendor. This request will only be approved after the vendor approves that purchase order.
+                                Purchase order {linkedPo?.poNumber || ''} was created and emailed to the selected vendor. Waiting for vendor approval.
+                              </div>
+                            ) : isReadyToReceive ? (
+                              <div className="mt-3 rounded-xl border border-cyan-200 bg-cyan-50 px-3 py-2 text-[11px] font-medium text-cyan-700">
+                                Vendor approved purchase order {linkedPo?.poNumber || ''}. Add the arrived materials into Parts & Inventory.
                               </div>
                             ) : vendorDeclinedPo ? (
                               <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] font-medium text-rose-700">
                                 The selected vendor declined the purchase order. This material request is not approved yet.
                               </div>
-                            ) : stockInfo.requiresPo ? (
-                              <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-medium text-amber-700">
-                                Requested quantity is higher than available stock. This request should create a purchase order.
+                            ) : isPending ? (
+                              <div className="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-medium text-slate-600">
+                                Admin review required. Approve or decline this request with a note.
                               </div>
-                            ) : stockInfo.fulfilled.length > 0 ? (
+                            ) : isAdminApproved && stockInfo.requiresPo ? (
+                              <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-medium text-amber-700">
+                                Admin approved this request. Procurement should create a purchase order because stock is not enough.
+                              </div>
+                            ) : isAdminApproved && stockInfo.fulfilled.length > 0 ? (
                               <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-medium text-emerald-700">
-                                Enough stock is available to fulfill this request from inventory.
+                                Admin approved this request and enough stock is available in inventory.
+                              </div>
+                            ) : effectiveStatus === 'RECEIVED_IN_INVENTORY' ? (
+                              <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-medium text-emerald-700">
+                                Materials have arrived and were added into Parts & Inventory.
                               </div>
                             ) : null}
                           </div>
@@ -26386,18 +26455,32 @@ function ClientDashboard() {
                         {isPending && (
                           <div className="p-3 bg-gray-50/50 border-t border-gray-50 flex gap-2">
                             <button
-                              onClick={() => {
-                                if (stockInfo.requiresPo) {
-                                  openMaterialRequestAdjustModal(reqId);
-                                  return;
-                                }
-                                handleApproveMaterial(reqId);
-                              }}
+                              onClick={() => openMaterialRequestDecisionModal(req, 'APPROVED')}
                               className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-xl text-xs font-bold transition-colors shadow-sm"
                             >
-                              {primaryActionLabel}
+                              Approve
                             </button>
-                            <button onClick={() => handleDeclineMaterial(reqId)} className="flex-1 glass-ghost hover:bg-rose-50 text-slate-700 hover:text-rose-600 py-2 rounded-xl text-xs font-bold transition-all">Decline</button>
+                            <button onClick={() => openMaterialRequestDecisionModal(req, 'DECLINED')} className="flex-1 glass-ghost hover:bg-rose-50 text-slate-700 hover:text-rose-600 py-2 rounded-xl text-xs font-bold transition-all">Decline</button>
+                          </div>
+                        )}
+                        {isAdminApproved && stockInfo.requiresPo && (
+                          <div className="p-3 bg-gray-50/50 border-t border-gray-50 flex gap-2">
+                            <button
+                              onClick={() => openMaterialRequestAdjustModal(reqId)}
+                              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-xl text-xs font-bold transition-colors shadow-sm"
+                            >
+                              Create Purchase Order
+                            </button>
+                          </div>
+                        )}
+                        {isReadyToReceive && (
+                          <div className="p-3 bg-gray-50/50 border-t border-gray-50 flex gap-2">
+                            <button
+                              onClick={() => handleReceiveMaterialRequestToInventory(reqId)}
+                              className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-xl text-xs font-bold transition-colors shadow-sm"
+                            >
+                              Add to Parts & Inventory
+                            </button>
                           </div>
                         )}
                       </div>
@@ -26560,9 +26643,9 @@ function ClientDashboard() {
               <div className="w-full max-w-[860px] rounded-2xl border border-gray-200 bg-white shadow-2xl">
                 <div className="flex items-center justify-between px-8 py-6">
                   <div>
-                    <h3 className="text-[28px] font-bold tracking-tight text-gray-900">Adjust Stock Quantity</h3>
+                    <h3 className="text-[28px] font-bold tracking-tight text-gray-900">Create Purchase Order</h3>
                     <p className="mt-1 text-sm text-gray-500">
-                      Review stock first, then continue to inventory fulfillment or purchase order creation.
+                      Select the vendor procurement should use for this approved material request.
                     </p>
                   </div>
                   <button
@@ -26576,7 +26659,7 @@ function ClientDashboard() {
                 <div className="max-h-[60vh] overflow-auto border-t border-gray-100 px-8 py-6">
                   <div className="space-y-4">
                     <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
-                      <label className="mb-2 block text-sm font-medium text-blue-900">Vendor to receive public PO link</label>
+                        <label className="mb-2 block text-sm font-medium text-blue-900">Vendor to receive public purchase order link</label>
                       <select
                         value={materialRequestAdjustModal.vendorId}
                         onChange={(e) => setMaterialRequestAdjustModal((prev) => ({ ...prev, vendorId: e.target.value }))}
@@ -26601,44 +26684,8 @@ function ClientDashboard() {
                             Requested: {entry.quantityNeeded} | In stock: {entry.availableStock}
                           </div>
                         </div>
-                        <div className="mt-4 grid gap-4 md:grid-cols-[0.8fr_1.2fr]">
-                          <div>
-                            <label className="mb-2 block text-sm font-medium text-gray-700">Adjustment Quantity</label>
-                            <input
-                              type="number"
-                              value={entry.adjustmentQuantity}
-                              onChange={(e) => {
-                                const value = Number(e.target.value || 0);
-                                setMaterialRequestAdjustModal((prev) => ({
-                                  ...prev,
-                                  entries: prev.entries.map((currentEntry, currentIndex) => (
-                                    currentIndex === index ? { ...currentEntry, adjustmentQuantity: value } : currentEntry
-                                  )),
-                                }));
-                              }}
-                              className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none focus:border-blue-500"
-                            />
-                            <p className="mt-2 text-xs text-gray-500">
-                              Use a positive number if the stock count should be increased before the request is processed. Leave `0` to continue directly with PO creation.
-                            </p>
-                          </div>
-                          <div>
-                            <label className="mb-2 block text-sm font-medium text-gray-700">Reason</label>
-                            <input
-                              value={entry.reason}
-                              onChange={(e) => {
-                                const value = e.target.value;
-                                setMaterialRequestAdjustModal((prev) => ({
-                                  ...prev,
-                                  entries: prev.entries.map((currentEntry, currentIndex) => (
-                                    currentIndex === index ? { ...currentEntry, reason: value } : currentEntry
-                                  )),
-                                }));
-                              }}
-                              className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none focus:border-blue-500"
-                              placeholder="Reason for stock adjustment"
-                            />
-                          </div>
+                        <div className="mt-4 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
+                          Purchase order quantity: {Math.max(1, Number(entry.shortage || entry.quantityNeeded || 1))}
                         </div>
                       </div>
                     ))}
@@ -26658,7 +26705,69 @@ function ClientDashboard() {
                     disabled={materialRequestAdjustSaving}
                     className="rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
                   >
-                    {materialRequestAdjustSaving ? 'Processing...' : 'Continue'}
+                    {materialRequestAdjustSaving ? 'Creating...' : 'Create Purchase Order'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+          {materialRequestDecisionModal.open && (
+            <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/60 p-4">
+              <div className="w-full max-w-xl rounded-2xl border border-gray-200 bg-white shadow-2xl">
+                <div className="flex items-center justify-between border-b border-gray-100 px-6 py-5">
+                  <div>
+                    <h3 className="text-2xl font-bold tracking-tight text-gray-900">
+                      {materialRequestDecisionModal.action === 'DECLINED' ? 'Decline Material Request' : 'Approve Material Request'}
+                    </h3>
+                    <p className="mt-1 text-sm text-gray-500">{materialRequestDecisionModal.title}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={closeMaterialRequestDecisionModal}
+                    className="rounded-lg p-2 text-gray-500 hover:bg-gray-100"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+                <div className="px-6 py-5">
+                  <label className="mb-2 block text-sm font-semibold text-gray-700">
+                    Note {materialRequestDecisionModal.action === 'DECLINED' ? '(recommended)' : '(optional)'}
+                  </label>
+                  <textarea
+                    value={materialRequestDecisionModal.note}
+                    onChange={(e) => setMaterialRequestDecisionModal((prev) => ({ ...prev, note: e.target.value }))}
+                    placeholder={materialRequestDecisionModal.action === 'DECLINED' ? 'Explain why this material request is declined...' : 'Add an approval note for procurement...'}
+                    className="min-h-[130px] w-full rounded-xl border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  />
+                  {materialRequestDecisionModal.action === 'APPROVED' && (
+                    <p className="mt-3 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700">
+                      After approval, procurement will create a purchase order later if stock is not available.
+                    </p>
+                  )}
+                </div>
+                <div className="flex items-center justify-end gap-3 border-t border-gray-100 px-6 py-4">
+                  <button
+                    type="button"
+                    onClick={closeMaterialRequestDecisionModal}
+                    className="rounded-xl border border-gray-300 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={submitMaterialRequestDecision}
+                    disabled={materialRequestDecisionSaving}
+                    className={`rounded-xl px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60 ${
+                      materialRequestDecisionModal.action === 'DECLINED'
+                        ? 'bg-rose-600 hover:bg-rose-700'
+                        : 'bg-emerald-600 hover:bg-emerald-700'
+                    }`}
+                  >
+                    {materialRequestDecisionSaving
+                      ? 'Saving...'
+                      : materialRequestDecisionModal.action === 'DECLINED'
+                        ? 'Decline Request'
+                        : 'Approve Request'}
                   </button>
                 </div>
               </div>
@@ -32903,6 +33012,18 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
     critical: false,
     inventoryLines: [{ location: '', area: '', minQty: '', maxQty: '', availQty: '', cost: '', barcode: '' }]
   });
+  const createEmptyAllocation = () => ({
+    partId: '',
+    partName: '',
+    quantity: 1,
+    requestedBy: '',
+    allocatedBy: '',
+    givenBy: '',
+    receivedBy: '',
+    date: new Date().toISOString().split('T')[0],
+    status: 'PENDING',
+    notes: '',
+  });
   const createEmptySet = () => ({ name: '', description: '', location: '', status: 'ACTIVE', tags: [], notes: '', partIds: [] });
   const createEmptyCycleCount = () => ({
     name: '',
@@ -32960,9 +33081,11 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
   const [showAddPart, setShowAddPart] = React.useState(false);
   const [showAddSet, setShowAddSet] = React.useState(false);
   const [showAddCycleCount, setShowAddCycleCount] = React.useState(false);
+  const [showAddAllocation, setShowAddAllocation] = React.useState(false);
   const [savingPart, setSavingPart] = React.useState(false);
   const [savingSet, setSavingSet] = React.useState(false);
   const [savingCycleCount, setSavingCycleCount] = React.useState(false);
+  const [savingAllocation, setSavingAllocation] = React.useState(false);
   const [selectedPart, setSelectedPart] = React.useState(null);
   const [partDetailOpen, setPartDetailOpen] = React.useState(false);
   const [partDetailTab, setPartDetailTab] = React.useState('details');
@@ -32975,6 +33098,7 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
   const [partEditForm, setPartEditForm] = React.useState(null);
   const [partAdjustmentForm, setPartAdjustmentForm] = React.useState({ quantity: 1, reason: '' });
   const [newPart, setNewPart] = React.useState(createEmptyPart());
+  const [newAllocation, setNewAllocation] = React.useState(createEmptyAllocation());
   const [newSet, setNewSet] = React.useState(createEmptySet());
   const [newCycleCount, setNewCycleCount] = React.useState(createEmptyCycleCount());
   const [showPartSelector, setShowPartSelector] = React.useState(false);
@@ -32984,21 +33108,171 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
   const [cycleCountLocationOpen, setCycleCountLocationOpen] = React.useState(false);
   const [cycleCountAssignedOpen, setCycleCountAssignedOpen] = React.useState(false);
   const [users, setUsers] = React.useState([]);
+  const [materialRequests, setMaterialRequests] = React.useState([]);
+  const [selectedRequest, setSelectedRequest] = React.useState(null);
+  const [showRequestDetail, setShowRequestDetail] = React.useState(false);
+  const [partRequests, setPartRequests] = React.useState([]);
+  const [selectedPartRequest, setSelectedPartRequest] = React.useState(null);
+  const [showPartRequestDetail, setShowPartRequestDetail] = React.useState(false);
+  const [partRequestForms, setPartRequestForms] = React.useState({});
+  const [partRequestAction, setPartRequestAction] = React.useState('');
+
+  const pendingRequests = React.useMemo(() => {
+    const allReqs = [];
+    // 1. From Allocation History (linked to specific parts)
+    (items || []).forEach(part => {
+      (part.allocationHistory || []).forEach(alloc => {
+        if (String(alloc.status).toUpperCase() === 'PENDING') {
+          allReqs.push({ 
+            ...alloc, 
+            id: alloc.id || alloc._id || `alloc-${Math.random()}`,
+            partId: part._id || part.id,
+            partName: alloc.partName || part.name || 'Unnamed Part',
+            quantity: Number(alloc.quantity) || 1,
+            part,
+            sourceType: 'allocation' 
+          });
+        }
+      });
+    });
+    // 2. From Material Requests
+    (materialRequests || []).forEach(req => {
+      if (String(req.status).toUpperCase() === 'PENDING') {
+        allReqs.push({
+          id: req._id || req.id,
+          partId: req.partId || '',
+          partName: req.title || 'General Material',
+          quantity: req.quantity || 1,
+          requestedBy: req.technicianId || req.userId || '',
+          date: req.createdAt || req.date || new Date().toISOString(),
+          notes: req.description || '',
+          sourceType: 'materialRequest',
+          originalRequest: req
+        });
+      }
+    });
+    return allReqs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [items, materialRequests]);
+
+  const partRequestStatusOptions = React.useMemo(() => ['PENDING', 'APPROVED', 'FULFILLED', 'REJECTED', 'CANCELLED'], []);
+  const filteredPartRequests = React.useMemo(() => {
+    const query = String(search || '').trim().toLowerCase();
+    return (partRequests || []).filter((request) => {
+      const status = String(request?.status || '').trim();
+      if (statusFilter && status !== statusFilter) return false;
+      if (!query) return true;
+      return [
+        request?.partName,
+        request?.partNumber,
+        request?.category,
+        request?.requestedBy,
+        request?.requestedFrom,
+        request?.workOrderId,
+        request?.pmId,
+        request?.reason,
+        request?.notes,
+        request?.status,
+        request?.approvedBy,
+        request?.declinedBy,
+        request?.allocations?.allocatedBy,
+        request?.allocations?.givenBy,
+        request?.allocations?.receivedBy,
+      ].filter(Boolean).join(' ').toLowerCase().includes(query);
+    });
+  }, [partRequests, search, statusFilter]);
+
+  const partRequestCounts = React.useMemo(() => {
+    return (partRequests || []).reduce((acc, request) => {
+      const status = String(request?.status || 'PENDING').toUpperCase();
+      acc[status] = (acc[status] || 0) + 1;
+      return acc;
+    }, {});
+  }, [partRequests]);
+  const incomingRequestCount = React.useMemo(() => {
+    const pendingPartRequestCount = (partRequests || []).filter((request) => {
+      const status = String(request?.status || 'PENDING').toUpperCase();
+      return status === 'PENDING' || status === 'REQUESTED';
+    }).length;
+    return pendingRequests.length + pendingPartRequestCount;
+  }, [partRequests, pendingRequests.length]);
+
+  const getUserDisplayName = React.useCallback((value) => {
+    if (!value) return '';
+    const match = (users || people || []).find((person) => {
+      const id = String(person?._id || person?.id || person?.userId || '');
+      const email = String(person?.email || '');
+      const name = String(person?.name || person?.fullName || '');
+      return [id, email, name].some((item) => item && item === String(value));
+    });
+    return match?.name || match?.fullName || match?.email || value;
+  }, [people, users]);
+
+  const getPartRequestForm = React.useCallback((request) => {
+    const id = String(request?._id || request?.id || '');
+    const allocations = request?.allocations || {};
+    return partRequestForms[id] || {
+      allocatedBy: allocations.allocatedBy || '',
+      givenBy: allocations.givenBy || '',
+      receivedBy: allocations.receivedBy || '',
+      quantityGiven: allocations.quantityGiven || request?.quantityRequested || 1,
+      quantityReceived: allocations.quantityReceived || request?.quantityRequested || 1,
+    };
+  }, [partRequestForms]);
+
+  const updatePartRequestForm = (request, field, value) => {
+    const id = String(request?._id || request?.id || '');
+    setPartRequestForms((prev) => ({
+      ...prev,
+      [id]: {
+        ...getPartRequestForm(request),
+        [field]: value,
+      },
+    }));
+  };
+
+  const getPartRequestHistoryValue = React.useCallback((request, action, pattern) => {
+    const entry = [...(request?.history || [])].reverse().find((item) => String(item?.action || '').toUpperCase() === action);
+    if (!entry) return { person: '', date: null };
+    const match = pattern ? String(entry.notes || '').match(pattern) : null;
+    return {
+      person: match?.[1]?.trim() || '',
+      date: entry.actionAt || null,
+    };
+  }, []);
+
+  const getPartRequestAllocationTrail = React.useCallback((request) => {
+    const allocations = request?.allocations || {};
+    const allocatedHistory = getPartRequestHistoryValue(request, 'ALLOCATED', /allocated by:\s*(.+)$/i);
+    const givenHistory = getPartRequestHistoryValue(request, 'GIVEN', /given by\s+(.+?)(?:,\s*quantity|$)/i);
+    const receivedHistory = getPartRequestHistoryValue(request, 'RECEIVED', /received by\s+(.+?)(?:,\s*quantity|$)/i);
+    return {
+      allocatedBy: allocations.allocatedBy || allocatedHistory.person,
+      allocatedAt: allocations.allocatedAt || allocatedHistory.date,
+      givenBy: allocations.givenBy || givenHistory.person,
+      givenAt: allocations.givenAt || givenHistory.date,
+      receivedBy: allocations.receivedBy || receivedHistory.person,
+      receivedAt: allocations.receivedAt || receivedHistory.date,
+    };
+  }, [getPartRequestHistoryValue]);
 
   const loadInventoryData = React.useCallback(async () => {
     try {
-      const [partsRes, setsRes, cycleCountsRes, usersRes, assetsRes] = await Promise.all([
+      const [partsRes, setsRes, cycleCountsRes, usersRes, assetsRes, materialRes, partReqRes] = await Promise.all([
         api.get('/api/parts'),
         api.get('/api/inventory-sets'),
         api.get('/api/cycle-counts'),
         api.get('/api/users').catch(() => ({ data: [] })),
         api.get('/api/assets').catch(() => ({ data: [] })),
+        api.get('/api/material-requests').catch(() => ({ data: [] })),
+        api.get('/api/part-requests').catch(() => ({ data: [] })),
       ]);
       setItems(Array.isArray(partsRes?.data) ? partsRes.data : []);
       setInventorySets(Array.isArray(setsRes?.data) ? setsRes.data : []);
       setCycleCounts(Array.isArray(cycleCountsRes?.data) ? cycleCountsRes.data : []);
       setUsers(Array.isArray(usersRes?.data) ? usersRes.data : []);
       setInventoryAssets(Array.isArray(assetsRes?.data) ? assetsRes.data : []);
+      setMaterialRequests(Array.isArray(materialRes?.data) ? materialRes.data : []);
+      setPartRequests(Array.isArray(partReqRes?.data) ? partReqRes.data : []);
     } catch (error) {
       console.error('Failed to load parts and inventory data', error);
       setItems([]);
@@ -33006,11 +33280,19 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
       setCycleCounts([]);
       setUsers([]);
       setInventoryAssets([]);
+      setMaterialRequests([]);
+      setPartRequests([]);
     }
   }, []);
 
   React.useEffect(() => {
     loadInventoryData();
+  }, [loadInventoryData]);
+
+  React.useEffect(() => {
+    const handleRefresh = () => loadInventoryData();
+    window.addEventListener('refreshInventory', handleRefresh);
+    return () => window.removeEventListener('refreshInventory', handleRefresh);
   }, [loadInventoryData]);
 
   const addPartToSet = (partId) => {
@@ -33305,9 +33587,9 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
       return [entry?.name, entry?.description, entry?.location, entry?.frequency, entry?.assignedTo, getTagList(entry).join(' ')].join(' ').toLowerCase().includes(query);
     });
   }, [cycleCounts, locationFilter, search, statusFilter, tagFilter]);
-  const activeRows = activeInventoryTab === 'parts' ? filteredParts : activeInventoryTab === 'sets' ? filteredSets : filteredCycleCounts;
-  const activeStatusOptions = activeInventoryTab === 'parts' ? partStatusOptions : activeInventoryTab === 'sets' ? setStatusOptions : cycleCountStatusOptions;
-  const activeSummaryLabel = activeInventoryTab === 'parts' ? 'parts' : activeInventoryTab === 'sets' ? 'sets' : 'cycle counts';
+  const activeRows = activeInventoryTab === 'parts' ? filteredParts : activeInventoryTab === 'sets' ? filteredSets : activeInventoryTab === 'requests' ? filteredPartRequests : filteredCycleCounts;
+  const activeStatusOptions = activeInventoryTab === 'parts' ? partStatusOptions : activeInventoryTab === 'sets' ? setStatusOptions : activeInventoryTab === 'requests' ? partRequestStatusOptions : cycleCountStatusOptions;
+  const activeSummaryLabel = activeInventoryTab === 'parts' ? 'parts' : activeInventoryTab === 'sets' ? 'sets' : activeInventoryTab === 'requests' ? 'part requests' : 'cycle counts';
   const filtered = filteredParts;
   const openPartDetails = (part) => {
     setSelectedPart(part);
@@ -33390,6 +33672,153 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
     const keys = Object.keys(rows[0] || {});
     const csv = [keys.join(',')].concat(rows.map(r => keys.map(k => `"${String(r[k] ?? '').replace(/"/g, '""')}"`).join(','))).join('\n');
     const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(new Blob([csv], { type: 'text/csv' })), download: `${activeInventoryTab}.csv` }); a.click();
+  };
+
+  const handleSaveAllocation = async (e) => {
+    e.preventDefault();
+    setSavingAllocation(true);
+    try {
+      const { partId } = newAllocation;
+      if (!partId) throw new Error('Part is required');
+
+      const partRes = await api.get(`/api/parts/${partId}`);
+      const part = partRes.data;
+      
+      let updatedHistory = [...(part.allocationHistory || [])];
+      
+      if (selectedRequest && selectedRequest.sourceType === 'allocation') {
+        // Update existing pending record in inventory history
+        updatedHistory = updatedHistory.map(h => {
+          if (h.id === selectedRequest.id) {
+            return {
+              ...h,
+              ...newAllocation,
+              status: 'FULFILLED',
+              fulfilledAt: new Date().toISOString()
+            };
+          }
+          return h;
+        });
+      } else {
+        // Add new fulfillment record (either from Material Request or direct allocation)
+        const allocationRecord = {
+          ...newAllocation,
+          id: Math.random().toString(36).substr(2, 9),
+          status: 'FULFILLED',
+          createdAt: new Date().toISOString(),
+          sourceRequest: selectedRequest?.id || undefined
+        };
+        updatedHistory = [allocationRecord, ...updatedHistory];
+
+        // If it came from a general material request, update that too
+        if (selectedRequest && selectedRequest.sourceType === 'materialRequest') {
+          await api.put(`/api/material-requests/${selectedRequest.id}`, {
+            status: 'FULFILLED',
+            fulfilledAt: new Date().toISOString()
+          });
+        }
+      }
+
+      const updateData = { allocationHistory: updatedHistory };
+      
+      // If manual allocation (not a pending inventory allocation), we need to update allocated/quantity
+      if (!selectedRequest || selectedRequest.sourceType === 'materialRequest') {
+        updateData.allocated = (Number(part.allocated) || 0) + Number(newAllocation.quantity || 0);
+      }
+
+      await api.put(`/api/parts/${partId}`, updateData);
+      
+      await loadInventoryData();
+      window.dispatchEvent(new CustomEvent('refreshInventory'));
+      
+      setShowAddAllocation(false);
+      setNewAllocation(createEmptyAllocation());
+      setSelectedRequest(null);
+    } catch (err) {
+      alert(err.response?.data?.error || err.message || 'Failed to save allocation');
+    } finally {
+      setSavingAllocation(false);
+    }
+  };
+
+  // Part Request handlers
+  const handleApprovePartRequest = async (requestId) => {
+    setPartRequestAction(`${requestId}:approve`);
+    try {
+      await api.put(`/api/part-requests/${requestId}/approve`);
+      await loadInventoryData();
+      alert('Part request approved');
+    } catch (err) {
+      alert(err.response?.data?.error || err.message || 'Failed to approve');
+    } finally {
+      setPartRequestAction('');
+    }
+  };
+
+  const handleDeclinePartRequest = async (requestId) => {
+    const reason = prompt('Enter decline reason:');
+    if (!reason) return;
+    setPartRequestAction(`${requestId}:decline`);
+    try {
+      await api.put(`/api/part-requests/${requestId}/decline`, { declineReason: reason });
+      await loadInventoryData();
+      alert('Part request declined');
+    } catch (err) {
+      alert(err.response?.data?.error || err.message || 'Failed to decline');
+    } finally {
+      setPartRequestAction('');
+    }
+  };
+
+  const handleRecordAllocatedBy = async (requestId, allocatedBy) => {
+    if (!String(allocatedBy || '').trim()) return alert('Allocated by is required');
+    setPartRequestAction(`${requestId}:record-allocated`);
+    try {
+      await api.put(`/api/part-requests/${requestId}/record-allocated`, { allocatedBy });
+      await loadInventoryData();
+    } catch (err) {
+      alert(err.response?.data?.error || err.message || 'Failed to record allocator');
+    } finally {
+      setPartRequestAction('');
+    }
+  };
+
+  const handleRecordGivenBy = async (requestId, givenBy, quantityGiven) => {
+    if (!String(givenBy || '').trim()) return alert('Given by is required');
+    setPartRequestAction(`${requestId}:record-given`);
+    try {
+      await api.put(`/api/part-requests/${requestId}/record-given`, { givenBy, quantityGiven });
+      await loadInventoryData();
+    } catch (err) {
+      alert(err.response?.data?.error || err.message || 'Failed to record giver');
+    } finally {
+      setPartRequestAction('');
+    }
+  };
+
+  const handleRecordReceivedBy = async (requestId, receivedBy, quantityReceived) => {
+    if (!String(receivedBy || '').trim()) return alert('Received by is required');
+    setPartRequestAction(`${requestId}:record-received`);
+    try {
+      await api.put(`/api/part-requests/${requestId}/record-received`, { receivedBy, quantityReceived });
+      await loadInventoryData();
+    } catch (err) {
+      alert(err.response?.data?.error || err.message || 'Failed to record receiver');
+    } finally {
+      setPartRequestAction('');
+    }
+  };
+
+  const handleFulfillPartRequest = async (requestId) => {
+    setPartRequestAction(`${requestId}:fulfill`);
+    try {
+      await api.put(`/api/part-requests/${requestId}/fulfill`);
+      await loadInventoryData();
+    } catch (err) {
+      alert(err.response?.data?.error || err.message || 'Failed to fulfill request');
+    } finally {
+      setPartRequestAction('');
+    }
   };
 
   const parseCsv = (text) => {
@@ -33492,6 +33921,7 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
       setSavingCycleCount(false);
     }
   };
+
   const resetFilters = () => {
     setSearch('');
     setStatusFilter('');
@@ -33514,6 +33944,18 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
           <button onClick={exportCSV} className="px-3 py-2 glass-ghost rounded-xl text-sm font-semibold hover:bg-white/70">Export CSV</button>
           {activeInventoryTab === 'parts' && (
             <>
+              <button 
+                onClick={() => {
+                  setShowAddAllocation(s => !s);
+                  setShowAddPart(false);
+                  setShowAddSet(false);
+                  setShowAddCycleCount(false);
+                }} 
+                className="px-3 py-2 bg-emerald-600 text-white rounded-xl text-sm font-bold flex items-center gap-2"
+              >
+                <ClipboardList className="h-4 w-4" />
+                {showAddAllocation ? 'Close' : 'Allocate'}
+              </button>
               <button onClick={() => fileRef.current?.click()} className="px-3 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold">Import</button>
               <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={e => handleImport(e.target.files?.[0])} />
             </>
@@ -33524,19 +33966,32 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
                 setShowAddPart((s) => !s);
                 setShowAddSet(false);
                 setShowAddCycleCount(false);
+                setShowAddAllocation(false);
               } else if (activeInventoryTab === 'sets') {
                 setShowAddSet((s) => !s);
                 setShowAddPart(false);
                 setShowAddCycleCount(false);
+                setShowAddAllocation(false);
+              } else if (activeInventoryTab === 'requests') {
+                setShowAddAllocation((s) => !s);
+                setShowAddPart(false);
+                setShowAddSet(false);
+                setShowAddCycleCount(false);
+                setSelectedRequest(null);
+                setNewAllocation(createEmptyAllocation());
               } else {
                 setShowAddCycleCount((s) => !s);
                 setShowAddPart(false);
                 setShowAddSet(false);
+                setShowAddAllocation(false);
               }
             }}
             className="px-3 py-2 bg-white border rounded-xl text-sm font-semibold hover:bg-gray-50"
           >
-            {activeInventoryTab === 'parts' ? (showAddPart ? 'Close' : 'Add Part') : activeInventoryTab === 'sets' ? (showAddSet ? 'Close' : 'Add Set') : (showAddCycleCount ? 'Close' : 'Add Cycle Count')}
+            {activeInventoryTab === 'parts' ? (showAddPart ? 'Close' : 'Add Part') : 
+             activeInventoryTab === 'sets' ? (showAddSet ? 'Close' : 'Add Set') : 
+             activeInventoryTab === 'requests' ? (showAddAllocation ? 'Close' : 'New Allocation') : 
+             (showAddCycleCount ? 'Close' : 'Add Cycle Count')}
           </button>
         </div>
       </div>
@@ -33547,6 +34002,7 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
               ['parts', 'Parts', Package],
               ['sets', 'Sets', Box],
               ['cycleCounts', 'Cycle Counts', ClipboardCheck],
+              ['requests', 'Requests', ClipboardList],
             ].map(([key, label, Icon]) => (
               <button
                 key={key}
@@ -33556,6 +34012,7 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
                   setShowAddPart(false);
                   setShowAddSet(false);
                   setShowAddCycleCount(false);
+                  setShowAddAllocation(false);
                   setStatusFilter('');
                   setPartStatusFilters([]);
                   setExcludeIncomingInventory(false);
@@ -33567,6 +34024,11 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
               >
                 <Icon className="h-4 w-4" />
                 {label}
+                {key === 'requests' && incomingRequestCount > 0 && (
+                  <span className="ml-1 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-amber-100 px-1.5 text-[11px] font-black text-amber-700">
+                    {incomingRequestCount}
+                  </span>
+                )}
               </button>
             ))}
           </div>
@@ -33577,6 +34039,301 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
           </button>
         </div>
       </div>
+      {showRequestDetail && selectedRequest && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Request Details</h3>
+                <p className="text-xs text-gray-500">Full information for {selectedRequest.partName}</p>
+              </div>
+              <button onClick={() => setShowRequestDetail(false)} className="rounded-lg p-2 text-gray-400 hover:bg-gray-100">
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+            <div className="p-6 space-y-6">
+              <div className="grid grid-cols-2 gap-6">
+                <div>
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Item / Part Name</label>
+                  <div className="mt-1 font-semibold text-gray-900 text-lg">{selectedRequest.partName}</div>
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Quantity Requested</label>
+                  <div className="mt-1 font-bold text-blue-600 text-2xl">{selectedRequest.quantity}</div>
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Requested By</label>
+                  <div className="mt-1 text-gray-700 flex items-center gap-2">
+                    <Users className="h-4 w-4 text-gray-400" />
+                    {((users || people || []).find(u => (u._id || u.id) === selectedRequest.requestedBy))?.name || selectedRequest.requestedBy || 'Unknown'}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Request Date</label>
+                  <div className="mt-1 text-gray-700 flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-gray-400" />
+                    {new Date(selectedRequest.date).toLocaleString()}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Source Module</label>
+                  <div className="mt-1">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                      selectedRequest.sourceType === 'allocation' ? 'bg-purple-50 text-purple-700' : 'bg-orange-50 text-orange-700'
+                    }`}>
+                      {selectedRequest.sourceType === 'allocation' ? 'Work Order / Linked' : 'General Material Request'}
+                    </span>
+                  </div>
+                </div>
+                {selectedRequest.partId && (
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Inventory Status</label>
+                    <div className="mt-1 text-sm font-semibold text-gray-600">
+                      Available: {items.find(p => (p._id || p.id) === selectedRequest.partId)?.available || 0}
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              <div className="pt-4 border-t border-gray-100">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Notes / Description</label>
+                <div className="mt-2 p-4 rounded-xl bg-gray-50 text-sm text-gray-700 border border-gray-100 italic">
+                  "{selectedRequest.notes || 'No notes provided.'}"
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-3 bg-gray-50 px-6 py-4">
+              <button 
+                onClick={() => setShowRequestDetail(false)}
+                className="px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-200 rounded-xl transition"
+              >
+                Close
+              </button>
+              <button 
+                onClick={() => {
+                  setNewAllocation({
+                    ...createEmptyAllocation(),
+                    partId: selectedRequest.partId,
+                    partName: selectedRequest.partName,
+                    quantity: selectedRequest.quantity,
+                    requestedBy: selectedRequest.requestedBy,
+                    notes: `Fulfilling request: ${selectedRequest.notes || ''}`,
+                    date: new Date().toISOString().split('T')[0]
+                  });
+                  setShowRequestDetail(false);
+                  setShowAddAllocation(true);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className="px-4 py-2 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-md transition flex items-center gap-2"
+              >
+                <CheckCircle className="h-4 w-4" />
+                Go to Fulfillment
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showPartRequestDetail && selectedPartRequest && (
+        (() => {
+          const allocationTrail = getPartRequestAllocationTrail(selectedPartRequest);
+          return (
+        <div className="fixed inset-0 z-[220] flex items-start justify-center overflow-y-auto bg-black/50 p-3 backdrop-blur-sm sm:p-6">
+          <div className="my-4 flex max-h-[calc(100vh-2rem)] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-100 bg-white px-6 py-4">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">{selectedPartRequest.partName || 'Part request'}</h3>
+                <p className="text-xs text-gray-500">Request lifecycle, allocation tracking, and history</p>
+              </div>
+              <button type="button" onClick={() => setShowPartRequestDetail(false)} className="rounded-lg p-2 text-gray-400 hover:bg-gray-100">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="grid flex-1 gap-5 overflow-y-auto p-6 md:grid-cols-2">
+              {[
+                ['Status', formatLabel(selectedPartRequest.status || 'Pending')],
+                ['Quantity Requested', selectedPartRequest.quantityRequested || 1],
+                ['Requested By', getUserDisplayName(selectedPartRequest.requestedBy) || 'Unknown'],
+                ['Requested From', formatLabel(selectedPartRequest.requestedFrom || 'Manual')],
+                ['Work Order', selectedPartRequest.workOrderId || 'None'],
+                ['Preventive Maintenance', selectedPartRequest.pmId || 'None'],
+                ['Approved By', selectedPartRequest.approvedBy || 'Not approved'],
+                ['Declined By', selectedPartRequest.declinedBy || 'Not declined'],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+                  <div className="text-xs font-bold uppercase tracking-wider text-gray-500">{label}</div>
+                  <div className="mt-1 text-sm font-semibold text-gray-900">{value}</div>
+                </div>
+              ))}
+              <div className="md:col-span-2 rounded-xl border border-gray-200 bg-white p-4">
+                <div className="mb-3 text-sm font-bold text-gray-700">Allocation Trail</div>
+                <div className="grid gap-3 md:grid-cols-3">
+                  {[
+                    ['Allocated By', allocationTrail.allocatedBy, allocationTrail.allocatedAt],
+                    ['Given By', allocationTrail.givenBy, allocationTrail.givenAt],
+                    ['Received By', allocationTrail.receivedBy, allocationTrail.receivedAt],
+                  ].map(([label, person, date]) => (
+                    <div key={label} className="rounded-lg bg-gray-50 px-3 py-3">
+                      <div className="text-xs font-bold uppercase tracking-wider text-gray-500">{label}</div>
+                      <div className="mt-1 text-sm font-semibold text-gray-900">{person || 'Not recorded'}</div>
+                      <div className="mt-1 text-xs text-gray-500">{date ? new Date(date).toLocaleString() : ''}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="md:col-span-2 rounded-xl border border-gray-200 bg-white p-4">
+                <div className="mb-3 text-sm font-bold text-gray-700">History</div>
+                {(selectedPartRequest.history || []).length ? (
+                  <div className="space-y-2">
+                    {selectedPartRequest.history.map((entry, index) => (
+                      <div key={`${entry.action}-${index}`} className="flex items-start justify-between gap-4 rounded-lg bg-gray-50 px-3 py-2 text-sm">
+                        <div>
+                          <div className="font-semibold text-gray-900">{formatLabel(entry.action || 'Update')}</div>
+                          <div className="text-gray-500">{entry.notes || 'No notes'}</div>
+                        </div>
+                        <div className="text-right text-xs text-gray-500">
+                          <div>{entry.actionBy || 'Unknown'}</div>
+                          <div>{entry.actionAt ? new Date(entry.actionAt).toLocaleString() : ''}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-sm text-gray-500">No history recorded yet.</div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+          );
+        })()
+      )}
+      {showAddAllocation && (
+        <form onSubmit={handleSaveAllocation} className="glass-surface rounded-xl border border-white/10 p-4 flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-lg font-bold text-gray-900">{selectedRequest ? 'Fulfill Part Request' : 'New Part Allocation'}</div>
+              <div className="text-xs text-gray-500">
+                {selectedRequest ? `Fulfilling request for ${newAllocation.partName}` : 'Track who requested, authorized, and received parts'}
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => { setShowAddAllocation(false); setNewAllocation(createEmptyAllocation()); }} className="px-3 py-1.5 text-sm font-semibold text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
+              <button type="submit" disabled={savingAllocation} className="px-3 py-1.5 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg disabled:opacity-50">
+                {savingAllocation ? 'Saving...' : (selectedRequest ? 'Complete Fulfillment' : 'Save Allocation')}
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold text-gray-700 uppercase">Select Part</label>
+              <select
+                required
+                disabled={!!selectedRequest}
+                value={newAllocation.partId}
+                onChange={(e) => {
+                  const part = items.find(p => (p._id || p.id) === e.target.value);
+                  setNewAllocation({ ...newAllocation, partId: e.target.value, partName: part?.name || '' });
+                }}
+                className="w-full rounded-xl border border-gray-200 p-2.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              >
+                <option value="">Select a part...</option>
+                {items.filter(p => !p.nonStock).map(p => (
+                  <option key={p._id || p.id} value={p._id || p.id}>{p.name} ({p.partNumber || 'No #'}) - Avail: {p.available}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold text-gray-700 uppercase">Quantity</label>
+              <input
+                type="number"
+                required
+                min="1"
+                value={newAllocation.quantity}
+                onChange={(e) => setNewAllocation({ ...newAllocation, quantity: e.target.value })}
+                className="w-full rounded-xl border border-gray-200 p-2.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold text-gray-700 uppercase">Date</label>
+              <input
+                type="date"
+                value={newAllocation.date}
+                onChange={(e) => setNewAllocation({ ...newAllocation, date: e.target.value })}
+                className="w-full rounded-xl border border-gray-200 p-2.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold text-gray-700 uppercase">Requested By</label>
+              <select
+                value={newAllocation.requestedBy}
+                onChange={(e) => setNewAllocation({ ...newAllocation, requestedBy: e.target.value })}
+                className="w-full rounded-xl border border-gray-200 p-2.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              >
+                <option value="">Select requester...</option>
+                {(users || people || []).map(u => (
+                  <option key={u._id || u.id} value={u._id || u.id}>{u.name || u.email}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold text-gray-700 uppercase">Authorized By (Approver)</label>
+              <select
+                value={newAllocation.allocatedBy}
+                onChange={(e) => setNewAllocation({ ...newAllocation, allocatedBy: e.target.value })}
+                className="w-full rounded-xl border border-gray-200 p-2.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              >
+                <option value="">Select authorizer...</option>
+                {(users || people || []).map(u => (
+                  <option key={u._id || u.id} value={u._id || u.id}>{u.name || u.email}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold text-gray-700 uppercase">Released By (Store Keeper)</label>
+              <select
+                value={newAllocation.givenBy}
+                onChange={(e) => setNewAllocation({ ...newAllocation, givenBy: e.target.value })}
+                className="w-full rounded-xl border border-gray-200 p-2.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              >
+                <option value="">Select store keeper...</option>
+                {(users || people || []).map(u => (
+                  <option key={u._id || u.id} value={u._id || u.id}>{u.name || u.email}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold text-gray-700 uppercase">Received By</label>
+              <select
+                value={newAllocation.receivedBy}
+                onChange={(e) => setNewAllocation({ ...newAllocation, receivedBy: e.target.value })}
+                className="w-full rounded-xl border border-gray-200 p-2.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              >
+                <option value="">Select receiver...</option>
+                {(users || people || []).map(u => (
+                  <option key={u._id || u.id} value={u._id || u.id}>{u.name || u.email}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex flex-col md:col-span-2 gap-1.5">
+              <label className="text-xs font-bold text-gray-700 uppercase">Notes</label>
+              <textarea
+                value={newAllocation.notes}
+                onChange={(e) => setNewAllocation({ ...newAllocation, notes: e.target.value })}
+                placeholder="Reason for allocation, work order reference, etc."
+                className="w-full rounded-xl border border-gray-200 p-2.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 min-h-[80px]"
+              />
+            </div>
+          </div>
+        </form>
+      )}
       {showAddPart && (
         <form onSubmit={savePart} className="glass-surface rounded-xl border border-white/10 p-4 flex flex-col gap-4">
           <div className="flex items-center justify-between">
@@ -34052,7 +34809,7 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
           </div>
         </form>
       )}
-      {activeInventoryTab !== 'parts' && (
+      {activeInventoryTab !== 'parts' && activeInventoryTab !== 'requests' && (
         <>
           <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
             <div className="mb-3 flex items-center justify-between gap-4">
@@ -34130,6 +34887,250 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
                 </tbody>
               </table>
             </div>
+          </div>
+      {activeInventoryTab === 'requests' && (
+        <div className="glass-surface rounded-xl border border-white/10 overflow-hidden shadow-sm">
+          <div className="bg-white p-4 border-b border-gray-100 flex justify-between items-center">
+            <h3 className="font-bold text-gray-900">Pending Part Requests</h3>
+            <span className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-full font-bold">
+              {pendingRequests.length} Pending
+            </span>
+          </div>
+          <table className="w-full text-left">
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Part Name</th>
+                <th className="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Requested By</th>
+                <th className="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Qty</th>
+                <th className="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Date</th>
+                <th className="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Notes</th>
+                <th className="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200 bg-white">
+              {pendingRequests.map((req) => (
+                <tr key={req.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3 text-sm font-medium text-gray-900">{req.partName}</td>
+                  <td className="px-4 py-3 text-sm text-gray-600">
+                    {((users || people || []).find(u => (u._id || u.id) === req.requestedBy))?.name || req.requestedBy || '—'}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-600 font-bold">{req.quantity}</td>
+                  <td className="px-4 py-3 text-sm text-gray-600">{new Date(req.date).toLocaleDateString()}</td>
+                  <td className="px-4 py-3 text-sm text-gray-600 truncate max-w-[200px]">{req.notes || '—'}</td>
+                  <td className="px-4 py-3 text-sm">
+                    <div className="flex items-center gap-2">
+                      <button 
+                        onClick={() => {
+                          setNewAllocation({
+                            ...createEmptyAllocation(),
+                            partId: req.partId,
+                            partName: req.partName,
+                            quantity: req.quantity,
+                            requestedBy: req.requestedBy,
+                            notes: `Fulfilling request: ${req.notes || ''}`,
+                            date: new Date().toISOString().split('T')[0]
+                          });
+                          setSelectedRequest(req);
+                          setShowAddAllocation(true);
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg font-bold text-xs hover:bg-emerald-100 transition"
+                        title="Allocate and track who gives/receives"
+                      >
+                        <CheckCircle className="h-3.5 w-3.5" />
+                        Fulfill / Give
+                      </button>
+                      <button 
+                        onClick={() => {
+                          setSelectedRequest(req);
+                          setShowRequestDetail(true);
+                          setPartDetailOpen(false); // Close part details if open
+                        }}
+                        className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                        title="View Full Request Details"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {pendingRequests.length === 0 && (
+                <tr>
+                  <td colSpan="6" className="px-4 py-16 text-center text-gray-500">
+                    <div className="flex flex-col items-center gap-2">
+                      <ClipboardList className="h-8 w-8 text-gray-300" />
+                      <div className="font-semibold text-lg">No Pending Requests</div>
+                      <p className="text-sm">New requests from Work Orders or PMs will appear here.</p>
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+      </>
+      )}
+      {activeInventoryTab === 'requests' && (
+        <>
+          <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold text-gray-700">{filteredPartRequests.length} part requests returned</div>
+                <div className="mt-1 text-xs text-gray-500">
+                  Pending {partRequestCounts.PENDING || 0} · Approved {partRequestCounts.APPROVED || 0} · Fulfilled {partRequestCounts.FULFILLED || 0}
+                </div>
+              </div>
+              <button type="button" onClick={loadInventoryData} className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                <Repeat className="h-4 w-4" />
+                Refresh
+              </button>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="relative min-w-[240px] flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <input
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder="Search part requests..."
+                  className="h-11 w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-4 text-sm text-gray-700 outline-none focus:border-blue-500"
+                />
+              </div>
+              <button type="button" className={getFilterButtonClasses(Boolean(statusFilter))}>
+                <SlidersHorizontal className="h-4 w-4" />
+                Status: {statusFilter ? formatLabel(statusFilter) : 'All'}
+                <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="bg-transparent outline-none">
+                  <option value="">All</option>
+                  {partRequestStatusOptions.map((status) => <option key={status} value={status}>{formatLabel(status)}</option>)}
+                </select>
+              </button>
+              <button type="button" onClick={resetFilters} className="text-sm font-medium text-blue-600 hover:text-blue-700">Reset Filters</button>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {filteredPartRequests.map((request) => {
+              const requestId = request._id || request.id;
+              const form = getPartRequestForm(request);
+              const allocations = request.allocations || {};
+              const status = String(request.status || 'PENDING').toUpperCase();
+              const isPending = status === 'PENDING';
+              const isApproved = status === 'APPROVED';
+              const isClosed = ['FULFILLED', 'REJECTED', 'CANCELLED'].includes(status);
+              const openRequestDetails = () => {
+                setSelectedPartRequest(request);
+                setShowPartRequestDetail(true);
+              };
+              return (
+                <div
+                  key={requestId}
+                  role="button"
+                  tabIndex={0}
+                  onClick={openRequestDetails}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      openRequestDetails();
+                    }
+                  }}
+                  className="cursor-pointer rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition hover:border-blue-200 hover:bg-blue-50/30"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="text-base font-bold text-gray-900">{request.partName || 'Part request'}</h3>
+                        <span className={`rounded-full px-3 py-1 text-xs font-bold ${getStatusBadgeClasses(status)}`}>{formatLabel(status)}</span>
+                        <span className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-semibold text-gray-600">{formatLabel(request.requestedFrom || 'Manual')}</span>
+                      </div>
+                      <div className="mt-2 grid gap-x-6 gap-y-1 text-sm text-gray-600 sm:grid-cols-2 lg:grid-cols-4">
+                        <div><span className="font-semibold text-gray-700">Qty:</span> {request.quantityRequested || 1}</div>
+                        <div><span className="font-semibold text-gray-700">Requested by:</span> {getUserDisplayName(request.requestedBy) || 'Unknown'}</div>
+                        <div><span className="font-semibold text-gray-700">Created:</span> {formatDateCell(request.createdAt)}</div>
+                        <div><span className="font-semibold text-gray-700">Part #:</span> {request.partNumber || 'None'}</div>
+                      </div>
+                      {(request.reason || request.notes || request.declineReason) && (
+                        <div className="mt-3 rounded-xl bg-gray-50 px-4 py-3 text-sm text-gray-600">
+                          {request.reason || request.notes || request.declineReason}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2" onClick={(event) => event.stopPropagation()}>
+                      {isPending && (
+                        <>
+                          <button
+                            type="button"
+                            disabled={partRequestAction === `${requestId}:approve`}
+                            onClick={() => handleApprovePartRequest(requestId)}
+                            className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+                          >
+                            <CheckCircle className="h-4 w-4" />
+                            Approve
+                          </button>
+                          <button
+                            type="button"
+                            disabled={partRequestAction === `${requestId}:decline`}
+                            onClick={() => handleDeclinePartRequest(requestId)}
+                            className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-100 disabled:opacity-60"
+                          >
+                            Decline
+                          </button>
+                        </>
+                      )}
+                      <button
+                        type="button"
+                        onClick={openRequestDetails}
+                        className="rounded-xl border border-gray-200 bg-white p-2 text-gray-500 hover:bg-gray-50"
+                        aria-label="View part request details"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {isApproved && (
+                    <div className="mt-5 grid gap-3 border-t border-gray-100 pt-5 lg:grid-cols-3" onClick={(event) => event.stopPropagation()}>
+                      <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+                        <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-500">Allocated By</label>
+                        <input value={form.allocatedBy} onChange={(e) => updatePartRequestForm(request, 'allocatedBy', e.target.value)} placeholder={allocations.allocatedBy || 'Name'} className="mb-2 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-500" />
+                        <button type="button" onClick={() => handleRecordAllocatedBy(requestId, form.allocatedBy)} className="w-full rounded-lg bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50">Save Allocator</button>
+                      </div>
+                      <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+                        <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-500">Given By</label>
+                        <div className="mb-2 grid grid-cols-[1fr_88px] gap-2">
+                          <input value={form.givenBy} onChange={(e) => updatePartRequestForm(request, 'givenBy', e.target.value)} placeholder={allocations.givenBy || 'Name'} className="rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-500" />
+                          <input type="number" min="0" value={form.quantityGiven} onChange={(e) => updatePartRequestForm(request, 'quantityGiven', e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-500" />
+                        </div>
+                        <button type="button" onClick={() => handleRecordGivenBy(requestId, form.givenBy, Number(form.quantityGiven || 0))} className="w-full rounded-lg bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50">Save Giver</button>
+                      </div>
+                      <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+                        <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-500">Received By</label>
+                        <div className="mb-2 grid grid-cols-[1fr_88px] gap-2">
+                          <input value={form.receivedBy} onChange={(e) => updatePartRequestForm(request, 'receivedBy', e.target.value)} placeholder={allocations.receivedBy || 'Name'} className="rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-500" />
+                          <input type="number" min="0" value={form.quantityReceived} onChange={(e) => updatePartRequestForm(request, 'quantityReceived', e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-500" />
+                        </div>
+                        <button type="button" onClick={() => handleRecordReceivedBy(requestId, form.receivedBy, Number(form.quantityReceived || 0))} className="w-full rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700">Save Receiver</button>
+                      </div>
+                    </div>
+                  )}
+
+                  {!isClosed && !isPending && (
+                    <div className="mt-4 flex justify-end" onClick={(event) => event.stopPropagation()}>
+                      <button type="button" onClick={() => handleFulfillPartRequest(requestId)} className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100">
+                        Mark Fulfilled
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {filteredPartRequests.length === 0 && (
+              <div className="rounded-2xl border border-dashed border-gray-300 bg-white px-6 py-16 text-center text-gray-500">
+                <ClipboardList className="mx-auto mb-3 h-9 w-9 text-gray-300" />
+                <div className="text-lg font-semibold text-gray-700">No part requests found</div>
+                <p className="mt-1 text-sm">Requests created from work orders, PMs, or manual inventory flows will appear here.</p>
+              </div>
+            )}
           </div>
         </>
       )}
@@ -34361,6 +35362,7 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
                     {[
                       ['details', 'Details'],
                       ['workOrders', 'Work Orders'],
+                      ['allocations', 'Allocations'],
                       ['files', 'Files'],
                       ['assets', 'Assets'],
                       ['adjustments', 'Adjustments'],
@@ -34518,6 +35520,59 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
                               ))}
                             </tbody>
                           </table>
+                        </div>
+                      )
+                    )}
+
+                    {partDetailTab === 'allocations' && (
+                      (selectedPart.allocationHistory || []).length === 0 ? (
+                        <div className="text-sm text-gray-500">No allocation history for this part.</div>
+                      ) : (
+                        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-left text-xs">
+                              <thead className="border-b border-gray-200 bg-gray-50 text-gray-600 font-bold uppercase tracking-wider">
+                                <tr>
+                                  <th className="px-4 py-3">Date</th>
+                                  <th className="px-4 py-3">Qty</th>
+                                  <th className="px-4 py-3">Requested By</th>
+                                  <th className="px-4 py-3">Authorized By</th>
+                                  <th className="px-4 py-3">Released By</th>
+                                  <th className="px-4 py-3">Received By</th>
+                                  <th className="px-4 py-3">Status</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-100">
+                                {selectedPart.allocationHistory.map((alloc, idx) => (
+                                  <tr key={alloc.id || idx} className="hover:bg-gray-50">
+                                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
+                                      {new Date(alloc.date || alloc.createdAt).toLocaleDateString()}
+                                    </td>
+                                    <td className="px-4 py-3 font-bold text-gray-900">{alloc.quantity}</td>
+                                    <td className="px-4 py-3 text-gray-600">
+                                      {((users || people || []).find(u => (u._id || u.id) === alloc.requestedBy))?.name || alloc.requestedBy || '—'}
+                                    </td>
+                                    <td className="px-4 py-3 text-gray-600">
+                                      {((users || people || []).find(u => (u._id || u.id) === alloc.allocatedBy))?.name || alloc.allocatedBy || '—'}
+                                    </td>
+                                    <td className="px-4 py-3 text-gray-600">
+                                      {((users || people || []).find(u => (u._id || u.id) === alloc.givenBy))?.name || alloc.givenBy || '—'}
+                                    </td>
+                                    <td className="px-4 py-3 text-gray-600">
+                                      {((users || people || []).find(u => (u._id || u.id) === alloc.receivedBy))?.name || alloc.receivedBy || '—'}
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] uppercase ${
+                                        alloc.status === 'FULFILLED' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+                                      }`}>
+                                        {alloc.status}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
                         </div>
                       )
                     )}
@@ -34957,11 +36012,12 @@ const ClientPurchaseOrdersTab = () => {
       <div className="glass-surface rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
-            <thead className="bg-[#fcfcfd] border-b border-gray-100"><tr>{['Title', 'PO Number', '# Items', 'Total Cost', 'Vendor', 'Actions'].map(h => <th key={h} className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">{h}</th>)}</tr></thead>
+            <thead className="bg-[#fcfcfd] border-b border-gray-100"><tr>{['Title', 'Status', 'PO Number', '# Items', 'Total Cost', 'Vendor', 'Actions'].map(h => <th key={h} className="py-4 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">{h}</th>)}</tr></thead>
             <tbody>
               {filteredOrders.map((o, idx) => (
                 <tr key={o._id || o.id || `po-${idx}`} className={`border-b border-gray-50 hover:bg-gray-50/50 transition-colors cursor-pointer ${selectedPo && getPoRouteId(selectedPo) === getPoRouteId(o) ? 'bg-blue-50/60' : ''}`} onClick={() => { setSelectedPo(o); setShowDetails(true); }}>
                   <td className="py-4 px-4 text-sm font-bold text-gray-900">{o.title || o.name || 'PO'}</td>
+                  <td className="py-4 px-4 text-sm text-gray-600"><span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${requestStatusColor(o.status || 'PENDING')}`}>{String(o.status || 'Pending').replace(/_/g, ' ')}</span></td>
                   <td className="py-4 px-4 text-sm font-mono text-gray-600">{o.poNumber || o.number || '—'}</td>
                   <td className="py-4 px-4 text-sm text-gray-600">{Array.isArray(o.items) ? o.items.length : (o.itemsCount || '—')}</td>
                   <td className="py-4 px-4 text-sm text-gray-600">{o.totalCost ? `$${Number(o.totalCost).toFixed(2)}` : '—'}</td>
@@ -34969,7 +36025,7 @@ const ClientPurchaseOrdersTab = () => {
                   <td className="py-4 px-4 text-right"><button type="button" className="p-1.5 hover:bg-gray-100 rounded-lg" onClick={(e) => { e.stopPropagation(); setSelectedPo(o); setShowDetails(true); }}><svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg></button></td>
                 </tr>
               ))}
-              {filteredOrders.length === 0 && <tr><td colSpan="6" className="py-20 text-center text-gray-500">No purchase orders found</td></tr>}
+              {filteredOrders.length === 0 && <tr><td colSpan="7" className="py-20 text-center text-gray-500">No purchase orders found</td></tr>}
             </tbody>
           </table>
         </div>
@@ -49323,8 +50379,10 @@ function CalendarScheduleModal({ open, onClose, scheduleConfig, setScheduleConfi
   const [unit, setUnit] = React.useState(scheduleConfig?.calendarRule?.unit || 'day');
   const [time, setTime] = React.useState(scheduleConfig?.calendarRule?.time || '22:00');
   const [leadDays, setLeadDays] = React.useState(scheduleConfig?.calendarRule?.leadDays || 0);
+  const [createWoTime, setCreateWoTime] = React.useState(scheduleConfig?.calendarRule?.createWoTime || scheduleConfig?.calendarRule?.workOrderCreateTime || '22:00');
   const [reminderLeadMinutes, setReminderLeadMinutes] = React.useState(Number(scheduleConfig?.reminderLeadMinutes || 60));
   const [inactivePeriods, setInactivePeriods] = React.useState(Array.isArray(scheduleConfig?.calendarRule?.inactivePeriods) ? scheduleConfig.calendarRule.inactivePeriods : []);
+  const [scheduleError, setScheduleError] = React.useState('');
   
   // Recurrence settings
   const [recurrenceType, setRecurrenceType] = React.useState(scheduleConfig?.calendarRule?.recurrenceType || 'none');
@@ -49345,8 +50403,10 @@ function CalendarScheduleModal({ open, onClose, scheduleConfig, setScheduleConfi
     setUnit(scheduleConfig?.calendarRule?.unit || 'day');
     setTime(scheduleConfig?.calendarRule?.time || '22:00');
     setLeadDays(scheduleConfig?.calendarRule?.leadDays || 0);
+    setCreateWoTime(scheduleConfig?.calendarRule?.createWoTime || scheduleConfig?.calendarRule?.workOrderCreateTime || '22:00');
     setReminderLeadMinutes(Number(scheduleConfig?.reminderLeadMinutes || 60));
     setInactivePeriods(Array.isArray(scheduleConfig?.calendarRule?.inactivePeriods) ? scheduleConfig.calendarRule.inactivePeriods : []);
+    setScheduleError('');
     setRecurrenceType(scheduleConfig?.calendarRule?.recurrenceType || 'none');
     setRecurrenceEndType(scheduleConfig?.calendarRule?.recurrenceEndType || 'never');
     setRecurrenceEndDate(scheduleConfig?.calendarRule?.recurrenceEndDate || '');
@@ -49368,6 +50428,51 @@ function CalendarScheduleModal({ open, onClose, scheduleConfig, setScheduleConfi
 
   const saveAndClose = () => {
     const normalizedEvery = Math.max(1, Number(every) || 1);
+    const normalizedLeadDays = Math.max(0, Number(leadDays) || 0);
+    const timePattern = /^([01]\d|2[0-3]):[0-5]\d$/;
+    if (!Number.isFinite(Number(every)) || Number(every) < 1) {
+      setScheduleError('Repeat every must be at least 1.');
+      return;
+    }
+    if (!timePattern.test(String(time || ''))) {
+      setScheduleError('Choose a valid WOs due time.');
+      return;
+    }
+    if (!Number.isFinite(Number(leadDays)) || Number(leadDays) < 0) {
+      setScheduleError('Create WOs lead time must be 0 or more days.');
+      return;
+    }
+    if (!timePattern.test(String(createWoTime || ''))) {
+      setScheduleError('Choose a valid Create WOs time.');
+      return;
+    }
+    if (recurrenceType === 'weekly' && selectedWeekDays.length === 0) {
+      setScheduleError('Choose at least one weekday for a weekly schedule.');
+      return;
+    }
+    if (recurrenceType === 'monthly' && (!Number(selectedMonthDay) || Number(selectedMonthDay) < 1 || Number(selectedMonthDay) > 31)) {
+      setScheduleError('Choose a valid day of the month.');
+      return;
+    }
+    if (recurrenceType === 'yearly' && (!Number(selectedYearMonth) || !Number(selectedYearDay))) {
+      setScheduleError('Choose a valid month and day for the yearly schedule.');
+      return;
+    }
+    if (recurrenceEndType === 'date' && !recurrenceEndDate) {
+      setScheduleError('Choose an end date or change the recurrence end option.');
+      return;
+    }
+    if (recurrenceEndType === 'occurrences' && (!Number(recurrenceMaxOccurrences) || Number(recurrenceMaxOccurrences) < 1)) {
+      setScheduleError('Enter at least 1 occurrence or change the recurrence end option.');
+      return;
+    }
+    const incompleteInactivePeriod = inactivePeriods.some((period) => (
+      !period.fromMonth || !period.fromDay || !period.toMonth || !period.toDay
+    ));
+    if (incompleteInactivePeriod) {
+      setScheduleError('Complete all inactive period fields or remove the incomplete period.');
+      return;
+    }
     const normalizedUnit = recurrenceType === 'yearly'
       ? 'year'
       : recurrenceType === 'monthly'
@@ -49384,7 +50489,9 @@ function CalendarScheduleModal({ open, onClose, scheduleConfig, setScheduleConfi
         every: normalizedEvery,
         unit: normalizedUnit,
         time,
-        leadDays: Number(leadDays) || 0,
+        leadDays: normalizedLeadDays,
+        createWoTime,
+        workOrderCreateTime: createWoTime,
         inactivePeriods,
         // New recurrence fields
         recurrenceType,
@@ -49437,8 +50544,24 @@ function CalendarScheduleModal({ open, onClose, scheduleConfig, setScheduleConfi
             <div className="grid grid-cols-2 gap-3 items-center">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-semibold text-gray-700">Every</span>
-                <input className="w-20 border border-gray-300 rounded-lg px-3 py-2 text-sm" value={every} onChange={(e) => setEvery(e.target.value)} />
-                <select className="w-32 border border-gray-300 rounded-lg px-2 py-2 text-sm" value={unit} onChange={(e) => setUnit(e.target.value)}>
+                <input
+                  type="number"
+                  min="1"
+                  className="w-20 border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  value={every}
+                  onChange={(e) => {
+                    setEvery(e.target.value);
+                    setScheduleError('');
+                  }}
+                />
+                <select
+                  className="w-32 border border-gray-300 rounded-lg px-2 py-2 text-sm"
+                  value={unit}
+                  onChange={(e) => {
+                    setUnit(e.target.value);
+                    setScheduleError('');
+                  }}
+                >
                   <option value="day">Day(s)</option>
                   <option value="week">Week(s)</option>
                   <option value="month">Month(s)</option>
@@ -49446,19 +50569,34 @@ function CalendarScheduleModal({ open, onClose, scheduleConfig, setScheduleConfi
                 </select>
               </div>
               <div>
-                <input type="time" className="w-40 border border-gray-300 rounded-lg px-3 py-2 text-sm" value={time} onChange={(e) => setTime(e.target.value)} />
+                <input
+                  type="time"
+                  className="w-40 border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  value={time}
+                  onChange={(e) => {
+                    setTime(e.target.value);
+                    setScheduleError('');
+                  }}
+                />
               </div>
             </div>
           </div>
 
           {/* Recurring PM Settings */}
           <div className="border-t border-gray-100 pt-4 space-y-4">
-            <label className="text-sm font-bold text-gray-800">Recurring Schedule</label>
+            <label className="text-sm font-bold text-gray-800 flex items-center gap-4">
+                Create WOs
+                <AlertCircle className="w-4 h-4 text-gray-400" />
+              </label>
+            <label className="text-sm text-gray-800">Recurring Schedule</label>
             <div className="grid grid-cols-1 gap-3">
               <select
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
                 value={recurrenceType}
-                onChange={(e) => setRecurrenceType(e.target.value)}
+                onChange={(e) => {
+                  setRecurrenceType(e.target.value);
+                  setScheduleError('');
+                }}
               >
                 <option value="none">No Recurrence (One-time)</option>
                 <option value="daily">Daily</option>
@@ -49476,7 +50614,10 @@ function CalendarScheduleModal({ open, onClose, scheduleConfig, setScheduleConfi
                       min="1"
                       className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
                       value={every}
-                      onChange={(e) => setEvery(e.target.value)}
+                      onChange={(e) => {
+                        setEvery(e.target.value);
+                        setScheduleError('');
+                      }}
                     />
                   </div>
                   <div>
@@ -49491,7 +50632,12 @@ function CalendarScheduleModal({ open, onClose, scheduleConfig, setScheduleConfi
                 </div>
               )}
 
-              {/* Weekly Day Selection */}
+              {recurrenceType === 'daily' && (
+                <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm font-semibold text-gray-700">
+                  Work orders will be created every {Math.max(1, Number(every) || 1)} day{Math.max(1, Number(every) || 1) === 1 ? '' : 's'} at {createWoTime}.
+                </div>
+              )}
+
               {recurrenceType === 'weekly' && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                   <p className="text-sm font-semibold text-gray-800 mb-3">Select days to repeat on:</p>
@@ -49502,7 +50648,10 @@ function CalendarScheduleModal({ open, onClose, scheduleConfig, setScheduleConfi
                           type="checkbox"
                           className="h-4 w-4 rounded border-gray-300"
                           checked={selectedWeekDays.includes(idx)}
-                          onChange={() => toggleWeekDay(idx)}
+                          onChange={() => {
+                            toggleWeekDay(idx);
+                            setScheduleError('');
+                          }}
                         />
                         <span className="font-medium">{day.slice(0, 3)}</span>
                       </label>
@@ -49511,14 +50660,16 @@ function CalendarScheduleModal({ open, onClose, scheduleConfig, setScheduleConfi
                 </div>
               )}
 
-              {/* Monthly Day Selection */}
               {recurrenceType === 'monthly' && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                   <p className="text-sm font-semibold text-gray-800 mb-3">Repeat on day:</p>
                   <select
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
                     value={selectedMonthDay}
-                    onChange={(e) => setSelectedMonthDay(e.target.value)}
+                    onChange={(e) => {
+                      setSelectedMonthDay(e.target.value);
+                      setScheduleError('');
+                    }}
                   >
                     {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
                       <option key={day} value={String(day)}>
@@ -49536,7 +50687,10 @@ function CalendarScheduleModal({ open, onClose, scheduleConfig, setScheduleConfi
                     <select
                       className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
                       value={selectedYearMonth}
-                      onChange={(e) => setSelectedYearMonth(e.target.value)}
+                      onChange={(e) => {
+                        setSelectedYearMonth(e.target.value);
+                        setScheduleError('');
+                      }}
                     >
                       {monthOptions.map((month, idx) => (
                         <option key={month} value={String(idx + 1)}>{month}</option>
@@ -49545,7 +50699,10 @@ function CalendarScheduleModal({ open, onClose, scheduleConfig, setScheduleConfi
                     <select
                       className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
                       value={selectedYearDay}
-                      onChange={(e) => setSelectedYearDay(e.target.value)}
+                      onChange={(e) => {
+                        setSelectedYearDay(e.target.value);
+                        setScheduleError('');
+                      }}
                     >
                       {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
                         <option key={day} value={String(day)}>Day {day}</option>
@@ -49566,7 +50723,10 @@ function CalendarScheduleModal({ open, onClose, scheduleConfig, setScheduleConfi
                         name="endType"
                         value="never"
                         checked={recurrenceEndType === 'never'}
-                        onChange={(e) => setRecurrenceEndType(e.target.value)}
+                        onChange={(e) => {
+                          setRecurrenceEndType(e.target.value);
+                          setScheduleError('');
+                        }}
                         className="h-4 w-4 border-gray-300"
                       />
                       Never (infinite recurrence)
@@ -49577,7 +50737,10 @@ function CalendarScheduleModal({ open, onClose, scheduleConfig, setScheduleConfi
                         name="endType"
                         value="date"
                         checked={recurrenceEndType === 'date'}
-                        onChange={(e) => setRecurrenceEndType(e.target.value)}
+                        onChange={(e) => {
+                          setRecurrenceEndType(e.target.value);
+                          setScheduleError('');
+                        }}
                         className="h-4 w-4 border-gray-300"
                       />
                       On a specific date
@@ -49587,7 +50750,10 @@ function CalendarScheduleModal({ open, onClose, scheduleConfig, setScheduleConfi
                         type="date"
                         className="ml-6 border border-gray-300 rounded-lg px-3 py-2 text-sm w-full"
                         value={recurrenceEndDate}
-                        onChange={(e) => setRecurrenceEndDate(e.target.value)}
+                        onChange={(e) => {
+                          setRecurrenceEndDate(e.target.value);
+                          setScheduleError('');
+                        }}
                       />
                     )}
                     <label className="flex items-center gap-2 text-sm text-gray-700">
@@ -49596,7 +50762,10 @@ function CalendarScheduleModal({ open, onClose, scheduleConfig, setScheduleConfi
                         name="endType"
                         value="occurrences"
                         checked={recurrenceEndType === 'occurrences'}
-                        onChange={(e) => setRecurrenceEndType(e.target.value)}
+                        onChange={(e) => {
+                          setRecurrenceEndType(e.target.value);
+                          setScheduleError('');
+                        }}
                         className="h-4 w-4 border-gray-300"
                       />
                       After a number of occurrences
@@ -49608,7 +50777,10 @@ function CalendarScheduleModal({ open, onClose, scheduleConfig, setScheduleConfi
                         placeholder="Number of occurrences"
                         min="1"
                         value={recurrenceMaxOccurrences}
-                        onChange={(e) => setRecurrenceMaxOccurrences(e.target.value)}
+                        onChange={(e) => {
+                          setRecurrenceMaxOccurrences(e.target.value);
+                          setScheduleError('');
+                        }}
                       />
                     )}
                   </div>
@@ -49618,15 +50790,21 @@ function CalendarScheduleModal({ open, onClose, scheduleConfig, setScheduleConfi
           </div>
 
           <div className="border-t border-gray-100 pt-4 space-y-3">
-            <label className="text-sm font-bold text-gray-800 flex items-center gap-2">
-              Create WOs
-              <AlertCircle className="w-4 h-4 text-gray-400" />
-            </label>
+            
             <div className="space-y-2">
               <label className="flex items-center gap-2 text-sm text-gray-700">
                 <input type="radio" name="createWO" defaultChecked className="h-4 w-4 text-blue-600 border-gray-300" />
                 <div className="flex items-center gap-2">
-                  <input className="w-16 border border-gray-300 rounded-lg px-2 py-2 text-sm" value={leadDays} onChange={(e) => setLeadDays(e.target.value)} />
+                  <input
+                    type="number"
+                    min="0"
+                    className="w-16 border border-gray-300 rounded-lg px-2 py-2 text-sm"
+                    value={leadDays}
+                    onChange={(e) => {
+                      setLeadDays(e.target.value);
+                      setScheduleError('');
+                    }}
+                  />
                   <select className="w-28 border border-gray-300 rounded-lg px-2 py-2 text-sm" value="day" disabled>
                     <option>Day(s)</option>
                     <option>Week(s)</option>
@@ -49647,10 +50825,24 @@ function CalendarScheduleModal({ open, onClose, scheduleConfig, setScheduleConfi
               </label>
               <div className="flex items-center gap-2 pl-6">
                 <span className="text-sm text-gray-700">At</span>
-                <input type="time" className="w-40 border border-gray-300 rounded-lg px-3 py-2 text-sm" defaultValue="22:00" />
+                <input
+                  type="time"
+                  className="w-40 border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  value={createWoTime}
+                  onChange={(e) => {
+                    setCreateWoTime(e.target.value);
+                    setScheduleError('');
+                  }}
+                />
               </div>
             </div>
           </div>
+
+          {scheduleError && (
+            <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
+              {scheduleError}
+            </div>
+          )}
 
           <div className="border-t border-gray-100 pt-4 space-y-2">
             <label className="text-sm font-bold text-gray-800">Email Reminder</label>
