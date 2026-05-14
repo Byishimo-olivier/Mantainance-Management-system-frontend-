@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import backgroundVideo from "../assets/136906-765457769_small.mp4";
-import companyLogoAsset from "../assets/company logo.jpeg";
+import companyLogoAsset from "../assets/fixnest-brand-logo.png";
 import { createPortal } from "react-dom";
 import api from "../api/axios";
 import subscriptionAPI from "../api/subscription";
@@ -37,11 +37,11 @@ const DEFAULT_REQUEST_FORM_SETTINGS = {
 };
 const DEFAULT_REQUEST_BRANDING = {
   logoUrl: '',
-  primaryColor: '#d3ac2a',
-  heroBackground: '#2c8214',
-  header: '#2c8214',
-  footer: '#2c8214',
-  pageBackground: '#c4cc9c',
+  primaryColor: '#FD8C04',
+  heroBackground: '#0B1F3A',
+  header: '#0B1F3A',
+  footer: '#0B1F3A',
+  pageBackground: '#F1F5F9',
 };
 const DEFAULT_GENERAL_SETTINGS = {
   language: 'English',

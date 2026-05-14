@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import companyLogo from '../../assets/company logo.jpeg';
+import companyLogo from '../../assets/fixnest-brand-wordmark.png';
 
 export default function AuthHeader() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -165,7 +165,7 @@ export default function AuthHeader() {
     <header className="auth-site-header">
       <div className="auth-nav">
         <Link to="/" className="auth-logo">
-          <img src={companyLogo} alt="Company Logo" className="auth-logo-img" />
+          <img src={companyLogo} alt="FixNest logo" className="auth-logo-img" />
         </Link>
 
         <nav className={`auth-nav-links ${isMobileMenuOpen ? 'mobile-open' : ''}`} aria-label="Primary">
@@ -316,7 +316,7 @@ export default function AuthHeader() {
             }}>Resources</summary>
             <div className="mega-menu mega-menu--resources">
               <div className="mega-section" style={{ marginBottom: '16px' }}>
-                <button type="button" className="mega-item" onClick={() => handleResourceClick('Asset Operations Resource Hub')} style={{ fontSize: '18px', fontWeight: '600', color: '#2563EB' }}>
+                <button type="button" className="mega-item" onClick={() => handleResourceClick('Asset Operations Resource Hub')} style={{ fontSize: '18px', fontWeight: '600', color: '#FD8C04' }}>
                   📚 View All Resources →
                 </button>
               </div>

@@ -5,6 +5,19 @@ module.exports = {
   ],
   theme: {
     extend: {
+      colors: {
+        brand: {
+          navy: '#0B1F3A',
+          amber: '#FD8C04',
+          steel: '#64748B',
+          slate: '#F1F5F9',
+          success: '#10B981',
+        },
+      },
+      fontFamily: {
+        display: ['Archivo', 'Public Sans', 'sans-serif'],
+        sans: ['Public Sans', 'Segoe UI', 'sans-serif'],
+      },
       screens: {
         'xs': '320px',   // Extra small phones
         'sm': '640px',   // Small phones
