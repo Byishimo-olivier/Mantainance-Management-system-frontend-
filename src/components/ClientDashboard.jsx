@@ -1782,6 +1782,7 @@ const RequestFormSettingsModal = ({
   onCreateWebhook,
   onUpdateWebhook,
   onDeleteWebhook,
+  currentUser = null,
 }) => {
   const [activeSettingsSection, setActiveSettingsSection] = useState('requests');
   const [activeRequestSettingsTab, setActiveRequestSettingsTab] = useState('internal');
@@ -1812,6 +1813,9 @@ const RequestFormSettingsModal = ({
   const [assetFieldSaving, setAssetFieldSaving] = useState(false);
   const [assetFieldForm, setAssetFieldForm] = useState(createEmptyAssetFieldForm());
   const [showScheduleBuilder, setShowScheduleBuilder] = useState(false);
+  const [showAssetOperatingHoursBuilder, setShowAssetOperatingHoursBuilder] = useState(false);
+  const [assetOperatingScheduleForm, setAssetOperatingScheduleForm] = useState({ name: '', scheduleType: 'daily' });
+  const [assetScheduleSaving, setAssetScheduleSaving] = useState(false);
   const [scheduleSaving, setScheduleSaving] = useState(false);
   const [operatingScheduleForm, setOperatingScheduleForm] = useState(createEmptyOperatingScheduleForm());
   const [showAssetStatusModal, setShowAssetStatusModal] = useState(false);
@@ -2912,7 +2916,7 @@ const RequestFormSettingsModal = ({
             <div>
               <div className="px-4 text-[13px] font-bold text-gray-900">Advanced</div>
               <div className="mt-3 space-y-1">
-                {['API', 'Authentication', 'Webhooks'].map((item) => (
+                {['API', 'Authentication', 'Webhooks', 'Integrations'].map((item) => (
                   <button
                     key={item}
                     type="button"
@@ -2920,11 +2924,13 @@ const RequestFormSettingsModal = ({
                       if (item === 'API') setActiveSettingsSection('api');
                       if (item === 'Authentication') setActiveSettingsSection('authentication');
                       if (item === 'Webhooks') setActiveSettingsSection('webhooks');
+                      if (item === 'Integrations') setActiveSettingsSection('integrations');
                     }}
                     className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-[15px] ${
                       (item === 'API' && activeSettingsSection === 'api') ||
                       (item === 'Authentication' && activeSettingsSection === 'authentication') ||
-                      (item === 'Webhooks' && activeSettingsSection === 'webhooks')
+                      (item === 'Webhooks' && activeSettingsSection === 'webhooks') ||
+                      (item === 'Integrations' && activeSettingsSection === 'integrations')
                         ? 'bg-blue-50 font-semibold text-blue-700'
                         : 'text-gray-700 hover:bg-gray-50'
                     }`}
@@ -3379,6 +3385,12 @@ const RequestFormSettingsModal = ({
                     </button>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {activeSettingsSection === 'integrations' && (
+              <div className="px-6 py-10">
+                <Dynamics365IntegrationPanel currentUser={currentUser} embedded />
               </div>
             )}
 
@@ -8948,6 +8960,10 @@ function ClientDashboard() {
       type: item.type || 'Status',
       meter: item.meter || '',
       required: !!item.required,
+      notesRequired: !!item.notesRequired,
+      photoRequired: !!item.photoRequired,
+      urlRequired: !!item.urlRequired,
+      selectedOutcome: item.selectedOutcome || '',
     }))
   ), []);
   const openChecklistTemplateEditor = useCallback((tpl) => {
@@ -8985,6 +9001,10 @@ function ClientDashboard() {
           type: item.type || 'Status',
           meter: item.meter || '',
           required: !!item.required,
+          notesRequired: !!item.notesRequired,
+          photoRequired: !!item.photoRequired,
+          urlRequired: !!item.urlRequired,
+          selectedOutcome: item.selectedOutcome || '',
         })),
       };
       const isLocalTemplate = String(checklistId || '').startsWith('seed-') || String(checklistId || '').startsWith('default-') || String(checklistId || '').startsWith('local-');
@@ -9050,6 +9070,10 @@ function ClientDashboard() {
           type: item.type || 'Status',
           meter: item.meter || '',
           required: !!item.required,
+          notesRequired: !!item.notesRequired,
+          photoRequired: !!item.photoRequired,
+          urlRequired: !!item.urlRequired,
+          selectedOutcome: item.selectedOutcome || '',
         })),
       });
       await refreshChecklists();
@@ -11341,7 +11365,7 @@ function ClientDashboard() {
       })
       .slice(0, 100);
 
-    const selectedLaborWorker = allWorkers.find((worker) => {
+    const selectedLaborWorker = selectableWorkers.find((worker) => {
       const workerName = worker?.name || worker?.fullName || worker?.email || worker?.phone || '';
       const workerValue = worker?._id || worker?.id || worker?.userId || workerName;
       return String(workerValue) === String(laborForm.worker) || String(workerName) === String(laborForm.worker);
@@ -14140,7 +14164,7 @@ function ClientDashboard() {
                         className="w-full appearance-none rounded-md border border-gray-300 bg-white py-3 pl-16 pr-11 text-[15px] text-gray-800 shadow-sm"
                       >
                         <option value="">Select worker</option>
-                        {allWorkers.map((t, idx) => {
+                        {selectableWorkers.map((t, idx) => {
                           const displayName = t.name || t.fullName || t.email || t.phone || 'User';
                           const value = t._id || t.id || t.userId || displayName;
                           return (
@@ -15832,8 +15856,8 @@ function ClientDashboard() {
         }
       }
 
-      // External technicians (managers/admins only)
-      if (userObj?.role === 'manager' || userObj?.role === 'admin') {
+      // External technicians used by work-order assignment and Add Time worker selection.
+      if (userObj?.companyName || userObj?.role === 'manager' || userObj?.role === 'admin') {
         try {
           const ep = '/api/technicians/for-assignment';
           const r = await api.get(ep);
@@ -19299,6 +19323,139 @@ function ClientDashboard() {
       return true;
     });
   }, [assignedIssueTasks, assignedPmTasks, dashboardTasks]);
+  const dashboardChartOptions = React.useMemo(() => ({
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: {
+          color: '#475569',
+          usePointStyle: true,
+          boxWidth: 10,
+          boxHeight: 10,
+          font: { size: 12, weight: '600' },
+        },
+      },
+      tooltip: {
+        backgroundColor: '#0f172a',
+        titleColor: '#ffffff',
+        bodyColor: '#ffffff',
+        padding: 12,
+      },
+    },
+    scales: {
+      x: {
+        grid: { display: false },
+        ticks: { color: '#64748b', maxRotation: 0 },
+        border: { display: false },
+      },
+      y: {
+        beginAtZero: true,
+        ticks: { color: '#64748b', precision: 0 },
+        grid: { color: '#e2e8f0' },
+        border: { display: false },
+      },
+    },
+  }), []);
+  const dashboardDoughnutOptions = React.useMemo(() => ({
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: {
+          color: '#475569',
+          usePointStyle: true,
+          boxWidth: 10,
+          boxHeight: 10,
+          font: { size: 12, weight: '600' },
+        },
+      },
+      tooltip: {
+        backgroundColor: '#0f172a',
+        titleColor: '#ffffff',
+        bodyColor: '#ffffff',
+        padding: 12,
+      },
+    },
+    cutout: '62%',
+  }), []);
+  const dashboardStatusChartData = React.useMemo(() => ({
+    labels: ['Open', 'Pending', 'In Progress', 'Completed', 'Overdue'],
+    datasets: [{
+      label: 'Items',
+      data: [combinedOpen, combinedPending, combinedInProgress, combinedCompleted, combinedOverdue],
+      backgroundColor: ['#64748b', '#f59e0b', '#2563eb', '#10b981', '#e11d48'],
+      borderColor: '#ffffff',
+      borderWidth: 2,
+    }],
+  }), [combinedCompleted, combinedInProgress, combinedOpen, combinedOverdue, combinedPending]);
+  const dashboardTaskChartData = React.useMemo(() => {
+    const source = taskCardItems.length > 0 ? taskCardItems : SAMPLE_TASKS;
+    const counts = ['upcoming', 'in-progress', 'overdue', 'completed'].map((status) => (
+      source.filter((task) => String(task.status || '').toLowerCase() === status).length
+    ));
+    return {
+      labels: ['Upcoming', 'In Progress', 'Overdue', 'Completed'],
+      datasets: [{
+        label: 'Tasks',
+        data: counts,
+        backgroundColor: ['#60a5fa', '#2563eb', '#e11d48', '#10b981'],
+        borderRadius: 10,
+        borderSkipped: false,
+      }],
+    };
+  }, [taskCardItems]);
+  const dashboardActivityTrendData = React.useMemo(() => {
+    const days = Array.from({ length: 7 }, (_, index) => {
+      const date = new Date();
+      date.setHours(0, 0, 0, 0);
+      date.setDate(date.getDate() - (6 - index));
+      return date;
+    });
+    const workOrderSeries = days.map((day) => {
+      const next = new Date(day);
+      next.setDate(day.getDate() + 1);
+      return workOrders.filter((item) => {
+        const date = new Date(item?.createdAt || item?.updatedAt || 0);
+        return !Number.isNaN(date.getTime()) && date >= day && date < next;
+      }).length;
+    });
+    const requestSeries = days.map((day) => {
+      const next = new Date(day);
+      next.setDate(day.getDate() + 1);
+      return pendingRequests.filter((item) => {
+        const date = new Date(item?.submittedAt || item?.createdAt || item?.updatedAt || 0);
+        return !Number.isNaN(date.getTime()) && date >= day && date < next;
+      }).length;
+    });
+    return {
+      labels: days.map((day) => day.toLocaleDateString('en-US', { weekday: 'short' })),
+      datasets: [
+        {
+          label: 'Work Orders',
+          data: workOrderSeries,
+          borderColor: '#2563eb',
+          backgroundColor: 'rgba(37, 99, 235, 0.16)',
+          tension: 0.35,
+          borderWidth: 3,
+          pointRadius: 3,
+          fill: true,
+        },
+        {
+          label: 'Requests',
+          data: requestSeries,
+          borderColor: '#f59e0b',
+          backgroundColor: 'rgba(245, 158, 11, 0.16)',
+          tension: 0.35,
+          borderWidth: 3,
+          pointRadius: 3,
+          fill: false,
+        },
+      ],
+    };
+  }, [pendingRequests, workOrders]);
   const getPmStatusTone = useCallback((statusValue) => {
     const normalized = String(statusValue || 'Pending').trim().toUpperCase();
     if (normalized.includes('COMPLETE')) return 'bg-emerald-50 text-emerald-700';
@@ -21669,6 +21826,43 @@ function ClientDashboard() {
                   icon={<svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>} />
               </div>
 
+              <div className="mb-6 grid gap-6 xl:grid-cols-[1.35fr_0.85fr_0.85fr]">
+                <div className="glass-surface rounded-2xl border border-gray-200/70 p-6 shadow-xl">
+                  <div className="mb-5 flex items-start justify-between gap-4">
+                    <div>
+                      <div className="text-[20px] font-extrabold text-gray-900">Activity Trend</div>
+                      <div className="mt-1 text-[13px] text-gray-500">Requests and work orders created over the last 7 days.</div>
+                    </div>
+                    <button type="button" onClick={() => setActiveTab('analytics')} className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50">
+                      Analytics
+                    </button>
+                  </div>
+                  <div className="h-[280px]">
+                    <Chart type="line" data={dashboardActivityTrendData} options={dashboardChartOptions} />
+                  </div>
+                </div>
+
+                <div className="glass-surface rounded-2xl border border-gray-200/70 p-6 shadow-xl">
+                  <div className="mb-5">
+                    <div className="text-[20px] font-extrabold text-gray-900">Status Mix</div>
+                    <div className="mt-1 text-[13px] text-gray-500">Current operational load by status.</div>
+                  </div>
+                  <div className="h-[280px]">
+                    <Chart type="doughnut" data={dashboardStatusChartData} options={dashboardDoughnutOptions} />
+                  </div>
+                </div>
+
+                <div className="glass-surface rounded-2xl border border-gray-200/70 p-6 shadow-xl">
+                  <div className="mb-5">
+                    <div className="text-[20px] font-extrabold text-gray-900">Task Pipeline</div>
+                    <div className="mt-1 text-[13px] text-gray-500">Upcoming, active, overdue, and completed tasks.</div>
+                  </div>
+                  <div className="h-[280px]">
+                    <Chart type="bar" data={dashboardTaskChartData} options={dashboardChartOptions} />
+                  </div>
+                </div>
+              </div>
+
               {combinedOverdue > 0 && (
                 <div className="mb-6 rounded-2xl border border-rose-200 bg-gradient-to-r from-rose-50 to-white p-5 shadow-sm">
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -23967,35 +24161,49 @@ function ClientDashboard() {
                       </div>
                     </div>
 
-                    <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_170px]">
-                      <div className="min-h-0 overflow-y-auto px-4 py-6 sm:px-8 lg:px-12">
+                    <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_190px]">
+                      <div className="min-h-0 overflow-y-auto px-4 py-8 sm:px-8 lg:px-12">
                         <div className="mx-auto max-w-3xl space-y-5">
-                          <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-                            <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_180px]">
-                              <div>
-                                <label className="mb-2 block text-xs font-bold uppercase tracking-wide text-gray-500">Checklist Name</label>
-                                <input
-                                  className="h-10 w-full rounded-md border border-gray-300 px-3 text-sm font-semibold text-gray-900 outline-none focus:border-blue-500"
-                                  value={checklistEditForm.name}
-                                  onChange={(e) => setChecklistEditForm((prev) => ({ ...prev, name: e.target.value }))}
-                                />
-                              </div>
-                              <div>
-                                <label className="mb-2 block text-xs font-bold uppercase tracking-wide text-gray-500">Tags</label>
-                                <input
-                                  className="h-10 w-full rounded-md border border-gray-300 px-3 text-sm text-gray-900 outline-none focus:border-blue-500"
-                                  value={(checklistEditForm.tags || []).join(', ')}
-                                  onChange={(e) => setChecklistEditForm((prev) => ({ ...prev, tags: String(e.target.value || '').split(/[;,|]/).map((tag) => tag.trim()).filter(Boolean) }))}
-                                  placeholder="Separate tags with commas"
-                                />
-                              </div>
-                            </div>
+                          <div className="space-y-4">
+                            <input
+                              className="w-full border-0 bg-transparent p-0 text-[2rem] font-black leading-tight tracking-tight text-gray-900 outline-none"
+                              value={checklistEditForm.name}
+                              onChange={(e) => setChecklistEditForm((prev) => ({ ...prev, name: e.target.value }))}
+                              placeholder="Checklist name"
+                            />
                             <textarea
-                              className="mt-4 min-h-[70px] w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-800 outline-none focus:border-blue-500"
+                              className="min-h-[42px] w-full resize-none border-0 bg-transparent p-0 text-sm text-gray-500 outline-none"
                               value={checklistEditForm.description}
                               onChange={(e) => setChecklistEditForm((prev) => ({ ...prev, description: e.target.value }))}
-                              placeholder="Description"
+                              placeholder="Write a description..."
                             />
+                            <div className="flex flex-wrap items-center gap-3">
+                              <div className="flex min-w-[220px] items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-2">
+                                <Tag className="h-4 w-4 text-gray-400" />
+                                <input
+                                  className="w-full border-0 bg-transparent text-sm text-gray-700 outline-none"
+                                  value={(checklistEditForm.tags || []).join(', ')}
+                                  onChange={(e) => setChecklistEditForm((prev) => ({ ...prev, tags: String(e.target.value || '').split(/[;,|]/).map((tag) => tag.trim()).filter(Boolean) }))}
+                                  placeholder="Add tag"
+                                />
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const allRequired = (checklistEditForm.items || []).every((entry) => entry.required);
+                                  setChecklistEditForm((prev) => ({
+                                    ...prev,
+                                    items: (prev.items || []).map((entry) => ({ ...entry, required: !allRequired })),
+                                  }));
+                                }}
+                                className="ml-auto inline-flex items-center gap-3 text-xs font-semibold text-gray-600"
+                              >
+                                Mark All Tasks as Required
+                                <span className={`relative h-5 w-9 rounded-full transition ${(checklistEditForm.items || []).every((entry) => entry.required) ? 'bg-blue-600' : 'bg-gray-200'}`}>
+                                  <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition ${(checklistEditForm.items || []).every((entry) => entry.required) ? 'left-4' : 'left-0.5'}`} />
+                                </span>
+                              </button>
+                            </div>
                           </div>
 
                           {(checklistEditForm.items || []).map((item, index) => (
@@ -24003,7 +24211,7 @@ function ClientDashboard() {
                               <div className="flex items-center justify-center pt-10 text-gray-400">
                                 <GripVertical className="h-4 w-4" />
                               </div>
-                              <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+                              <div className={`rounded-xl border bg-white p-4 shadow-sm transition ${item.expanded ? 'border-blue-400 ring-1 ring-blue-200' : 'border-gray-200'}`}>
                                 <input
                                   className="w-full border-0 p-0 text-sm font-bold text-gray-900 outline-none"
                                   placeholder={`Task ${index + 1}`}
@@ -24013,33 +24221,152 @@ function ClientDashboard() {
                                     items: prev.items.map((entry, itemIndex) => itemIndex === index ? { ...entry, text: e.target.value } : entry),
                                   }))}
                                 />
-                                <div className="relative mt-3">
-                                  <select
-                                    className="h-10 w-full appearance-none rounded-md border border-gray-300 bg-white px-3 pr-9 text-sm text-gray-500 outline-none focus:border-blue-500"
-                                    value={item.type || 'Status'}
-                                    onChange={(e) => setChecklistEditForm((prev) => ({
-                                      ...prev,
-                                      items: prev.items.map((entry, itemIndex) => itemIndex === index ? { ...entry, type: e.target.value } : entry),
-                                    }))}
-                                  >
-                                    <option>Select a status</option>
-                                    {checklistTemplateTypeOptions.map((option) => (
-                                      <option key={option} value={option}>{option}</option>
-                                    ))}
-                                  </select>
-                                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                                <div className="mt-3">
+                                  {['Status', 'Inspection'].includes(item.type || 'Status') ? (
+                                    <div className="grid grid-cols-3 overflow-hidden rounded-md border border-gray-200 bg-gray-100 text-center text-xs font-semibold text-gray-600">
+                                      {['Pass', 'Flag', 'Fail'].map((label) => {
+                                        const isSelected = item.selectedOutcome === label;
+                                        const selectedClass = label === 'Pass'
+                                          ? 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-300'
+                                          : label === 'Flag'
+                                            ? 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-300'
+                                            : 'bg-rose-50 text-rose-700 ring-1 ring-inset ring-rose-300';
+                                        return (
+                                          <button
+                                            key={label}
+                                            type="button"
+                                            onClick={() => setChecklistEditForm((prev) => ({
+                                              ...prev,
+                                              items: prev.items.map((entry, itemIndex) => itemIndex === index ? { ...entry, expanded: true, selectedOutcome: label } : entry),
+                                            }))}
+                                            className={`h-9 border-r border-gray-200 font-semibold transition last:border-r-0 ${isSelected ? selectedClass : 'bg-gray-100 text-gray-600 hover:bg-white'}`}
+                                          >
+                                            {label}
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  ) : item.type === 'Checkbox' ? (
+                                    <label className="flex h-10 items-center gap-3 rounded-md border border-gray-200 px-3 text-sm text-gray-500">
+                                      <input type="checkbox" className="h-4 w-4 rounded border-gray-300" />
+                                      Checkbox response
+                                    </label>
+                                  ) : item.type === 'Signature' ? (
+                                    <div className="flex h-10 items-center gap-3 rounded-md border border-dashed border-gray-300 px-3 text-sm text-gray-500">
+                                      <Pencil className="h-4 w-4" />
+                                      Signature field
+                                    </div>
+                                  ) : (
+                                    <input
+                                      className="h-10 w-full rounded-md border border-gray-300 px-3 text-sm text-gray-500 outline-none focus:border-blue-500"
+                                      placeholder={item.type === 'Number' || item.type === 'Meter' ? 'Value' : 'Text response'}
+                                      readOnly
+                                    />
+                                  )}
                                 </div>
+                                <div className="mt-3 flex flex-wrap items-center gap-3">
+                                  <div className="relative">
+                                    <select
+                                      className="h-8 appearance-none rounded-md border border-gray-200 bg-white px-3 pr-8 text-xs font-semibold text-gray-600 outline-none focus:border-blue-500"
+                                      value={item.type || 'Status'}
+                                      onChange={(e) => setChecklistEditForm((prev) => ({
+                                        ...prev,
+                                        items: prev.items.map((entry, itemIndex) => itemIndex === index ? { ...entry, type: e.target.value } : entry),
+                                      }))}
+                                    >
+                                      {checklistTemplateTypeOptions.map((option) => (
+                                        <option key={option} value={option}>{option}</option>
+                                      ))}
+                                    </select>
+                                    <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
+                                  </div>
+                                  <label className="inline-flex items-center gap-2 text-xs font-semibold text-gray-500">
+                                    <input
+                                      type="checkbox"
+                                      checked={!!item.required}
+                                      onChange={(e) => setChecklistEditForm((prev) => ({
+                                        ...prev,
+                                        items: prev.items.map((entry, itemIndex) => itemIndex === index ? { ...entry, required: e.target.checked } : entry),
+                                      }))}
+                                      className="h-4 w-4 rounded border-gray-300 text-blue-600"
+                                    />
+                                    Required
+                                  </label>
+                                </div>
+                                {item.expanded && (
+                                  <div className="mt-4 rounded-lg bg-gray-50 px-4 py-4">
+                                    <button type="button" className="inline-flex items-center gap-2 text-xs font-semibold text-gray-500 hover:text-gray-700">
+                                      <Link2 className="h-3.5 w-3.5" />
+                                      Instructions
+                                    </button>
+                                    <div className="mt-6 flex items-center justify-between">
+                                      <div className="text-sm font-bold text-gray-900">Additional Requirements</div>
+                                      <ChevronDown className="h-4 w-4 text-gray-500" />
+                                    </div>
+                                    <div className="mt-4 divide-y divide-gray-200">
+                                      {[
+                                        ['notesRequired', FileText, 'Notes', 'Require technician to add a note with this task.'],
+                                        ['photoRequired', ImageIcon, 'Photo', 'Require technician to upload images (up to 20).'],
+                                        ['urlRequired', Link2, 'URL', 'Require technician to attach a relevant link.'],
+                                      ].map(([key, RequirementIcon, title, description]) => (
+                                        <div key={key} className="flex items-center justify-between gap-4 py-3">
+                                          <div className="flex items-center gap-3">
+                                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-500">
+                                              <RequirementIcon className="h-4 w-4" />
+                                            </div>
+                                            <div>
+                                              <div className="text-sm font-bold text-gray-800">{title}</div>
+                                              <div className="mt-1 text-xs text-gray-500">{description}</div>
+                                            </div>
+                                          </div>
+                                          <button
+                                            type="button"
+                                            onClick={() => setChecklistEditForm((prev) => ({
+                                              ...prev,
+                                              items: prev.items.map((entry, itemIndex) => itemIndex === index ? { ...entry, [key]: !entry[key] } : entry),
+                                            }))}
+                                            className={`relative h-5 w-9 rounded-full transition ${item[key] ? 'bg-blue-600' : 'bg-gray-200'}`}
+                                            aria-pressed={!!item[key]}
+                                          >
+                                            <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition ${item[key] ? 'left-4' : 'left-0.5'}`} />
+                                          </button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
                                 <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-gray-500">
                                   <div className="flex flex-wrap items-center gap-3">
-                                    <button type="button" className="inline-flex items-center gap-1 hover:text-gray-800">
+                                    <button
+                                      type="button"
+                                      onClick={() => setChecklistEditForm((prev) => ({
+                                        ...prev,
+                                        items: prev.items.map((entry, itemIndex) => itemIndex === index ? { ...entry, expanded: true, photoRequired: !entry.photoRequired } : entry),
+                                      }))}
+                                      className={`inline-flex items-center gap-1 hover:text-gray-800 ${item.photoRequired ? 'font-semibold text-blue-600' : ''}`}
+                                    >
                                       <ImageIcon className="h-3.5 w-3.5" />
                                       Photo
                                     </button>
-                                    <button type="button" className="inline-flex items-center gap-1 hover:text-gray-800">
+                                    <button
+                                      type="button"
+                                      onClick={() => setChecklistEditForm((prev) => ({
+                                        ...prev,
+                                        items: prev.items.map((entry, itemIndex) => itemIndex === index ? { ...entry, expanded: true, notesRequired: !entry.notesRequired } : entry),
+                                      }))}
+                                      className={`inline-flex items-center gap-1 hover:text-gray-800 ${item.notesRequired ? 'font-semibold text-blue-600' : ''}`}
+                                    >
                                       <FileText className="h-3.5 w-3.5" />
                                       Notes
                                     </button>
-                                    <button type="button" className="inline-flex items-center gap-1 hover:text-gray-800">
+                                    <button
+                                      type="button"
+                                      onClick={() => setChecklistEditForm((prev) => ({
+                                        ...prev,
+                                        items: prev.items.map((entry, itemIndex) => itemIndex === index ? { ...entry, expanded: true, urlRequired: !entry.urlRequired } : entry),
+                                      }))}
+                                      className={`inline-flex items-center gap-1 hover:text-gray-800 ${item.urlRequired ? 'font-semibold text-blue-600' : ''}`}
+                                    >
                                       <Link2 className="h-3.5 w-3.5" />
                                       URL
                                     </button>
@@ -30863,6 +31190,22 @@ function ClientDashboard() {
 
           {/* Integrations (Lattice) */}
           {activeTab === 'integrations' && (
+            <div className="flex min-h-[500px] flex-col items-center justify-center px-10 text-center">
+              <Globe className="mb-5 h-12 w-12 text-blue-600" />
+              <h2 className="text-[28px] font-bold text-gray-900">Integrations & Data Connectivity</h2>
+              <p className="mt-3 max-w-[620px] text-[16px] text-gray-600">
+                Manage integrations from Settings. Open Settings, then choose Advanced and Integrations to configure Microsoft Dynamics 365.
+              </p>
+              <button
+                type="button"
+                onClick={() => setShowRequestSettingsModal(true)}
+                className="mt-8 rounded-lg bg-blue-600 px-6 py-3 text-[16px] font-semibold text-white hover:bg-blue-700"
+              >
+                Open Settings
+              </button>
+            </div>
+          )}
+          {false && activeTab === 'integrations' && (
             <div style={{ padding: '40px', textAlign: 'center', minHeight: '500px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
               <div style={{ fontSize: '48px', marginBottom: '20px' }}>🔗</div>
               <h2 style={{ fontSize: '28px', fontWeight: 'bold', color: '#1f2937', marginBottom: '12px' }}>Integrations & Data Connectivity</h2>
@@ -31499,6 +31842,7 @@ function ClientDashboard() {
         onCreateWebhook={createWebhook}
         onUpdateWebhook={updateWebhook}
         onDeleteWebhook={deleteWebhook}
+        currentUser={currentUser}
       />
 
       {/* â”€â”€ Issue Assign Modal (For Client) â”€â”€ */}
@@ -43753,6 +44097,109 @@ const ClientMetersTab = ({
       variance: previousMonth ? currentMonth.consumption - previousMonth.consumption : null,
     };
   }, [selectedMeterMonthlyRecords]);
+  const selectedMeterChartRows = React.useMemo(() => (
+    [...selectedMeterReadings].sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0))
+  ), [selectedMeterReadings]);
+  const selectedMeterConsumptionRows = React.useMemo(() => (
+    selectedMeterChartRows.map((entry, index, rows) => {
+      const previous = rows[index - 1];
+      return {
+        ...entry,
+        consumption: previous ? Math.max(0, Number(entry.value || 0) - Number(previous.value || 0)) : 0,
+      };
+    })
+  ), [selectedMeterChartRows]);
+  const selectedMeterTrendChartData = React.useMemo(() => ({
+    labels: selectedMeterChartRows.map((entry) => formatDateOnly(entry.createdAt)),
+    datasets: [
+      {
+        label: `Reading (${selectedMeter?.unit || 'Units'})`,
+        data: selectedMeterChartRows.map((entry) => Number(entry.value || 0)),
+        borderColor: '#2563eb',
+        backgroundColor: 'rgba(37, 99, 235, 0.14)',
+        tension: 0.35,
+        fill: true,
+        pointRadius: 3,
+      },
+    ],
+  }), [formatDateOnly, selectedMeter?.unit, selectedMeterChartRows]);
+  const selectedMeterConsumptionChartData = React.useMemo(() => ({
+    labels: selectedMeterConsumptionRows.map((entry) => formatDateOnly(entry.createdAt)),
+    datasets: [
+      {
+        label: `Consumption (${selectedMeter?.unit || 'Units'})`,
+        data: selectedMeterConsumptionRows.map((entry) => entry.consumption),
+        backgroundColor: '#10b981',
+        borderRadius: 8,
+      },
+    ],
+  }), [formatDateOnly, selectedMeter?.unit, selectedMeterConsumptionRows]);
+  const selectedMeterMonthlyChartData = React.useMemo(() => {
+    const rows = [...selectedMeterMonthlyRecords].reverse().filter((row) => Number(row.consumption || 0) > 0);
+    return {
+      labels: rows.map((row) => row.label),
+      datasets: [
+        {
+          label: 'Monthly consumption',
+          data: rows.map((row) => Number(row.consumption || 0)),
+          backgroundColor: ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'],
+          borderWidth: 0,
+        },
+      ],
+    };
+  }, [selectedMeterMonthlyRecords]);
+  const selectedMeterChartOptions = React.useMemo(() => ({
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        labels: {
+          color: '#374151',
+          boxWidth: 12,
+          font: { size: 12, weight: '600' },
+        },
+      },
+      tooltip: {
+        callbacks: {
+          label: (context) => `${context.dataset.label || 'Value'}: ${Number(context.raw || 0).toLocaleString()}`,
+        },
+      },
+    },
+    scales: {
+      x: {
+        grid: { display: false },
+        ticks: { color: '#6b7280', maxRotation: 0, autoSkip: true, maxTicksLimit: 8 },
+      },
+      y: {
+        beginAtZero: true,
+        grid: { color: 'rgba(148, 163, 184, 0.22)' },
+        ticks: {
+          color: '#6b7280',
+          callback: (value) => Number(value || 0).toLocaleString(),
+        },
+      },
+    },
+  }), []);
+  const selectedMeterDoughnutOptions = React.useMemo(() => ({
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: {
+          color: '#374151',
+          boxWidth: 12,
+          font: { size: 12, weight: '600' },
+        },
+      },
+      tooltip: {
+        callbacks: {
+          label: (context) => `${context.label}: ${Number(context.raw || 0).toLocaleString()} ${selectedMeter?.unit || ''}`.trim(),
+        },
+      },
+    },
+    cutout: '62%',
+  }), [selectedMeter?.unit]);
   const selectedMeterTriggers = React.useMemo(() => Array.isArray(selectedMeter?.triggers) ? selectedMeter.triggers : [], [selectedMeter]);
   const canCreateTrigger = React.useMemo(() => {
     return Boolean(
@@ -44138,6 +44585,49 @@ const ClientMetersTab = ({
                       </div>
                     ))}
                   </div>
+                </section>
+                <section className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
+                  <div className="mb-6 flex items-start justify-between gap-6">
+                    <div>
+                      <h3 className="text-[1.65rem] font-bold text-gray-900">Reading Charts</h3>
+                      <p className="mt-2 text-[0.98rem] text-gray-500">Visualize reading changes, consumption, and monthly usage for this meter.</p>
+                    </div>
+                    <button type="button" onClick={() => setShowAddReading(true)} className="rounded-lg bg-blue-600 px-5 py-3 text-base font-semibold text-white hover:bg-blue-700">
+                      Add Reading
+                    </button>
+                  </div>
+                  {selectedMeterChartRows.length > 0 ? (
+                    <div className="grid gap-5 2xl:grid-cols-2">
+                      <div className="rounded-2xl border border-gray-200 p-5">
+                        <div className="mb-4 text-[1rem] font-bold text-gray-900">Reading Trend</div>
+                        <div className="h-[300px]">
+                          <Chart type="line" data={selectedMeterTrendChartData} options={selectedMeterChartOptions} />
+                        </div>
+                      </div>
+                      <div className="rounded-2xl border border-gray-200 p-5">
+                        <div className="mb-4 text-[1rem] font-bold text-gray-900">Consumption Between Readings</div>
+                        <div className="h-[300px]">
+                          <Chart type="bar" data={selectedMeterConsumptionChartData} options={selectedMeterChartOptions} />
+                        </div>
+                      </div>
+                      <div className="rounded-2xl border border-gray-200 p-5 2xl:col-span-2">
+                        <div className="mb-4 text-[1rem] font-bold text-gray-900">Monthly Breakdown</div>
+                        {selectedMeterMonthlyChartData.labels.length > 0 ? (
+                          <div className="h-[300px]">
+                            <Chart type="doughnut" data={selectedMeterMonthlyChartData} options={selectedMeterDoughnutOptions} />
+                          </div>
+                        ) : (
+                          <div className="flex h-[220px] items-center justify-center rounded-xl bg-gray-50 text-[0.95rem] text-gray-500">
+                            Add at least two readings in a month to see the monthly breakdown.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="rounded-xl bg-gray-50 px-6 py-12 text-center text-[0.95rem] text-gray-500">
+                      Add readings to see charts for this meter.
+                    </div>
+                  )}
                 </section>
                 <section className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
                   <div className="mb-6 flex items-start justify-between gap-6">
@@ -45061,6 +45551,274 @@ const ClientMetersTab = ({
               </tbody>
             </table>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const Dynamics365IntegrationPanel = ({ currentUser = null, embedded = false }) => {
+  const emptyConfig = {
+    enabled: false,
+    tenantId: '',
+    clientId: '',
+    clientSecret: '',
+    environmentUrl: '',
+    apiVersion: 'v9.2',
+    syncDirection: 'pull',
+    entityMappings: {
+      assets: 'msdyn_customerassets',
+      workOrders: 'msdyn_workorders',
+      accounts: 'accounts',
+      meters: '',
+    },
+  };
+  const [config, setConfig] = React.useState(emptyConfig);
+  const [loading, setLoading] = React.useState(true);
+  const [saving, setSaving] = React.useState(false);
+  const [testing, setTesting] = React.useState(false);
+  const [syncing, setSyncing] = React.useState(false);
+  const [message, setMessage] = React.useState('');
+  const [error, setError] = React.useState('');
+  const [syncSummary, setSyncSummary] = React.useState(null);
+
+  const loadConfig = React.useCallback(async () => {
+    try {
+      setLoading(true);
+      setError('');
+      const response = await api.get('/api/integrations/dynamics365/config');
+      const next = response.data || {};
+      setConfig({
+        ...emptyConfig,
+        ...next,
+        clientSecret: '',
+        entityMappings: {
+          ...emptyConfig.entityMappings,
+          ...(next.entityMappings || {}),
+        },
+      });
+      setSyncSummary(next.lastSyncSummary || null);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Could not load Dynamics 365 settings.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    loadConfig();
+  }, [loadConfig]);
+
+  const updateConfig = (key, value) => {
+    setConfig((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const updateMapping = (key, value) => {
+    setConfig((prev) => ({
+      ...prev,
+      entityMappings: { ...(prev.entityMappings || {}), [key]: value },
+    }));
+  };
+
+  const saveConfig = async () => {
+    try {
+      setSaving(true);
+      setMessage('');
+      setError('');
+      const payload = {
+        ...config,
+        companyName: currentUser?.companyName || '',
+      };
+      const response = await api.put('/api/integrations/dynamics365/config', payload);
+      setConfig((prev) => ({
+        ...prev,
+        ...(response.data || {}),
+        clientSecret: '',
+        entityMappings: {
+          ...emptyConfig.entityMappings,
+          ...(response.data?.entityMappings || prev.entityMappings || {}),
+        },
+      }));
+      setMessage('Dynamics 365 settings saved.');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Could not save Dynamics 365 settings.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const testConnection = async () => {
+    try {
+      setTesting(true);
+      setMessage('');
+      setError('');
+      const response = await api.post('/api/integrations/dynamics365/test');
+      setMessage(`Connection successful. Organization: ${response.data?.organizationId || 'verified'}.`);
+      await loadConfig();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Dynamics 365 connection failed.');
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const runSyncPreview = async () => {
+    try {
+      setSyncing(true);
+      setMessage('');
+      setError('');
+      const response = await api.post('/api/integrations/dynamics365/sync-preview');
+      setSyncSummary(response.data?.summary || null);
+      setMessage('Sync preview completed.');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Dynamics 365 sync preview failed.');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className={`flex min-h-[420px] items-center justify-center ${embedded ? '' : 'bg-[#f8fafc]'}`}>
+        <Loader className="h-6 w-6 animate-spin text-blue-600" />
+      </div>
+    );
+  }
+
+  return (
+    <div className={embedded ? '' : '-m-6 min-h-screen bg-[#f8fafc] px-8 py-7'}>
+      <div className="mx-auto max-w-6xl space-y-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-3">
+              <div className="rounded-xl bg-blue-100 p-3 text-blue-700">
+                <Globe className="h-6 w-6" />
+              </div>
+              <div>
+                <h2 className="text-3xl font-black text-gray-900">Microsoft Dynamics 365</h2>
+                <p className="mt-1 text-sm text-gray-500">Connect Fixnest to Dataverse for asset, work order, account, and meter data.</p>
+              </div>
+            </div>
+          </div>
+          <div className={`rounded-full px-4 py-2 text-sm font-semibold ${config.enabled ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-700'}`}>
+            {config.enabled ? 'Enabled' : 'Disabled'}
+          </div>
+        </div>
+
+        {(message || error) && (
+          <div className={`rounded-xl border px-4 py-3 text-sm font-semibold ${error ? 'border-red-200 bg-red-50 text-red-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
+            {error || message}
+          </div>
+        )}
+
+        <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
+          <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+            <div className="mb-6 flex items-center justify-between">
+              <h3 className="text-xl font-bold text-gray-900">Connection Settings</h3>
+              <label className="flex items-center gap-3 text-sm font-semibold text-gray-700">
+                <input type="checkbox" checked={!!config.enabled} onChange={(e) => updateConfig('enabled', e.target.checked)} className="h-4 w-4" />
+                Enable integration
+              </label>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="block">
+                <span className="mb-1 block text-sm font-semibold text-gray-700">Tenant ID</span>
+                <input value={config.tenantId} onChange={(e) => updateConfig('tenantId', e.target.value)} placeholder="Microsoft Entra tenant ID" className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm" />
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-sm font-semibold text-gray-700">Client ID</span>
+                <input value={config.clientId} onChange={(e) => updateConfig('clientId', e.target.value)} placeholder="Application client ID" className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm" />
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-sm font-semibold text-gray-700">Client Secret</span>
+                <input type="password" value={config.clientSecret || ''} onChange={(e) => updateConfig('clientSecret', e.target.value)} placeholder={config.hasClientSecret ? 'Saved. Enter a new secret to replace it.' : 'Application client secret'} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm" />
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-sm font-semibold text-gray-700">Dataverse Environment URL</span>
+                <input value={config.environmentUrl} onChange={(e) => updateConfig('environmentUrl', e.target.value)} placeholder="https://org.crm.dynamics.com" className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm" />
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-sm font-semibold text-gray-700">API Version</span>
+                <input value={config.apiVersion} onChange={(e) => updateConfig('apiVersion', e.target.value)} placeholder="v9.2" className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm" />
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-sm font-semibold text-gray-700">Sync Direction</span>
+                <select value={config.syncDirection} onChange={(e) => updateConfig('syncDirection', e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm">
+                  <option value="pull">Pull from Dynamics</option>
+                  <option value="push">Push to Dynamics</option>
+                  <option value="bidirectional">Bidirectional</option>
+                </select>
+              </label>
+            </div>
+
+            <div className="mt-8">
+              <h4 className="mb-4 text-base font-bold text-gray-900">Dataverse Entity Sets</h4>
+              <div className="grid gap-4 md:grid-cols-2">
+                {[
+                  ['assets', 'Assets'],
+                  ['workOrders', 'Work Orders'],
+                  ['accounts', 'Accounts'],
+                  ['meters', 'Meters'],
+                ].map(([key, label]) => (
+                  <label key={key} className="block">
+                    <span className="mb-1 block text-sm font-semibold text-gray-700">{label}</span>
+                    <input value={config.entityMappings?.[key] || ''} onChange={(e) => updateMapping(key, e.target.value)} placeholder="Dataverse entity set name" className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm" />
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-8 flex flex-wrap gap-3">
+              <button type="button" onClick={saveConfig} disabled={saving} className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60">
+                <Settings className="h-4 w-4" />
+                {saving ? 'Saving...' : 'Save Settings'}
+              </button>
+              <button type="button" onClick={testConnection} disabled={testing || !config.hasClientSecret && !config.clientSecret} className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60">
+                <CheckCircle className="h-4 w-4" />
+                {testing ? 'Testing...' : 'Test Connection'}
+              </button>
+              <button type="button" onClick={runSyncPreview} disabled={syncing || !config.enabled} className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60">
+                <RotateCcw className="h-4 w-4" />
+                {syncing ? 'Previewing...' : 'Sync Preview'}
+              </button>
+            </div>
+          </section>
+
+          <aside className="space-y-6">
+            <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+              <h3 className="text-lg font-bold text-gray-900">Setup Checklist</h3>
+              <div className="mt-4 space-y-3 text-sm text-gray-700">
+                {[
+                  ['Create an app registration in Microsoft Entra ID.', !!config.clientId],
+                  ['Grant Dataverse application permissions and admin consent.', !!config.tenantId],
+                  ['Create an Application User in Dynamics 365.', !!config.hasClientSecret || !!config.clientSecret],
+                  ['Paste the Dataverse environment URL here.', !!config.environmentUrl],
+                ].map(([label, done]) => (
+                  <div key={label} className="flex gap-3">
+                    {done ? <CheckCircle className="mt-0.5 h-4 w-4 text-emerald-600" /> : <AlertCircle className="mt-0.5 h-4 w-4 text-amber-500" />}
+                    <span>{label}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+              <h3 className="text-lg font-bold text-gray-900">Sync Preview</h3>
+              <div className="mt-4 space-y-3">
+                {syncSummary ? Object.entries(syncSummary).map(([key, value]) => (
+                  <div key={key} className="rounded-xl bg-gray-50 px-4 py-3">
+                    <div className="text-sm font-bold capitalize text-gray-900">{key}</div>
+                    <div className="mt-1 text-sm text-gray-600">{value.fetched || 0} records from {value.entitySet}</div>
+                  </div>
+                )) : (
+                  <div className="rounded-xl bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">
+                    Run Sync Preview after testing the connection.
+                  </div>
+                )}
+              </div>
+            </section>
+          </aside>
         </div>
       </div>
     </div>
