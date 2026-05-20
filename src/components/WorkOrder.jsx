@@ -26,7 +26,7 @@ export function WorkOrderForm({
   const locationDropdownRef = useRef(null);
   const fieldMode = (key) => fieldSettings?.[key]?.create || 'Optional';
   const isVisible = (key) => fieldMode(key) !== 'Hidden';
-  const isRequired = (key) => fieldMode(key) === 'Required';
+  const isRequired = (key) => ['title', 'description'].includes(key) && isVisible(key);
 
   useEffect(() => {
     try {
@@ -96,6 +96,10 @@ export function WorkOrderForm({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if ((isRequired('title') && !form.title.trim()) || (isRequired('description') && !form.description.trim())) {
+      alert('Title and description are required.');
+      return;
+    }
     setSubmitting(true);
     try {
       const fd = new FormData();
@@ -191,7 +195,9 @@ export function WorkOrderForm({
 
       {isVisible('description') && (
       <div>
-        <label className="mb-2 block text-[15px] text-gray-900">Description</label>
+        <label className="mb-2 block text-[15px] text-gray-900">
+          Description {isRequired('description') && <span className="text-rose-500">*</span>}
+        </label>
         <textarea
           name="description"
           value={form.description}
@@ -258,7 +264,7 @@ export function WorkOrderForm({
         </button>
         <button
           type="submit"
-          disabled={submitting || (isVisible('title') && isRequired('title') && !form.title.trim())}
+          disabled={submitting || (isRequired('title') && !form.title.trim()) || (isRequired('description') && !form.description.trim())}
           className="rounded-md bg-blue-600 px-7 py-3 text-[15px] font-semibold text-white hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
         >
           {submitting ? 'Submitting...' : submitLabel}

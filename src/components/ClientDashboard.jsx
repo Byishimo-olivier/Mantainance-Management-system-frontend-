@@ -49305,13 +49305,23 @@ function WorkOrderDetailsModal({ open, onClose, onSave, mode = 'create', tasks =
   const isEditMode = mode === 'edit' || mode === 'edit-pm';
   const modalHeading = isEditMode ? 'Edit Work Order Details' : 'Add Work Order Details';
   const modalSaveLabel = isEditMode ? 'Save Changes' : 'Save Work Order Details';
+  const requiredWorkOrderTitle = mode === 'edit-pm'
+    ? workOrderDetails?.pmTitle
+    : workOrderDetails?.title;
+  const isWorkOrderSaveDisabled = !String(requiredWorkOrderTitle || '').trim()
+    || !String(workOrderDetails?.description || '').trim();
   const handleSaveWorkOrder = React.useCallback(async () => {
+    const titleValue = mode === 'edit-pm' ? workOrderDetails?.pmTitle : workOrderDetails?.title;
+    if (!String(titleValue || '').trim() || !String(workOrderDetails?.description || '').trim()) {
+      alert('Title and description are required.');
+      return;
+    }
     if (typeof onSave === 'function') {
       await onSave(workOrderDetails);
       return;
     }
     onClose?.();
-  }, [onClose, onSave, workOrderDetails]);
+  }, [mode, onClose, onSave, workOrderDetails]);
   const locationOptions = React.useMemo(
     () => {
       const propertyOptions = (Array.isArray(companyProperties) ? companyProperties : [])
@@ -49766,7 +49776,7 @@ function WorkOrderDetailsModal({ open, onClose, onSave, mode = 'create', tasks =
               </div>
             )}
             <div className="space-y-1">
-              <label className="text-sm font-bold text-gray-800">Description</label>
+              <label className="text-sm font-bold text-gray-800">Description <span className="text-rose-500">*</span></label>
               <textarea
                 className="w-full border border-gray-300 rounded-lg px-4 py-3 text-[15px] min-h-[120px]"
                 placeholder="Describe the work order"
@@ -50379,9 +50389,10 @@ function WorkOrderDetailsModal({ open, onClose, onSave, mode = 'create', tasks =
       <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100">
         <button onClick={onClose} className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50">Cancel</button>
         <button
-          className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold shadow-sm hover:bg-blue-700"
+          className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300"
           type="button"
             onClick={handleSaveWorkOrder}
+            disabled={isWorkOrderSaveDisabled}
           >
             {modalSaveLabel}
           </button>
