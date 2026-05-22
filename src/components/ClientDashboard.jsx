@@ -1362,6 +1362,19 @@ const getWorkOrderDisplayStatus = (issue) => {
   return raw || 'OPEN';
 };
 
+const getIssueDueDateValue = (issue) => issue?.fixDeadline || issue?.dueDate || issue?.nextDate || issue?.scheduledFor || null;
+
+const isIssueOverdue = (issue) => {
+  const status = String(issue?.status || '').toUpperCase().replace(/_/g, ' ').trim();
+  const isCompleted = status.includes('COMPLETE') || status === 'CLOSED' || status === 'DONE' || status === 'RESOLVED';
+  if (isCompleted) return false;
+  if (issue?.overdue || status === 'OVERDUE') return true;
+  const dueDate = getIssueDueDateValue(issue);
+  if (!dueDate) return false;
+  const parsed = new Date(dueDate);
+  return !Number.isNaN(parsed.getTime()) && parsed < new Date();
+};
+
 const getRequestDisplayState = (request) => {
   const rawRequestStatus = String(request?.status || '').toUpperCase().replace(/_/g, ' ').trim();
   const hasWorkOrderReference = Boolean(
@@ -8026,6 +8039,8 @@ function ClientDashboard() {
   const [selectedWorkOrderAssets, setSelectedWorkOrderAssets] = useState([]);
   const [selectedWorkOrderAssignedTo, setSelectedWorkOrderAssignedTo] = useState([]);
   const [workOrderSortDirection, setWorkOrderSortDirection] = useState('desc');
+  const [workOrderPage, setWorkOrderPage] = useState(1);
+  const [workOrderPageSize, setWorkOrderPageSize] = useState(25);
   const [savedWorkOrderViews, setSavedWorkOrderViews] = useState([]);
   const workOrderStatusFilterRef = useRef(null);
   const workOrderPriorityFilterRef = useRef(null);
@@ -15182,7 +15197,10 @@ function ClientDashboard() {
         const time = hours > 24 ? `${Math.floor(hours / 24)}d ago` : hours > 0 ? `${hours}h ago` : 'Just now';
         const st = (issue.status || '').toUpperCase();
         const isCompleted = st.includes('COMPLETE') || st === 'CLOSED' || st === 'DONE' || st === 'RESOLVED';
-        const isOverdue = (st === 'PENDING' || st.includes('PROGRESS')) && hours > 72;
+        const dueDate = getIssueDueDateValue(issue);
+        const parsedDueDate = dueDate ? new Date(dueDate) : null;
+        const isPastDue = parsedDueDate && !Number.isNaN(parsedDueDate.getTime()) && parsedDueDate < now;
+        const isOverdue = Boolean(isPastDue) || ((st === 'PENDING' || st.includes('PROGRESS')) && hours > 72);
         return { ...issue, time, overdue: !isCompleted && (issue.overdue ?? isOverdue) };
       }).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
       const user = context.user || getCurrentUser();
@@ -15204,7 +15222,7 @@ function ClientDashboard() {
         else if (st.includes('pending')) counts.Pending++;
         else if (st.includes('progress')) counts['In Progress']++;
         else if (st.includes('complete') || st.includes('verified')) counts.Completed++;
-        if (!isCompleted && (issue.overdue || st === 'overdue')) counts.Overdue++;
+        if (isIssueOverdue(issue)) counts.Overdue++;
       });
       setStatusCounts(counts);
     } catch {
@@ -17869,6 +17887,31 @@ function ClientDashboard() {
 
   // Resolve assigned technician name from issue (check assignedTo, technician, internal/ external lists)
   const getAssignedName = useCallback((issue) => {
+    if (!issue) return 'Unassigned';
+
+    const directName = [
+      issue.assignedToName,
+      issue.assignedTechnicianName,
+      issue.technicianName,
+      issue.assigneeName,
+      issue.primaryWorker?.name,
+      issue.assignedWorker?.name,
+      issue.assignedTo?.name,
+      issue.assignedTo?.fullName,
+      issue.assignedTo?.email,
+      issue.technician?.name,
+      issue.technician?.fullName,
+      issue.technician?.email,
+    ].find((value) => String(value || '').trim());
+    if (directName) return String(directName).trim();
+
+    const firstNamedAssignee = Array.isArray(issue.assignees)
+      ? issue.assignees.find((entry) => String(entry?.name || entry?.fullName || entry?.email || entry?.label || '').trim())
+      : null;
+    if (firstNamedAssignee) {
+      return String(firstNamedAssignee.name || firstNamedAssignee.fullName || firstNamedAssignee.email || firstNamedAssignee.label).trim();
+    }
+
     if (!issue) return 'â€”';
     if (issue.assignedTo && typeof issue.assignedTo === 'object' && (issue.assignedTo.name || issue.assignedTo.fullName)) return issue.assignedTo.name || issue.assignedTo.fullName;
     const aid = extractId(issue.assignedTo) || extractId(issue.technician) || (issue.assignedTo && String(issue.assignedTo));
@@ -18472,7 +18515,7 @@ function ClientDashboard() {
     selectedRequestStatuses,
   ]);
   const requestBulkSelection = useBulkSelection(filteredRequests, (request) => request?._id || request?.id);
-  const workOrders = dedupePmWorkOrders(allIssues.filter(issue => isApprovedWorkOrder(issue) && !isPmLinkedIssue(issue)));
+  const workOrders = dedupePmWorkOrders(allIssues.filter(issue => isApprovedWorkOrder(issue)));
   const resolveRequestWorkOrderLabel = React.useCallback((request) => {
     const rawRequestStatus = String(request?.status || '').toUpperCase().replace(/_/g, ' ').trim();
     const requestRefs = Array.from(new Set([
@@ -18597,7 +18640,7 @@ function ClientDashboard() {
       setMaterialRequestSubmitBusy(false);
     }
   }, [currentUser?._id, currentUser?.email, currentUser?.id, currentUser?.name, fetchMaterialRequests, materialRequestForm, resetMaterialRequestForm, userName]);
-  const workOrderStatusOptions = ['OPEN', 'IN PROGRESS', 'ON HOLD', 'COMPLETED'];
+  const workOrderStatusOptions = ['OPEN', 'IN PROGRESS', 'ON HOLD', 'COMPLETED', 'OVERDUE'];
   const workOrderPriorityOptions = ['HIGH', 'MEDIUM', 'LOW', 'NONE'];
   const workOrderLocationOptions = React.useMemo(
     () => Array.from(new Set(
@@ -18645,7 +18688,12 @@ function ClientDashboard() {
       const assignedTo = String(getAssignedName(issue) || '').trim();
       const priority = String(issue.priority || 'NONE').toUpperCase();
 
-      if (selectedWorkOrderStatuses.length > 0 && !selectedWorkOrderStatuses.includes(status)) return false;
+      if (selectedWorkOrderStatuses.length > 0) {
+        const matchesStatus = selectedWorkOrderStatuses.some((selectedStatus) => (
+          selectedStatus === 'OVERDUE' ? isIssueOverdue(issue) : status === selectedStatus
+        ));
+        if (!matchesStatus) return false;
+      }
       if (selectedWorkOrderPriorities.length > 0 && !selectedWorkOrderPriorities.includes(priority)) return false;
       if (selectedWorkOrderLocations.length > 0 && !selectedWorkOrderLocations.includes(location)) return false;
       if (selectedWorkOrderAssets.length > 0 && !selectedWorkOrderAssets.includes(asset)) return false;
@@ -18679,16 +18727,38 @@ function ClientDashboard() {
     workOrders,
   ]);
   const workOrderBulkSelection = useBulkSelection(filteredClientWorkOrders, (issue) => issue?._id || issue?.id);
+  const workOrderTotalPages = Math.max(1, Math.ceil(filteredClientWorkOrders.length / workOrderPageSize));
+  const paginatedClientWorkOrders = React.useMemo(() => {
+    const safePage = Math.min(Math.max(1, workOrderPage), workOrderTotalPages);
+    const start = (safePage - 1) * workOrderPageSize;
+    return filteredClientWorkOrders.slice(start, start + workOrderPageSize);
+  }, [filteredClientWorkOrders, workOrderPage, workOrderPageSize, workOrderTotalPages]);
   const preventiveBulkSelection = useBulkSelection(maintenanceSchedules, (schedule) => schedule?._id || schedule?.id);
   const overdueOverviewItems = React.useMemo(() => (
     workOrders
       .filter((issue) => {
-        const status = String(issue?.status || '').toUpperCase();
-        return Boolean(issue?.overdue) || status === 'OVERDUE';
+        return isIssueOverdue(issue);
       })
       .sort((a, b) => new Date(b.updatedAt || b.createdAt || 0).getTime() - new Date(a.updatedAt || a.createdAt || 0).getTime())
       .slice(0, 4)
   ), [workOrders]);
+  useEffect(() => {
+    setWorkOrderPage(1);
+  }, [
+    selectedWorkOrderStatuses,
+    selectedWorkOrderPriorities,
+    selectedWorkOrderLocations,
+    selectedWorkOrderAssets,
+    selectedWorkOrderAssignedTo,
+    workOrderSearchQuery,
+    workOrderSortDirection,
+    workOrderPageSize,
+  ]);
+  useEffect(() => {
+    if (workOrderPage > workOrderTotalPages) {
+      setWorkOrderPage(workOrderTotalPages);
+    }
+  }, [workOrderPage, workOrderTotalPages]);
   useEffect(() => {
     try {
       const raw = localStorage.getItem('mms_client_work_order_views');
@@ -21875,7 +21945,7 @@ function ClientDashboard() {
                         Review overdue work orders and requests before they fall further behind.
                       </div>
                     </div>
-                    <Btn onClick={() => setActiveTab('workOrders')} style={{ background: '#E11D48', color: 'white', border: '1px solid #E11D48' }}>
+                    <Btn onClick={() => openDashboardStatusView('OVERDUE')} style={{ background: '#E11D48', color: 'white', border: '1px solid #E11D48' }}>
                       Review Overdue
                     </Btn>
                   </div>
@@ -26058,7 +26128,7 @@ function ClientDashboard() {
                         </tr>
                       </thead>
                       <tbody>
-                        {filteredClientWorkOrders.map((issue, i) => {
+                        {paginatedClientWorkOrders.map((issue, i) => {
                           const due = normalizeDate(issue.fixDeadline || issue.dueDate || issue.nextDate);
                           const issueStatus = String(issue?.status || '').toUpperCase();
                           const isCompleted = issueStatus.includes('COMPLETE') || issueStatus === 'CLOSED' || issueStatus === 'DONE' || issueStatus === 'RESOLVED';
@@ -26147,6 +26217,48 @@ function ClientDashboard() {
                         })}
                       </tbody>
                     </table>
+                  </div>
+                  <div className="flex flex-col gap-3 border-t border-gray-200 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="text-sm text-gray-600">
+                      Showing {filteredClientWorkOrders.length === 0 ? 0 : ((workOrderPage - 1) * workOrderPageSize) + 1}
+                      {' '}to {Math.min(workOrderPage * workOrderPageSize, filteredClientWorkOrders.length)}
+                      {' '}of {filteredClientWorkOrders.length} work orders
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <label className="flex items-center gap-2 text-sm font-medium text-gray-600">
+                        Rows
+                        <select
+                          value={workOrderPageSize}
+                          onChange={(e) => setWorkOrderPageSize(Number(e.target.value) || 25)}
+                          className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm text-gray-700 outline-none focus:border-blue-500"
+                        >
+                          {[10, 25, 50, 100].map((size) => (
+                            <option key={size} value={size}>{size}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setWorkOrderPage((page) => Math.max(1, page - 1))}
+                          disabled={workOrderPage <= 1}
+                          className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-semibold text-gray-700 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          Previous
+                        </button>
+                        <span className="text-sm font-semibold text-gray-700">
+                          Page {workOrderPage} of {workOrderTotalPages}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setWorkOrderPage((page) => Math.min(workOrderTotalPages, page + 1))}
+                          disabled={workOrderPage >= workOrderTotalPages}
+                          className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-semibold text-gray-700 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          Next
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
