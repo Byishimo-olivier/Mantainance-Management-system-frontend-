@@ -25680,6 +25680,8 @@ function ClientDashboard() {
 
               if (workOrderDetailsMode !== 'edit' || !editingWorkOrderId) {
                 if (workOrderDetailsMode === 'create') {
+                  const imageFiles = Array.isArray(payload?.imageFiles) ? payload.imageFiles : [];
+                  const attachmentFiles = Array.isArray(payload?.attachmentFiles) ? payload.attachmentFiles : [];
                   const requestPayload = {
                     title: payload?.title || '',
                     description: payload?.description || '',
@@ -25689,6 +25691,7 @@ function ClientDashboard() {
                     assetId: payload?.assetId || '',
                     assetName: payload?.assetName || '',
                     dueDate: payload?.dueDate || '',
+                    fixDeadline: payload?.dueDate || '',
                     startDate: payload?.startDate || '',
                     assignedTo: payload?.assignedTo || '',
                     additionalResponsibleWorkers: payload?.additionalResponsibleWorkers || '',
@@ -25700,7 +25703,25 @@ function ClientDashboard() {
                     tasks: Array.isArray(pmTasks) ? pmTasks : [],
                   };
 
-                  const createdRes = await api.post('/api/issues', requestPayload);
+                  let createdRes;
+                  if (imageFiles.length || attachmentFiles.length) {
+                    const formData = new FormData();
+                    Object.entries(requestPayload).forEach(([key, value]) => {
+                      if (value === undefined || value === null) return;
+                      if (Array.isArray(value) || (typeof value === 'object' && !(value instanceof Date))) {
+                        formData.append(key, JSON.stringify(value));
+                        return;
+                      }
+                      formData.append(key, value instanceof Date ? value.toISOString() : String(value));
+                    });
+                    imageFiles.forEach((file) => formData.append('photos', file));
+                    attachmentFiles.forEach((file) => formData.append('files', file));
+                    createdRes = await api.post('/api/issues', formData, {
+                      headers: { 'Content-Type': 'multipart/form-data' },
+                    });
+                  } else {
+                    createdRes = await api.post('/api/issues', requestPayload);
+                  }
                   const createdId = createdRes?.data?.id || createdRes?.data?._id;
                   if (createdId) {
                     try {
@@ -25731,6 +25752,7 @@ function ClientDashboard() {
                 assetId: payload?.assetId || '',
                 assetName: payload?.assetName || '',
                 dueDate: payload?.dueDate || '',
+                fixDeadline: payload?.dueDate || '',
                 startDate: payload?.startDate || '',
                 assignedTo: payload?.assignedTo || '',
                 additionalResponsibleWorkers: payload?.additionalResponsibleWorkers || '',
@@ -31375,7 +31397,21 @@ function ClientDashboard() {
 <WorkOrderDetailsModal
             open={showStandaloneWorkOrderCreate}
             showDates={true}
-            onClose={() => setShowStandaloneWorkOrderCreate(false)}
+            onClose={() => {
+              setShowStandaloneWorkOrderCreate(false);
+              setStandaloneWorkOrderDraft({
+                pmTitle: '',
+                title: '',
+                description: '',
+                createNow: false,
+                priority: 'Medium',
+                category: 'General',
+                durationHours: '',
+                requiresSignature: false,
+              });
+              setStandaloneWorkOrderTasks([{ id: Date.now(), title: '', status: 'Open' }]);
+              setStandaloneWorkOrderChecklist([{ id: Date.now() + 1, text: '', type: 'Status', meter: '' }]);
+            }}
             onSave={async (payload) => {
               try {
                 // Prepare the payload for issue creation
@@ -31390,17 +31426,25 @@ function ClientDashboard() {
                 fd.append('team', payload?.team || '');
                 fd.append('additionalResponsibleWorkers', payload?.additionalResponsibleWorkers || '');
                 fd.append('durationHours', payload?.durationHours || '');
+                fd.append('dueDate', payload?.dueDate || '');
+                fd.append('fixDeadline', payload?.dueDate || '');
                 fd.append('approved', 'true');
                 fd.append('status', 'OPEN');
                 
-                if (Array.isArray(pmTasks) && pmTasks.length) {
-                   fd.append('tasks', JSON.stringify(pmTasks));
+                if (Array.isArray(standaloneWorkOrderTasks) && standaloneWorkOrderTasks.length) {
+                   fd.append('tasks', JSON.stringify(standaloneWorkOrderTasks));
                 }
-                if (Array.isArray(pmChecklist) && pmChecklist.length) {
-                   fd.append('checklist', JSON.stringify(pmChecklist));
+                if (Array.isArray(standaloneWorkOrderChecklist) && standaloneWorkOrderChecklist.length) {
+                   fd.append('checklist', JSON.stringify(standaloneWorkOrderChecklist));
                 }
                 if (Array.isArray(payload?.lineItems) && payload.lineItems.length) {
                    fd.append('parts', JSON.stringify(payload.lineItems));
+                }
+                if (Array.isArray(payload?.imageFiles) && payload.imageFiles.length) {
+                  payload.imageFiles.forEach((file) => fd.append('photos', file));
+                }
+                if (Array.isArray(payload?.attachmentFiles) && payload.attachmentFiles.length) {
+                  payload.attachmentFiles.forEach((file) => fd.append('files', file));
                 }
 
                 const res = await api.post('/api/issues', fd, {
@@ -31409,6 +31453,18 @@ function ClientDashboard() {
                 
                 await fetchIssues();
                 setShowStandaloneWorkOrderCreate(false);
+                setStandaloneWorkOrderDraft({
+                  pmTitle: '',
+                  title: '',
+                  description: '',
+                  createNow: false,
+                  priority: 'Medium',
+                  category: 'General',
+                  durationHours: '',
+                  requiresSignature: false,
+                });
+                setStandaloneWorkOrderTasks([{ id: Date.now(), title: '', status: 'Open' }]);
+                setStandaloneWorkOrderChecklist([{ id: Date.now() + 1, text: '', type: 'Status', meter: '' }]);
                 setActiveTab('workOrders');
               } catch (err) {
                 console.error('Failed to create standalone work order', err);
@@ -31416,12 +31472,12 @@ function ClientDashboard() {
               }
             }}
             mode="create"
-            tasks={pmTasks}
-            setTasks={setPmTasks}
-            workOrderDetails={pmWorkOrder}
-            setWorkOrderDetails={setPmWorkOrder}
-            checklist={pmChecklist}
-            setChecklist={setPmChecklist}
+            tasks={standaloneWorkOrderTasks}
+            setTasks={setStandaloneWorkOrderTasks}
+            workOrderDetails={standaloneWorkOrderDraft}
+            setWorkOrderDetails={setStandaloneWorkOrderDraft}
+            checklist={standaloneWorkOrderChecklist}
+            setChecklist={setStandaloneWorkOrderChecklist}
             checklistLibrary={pmChecklistLibrary}
             setChecklistLibrary={setPmChecklistLibrary}
             companyAssets={assets}

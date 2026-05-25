@@ -1182,6 +1182,7 @@ function ManagerDashboard() {
         techId: normalizeId(tech._id || tech.id || tech.userId),
         priority: assignmentData.priority,
         dueDate: assignmentData.dueDate,
+        fixDeadline: assignmentData.dueDate,
         status: 'ASSIGNED'
       });
 
@@ -7720,6 +7721,7 @@ const PreventiveMaintenanceTab = ({ issues, technicians, locations, assets, onRe
         priority: newTask.priority || 'MEDIUM',
         frequency: newTask.frequency || 'MONTHLY',
         dueDate: newTask.dueDate || undefined,
+        fixDeadline: newTask.dueDate || undefined,
         tags: ['preventive'],
         issueType: 'preventive',
         category: 'preventive',
