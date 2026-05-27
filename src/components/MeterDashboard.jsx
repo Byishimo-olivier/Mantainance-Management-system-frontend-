@@ -124,6 +124,7 @@ export default function MeterDashboard({ companyName, currentUser }) {
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [refreshInterval, setRefreshInterval] = useState(30000);
   const [chartType, setChartType] = useState('area');
+  const [meterDetailTab, setMeterDetailTab] = useState('details');
   const [lastUpdated, setLastUpdated] = useState(null);
 
   const loadMeter = useCallback(async (meterId) => {
@@ -597,135 +598,155 @@ export default function MeterDashboard({ companyName, currentUser }) {
                       </div>
                     </div>
                   )}
-                </section>
 
-                <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-                  <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-                    <h3 className="text-lg font-bold text-gray-900">Charts</h3>
-                    <div className="flex flex-wrap gap-2">
-                      {[
-                        ['area', 'Area'],
-                        ['line', 'Line'],
-                        ['bar', 'Daily'],
-                        ['pie', 'Breakdown'],
-                        ['compare', 'Compare'],
-                      ].map(([value, label]) => (
-                        <button
-                          key={value}
-                          type="button"
-                          onClick={() => setChartType(value)}
-                          className={`rounded-lg px-3 py-2 text-sm font-semibold ${chartType === value ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
-                        >
-                          {label}
-                        </button>
-                      ))}
-                    </div>
+                  <div className="mt-6 flex w-fit rounded-lg border border-gray-200 bg-gray-50 p-1">
+                    {[
+                      ['details', 'Details'],
+                      ['history', 'History'],
+                    ].map(([value, label]) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setMeterDetailTab(value)}
+                        className={`rounded-md px-4 py-2 text-sm font-semibold transition ${meterDetailTab === value ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
+                      >
+                        {label}
+                      </button>
+                    ))}
                   </div>
-
-                  <ResponsiveContainer width="100%" height={360}>
-                    {chartType === 'area' ? (
-                      <AreaChart data={meterReadings}>
-                        <defs>
-                          <linearGradient id="readingGradient" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#2563eb" stopOpacity={0.28} />
-                            <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                        <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                        <YAxis tick={{ fontSize: 12 }} />
-                        <Tooltip />
-                        <Area type="monotone" dataKey="reading" stroke="#2563eb" fill="url(#readingGradient)" />
-                      </AreaChart>
-                    ) : chartType === 'line' ? (
-                      <LineChart data={meterReadings}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                        <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                        <YAxis tick={{ fontSize: 12 }} />
-                        <Tooltip />
-                        <Legend />
-                        <Line type="monotone" dataKey="reading" stroke="#2563eb" dot={false} />
-                        <Line type="monotone" dataKey="consumed" stroke="#059669" dot={false} />
-                      </LineChart>
-                    ) : chartType === 'bar' ? (
-                      <BarChart data={meterReadings}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                        <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                        <YAxis tick={{ fontSize: 12 }} />
-                        <Tooltip />
-                        <Bar dataKey="consumed" fill="#059669" radius={[6, 6, 0, 0]} />
-                      </BarChart>
-                    ) : chartType === 'pie' ? (
-                      <PieChart>
-                        <Pie
-                          data={meterReadings.slice(-7).map((row) => ({ name: row.date, value: row.consumed }))}
-                          dataKey="value"
-                          nameKey="name"
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={120}
-                          label
-                        >
-                          {meterReadings.slice(-7).map((row, index) => <Cell key={row.id || index} fill={COLORS[index % COLORS.length]} />)}
-                        </Pie>
-                        <Tooltip />
-                      </PieChart>
-                    ) : (
-                      <BarChart data={comparisonData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                        <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                        <YAxis tick={{ fontSize: 12 }} />
-                        <Tooltip />
-                        <Bar dataKey="usage" fill="#7c3aed" radius={[6, 6, 0, 0]} />
-                      </BarChart>
-                    )}
-                  </ResponsiveContainer>
                 </section>
 
-                <div className="grid gap-6 xl:grid-cols-2">
-                  <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-                    <h3 className="mb-4 text-lg font-bold text-gray-900">Monthly Consumption</h3>
-                    <ResponsiveContainer width="100%" height={260}>
-                      <BarChart data={monthlyData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                        <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-                        <YAxis tick={{ fontSize: 12 }} />
-                        <Tooltip />
-                        <Bar dataKey="total" fill="#0891b2" radius={[6, 6, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </section>
-
-                  <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-                    <h3 className="mb-4 text-lg font-bold text-gray-900">Recent Readings</h3>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead className="border-b border-gray-200">
-                          <tr>
-                            <th className="px-4 py-3 text-left font-semibold text-gray-700">Date</th>
-                            <th className="px-4 py-3 text-left font-semibold text-gray-700">Reading</th>
-                            <th className="px-4 py-3 text-left font-semibold text-gray-700">Consumed</th>
-                            <th className="px-4 py-3 text-left font-semibold text-gray-700">Efficiency</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {meterReadings.slice(-10).reverse().map((reading) => (
-                            <tr key={reading.id} className="border-b border-gray-100 last:border-b-0">
-                              <td className="px-4 py-3 text-gray-900">{reading.date}</td>
-                              <td className="px-4 py-3 font-semibold text-gray-900">{reading.reading.toLocaleString()}</td>
-                              <td className="px-4 py-3 text-gray-600">{reading.consumed.toLocaleString()} {selectedMeter.unit || ''}</td>
-                              <td className="px-4 py-3">
-                                <span className={`rounded px-2 py-1 text-xs font-semibold ${reading.efficiency >= 80 ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                                  {reading.efficiency}%
-                                </span>
-                              </td>
-                            </tr>
+                {meterDetailTab === 'history' && (
+                  <>
+                    <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+                      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+                        <h3 className="text-lg font-bold text-gray-900">Charts</h3>
+                        <div className="flex flex-wrap gap-2">
+                          {[
+                            ['area', 'Area'],
+                            ['line', 'Line'],
+                            ['bar', 'Daily'],
+                            ['pie', 'Breakdown'],
+                            ['compare', 'Compare'],
+                          ].map(([value, label]) => (
+                            <button
+                              key={value}
+                              type="button"
+                              onClick={() => setChartType(value)}
+                              className={`rounded-lg px-3 py-2 text-sm font-semibold ${chartType === value ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                            >
+                              {label}
+                            </button>
                           ))}
-                        </tbody>
-                      </table>
+                        </div>
+                      </div>
+
+                      <ResponsiveContainer width="100%" height={360}>
+                        {chartType === 'area' ? (
+                          <AreaChart data={meterReadings}>
+                            <defs>
+                              <linearGradient id="readingGradient" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#2563eb" stopOpacity={0.28} />
+                                <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
+                              </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                            <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                            <YAxis tick={{ fontSize: 12 }} />
+                            <Tooltip />
+                            <Area type="monotone" dataKey="reading" stroke="#2563eb" fill="url(#readingGradient)" />
+                          </AreaChart>
+                        ) : chartType === 'line' ? (
+                          <LineChart data={meterReadings}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                            <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                            <YAxis tick={{ fontSize: 12 }} />
+                            <Tooltip />
+                            <Legend />
+                            <Line type="monotone" dataKey="reading" stroke="#2563eb" dot={false} />
+                            <Line type="monotone" dataKey="consumed" stroke="#059669" dot={false} />
+                          </LineChart>
+                        ) : chartType === 'bar' ? (
+                          <BarChart data={meterReadings}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                            <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                            <YAxis tick={{ fontSize: 12 }} />
+                            <Tooltip />
+                            <Bar dataKey="consumed" fill="#059669" radius={[6, 6, 0, 0]} />
+                          </BarChart>
+                        ) : chartType === 'pie' ? (
+                          <PieChart>
+                            <Pie
+                              data={meterReadings.slice(-7).map((row) => ({ name: row.date, value: row.consumed }))}
+                              dataKey="value"
+                              nameKey="name"
+                              cx="50%"
+                              cy="50%"
+                              outerRadius={120}
+                              label
+                            >
+                              {meterReadings.slice(-7).map((row, index) => <Cell key={row.id || index} fill={COLORS[index % COLORS.length]} />)}
+                            </Pie>
+                            <Tooltip />
+                          </PieChart>
+                        ) : (
+                          <BarChart data={comparisonData}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                            <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                            <YAxis tick={{ fontSize: 12 }} />
+                            <Tooltip />
+                            <Bar dataKey="usage" fill="#7c3aed" radius={[6, 6, 0, 0]} />
+                          </BarChart>
+                        )}
+                      </ResponsiveContainer>
+                    </section>
+
+                    <div className="grid gap-6 xl:grid-cols-2">
+                      <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+                        <h3 className="mb-4 text-lg font-bold text-gray-900">Monthly Consumption</h3>
+                        <ResponsiveContainer width="100%" height={260}>
+                          <BarChart data={monthlyData}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                            <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+                            <YAxis tick={{ fontSize: 12 }} />
+                            <Tooltip />
+                            <Bar dataKey="total" fill="#0891b2" radius={[6, 6, 0, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </section>
+
+                      <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+                        <h3 className="mb-4 text-lg font-bold text-gray-900">Recent Readings</h3>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead className="border-b border-gray-200">
+                              <tr>
+                                <th className="px-4 py-3 text-left font-semibold text-gray-700">Date</th>
+                                <th className="px-4 py-3 text-left font-semibold text-gray-700">Reading</th>
+                                <th className="px-4 py-3 text-left font-semibold text-gray-700">Consumed</th>
+                                <th className="px-4 py-3 text-left font-semibold text-gray-700">Efficiency</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {meterReadings.slice(-10).reverse().map((reading) => (
+                                <tr key={reading.id} className="border-b border-gray-100 last:border-b-0">
+                                  <td className="px-4 py-3 text-gray-900">{reading.date}</td>
+                                  <td className="px-4 py-3 font-semibold text-gray-900">{reading.reading.toLocaleString()}</td>
+                                  <td className="px-4 py-3 text-gray-600">{reading.consumed.toLocaleString()} {selectedMeter.unit || ''}</td>
+                                  <td className="px-4 py-3">
+                                    <span className={`rounded px-2 py-1 text-xs font-semibold ${reading.efficiency >= 80 ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                                      {reading.efficiency}%
+                                    </span>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </section>
                     </div>
-                  </section>
-                </div>
+                  </>
+                )}
               </>
             ) : (
               <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-12 text-center">

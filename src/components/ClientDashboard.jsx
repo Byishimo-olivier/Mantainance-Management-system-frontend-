@@ -8435,11 +8435,14 @@ function ClientDashboard() {
   const openNewWorkOrderDetails = (assetSnapshot = null) => {
     const assetId = assetSnapshot?._id || assetSnapshot?.id || '';
     const assetName = assetSnapshot?.name || '';
+    const propertyId = assetSnapshot?.propertyId || assetSnapshot?.property?._id || assetSnapshot?.property?.id || '';
     const assetLocation = [
+      assetSnapshot?.property?.name,
+      assetSnapshot?.propertyName,
       assetSnapshot?.location?.building,
       assetSnapshot?.location?.room,
       assetSnapshot?.identifiers?.area,
-    ].filter(Boolean).join(', ');
+    ].filter(Boolean)[0] || '';
 
     setShowWorkOrderModal(false);
     setWorkOrderDetailsMode('create');
@@ -8455,6 +8458,7 @@ function ClientDashboard() {
       requiresSignature: false,
       assetId,
       assetName,
+      propertyId,
       location: assetLocation,
     });
     setPmTasks([{ id: Date.now(), title: '', status: 'Open' }]);
@@ -18297,9 +18301,16 @@ function ClientDashboard() {
   const isApprovedWorkOrder = (issue) => {
     const st = String(issue?.status || '').toUpperCase();
     const hasWorkOrderRef = !!(issue?.workOrderId || issue?.workOrder || issue?.workOrderNumber || issue?.workOrderNo || issue?.workOrderCode || issue?.workOrderRef);
+    const referenceType = String(issue?.referenceType || '').toLowerCase();
+    const issueType = String(issue?.issueType || issue?.type || '').toLowerCase();
     return Boolean(issue?.approved)
       || hasWorkOrderRef
       || isPmLinkedIssue(issue)
+      || Boolean(issue?.createdBySchedule)
+      || Boolean(issue?.isPreventive)
+      || referenceType === 'workorder'
+      || referenceType === 'work_order'
+      || issueType === 'preventive'
       || st === 'APPROVED'
       || st === 'OPEN'
       || st.includes('IN PROGRESS')
@@ -18361,7 +18372,8 @@ function ClientDashboard() {
 
   const isRequestIssue = (issue) => {
     if (!issue || isRejectedRequest(issue)) return false;
-    return isRequestRecord(issue) || !isApprovedWorkOrder(issue);
+    if (isApprovedWorkOrder(issue)) return false;
+    return isRequestRecord(issue);
   };
 
   const doesIssueBelongToCurrentUser = React.useCallback((issue) => {
@@ -20208,22 +20220,75 @@ function ClientDashboard() {
   }, [assetSearchQuery, assets, getAssetLocationLabel, selectedAssetLocationFilter]);
   const selectedAssetWorkOrders = React.useMemo(() => {
     const assetId = String(selectedAsset?._id || selectedAsset?.id || '');
-    if (!assetId) return [];
+    const propertyId = String(selectedAsset?.propertyId || selectedAsset?.property?._id || selectedAsset?.property?.id || '');
+    const assetName = String(selectedAsset?.name || selectedAsset?.title || selectedAsset?.assetName || '').trim();
+    const assetLocationLabel = String(getAssetLocationLabel(selectedAsset) || '').trim();
+    if (!assetId && !propertyId && !assetName && !assetLocationLabel) return [];
+
+    const normalizeComparable = (value) => String(value || '').trim().toLowerCase();
 
     const assetMatches = (value) => {
       if (!value) return false;
       if (Array.isArray(value)) return value.some(assetMatches);
-      if (typeof value === 'object') return String(value._id || value.id || value.assetId || '') === assetId;
-      return String(value) === assetId;
+      if (typeof value === 'object') {
+        const valueId = String(value._id || value.id || value.assetId || value.value || '');
+        const valueName = normalizeComparable(value.name || value.title || value.assetName || value.label);
+        return (!!assetId && valueId === assetId) || (!!assetName && valueName === normalizeComparable(assetName));
+      }
+      return (!!assetId && String(value) === assetId) || (!!assetName && normalizeComparable(value) === normalizeComparable(assetName));
+    };
+
+    const propertyMatches = (value) => {
+      if (!propertyId || !value) return false;
+      if (Array.isArray(value)) return value.some(propertyMatches);
+      if (typeof value === 'object') return String(value._id || value.id || value.propertyId || value.locationId || value.value || '') === propertyId;
+      return String(value) === propertyId;
+    };
+
+    const locationMatches = (workOrder) => {
+      const selectedLocations = [
+        assetLocationLabel,
+        selectedAsset?.property?.name,
+        selectedAsset?.propertyName,
+        selectedAsset?.location?.branchName,
+        selectedAsset?.location?.building,
+        selectedAsset?.location?.room,
+        selectedAsset?.identifiers?.area,
+      ].map(normalizeComparable).filter(Boolean);
+      if (!selectedLocations.length) return false;
+
+      const workOrderLocations = [
+        workOrder?.location,
+        workOrder?.property?.name,
+        workOrder?.propertyName,
+        workOrder?.branch?.name,
+        workOrder?.assetLocation,
+        ...(Array.isArray(workOrder?.assetsRows) ? workOrder.assetsRows.map((row) => row?.locationName || row?.location || row?.propertyName) : []),
+      ].map(normalizeComparable).filter(Boolean);
+
+      return selectedLocations.some((selectedLocation) => (
+        workOrderLocations.some((workOrderLocation) => (
+          workOrderLocation === selectedLocation ||
+          workOrderLocation.includes(selectedLocation) ||
+          selectedLocation.includes(workOrderLocation)
+        ))
+      ));
     };
 
     return (workOrders || []).filter((workOrder) => (
       assetMatches(workOrder.assetId) ||
       assetMatches(workOrder.assetIds) ||
       assetMatches(workOrder.asset) ||
-      assetMatches(workOrder.assets)
+      assetMatches(workOrder.assets) ||
+      assetMatches(workOrder.assetName) ||
+      assetMatches(workOrder.assetsRows) ||
+      propertyMatches(workOrder.propertyId) ||
+      propertyMatches(workOrder.locationId) ||
+      propertyMatches(workOrder.property) ||
+      propertyMatches(workOrder.assetsRows) ||
+      locationMatches(workOrder)
     ));
-  }, [selectedAsset, workOrders]);
+  }, [getAssetLocationLabel, selectedAsset, workOrders]);
   const selectedAssetParts = React.useMemo(() => (
     Array.isArray(selectedAsset?.identifiers?.parts) ? selectedAsset.identifiers.parts : []
   ), [selectedAsset]);
@@ -25688,6 +25753,7 @@ function ClientDashboard() {
                     category: payload?.category || '',
                     priority: payload?.priority || 'Medium',
                     location: payload?.location || '',
+                    propertyId: payload?.propertyId || undefined,
                     assetId: payload?.assetId || '',
                     assetName: payload?.assetName || '',
                     dueDate: payload?.dueDate || '',
@@ -25749,6 +25815,7 @@ function ClientDashboard() {
                 category: payload?.category || '',
                 priority: payload?.priority || 'Medium',
                 location: payload?.location || '',
+                propertyId: payload?.propertyId || undefined,
                 assetId: payload?.assetId || '',
                 assetName: payload?.assetName || '',
                 dueDate: payload?.dueDate || '',
@@ -31416,26 +31483,40 @@ function ClientDashboard() {
               try {
                 // Prepare the payload for issue creation
                 const fd = new FormData();
-                fd.append('title', payload?.title || '');
+                const appendIfPresent = (key, value) => {
+                  if (value === undefined || value === null) return;
+                  const normalized = String(value).trim();
+                  if (!normalized) return;
+                  fd.append(key, normalized);
+                };
+                fd.append('title', String(payload?.title || '').trim() || 'Untitled Work Order');
                 fd.append('description', payload?.description || '');
                 fd.append('priority', (payload?.priority || 'Medium').toUpperCase());
                 fd.append('category', payload?.category || 'General');
-                fd.append('assetId', payload?.assetId || '');
-                fd.append('location', payload?.location || '');
-                fd.append('assignedTo', payload?.assignedTo || '');
-                fd.append('team', payload?.team || '');
-                fd.append('additionalResponsibleWorkers', payload?.additionalResponsibleWorkers || '');
-                fd.append('durationHours', payload?.durationHours || '');
-                fd.append('dueDate', payload?.dueDate || '');
-                fd.append('fixDeadline', payload?.dueDate || '');
+                appendIfPresent('assetId', payload?.assetId);
+                appendIfPresent('propertyId', payload?.propertyId);
+                appendIfPresent('location', payload?.location);
+                appendIfPresent('assignedTo', payload?.assignedTo);
+                appendIfPresent('team', payload?.team);
+                appendIfPresent('additionalResponsibleWorkers', payload?.additionalResponsibleWorkers);
+                appendIfPresent('durationHours', payload?.durationHours);
+                appendIfPresent('dueDate', payload?.dueDate);
+                appendIfPresent('fixDeadline', payload?.dueDate);
                 fd.append('approved', 'true');
                 fd.append('status', 'OPEN');
                 
-                if (Array.isArray(standaloneWorkOrderTasks) && standaloneWorkOrderTasks.length) {
-                   fd.append('tasks', JSON.stringify(standaloneWorkOrderTasks));
+                const filledTasks = Array.isArray(standaloneWorkOrderTasks)
+                  ? standaloneWorkOrderTasks.filter((task) => String(task?.title || '').trim())
+                  : [];
+                const filledChecklist = Array.isArray(standaloneWorkOrderChecklist)
+                  ? standaloneWorkOrderChecklist.filter((item) => String(item?.text || '').trim())
+                  : [];
+
+                if (filledTasks.length) {
+                   fd.append('tasks', JSON.stringify(filledTasks));
                 }
-                if (Array.isArray(standaloneWorkOrderChecklist) && standaloneWorkOrderChecklist.length) {
-                   fd.append('checklist', JSON.stringify(standaloneWorkOrderChecklist));
+                if (filledChecklist.length) {
+                   fd.append('checklist', JSON.stringify(filledChecklist));
                 }
                 if (Array.isArray(payload?.lineItems) && payload.lineItems.length) {
                    fd.append('parts', JSON.stringify(payload.lineItems));
@@ -33522,6 +33603,8 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
     barcode: '',
     nonStock: false,
     critical: false,
+    minQtyThreshold: 0,
+    maxQtyThreshold: 0,
     inventoryLines: [{ location: '', area: '', minQty: '', maxQty: '', availQty: '', cost: '', barcode: '' }]
   });
   const createEmptyAllocation = () => ({
@@ -33568,6 +33651,27 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
   const getFilterButtonClasses = (active) => `inline-flex h-11 items-center gap-2 rounded-xl border px-4 text-sm font-medium transition ${
     active ? 'border-blue-200 bg-blue-50 text-blue-700 shadow-sm' : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
   }`;
+  const getDerivedPartStatus = (part = {}) => {
+    if (part.nonStock) return 'NON_STOCK';
+    const availableQty = Number(part.available ?? part.availableQty ?? part.quantity ?? 0);
+    const minQty = Number(part.minQtyThreshold ?? part.minQty ?? 0);
+    if (availableQty <= 0) return 'STOCK_OUT';
+    if (minQty > 0 && availableQty < minQty) return 'LOW_STOCK';
+    return 'STOCK_IN';
+  };
+  const getLowStockReorderQuantity = (part = {}) => {
+    const availableQty = Number(part.available ?? part.availableQty ?? part.quantity ?? 0);
+    const minQty = Number(part.minQtyThreshold ?? part.minQty ?? 0);
+    const maxQty = Number(part.maxQtyThreshold ?? part.maxQty ?? 0);
+    const targetQty = maxQty > minQty ? maxQty : minQty;
+    return Math.max(1, Math.ceil(targetQty - availableQty));
+  };
+  const isPartBelowMinimum = (part = {}) => {
+    if (!part || part.nonStock) return false;
+    const availableQty = Number(part.available ?? part.availableQty ?? part.quantity ?? 0);
+    const minQty = Number(part.minQtyThreshold ?? part.minQty ?? 0);
+    return minQty > 0 && availableQty < minQty;
+  };
   const PART_STATUS_FILTER_OPTIONS = [
     { key: 'IN_STOCK', label: 'In stock' },
     { key: 'LOW_STOCK', label: 'Low stock' },
@@ -33967,7 +34071,7 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
     if (rawStatus.includes('LOW')) return 'LOW_STOCK';
     if (rawStatus.includes('IN_STOCK') || rawStatus.includes('STOCK_IN') || rawStatus.includes('AVAILABLE')) return 'IN_STOCK';
     if (availableQty <= 0) return 'OUT_OF_STOCK';
-    if (minQty > 0 && availableQty <= minQty) return 'LOW_STOCK';
+    if (minQty > 0 && availableQty < minQty) return 'LOW_STOCK';
     return 'IN_STOCK';
   }, []);
   const getPartStatusFilterLabel = React.useCallback((part) => (
@@ -34075,6 +34179,28 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
       return Number(right?.incoming || 0) - Number(left?.incoming || 0);
     });
   }, [excludeIncomingInventory, getPartStatusFilterKey, getPartStatusFilterLabel, items, locationFilter, partStatusFilters, search, sortField, tagFilter]);
+  const createLowStockPurchaseOrder = React.useCallback(async (part) => {
+    if (!isPartBelowMinimum(part)) return null;
+    const quantity = getLowStockReorderQuantity(part);
+    const unitCost = Number(part?.inventoryLines?.[0]?.cost || part?.cost || 0);
+    const payload = {
+      title: `Reorder ${part.name || 'part'}`,
+      status: 'Awaiting Approval',
+      category: 'Inventory Reorder',
+      currency: 'RWF',
+      notes: `Auto-created because available quantity (${Number(part.available || 0)}) is below minimum threshold (${Number(part.minQtyThreshold || 0)}).`,
+      additionalDetails: `Auto-created from Parts & Inventory low-stock threshold.`,
+      items: [{
+        name: part.name || 'Part',
+        quantity,
+        unitCost,
+        description: part.partNumber ? `Part number: ${part.partNumber}` : '',
+      }],
+    };
+    const res = await api.post('/api/purchase-orders', payload);
+    window.dispatchEvent(new CustomEvent('purchase-order-created'));
+    return res.data;
+  }, [getPartStatusFilterKey]);
   const filteredSets = React.useMemo(() => {
     const query = String(search || '').trim().toLowerCase();
     return (inventorySets || []).filter((entry) => {
@@ -34114,8 +34240,20 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
     setPartEditSaving(true);
     try {
       const partId = selectedPart._id || selectedPart.id;
-      const res = await api.put(`/api/parts/${partId}`, partEditForm);
+      const res = await api.put(`/api/parts/${partId}`, {
+        ...partEditForm,
+        status: getDerivedPartStatus(partEditForm),
+      });
       const updated = res.data;
+      const wasReorderNeeded = isPartBelowMinimum(selectedPart);
+      const isReorderNeeded = isPartBelowMinimum(updated);
+      if (!wasReorderNeeded && isReorderNeeded) {
+        try {
+          await createLowStockPurchaseOrder(updated);
+        } catch (poError) {
+          console.warn('Failed to create low-stock purchase order', poError);
+        }
+      }
       setSelectedPart(updated);
       setItems((prev) => prev.map((entry) => String(entry._id || entry.id) === String(partId) ? updated : entry));
       setPartEditMode(false);
@@ -34144,6 +34282,15 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
         createdBy,
       });
       const updated = res.data;
+      const wasReorderNeeded = isPartBelowMinimum(selectedPart);
+      const isReorderNeeded = isPartBelowMinimum(updated);
+      if (!wasReorderNeeded && isReorderNeeded) {
+        try {
+          await createLowStockPurchaseOrder(updated);
+        } catch (poError) {
+          console.warn('Failed to create low-stock purchase order', poError);
+        }
+      }
       setSelectedPart(updated);
       setItems((prev) => prev.map((entry) => String(entry._id || entry.id) === String(partId) ? updated : entry));
       setPartAdjustmentForm({ quantity: 1, reason: '' });
@@ -34358,6 +34505,8 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
           allocated: Number(r.allocated || r.allocatedqty || 0),
           onHand: Number(r.onhand || r.on_hand || 0),
           incoming: Number(r.incoming || r.incomingqty || 0),
+          minQtyThreshold: Number(r.minqtythreshold || r.minimum || r.minqty || 0),
+          maxQtyThreshold: Number(r.maxqtythreshold || r.maximum || r.maxqty || 0),
           location: r.location || r.warehouse || '',
           barcode: r.barcode || '',
           tags: String(r.tags || '').split(',').map((item) => item.trim()).filter(Boolean)
@@ -34384,7 +34533,16 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
     }
     setSavingPart(true);
     try {
-      const res = await api.post('/api/parts', newPart);
+      const payload = {
+        ...newPart,
+        status: getDerivedPartStatus(newPart),
+      };
+      const res = await api.post('/api/parts', payload);
+      try {
+        await createLowStockPurchaseOrder(res.data);
+      } catch (poError) {
+        console.warn('Failed to create low-stock purchase order', poError);
+      }
       setItems(prev => [res.data, ...(prev || [])]);
       setNewPart(createEmptyPart());
       setShowAddPart(false);
@@ -34869,6 +35027,8 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
                 barcode: '',
                 nonStock: false,
                 critical: false,
+                minQtyThreshold: 0,
+                maxQtyThreshold: 0,
                 inventoryLines: [{ location: '', area: '', minQty: '', maxQty: '', availQty: '', cost: '', barcode: '' }]
               }); }} className="px-3 py-2 text-sm border rounded-lg">Cancel</button>
               <button type="submit" disabled={savingPart} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold disabled:opacity-60">
@@ -34933,6 +35093,8 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
               ['Allocated Qty', 'allocated', 'number'],
               ['On Hand Qty', 'onHand', 'number'],
               ['Incoming Qty', 'incoming', 'number'],
+              ['Minimum Qty Threshold', 'minQtyThreshold', 'number'],
+              ['Maximum Qty Threshold', 'maxQtyThreshold', 'number'],
               ['Location', 'location', 'select-location'],
               ['Barcode', 'barcode', 'text'],
             ].map(([label, field, type]) => (
@@ -34970,6 +35132,9 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
                 )}
               </div>
             ))}
+          </div>
+          <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            Inventory status becomes Low Stock when available quantity is below the minimum threshold. Reorder quantity is calculated up to the maximum threshold.
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -35830,7 +35995,9 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
                 <tr key={it._id || it.id || `part-${idx}`} className="cursor-pointer border-b border-gray-50 hover:bg-gray-50/50 transition-colors" onClick={() => openPartDetails(it)}>
                   <td className="py-4 px-4 text-sm font-bold text-gray-900">{it.name || it.partName || 'Unnamed'}</td>
                   <td className="py-4 px-4 text-sm text-gray-600">
-                    {(it.status || 'â€”').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                    <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${getStatusBadgeClasses(getPartStatusFilterLabel(it))}`}>
+                      {getPartStatusFilterLabel(it)}
+                    </span>
                   </td>
                   <td className="py-4 px-4 text-sm text-gray-600">{it.available || it.availableQty || it.quantity || 0}</td>
                   <td className="py-4 px-4 text-sm text-gray-600">{it.allocated || 0}</td>
@@ -35935,6 +36102,8 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
                               ['Allocated', 'allocated'],
                               ['On Hand', 'onHand'],
                               ['Incoming', 'incoming'],
+                              ['Minimum Threshold', 'minQtyThreshold'],
+                              ['Maximum Threshold', 'maxQtyThreshold'],
                             ].map(([label, field]) => (
                               <div key={field}>
                                 <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-500">{label}</label>
@@ -35972,6 +36141,8 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
                               ['Allocated Qty', selectedPart.allocated || 0],
                               ['On Hand Qty', selectedPart.onHand || 0],
                               ['Incoming Qty', selectedPart.incoming || 0],
+                              ['Minimum Qty Threshold', selectedPart.minQtyThreshold || 0],
+                              ['Maximum Qty Threshold', selectedPart.maxQtyThreshold || 0],
                               ['Location', selectedPart.location],
                               ['Critical Part', selectedPart.critical ? 'Yes' : 'No'],
                             ].map(([label, value]) => (
@@ -36308,6 +36479,21 @@ const ClientPurchaseOrdersTab = () => {
     if (!Array.isArray(po?.items)) return 0;
     return po.items.reduce((sum, item) => sum + ((Number(item?.quantity) || 0) * (Number(item?.unitCost || item?.cost) || 0)), 0);
   };
+  const formatPoMoney = (value) => new Intl.NumberFormat('en-RW', {
+    style: 'currency',
+    currency: 'RWF',
+    maximumFractionDigits: 0,
+  }).format(Number(value) || 0);
+  const normalizePoStatus = (status) => {
+    const normalized = String(status || 'Awaiting Approval').trim().toUpperCase().replace(/[_-]+/g, ' ');
+    if (normalized === 'APPROVED') return 'Approved';
+    if (normalized === 'FULFILLED') return 'Fulfilled';
+    if (normalized === 'PARTIALLY FULFILLED') return 'Partially Fulfilled';
+    if (normalized === 'DECLINED' || normalized === 'VENDOR DECLINED') return 'Declined';
+    if (normalized === 'DRAFT' || normalized === 'SUBMITTED' || normalized === 'PENDING' || normalized === 'AWAITING APPROVAL') return 'Awaiting Approval';
+    return status || 'Awaiting Approval';
+  };
+  const PURCHASE_ORDER_STATUS_OPTIONS = ['Fulfilled', 'Approved', 'Partially Fulfilled', 'Awaiting Approval', 'Declined'];
   const resetForm = () => setForm({
     title: '', vendor: '', vendorId: '', expectedDate: '', purchaseDate: '', shippingMethod: '', terms: '', fobShippingPoint: '', category: '', additionalDetails: '', requisitioner: '', shippingCompanyName: '', shippingAddress: '', shippingPhone: '', shippingFax: '', requesterCompanyName: '', requesterAddress: '', requesterPhone: '', requesterFax: '', itemName: '', quantity: 1, unitCost: 0, poNumber: ''
   });
@@ -36354,7 +36540,10 @@ const ClientPurchaseOrdersTab = () => {
   };
 
   const poStatusOptions = React.useMemo(
-    () => Array.from(new Set((orders || []).map((order) => String(order?.status || 'Pending').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    () => Array.from(new Set([
+      ...PURCHASE_ORDER_STATUS_OPTIONS,
+      ...(orders || []).map((order) => normalizePoStatus(order?.status)).filter(Boolean),
+    ])),
     [orders]
   );
   const poVendorOptions = React.useMemo(
@@ -36368,7 +36557,7 @@ const ClientPurchaseOrdersTab = () => {
   const filteredOrders = React.useMemo(() => {
     const query = String(poSearchQuery || '').trim().toLowerCase();
     return (orders || []).filter((order) => {
-      const status = String(order?.status || 'Pending').trim();
+      const status = normalizePoStatus(order?.status);
       const vendorName = String(order?.vendor?.name || order?.vendorDetails?.name || order?.vendor || '').trim();
       const category = String(order?.category || '').trim();
       if (poStatusFilter && status !== poStatusFilter) return false;
@@ -36417,6 +36606,8 @@ const ClientPurchaseOrdersTab = () => {
           phone: form.shippingPhone || ''
         },
         poNumber: form.poNumber || `PO-${Date.now()}`,
+        currency: 'RWF',
+        status: editingId ? undefined : 'Awaiting Approval',
         vendorEmail: vendors.find((vendor) => String(vendor._id || vendor.id) === String(form.vendorId))?.email || undefined,
         notes: form.additionalDetails || '',
         items: form.itemName ? [{ name: form.itemName, quantity: Number(form.quantity) || 1, unitCost: Number(form.unitCost) || 0 }] : [],
@@ -36502,7 +36693,7 @@ const ClientPurchaseOrdersTab = () => {
           <div className="flex flex-col gap-1"><label className="text-xs font-semibold text-gray-600">Category</label><input value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" placeholder="None" /></div>
           <div className="flex flex-col gap-1"><label className="text-xs font-semibold text-gray-600">Item</label><input value={form.itemName} onChange={e => setForm(f => ({ ...f, itemName: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" placeholder="Optional" /></div>
           <div className="flex flex-col gap-1"><label className="text-xs font-semibold text-gray-600">Quantity</label><input type="number" min="1" value={form.quantity} onChange={e => setForm(f => ({ ...f, quantity: Number(e.target.value) || 1 }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" /></div>
-          <div className="flex flex-col gap-1"><label className="text-xs font-semibold text-gray-600">Unit Cost</label><input type="number" step="0.01" value={form.unitCost} onChange={e => setForm(f => ({ ...f, unitCost: Number(e.target.value) || 0 }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" /></div>
+          <div className="flex flex-col gap-1"><label className="text-xs font-semibold text-gray-600">Unit Cost (RWF)</label><input type="number" step="1" value={form.unitCost} onChange={e => setForm(f => ({ ...f, unitCost: Number(e.target.value) || 0 }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" /></div>
           <div className="flex flex-col gap-1"><label className="text-xs font-semibold text-gray-600">Shipping Method</label><input value={form.shippingMethod} onChange={e => setForm(f => ({ ...f, shippingMethod: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" placeholder="None" /></div>
           <div className="flex flex-col gap-1"><label className="text-xs font-semibold text-gray-600">Terms</label><input value={form.terms} onChange={e => setForm(f => ({ ...f, terms: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" placeholder="None" /></div>
           <div className="flex flex-col gap-1"><label className="text-xs font-semibold text-gray-600">F.O.B. Shipping Point</label><input value={form.fobShippingPoint} onChange={e => setForm(f => ({ ...f, fobShippingPoint: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" placeholder="None" /></div>
@@ -36529,10 +36720,10 @@ const ClientPurchaseOrdersTab = () => {
               {filteredOrders.map((o, idx) => (
                 <tr key={o._id || o.id || `po-${idx}`} className={`border-b border-gray-50 hover:bg-gray-50/50 transition-colors cursor-pointer ${selectedPo && getPoRouteId(selectedPo) === getPoRouteId(o) ? 'bg-blue-50/60' : ''}`} onClick={() => { setSelectedPo(o); setShowDetails(true); }}>
                   <td className="py-4 px-4 text-sm font-bold text-gray-900">{o.title || o.name || 'PO'}</td>
-                  <td className="py-4 px-4 text-sm text-gray-600"><span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${requestStatusColor(o.status || 'PENDING')}`}>{String(o.status || 'Pending').replace(/_/g, ' ')}</span></td>
+                  <td className="py-4 px-4 text-sm text-gray-600"><span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${requestStatusColor(normalizePoStatus(o.status))}`}>{normalizePoStatus(o.status)}</span></td>
                   <td className="py-4 px-4 text-sm font-mono text-gray-600">{o.poNumber || o.number || '—'}</td>
                   <td className="py-4 px-4 text-sm text-gray-600">{Array.isArray(o.items) ? o.items.length : (o.itemsCount || '—')}</td>
-                  <td className="py-4 px-4 text-sm text-gray-600">{o.totalCost ? `$${Number(o.totalCost).toFixed(2)}` : '—'}</td>
+                  <td className="py-4 px-4 text-sm text-gray-600">{getPoTotal(o) ? formatPoMoney(getPoTotal(o)) : '—'}</td>
                   <td className="py-4 px-4 text-sm text-gray-600">{o.vendor?.name || o.vendor || '—'}</td>
                   <td className="py-4 px-4 text-right"><button type="button" className="p-1.5 hover:bg-gray-100 rounded-lg" onClick={(e) => { e.stopPropagation(); setSelectedPo(o); setShowDetails(true); }}><svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg></button></td>
                 </tr>
@@ -36545,15 +36736,15 @@ const ClientPurchaseOrdersTab = () => {
       {selectedPo && showDetails && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={() => setShowDetails(false)}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-5xl max-h-[90vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100"><div><p className="text-xs uppercase font-bold text-gray-400">Purchase Order</p><h3 className="text-lg font-bold text-gray-900">#{selectedPo.poNumber || selectedPo.number || '—'} / {selectedPo.title || 'Untitled PO'}</h3><p className="text-sm text-gray-500">Status: {selectedPo.status || 'Pending'}</p></div><div className="flex items-center gap-2"><button className="px-3 py-2 text-sm border rounded-lg" onClick={() => setShowDetails(false)}>Close</button><button className="px-3 py-2 text-sm border rounded-lg" onClick={() => openPoEditor(selectedPo)}>Edit</button><button className="px-3 py-2 text-sm bg-rose-500 text-white rounded-lg" onClick={() => updatePoStatus(selectedPo, 'DECLINED')}>Decline</button><button className="px-3 py-2 text-sm bg-blue-600 text-white rounded-lg" onClick={() => updatePoStatus(selectedPo, 'APPROVED')}>Approve</button></div></div>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100"><div><p className="text-xs uppercase font-bold text-gray-400">Purchase Order</p><h3 className="text-lg font-bold text-gray-900">#{selectedPo.poNumber || selectedPo.number || '—'} / {selectedPo.title || 'Untitled PO'}</h3><p className="text-sm text-gray-500">Status: {normalizePoStatus(selectedPo.status)}</p></div><div className="flex items-center gap-2"><button className="px-3 py-2 text-sm border rounded-lg" onClick={() => setShowDetails(false)}>Close</button><button className="px-3 py-2 text-sm border rounded-lg" onClick={() => openPoEditor(selectedPo)}>Edit</button><button className="px-3 py-2 text-sm bg-rose-500 text-white rounded-lg" onClick={() => updatePoStatus(selectedPo, 'Declined')}>Decline</button><button className="px-3 py-2 text-sm bg-blue-600 text-white rounded-lg" onClick={() => updatePoStatus(selectedPo, 'Approved')}>Approve</button></div></div>
             <div className="border-b border-gray-100 px-6"><div className="flex items-center gap-8 text-sm font-semibold text-gray-500"><button type="button" className="py-4 border-b-2 border-blue-600 text-gray-900">Details</button><button type="button" className="py-4">Activity</button><button type="button" className="py-4">Files</button></div></div>
             <div className="p-6 grid grid-cols-1 xl:grid-cols-[minmax(0,2fr)_320px] gap-6">
               <div className="space-y-6">
                 <div className="rounded-2xl border border-gray-200 overflow-hidden"><div className="px-6 py-4 bg-gray-50 text-lg font-bold text-gray-900">Shipping Information</div><div className="divide-y divide-gray-100 text-sm"><div className="grid grid-cols-2 gap-4 px-6 py-5"><span className="text-gray-500">Company Name</span><span className="font-medium text-gray-900">{selectedPo.shipping?.name || selectedPo.billing?.companyName || selectedPo.vendorDetails?.name || selectedPo.vendor?.name || selectedPo.vendor || '—'}</span></div><div className="grid grid-cols-2 gap-4 px-6 py-5"><span className="text-gray-500">Address</span><span className="font-medium text-gray-900">{selectedPo.shipping?.address || selectedPo.billing?.address || renderValue(selectedPo.address, '—')}</span></div><div className="grid grid-cols-2 gap-4 px-6 py-5"><span className="text-gray-500">Phone Number</span><span className="font-medium text-gray-900">{selectedPo.shipping?.phone || selectedPo.billing?.phone || selectedPo.vendorDetails?.phone || '—'}</span></div><div className="grid grid-cols-2 gap-4 px-6 py-5"><span className="text-gray-500">Fax</span><span className="font-medium text-gray-900">{selectedPo.billing?.fax || 'None'}</span></div></div></div>
-                <div className="rounded-2xl border border-gray-200 overflow-hidden"><div className="px-6 py-4 bg-gray-50 text-lg font-bold text-gray-900">Line Items</div><div className="overflow-x-auto"><table className="w-full text-left"><thead className="bg-gray-50 text-xs font-bold text-gray-600"><tr><th className="py-3 px-4">Item</th><th className="py-3 px-4">Cost</th><th className="py-3 px-4">Qty</th><th className="py-3 px-4 text-right">Total</th></tr></thead><tbody className="text-sm">{(selectedPo.items || []).map((item, idx) => { const qty = Number(item.quantity) || 0; const cost = Number(item.unitCost || item.cost) || 0; return (<tr key={idx} className="border-t border-gray-100"><td className="py-3 px-4"><div className="font-semibold text-gray-900">{item.name || 'Item'}</div>{item.description && <div className="text-xs text-gray-500 mt-1">{item.description}</div>}</td><td className="py-3 px-4 text-gray-700">${cost.toFixed(2)}</td><td className="py-3 px-4 text-gray-700">{qty}</td><td className="py-3 px-4 text-right font-bold text-gray-900">${(qty * cost).toFixed(2)}</td></tr>); })}{(selectedPo.items || []).length === 0 && (<tr><td colSpan={4} className="py-8 text-center text-gray-400">No items</td></tr>)}</tbody></table></div></div>
+                <div className="rounded-2xl border border-gray-200 overflow-hidden"><div className="px-6 py-4 bg-gray-50 text-lg font-bold text-gray-900">Line Items</div><div className="overflow-x-auto"><table className="w-full text-left"><thead className="bg-gray-50 text-xs font-bold text-gray-600"><tr><th className="py-3 px-4">Item</th><th className="py-3 px-4">Cost</th><th className="py-3 px-4">Qty</th><th className="py-3 px-4 text-right">Total</th></tr></thead><tbody className="text-sm">{(selectedPo.items || []).map((item, idx) => { const qty = Number(item.quantity) || 0; const cost = Number(item.unitCost || item.cost) || 0; return (<tr key={idx} className="border-t border-gray-100"><td className="py-3 px-4"><div className="font-semibold text-gray-900">{item.name || 'Item'}</div>{item.description && <div className="text-xs text-gray-500 mt-1">{item.description}</div>}</td><td className="py-3 px-4 text-gray-700">{formatPoMoney(cost)}</td><td className="py-3 px-4 text-gray-700">{qty}</td><td className="py-3 px-4 text-right font-bold text-gray-900">{formatPoMoney(qty * cost)}</td></tr>); })}{(selectedPo.items || []).length === 0 && (<tr><td colSpan={4} className="py-8 text-center text-gray-400">No items</td></tr>)}</tbody></table></div></div>
                 <div className="rounded-2xl border border-gray-200 overflow-hidden"><div className="px-6 py-4 bg-gray-50 text-lg font-bold text-gray-900">Additional Details</div><div className="divide-y divide-gray-100 text-sm"><div className="grid grid-cols-2 gap-4 px-6 py-5"><span className="text-gray-500">Purchase Date</span><span className="font-medium text-gray-900">{formatDate(selectedPo.purchaseDate || selectedPo.createdAt)}</span></div><div className="grid grid-cols-2 gap-4 px-6 py-5"><span className="text-gray-500">Shipping Method</span><span className="font-medium text-gray-900">{selectedPo.shippingMethod || 'None'}</span></div><div className="grid grid-cols-2 gap-4 px-6 py-5"><span className="text-gray-500">Terms</span><span className="font-medium text-gray-900">{selectedPo.terms || 'None'}</span></div><div className="grid grid-cols-2 gap-4 px-6 py-5"><span className="text-gray-500">F.O.B. Shipping Point</span><span className="font-medium text-gray-900">{selectedPo.fobShippingPoint || 'None'}</span></div><div className="grid grid-cols-2 gap-4 px-6 py-5"><span className="text-gray-500">Notes</span><span className="font-medium text-gray-900">{selectedPo.notes || selectedPo.additionalDetails || 'None'}</span></div></div></div>
               </div>
-              <div className="rounded-2xl border border-gray-200 bg-white"><div className="p-6 space-y-5"><div className="flex items-center justify-between gap-4"><span className="text-gray-500">Status</span><span className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold ${requestStatusColor(selectedPo.status || 'PENDING')}`}>{String(selectedPo.status || 'Pending').replace(/_/g, ' ')}</span></div><div className="flex items-center justify-between gap-4"><span className="text-gray-500">Vendor</span><span className="font-medium text-gray-900 text-right">{selectedPo.vendor?.name || selectedPo.vendorDetails?.name || selectedPo.vendor || '—'}</span></div><div className="flex items-center justify-between gap-4"><span className="text-gray-500">Due Date</span><span className="font-medium text-gray-900 text-right">{formatDate(selectedPo.expectedDate)}</span></div><div className="flex items-center justify-between gap-4"><span className="text-gray-500">Added By</span><span className="font-medium text-gray-900 text-right">{selectedPo.createdBy?.name || selectedPo.createdBy?.email || '—'}</span></div><div className="flex items-center justify-between gap-4"><span className="text-gray-500">Date Added</span><span className="font-medium text-gray-900 text-right">{formatDate(selectedPo.createdAt)}</span></div><div className="flex items-center justify-between gap-4"><span className="text-gray-500">Cost</span><span className="font-medium text-gray-900 text-right">${getPoTotal(selectedPo).toFixed(2)}</span></div><div className="flex items-center justify-between gap-4"><span className="text-gray-500">Category</span><span className="font-medium text-gray-900 text-right">{selectedPo.category || 'None'}</span></div><div className="flex items-start justify-between gap-4"><span className="text-gray-500">Public Link</span><div className="flex max-w-[240px] items-center gap-2 text-right"><span className="truncate font-medium text-blue-700">{selectedPo.publicLink || 'Not available'}</span>{selectedPo.publicLink ? <button type="button" className="rounded-lg border border-gray-200 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50" onClick={async () => { try { await navigator.clipboard.writeText(selectedPo.publicLink); alert('Public link copied.'); } catch (error) { alert(`Copy failed. Use this link manually:\n${selectedPo.publicLink}`); } }}>Copy Link</button> : null}</div></div><div className="border-t border-gray-100 pt-5"><div className="grid grid-cols-[96px_minmax(0,1fr)] gap-4 text-sm"><span className="text-gray-500">Additional Details</span><span className="font-medium text-gray-900">{selectedPo.notes || selectedPo.additionalDetails || 'None'}</span></div></div></div><div className="border-t border-gray-100 p-6"><h4 className="text-lg font-bold text-gray-900 mb-5">Requester Information</h4><div className="space-y-5 text-sm"><div className="flex items-start justify-between gap-4"><span className="text-gray-500">Requisitioner</span><span className="font-medium text-gray-900 text-right">{selectedPo.requisitioner || selectedPo.createdBy?.name || 'Requisitioner'}</span></div><div className="flex items-start justify-between gap-4"><span className="text-gray-500">Company Name</span><span className="font-medium text-gray-900 text-right">{selectedPo.billing?.companyName || selectedPo.shipping?.name || '—'}</span></div><div className="flex items-start justify-between gap-4"><span className="text-gray-500">Address</span><span className="font-medium text-gray-900 text-right">{selectedPo.billing?.address || selectedPo.shipping?.address || '—'}</span></div><div className="flex items-start justify-between gap-4"><span className="text-gray-500">Phone Number</span><span className="font-medium text-gray-900 text-right">{selectedPo.billing?.phone || selectedPo.shipping?.phone || '—'}</span></div><div className="flex items-start justify-between gap-4"><span className="text-gray-500">Fax</span><span className="font-medium text-gray-900 text-right">{selectedPo.billing?.fax || '—'}</span></div></div></div></div>
+              <div className="rounded-2xl border border-gray-200 bg-white"><div className="p-6 space-y-5"><div className="flex items-center justify-between gap-4"><span className="text-gray-500">Status</span><span className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold ${requestStatusColor(normalizePoStatus(selectedPo.status))}`}>{normalizePoStatus(selectedPo.status)}</span></div><div className="flex items-center justify-between gap-4"><span className="text-gray-500">Vendor</span><span className="font-medium text-gray-900 text-right">{selectedPo.vendor?.name || selectedPo.vendorDetails?.name || selectedPo.vendor || '—'}</span></div><div className="flex items-center justify-between gap-4"><span className="text-gray-500">Due Date</span><span className="font-medium text-gray-900 text-right">{formatDate(selectedPo.expectedDate)}</span></div><div className="flex items-center justify-between gap-4"><span className="text-gray-500">Added By</span><span className="font-medium text-gray-900 text-right">{selectedPo.createdBy?.name || selectedPo.createdBy?.email || '—'}</span></div><div className="flex items-center justify-between gap-4"><span className="text-gray-500">Date Added</span><span className="font-medium text-gray-900 text-right">{formatDate(selectedPo.createdAt)}</span></div><div className="flex items-center justify-between gap-4"><span className="text-gray-500">Cost</span><span className="font-medium text-gray-900 text-right">{formatPoMoney(getPoTotal(selectedPo))}</span></div><div className="flex items-center justify-between gap-4"><span className="text-gray-500">Category</span><span className="font-medium text-gray-900 text-right">{selectedPo.category || 'None'}</span></div><div className="flex items-start justify-between gap-4"><span className="text-gray-500">Public Link</span><div className="flex max-w-[240px] items-center gap-2 text-right"><span className="truncate font-medium text-blue-700">{selectedPo.publicLink || 'Not available'}</span>{selectedPo.publicLink ? <button type="button" className="rounded-lg border border-gray-200 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50" onClick={async () => { try { await navigator.clipboard.writeText(selectedPo.publicLink); alert('Public link copied.'); } catch (error) { alert(`Copy failed. Use this link manually:\n${selectedPo.publicLink}`); } }}>Copy Link</button> : null}</div></div><div className="border-t border-gray-100 pt-5"><div className="grid grid-cols-[96px_minmax(0,1fr)] gap-4 text-sm"><span className="text-gray-500">Additional Details</span><span className="font-medium text-gray-900">{selectedPo.notes || selectedPo.additionalDetails || 'None'}</span></div></div></div><div className="border-t border-gray-100 p-6"><h4 className="text-lg font-bold text-gray-900 mb-5">Requester Information</h4><div className="space-y-5 text-sm"><div className="flex items-start justify-between gap-4"><span className="text-gray-500">Requisitioner</span><span className="font-medium text-gray-900 text-right">{selectedPo.requisitioner || selectedPo.createdBy?.name || 'Requisitioner'}</span></div><div className="flex items-start justify-between gap-4"><span className="text-gray-500">Company Name</span><span className="font-medium text-gray-900 text-right">{selectedPo.billing?.companyName || selectedPo.shipping?.name || '—'}</span></div><div className="flex items-start justify-between gap-4"><span className="text-gray-500">Address</span><span className="font-medium text-gray-900 text-right">{selectedPo.billing?.address || selectedPo.shipping?.address || '—'}</span></div><div className="flex items-start justify-between gap-4"><span className="text-gray-500">Phone Number</span><span className="font-medium text-gray-900 text-right">{selectedPo.billing?.phone || selectedPo.shipping?.phone || '—'}</span></div><div className="flex items-start justify-between gap-4"><span className="text-gray-500">Fax</span><span className="font-medium text-gray-900 text-right">{selectedPo.billing?.fax || '—'}</span></div></div></div></div>
             </div>
           </div>
         </div>
@@ -37716,6 +37907,8 @@ const ClientAnalyticsTab = ({
   );
   const isApprovedWorkOrder = (issue) => {
     const status = String(issue?.status || '').toUpperCase();
+    const referenceType = String(issue?.referenceType || '').toLowerCase();
+    const issueType = String(issue?.issueType || issue?.type || '').toLowerCase();
     const hasWorkOrderRef = !!(
       issue?.workOrderId ||
       issue?.workOrder ||
@@ -37727,6 +37920,11 @@ const ClientAnalyticsTab = ({
     return Boolean(issue?.approved)
       || hasWorkOrderRef
       || isPmLinkedIssue(issue)
+      || Boolean(issue?.createdBySchedule)
+      || Boolean(issue?.isPreventive)
+      || referenceType === 'workorder'
+      || referenceType === 'work_order'
+      || issueType === 'preventive'
       || status === 'APPROVED'
       || status === 'OPEN'
       || status.includes('IN PROGRESS')
@@ -37751,7 +37949,8 @@ const ClientAnalyticsTab = ({
   };
   const isRequestIssue = (issue) => {
     if (!issue || isRejectedRequest(issue)) return false;
-    return isRequestRecord(issue) || !isApprovedWorkOrder(issue);
+    if (isApprovedWorkOrder(issue)) return false;
+    return isRequestRecord(issue);
   };
   const isReactiveRequest = (issue) => {
     if (!issue || isPreventiveIssue(issue)) return false;
@@ -44757,49 +44956,6 @@ const ClientMetersTab = ({
                 <section className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
                   <div className="mb-6 flex items-start justify-between gap-6">
                     <div>
-                      <h3 className="text-[1.65rem] font-bold text-gray-900">Reading Charts</h3>
-                      <p className="mt-2 text-[0.98rem] text-gray-500">Visualize reading changes, consumption, and monthly usage for this meter.</p>
-                    </div>
-                    <button type="button" onClick={() => setShowAddReading(true)} className="rounded-lg bg-blue-600 px-5 py-3 text-base font-semibold text-white hover:bg-blue-700">
-                      Add Reading
-                    </button>
-                  </div>
-                  {selectedMeterChartRows.length > 0 ? (
-                    <div className="grid gap-5 2xl:grid-cols-2">
-                      <div className="rounded-2xl border border-gray-200 p-5">
-                        <div className="mb-4 text-[1rem] font-bold text-gray-900">Reading Trend</div>
-                        <div className="h-[300px]">
-                          <Chart type="line" data={selectedMeterTrendChartData} options={selectedMeterChartOptions} />
-                        </div>
-                      </div>
-                      <div className="rounded-2xl border border-gray-200 p-5">
-                        <div className="mb-4 text-[1rem] font-bold text-gray-900">Consumption Between Readings</div>
-                        <div className="h-[300px]">
-                          <Chart type="bar" data={selectedMeterConsumptionChartData} options={selectedMeterChartOptions} />
-                        </div>
-                      </div>
-                      <div className="rounded-2xl border border-gray-200 p-5 2xl:col-span-2">
-                        <div className="mb-4 text-[1rem] font-bold text-gray-900">Monthly Breakdown</div>
-                        {selectedMeterMonthlyChartData.labels.length > 0 ? (
-                          <div className="h-[300px]">
-                            <Chart type="doughnut" data={selectedMeterMonthlyChartData} options={selectedMeterDoughnutOptions} />
-                          </div>
-                        ) : (
-                          <div className="flex h-[220px] items-center justify-center rounded-xl bg-gray-50 text-[0.95rem] text-gray-500">
-                            Add at least two readings in a month to see the monthly breakdown.
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="rounded-xl bg-gray-50 px-6 py-12 text-center text-[0.95rem] text-gray-500">
-                      Add readings to see charts for this meter.
-                    </div>
-                  )}
-                </section>
-                <section className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
-                  <div className="mb-6 flex items-start justify-between gap-6">
-                    <div>
                       <h3 className="text-[1.65rem] font-bold text-gray-900">Monthly Consumption</h3>
                       <p className="mt-2 text-[0.98rem] text-gray-500">Track month-by-month usage so the company can compare trends and make spending decisions.</p>
                     </div>
@@ -44879,7 +45035,51 @@ const ClientMetersTab = ({
                 </section>
               </div>
             ) : (
-              <section className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
+              <div className="space-y-8">
+                <section className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
+                  <div className="mb-6 flex items-start justify-between gap-6">
+                    <div>
+                      <h3 className="text-[1.65rem] font-bold text-gray-900">Reading Charts</h3>
+                      <p className="mt-2 text-[0.98rem] text-gray-500">Visualize reading changes, consumption, and monthly usage for this meter.</p>
+                    </div>
+                    <button type="button" onClick={() => setShowAddReading(true)} className="rounded-lg bg-blue-600 px-5 py-3 text-base font-semibold text-white hover:bg-blue-700">
+                      Add Reading
+                    </button>
+                  </div>
+                  {selectedMeterChartRows.length > 0 ? (
+                    <div className="grid gap-5 2xl:grid-cols-2">
+                      <div className="rounded-2xl border border-gray-200 p-5">
+                        <div className="mb-4 text-[1rem] font-bold text-gray-900">Reading Trend</div>
+                        <div className="h-[300px]">
+                          <Chart type="line" data={selectedMeterTrendChartData} options={selectedMeterChartOptions} />
+                        </div>
+                      </div>
+                      <div className="rounded-2xl border border-gray-200 p-5">
+                        <div className="mb-4 text-[1rem] font-bold text-gray-900">Consumption Between Readings</div>
+                        <div className="h-[300px]">
+                          <Chart type="bar" data={selectedMeterConsumptionChartData} options={selectedMeterChartOptions} />
+                        </div>
+                      </div>
+                      <div className="rounded-2xl border border-gray-200 p-5 2xl:col-span-2">
+                        <div className="mb-4 text-[1rem] font-bold text-gray-900">Monthly Breakdown</div>
+                        {selectedMeterMonthlyChartData.labels.length > 0 ? (
+                          <div className="h-[300px]">
+                            <Chart type="doughnut" data={selectedMeterMonthlyChartData} options={selectedMeterDoughnutOptions} />
+                          </div>
+                        ) : (
+                          <div className="flex h-[220px] items-center justify-center rounded-xl bg-gray-50 text-[0.95rem] text-gray-500">
+                            Add at least two readings in a month to see the monthly breakdown.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="rounded-xl bg-gray-50 px-6 py-12 text-center text-[0.95rem] text-gray-500">
+                      Add readings to see charts for this meter.
+                    </div>
+                  )}
+                </section>
+                <section className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
                 <h3 className="mb-8 text-[1.65rem] font-bold text-gray-900">Reading History</h3>
                 <div className="overflow-hidden rounded-2xl border border-gray-200">
                   <table className="min-w-full border-collapse text-left">
@@ -44903,6 +45103,7 @@ const ClientMetersTab = ({
                   </table>
                 </div>
               </section>
+              </div>
             )}
           </div>
           <aside className="bg-white">
@@ -48858,10 +49059,6 @@ function CreatePmModal({
 
   const handleCreate = async () => {
     setError('');
-    if (!isAssetMode && !workOrderDetails?.title?.trim()) {
-      setError('Work order title is required.');
-      return;
-    }
     setCreating(true);
     try {
       const firstAssetStart = combineDateAndTime(assetRows[0]?.startDate, assetRows[0]?.startTime);
@@ -49476,20 +49673,21 @@ function WorkOrderDetailsModal({ open, onClose, onSave, mode = 'create', tasks =
   const requiredWorkOrderTitle = mode === 'edit-pm'
     ? workOrderDetails?.pmTitle
     : workOrderDetails?.title;
-  const isWorkOrderSaveDisabled = !String(requiredWorkOrderTitle || '').trim()
-    || !String(workOrderDetails?.description || '').trim();
+  const isWorkOrderSaveDisabled = false;
   const handleSaveWorkOrder = React.useCallback(async () => {
-    const titleValue = mode === 'edit-pm' ? workOrderDetails?.pmTitle : workOrderDetails?.title;
-    if (!String(titleValue || '').trim() || !String(workOrderDetails?.description || '').trim()) {
-      alert('Title and description are required.');
-      return;
-    }
+    const titleValue = String(requiredWorkOrderTitle || '').trim() || 'Untitled Work Order';
+    const descriptionValue = String(workOrderDetails?.description || '').trim();
+    const payload = {
+      ...workOrderDetails,
+      ...(mode === 'edit-pm' ? { pmTitle: titleValue } : { title: titleValue }),
+      description: descriptionValue,
+    };
     if (typeof onSave === 'function') {
-      await onSave(workOrderDetails);
+      await onSave(payload);
       return;
     }
     onClose?.();
-  }, [mode, onClose, onSave, workOrderDetails]);
+  }, [mode, onClose, onSave, requiredWorkOrderTitle, workOrderDetails]);
   const locationOptions = React.useMemo(
     () => {
       const propertyOptions = (Array.isArray(companyProperties) ? companyProperties : [])
@@ -49923,7 +50121,7 @@ function WorkOrderDetailsModal({ open, onClose, onSave, mode = 'create', tasks =
             <h3 className="text-[22px] font-bold text-gray-900">Work Order Details</h3>
             {mode === 'edit-pm' && (
               <div className="space-y-1">
-                <label className="text-sm font-bold text-gray-800">PM Title <span className="text-rose-500">*</span></label>
+                <label className="text-sm font-bold text-gray-800">PM Title</label>
                 <input
                   className="w-full border border-gray-300 rounded-lg px-4 py-3 text-[15px]"
                   placeholder="PM Title"
@@ -49934,7 +50132,7 @@ function WorkOrderDetailsModal({ open, onClose, onSave, mode = 'create', tasks =
             )}
             {mode !== 'edit-pm' && (
               <div className="space-y-1">
-                <label className="text-sm font-bold text-gray-800">Work Order Title <span className="text-rose-500">*</span></label>
+                <label className="text-sm font-bold text-gray-800">Work Order Title</label>
                 <input
                   className="w-full border border-gray-300 rounded-lg px-4 py-3 text-[15px]"
                   placeholder="Work Order Title"
@@ -49944,7 +50142,7 @@ function WorkOrderDetailsModal({ open, onClose, onSave, mode = 'create', tasks =
               </div>
             )}
             <div className="space-y-1">
-              <label className="text-sm font-bold text-gray-800">Description <span className="text-rose-500">*</span></label>
+              <label className="text-sm font-bold text-gray-800">Description</label>
               <textarea
                 className="w-full border border-gray-300 rounded-lg px-4 py-3 text-[15px] min-h-[120px]"
                 placeholder="Describe the work order"
@@ -50037,6 +50235,7 @@ function WorkOrderDetailsModal({ open, onClose, onSave, mode = 'create', tasks =
                       ...w,
                       assetId: e.target.value,
                       assetName: selectedAsset?.name || selectedAsset?.title || '',
+                      propertyId: selectedAsset?.propertyId || selectedAsset?.property?._id || selectedAsset?.property?.id || w.propertyId || '',
                       location: getAssetLocationLabel(selectedAsset) || w.location || '',
                     }));
                   }}
@@ -50054,7 +50253,17 @@ function WorkOrderDetailsModal({ open, onClose, onSave, mode = 'create', tasks =
                 <select
                   className="w-full border border-gray-300 rounded-lg px-4 py-3 text-[15px]"
                   value={workOrderDetails?.location || ''}
-                  onChange={(e) => setWorkOrderDetails?.((w) => ({ ...w, location: e.target.value }))}
+                  onChange={(e) => {
+                    const nextLocation = e.target.value;
+                    const selectedProperty = (companyProperties || []).find((property) => (
+                      String(property?.name || property?.title || property?.address || property?.location || '') === String(nextLocation)
+                    ));
+                    setWorkOrderDetails?.((w) => ({
+                      ...w,
+                      location: nextLocation,
+                      propertyId: selectedProperty?._id || selectedProperty?.id || w.propertyId || '',
+                    }));
+                  }}
                 >
                   <option value="">Select location</option>
                   {locationOptions.map((location) => (
