@@ -745,9 +745,25 @@ function ManagerDashboard() {
   useEffect(() => {
     const tab = new URLSearchParams(location.search).get('tab');
     if (tab) {
-      setActiveTab(tab);
+      setActiveTab(tab === 'manage-issue' ? 'issues' : tab);
     }
   }, [location.search]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const targetId = params.get('id') || params.get('workOrderId') || params.get('issueId');
+    if (!targetId || allIssues.length === 0) return;
+
+    const targetIssue = allIssues.find((issue) => String(issue?._id || issue?.id || '') === String(targetId));
+    if (!targetIssue) return;
+
+    setActiveTab('issues');
+    setDetailModal({
+      open: true,
+      type: targetIssue.approved ? 'issue' : 'request',
+      item: targetIssue,
+    });
+  }, [location.search, allIssues]);
 
   // Load logged-in user from localStorage for sidebar display
   let loggedUser = null;

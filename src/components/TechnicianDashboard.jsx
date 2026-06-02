@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import backgroundVideo from "../assets/136906-765457769_small.mp4";
 import api from "../api/axios";
 import { getImageUrl } from '../utils/imageUrl';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import Header from "./Header";
 import { useTranslation } from "../i18n/LanguageContext";
 import { MessageSquare, Search, ArrowUpDown, LayoutDashboard, SlidersHorizontal, MapPin, Flag, ChevronDown, MoreHorizontal, Image as ImageIcon } from "lucide-react";
@@ -543,6 +543,7 @@ const TechnicianDashboard = () => {
   const [directMessageDraft, setDirectMessageDraft] = useState('');
   const [directMessageSending, setDirectMessageSending] = useState(false);
   const [activeSection, setActiveSection] = useState('overview');
+  const location = useLocation();
   const navigate = useNavigate();
   const userName = user?.name || user?.username || 'Technician';
   const currentUserId = String(user?._id || user?.id || '');
@@ -721,7 +722,26 @@ const TechnicianDashboard = () => {
 
   const handleViewJob = (job) => {
     setSelectedJob(job);
+    setActiveSection('workOrders');
   };
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const section = params.get('section');
+    const targetId = params.get('id') || params.get('workOrderId') || params.get('issueId');
+
+    if (section === 'workOrders') {
+      setActiveSection('workOrders');
+    }
+
+    if (!targetId || jobs.length === 0) return;
+
+    const targetJob = jobs.find((job) => String(job?._id || job?.id || '') === String(targetId));
+    if (targetJob) {
+      setSelectedJob(targetJob);
+      setActiveSection('workOrders');
+    }
+  }, [location.search, jobs]);
 
   const isOverdue = (dueDate) => {
     if (!dueDate) return false;
