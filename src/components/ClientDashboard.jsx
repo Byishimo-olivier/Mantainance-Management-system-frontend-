@@ -6547,6 +6547,32 @@ const getPaidSeatLimit = (subscription, company = null) => {
   return Number.isFinite(explicitLimit) && explicitLimit > 0 ? Math.max(2, Math.ceil(explicitLimit)) : 2;
 };
 
+const isFreeTrialCompany = (subscription, company = null) => {
+  const status = String(subscription?.status || '').toLowerCase();
+  const metadata = subscription?.metadata || {};
+  const companyMeta = company || {};
+  const adminGrantedFreeInvite = Boolean(
+    metadata?.allowFreeStaffInvites === true ||
+    metadata?.freeStaffInvites === true ||
+    metadata?.allowFreeInvite === true ||
+    companyMeta?.allowFreeStaffInvites === true ||
+    companyMeta?.freeStaffInvites === true ||
+    companyMeta?.allowFreeInvite === true
+  );
+
+  return Boolean(
+    adminGrantedFreeInvite ||
+    status === 'trial' ||
+    subscription?.plan === 'trial' ||
+    metadata?.isTrialPeriod === true ||
+    metadata?.onFreeTrial === true ||
+    metadata?.trialDaysRemaining > 0 ||
+    companyMeta?.onFreeTrial === true ||
+    companyMeta?.subscriptionStatus === 'trial' ||
+    companyMeta?.trialDaysRemaining > 0
+  );
+};
+
 function InviteUsersModal({ open, onClose, onInvite, unusedSeats = '—', busy = false }) {
   const [rows, setRows] = React.useState([{ email: '', role: 'administrator' }]);
   const [rolePickerForRow, setRolePickerForRow] = React.useState(null);
@@ -6649,7 +6675,7 @@ function InviteUsersModal({ open, onClose, onInvite, unusedSeats = '—', busy =
         </div>
 
         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between gap-4 text-sm">
-          <div className="text-gray-600">Unused paid seats: <span className="font-semibold text-gray-900">{unusedSeats}</span></div>
+          <div className="text-gray-600">Unused seats: <span className="font-semibold text-gray-900">{unusedSeats}</span></div>
           <a
             href="#"
             onClick={(e) => e.preventDefault()}
@@ -15458,8 +15484,9 @@ function ClientDashboard() {
     if (!Array.isArray(invites) || invites.length === 0) return;
     try {
       setInviteUsersBusy(true);
+      const freeTrialInviteMode = isFreeTrialCompany(companySubscription, subscribedCompany);
       const paidInvites = invites.filter((invite) => isPaidInviteRole(invite.role));
-      if (paidInvites.length > 0) {
+      if (paidInvites.length > 0 && !freeTrialInviteMode) {
         const existingPaidSeats = (people || []).filter((person) => {
           const role = String(person?.role || '').toLowerCase();
           const accessLevel = String(person?.accessLevel || '').toLowerCase();
@@ -29969,6 +29996,19 @@ function ClientDashboard() {
                 onClose={() => setInviteUsersOpen(false)}
                 onInvite={handleInviteUsers}
                 unusedSeats={(() => {
+                  if (isFreeTrialCompany(companySubscription, subscribedCompany)) {
+                    const metadata = companySubscription?.metadata || {};
+                    const companyMeta = subscribedCompany || {};
+                    const adminGranted = Boolean(
+                      metadata?.allowFreeStaffInvites === true ||
+                      metadata?.freeStaffInvites === true ||
+                      metadata?.allowFreeInvite === true ||
+                      companyMeta?.allowFreeStaffInvites === true ||
+                      companyMeta?.freeStaffInvites === true ||
+                      companyMeta?.allowFreeInvite === true
+                    );
+                    return adminGranted ? 'Unlimited (granted by manager)' : 'Unlimited during trial';
+                  }
                   const total = getPaidSeatLimit(companySubscription, subscribedCompany);
                   if (!Number.isFinite(total) || total <= 0) return '—';
                   return Math.max(0, total - (people?.length || 0));
@@ -33588,6 +33628,15 @@ const ClientIntelligenceTab = ({
 
 
 const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
+  const getAuthenticatedUserName = React.useCallback(() => {
+    try {
+      const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+      return storedUser?.name || storedUser?.fullName || storedUser?.username || storedUser?.email || '';
+    } catch {
+      return '';
+    }
+  }, []);
+
   const createEmptyPart = () => ({
     name: '',
     partNumber: '',
@@ -34404,9 +34453,17 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
   const handleApprovePartRequest = async (requestId) => {
     setPartRequestAction(`${requestId}:approve`);
     try {
-      await api.put(`/api/part-requests/${requestId}/approve`);
+      const res = await api.put(`/api/part-requests/${requestId}/approve`);
       await loadInventoryData();
-      alert('Part request approved');
+      const decision = res?.data?.action || res?.data?.stockDecision || res?.data?.partRequest?.stockDecision;
+      const poNumber = res?.data?.purchaseOrder?.poNumber || res?.data?.partRequest?.purchaseOrderNumber;
+      if (decision === 'ALLOCATED_FROM_STOCK') {
+        alert('Part request approved and allocated from inventory stock.');
+      } else if (decision === 'PURCHASE_ORDER_CREATED') {
+        alert(`Part request approved. Stock is insufficient, so purchase order ${poNumber || ''} was created.`);
+      } else {
+        alert('Part request approved');
+      }
     } catch (err) {
       alert(err.response?.data?.error || err.message || 'Failed to approve');
     } finally {
@@ -34442,11 +34499,10 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
     }
   };
 
-  const handleRecordGivenBy = async (requestId, givenBy, quantityGiven) => {
-    if (!String(givenBy || '').trim()) return alert('Given by is required');
+  const handleRecordGivenBy = async (requestId, quantityGiven) => {
     setPartRequestAction(`${requestId}:record-given`);
     try {
-      await api.put(`/api/part-requests/${requestId}/record-given`, { givenBy, quantityGiven });
+      await api.put(`/api/part-requests/${requestId}/record-given`, { quantityGiven });
       await loadInventoryData();
     } catch (err) {
       alert(err.response?.data?.error || err.message || 'Failed to record giver');
@@ -34826,6 +34882,8 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
                 ['Requested From', formatLabel(selectedPartRequest.requestedFrom || 'Manual')],
                 ['Work Order', selectedPartRequest.workOrderId || 'None'],
                 ['Preventive Maintenance', selectedPartRequest.pmId || 'None'],
+                ['Stock Decision', selectedPartRequest.stockDecision ? formatLabel(selectedPartRequest.stockDecision) : 'Not decided'],
+                ['Purchase Order', selectedPartRequest.purchaseOrderNumber || selectedPartRequest.purchaseOrderId || 'None'],
                 ['Approved By', selectedPartRequest.approvedBy || 'Not approved'],
                 ['Declined By', selectedPartRequest.declinedBy || 'Not declined'],
               ].map(([label, value]) => (
@@ -35719,6 +35777,16 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
                         <h3 className="text-base font-bold text-gray-900">{request.partName || 'Part request'}</h3>
                         <span className={`rounded-full px-3 py-1 text-xs font-bold ${getStatusBadgeClasses(status)}`}>{formatLabel(status)}</span>
                         <span className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-semibold text-gray-600">{formatLabel(request.requestedFrom || 'Manual')}</span>
+                        {request.stockDecision && (
+                          <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                            {formatLabel(request.stockDecision)}
+                          </span>
+                        )}
+                        {request.purchaseOrderNumber && (
+                          <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
+                            PO {request.purchaseOrderNumber}
+                          </span>
+                        )}
                       </div>
                       <div className="mt-2 grid gap-x-6 gap-y-1 text-sm text-gray-600 sm:grid-cols-2 lg:grid-cols-4">
                         <div><span className="font-semibold text-gray-700">Qty:</span> {request.quantityRequested || 1}</div>
@@ -35775,10 +35843,12 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
                       <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
                         <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-500">Given By</label>
                         <div className="mb-2 grid grid-cols-[1fr_88px] gap-2">
-                          <input value={form.givenBy} onChange={(e) => updatePartRequestForm(request, 'givenBy', e.target.value)} placeholder={allocations.givenBy || 'Name'} className="rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-500" />
+                          <div className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700">
+                            {allocations.givenBy || getAuthenticatedUserName() || 'Current user'}
+                          </div>
                           <input type="number" min="0" value={form.quantityGiven} onChange={(e) => updatePartRequestForm(request, 'quantityGiven', e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-500" />
                         </div>
-                        <button type="button" onClick={() => handleRecordGivenBy(requestId, form.givenBy, Number(form.quantityGiven || 0))} className="w-full rounded-lg bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50">Save Giver</button>
+                        <button type="button" onClick={() => handleRecordGivenBy(requestId, Number(form.quantityGiven || 0))} className="w-full rounded-lg bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50">Save Giver</button>
                       </div>
                       <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
                         <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-500">Received By</label>

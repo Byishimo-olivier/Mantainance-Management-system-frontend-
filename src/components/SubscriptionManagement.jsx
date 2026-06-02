@@ -143,6 +143,34 @@ const SubscriptionManagement = () => {
     }
   };
 
+  const handleToggleFreeStaffInvites = async (subscription) => {
+    const currentValue = Boolean(
+      subscription?.metadata?.allowFreeStaffInvites === true ||
+      subscription?.metadata?.freeStaffInvites === true ||
+      subscription?.metadata?.allowFreeInvite === true
+    );
+    const nextValue = !currentValue;
+
+    try {
+      setLoading(true);
+      const updatedMetadata = {
+        ...(subscription?.metadata || {}),
+        allowFreeStaffInvites: nextValue,
+        freeStaffInvites: nextValue,
+        allowFreeInvite: nextValue,
+        grantedFreeStaffInviteBy: 'manager-dashboard',
+      };
+
+      const response = await subscriptionAPI.updateSubscription(subscription.id, { metadata: updatedMetadata });
+      setSubscriptions((prev) => prev.map((item) => item.id === subscription.id ? response.data : item));
+      showSuccess(nextValue ? 'Free staff-invite privilege granted.' : 'Free staff-invite privilege removed.');
+    } catch (err) {
+      setError(err?.error || err?.message || 'Failed to update free staff-invite privilege');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleRenewSubscription = async (subscription) => {
     if (!pricing) {
       setError('Pricing not loaded yet');
@@ -597,6 +625,15 @@ const SubscriptionManagement = () => {
                           title="Edit / Change Plan"
                         >
                           <Edit2 size={18} />
+                        </button>
+
+                        <button
+                          onClick={() => handleToggleFreeStaffInvites(subscription)}
+                          disabled={loading}
+                          className={`disabled:opacity-50 ${Boolean(subscription?.metadata?.allowFreeStaffInvites || subscription?.metadata?.freeStaffInvites || subscription?.metadata?.allowFreeInvite) ? 'text-emerald-600 hover:text-emerald-800' : 'text-amber-600 hover:text-amber-800'}`}
+                          title="Grant / revoke free staff invites"
+                        >
+                          <Shield size={18} />
                         </button>
 
                         <button

@@ -370,6 +370,32 @@ export default function AdminGrowthPanel() {
                           />
                         </div>
                       </td>
+                      {/* Free Staff Invite Privilege Toggle */}
+                      <td className="px-4 py-4">
+                        <label className="flex items-center gap-2 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={!!company.allowFreeStaffInvites}
+                            onChange={async (e) => {
+                              setSavingId(company.id);
+                              try {
+                                await api.patch(`/subscriptions/company/${company.id}/free-staff-invites`, {
+                                  allowFreeStaffInvites: e.target.checked
+                                });
+                                await loadData();
+                              } catch (err) {
+                                alert(err.response?.data?.error || err.message || 'Failed to update privilege');
+                              } finally {
+                                setSavingId('');
+                              }
+                            }}
+                            disabled={savingId === company.id}
+                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          />
+                          <span className="text-xs font-semibold text-slate-700">Free Staff Invite</span>
+                          {savingId === company.id && <span className="ml-2 text-blue-500 animate-pulse">Saving...</span>}
+                        </label>
+                      </td>
                       <td className="px-4 py-4">
                         <button
                           type="button"
