@@ -769,6 +769,29 @@ const TechnicianDashboard = () => {
       .catch(err => console.warn('Failed to fetch inventory parts:', err));
   };
 
+  const fetchMaterialRequests = (userOverride = null) => {
+    let activeUser = userOverride || user || {};
+    if (!activeUser?._id && !activeUser?.id && !activeUser?.userId) {
+      try {
+        activeUser = JSON.parse(localStorage.getItem('user') || '{}');
+      } catch {
+        activeUser = {};
+      }
+    }
+
+    const techId = activeUser?._id || activeUser?.id || activeUser?.userId || '';
+    const request = techId
+      ? api.get(`/api/material-requests/tech/${techId}`)
+      : api.get('/api/material-requests');
+
+    request
+      .then(res => setMaterialRequests(Array.isArray(res.data) ? res.data : []))
+      .catch(err => {
+        console.warn('Failed to fetch material requests:', err?.response?.data || err.message);
+        setMaterialRequests([]);
+      });
+  };
+
   const [alerts, setAlerts] = useState([]);
   const [reminders, setReminders] = useState([]); // Keep for backward compatibility or refactor to use alerts
 
@@ -1206,7 +1229,7 @@ const TechnicianDashboard = () => {
       const u = JSON.parse(userStr);
       setUser(u);
       fetchAssignedIssues();
-      fetchMaterialRequests();
+      fetchMaterialRequests(u);
       fetchInventoryParts();
     }
   }, []);
