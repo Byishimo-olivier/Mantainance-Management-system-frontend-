@@ -599,6 +599,69 @@ const useBulkSelection = (items, getId) => {
   return { selectedIds, allSelected, toggleAll, toggleOne, clear };
 };
 
+const usePagination = (items = [], pageSize = 10) => {
+  const [page, setPage] = useState(1);
+  const totalItems = Array.isArray(items) ? items.length : 0;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+
+  useEffect(() => {
+    setPage(1);
+  }, [totalItems, pageSize]);
+
+  useEffect(() => {
+    setPage((prev) => Math.min(Math.max(prev, 1), totalPages));
+  }, [totalPages]);
+
+  const startIndex = (page - 1) * pageSize;
+  const endIndex = Math.min(startIndex + pageSize, totalItems);
+  const pageItems = (Array.isArray(items) ? items : []).slice(startIndex, endIndex);
+
+  return {
+    page,
+    pageItems,
+    pageSize,
+    setPage,
+    startIndex,
+    endIndex,
+    totalItems,
+    totalPages,
+  };
+};
+
+const PaginationControls = ({ pagination, label = 'items' }) => {
+  if (!pagination || pagination.totalItems <= pagination.pageSize) return null;
+  return (
+    <div className="flex flex-col gap-3 border-t border-slate-100 bg-white/80 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+      <div className="text-xs font-semibold text-slate-500">
+        Showing {pagination.startIndex + 1}-{pagination.endIndex} of {pagination.totalItems} {label}
+      </div>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => pagination.setPage((page) => Math.max(1, page - 1))}
+          disabled={pagination.page === 1}
+          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <ChevronLeft className="h-3.5 w-3.5" />
+          Prev
+        </button>
+        <span className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600">
+          Page {pagination.page} / {pagination.totalPages}
+        </span>
+        <button
+          type="button"
+          onClick={() => pagination.setPage((page) => Math.min(pagination.totalPages, page + 1))}
+          disabled={pagination.page === pagination.totalPages}
+          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Next
+          <ChevronRight className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    </div>
+  );
+};
+
 const BulkActionBar = ({ count, label, onDelete }) => {
   if (!count) return null;
   return (
@@ -1437,16 +1500,16 @@ function ManagerDashboard() {
             label={t("manager.sidebar.dashboard")}
           />
           <NavItem
-            active={false}
-            onClick={() => { }}
+            active={activeTab === 'intelligence'}
+            onClick={() => setActiveTab('intelligence')}
             icon={Brain}
             label={t("manager.sidebar.intelligence")}
             badge="New"
             badgeColor="bg-blue-600"
           />
           <NavItem
-            active={false}
-            onClick={() => { }}
+            active={activeTab === 'studio'}
+            onClick={() => setActiveTab('studio')}
             icon={Video}
             label={t("manager.sidebar.studio")}
             badge="New"
@@ -1559,8 +1622,8 @@ function ManagerDashboard() {
             label={t("manager.sidebar.checklists")}
           />
           <NavItem
-            active={false}
-            onClick={() => { }}
+            active={activeTab === 'files'}
+            onClick={() => setActiveTab('files')}
             icon={Database}
             label={t("manager.sidebar.files")}
           />
@@ -1998,6 +2061,34 @@ function ManagerDashboard() {
               <AdminGrowthPanel />
             ) : activeTab === 'settings' ? (
               <SystemSettingsTab />
+            ) : activeTab === 'intelligence' ? (
+              <IntelligenceTab
+                aiSentiment={aiSentiment}
+                loadingAI={loadingAI}
+                aiError={aiError}
+                aiRecommendations={aiRecommendations}
+                aiSummary={aiSummary}
+                loadingRecs={loadingRecs}
+                loadingSummary={loadingSummary}
+                recsError={recsError}
+                summaryError={summaryError}
+                exportToPDF={exportToPDF}
+                exportToExcel={exportToExcel}
+                issues={allIssues}
+                technicians={technicians}
+                pendingRequests={pendingRequests}
+                materialRequests={materialRequests}
+                setActiveTab={setActiveTab}
+              />
+            ) : activeTab === 'studio' ? (
+              <StudioTab
+                exportToPDF={exportToPDF}
+                exportToExcel={exportToExcel}
+                setActiveTab={setActiveTab}
+                openWorkOrderModal={openWorkOrderModal}
+                fetchDashboardData={fetchDashboardData}
+                fetchMaterialRequests={fetchMaterialRequests}
+              />
             ) : activeTab === 'issues' ? (
               <IssuesTab
                 issues={getFilteredIssues()}
@@ -2031,7 +2122,8 @@ function ManagerDashboard() {
                     setDetailModal({ open: true, type: 'issue', item });
                   }}
                   onAddAsset={(item) => {
-                    alert('Add Asset functionality for ' + (item.title || item.name));
+                    setSelectedPreventive(null);
+                    setActiveTab('assets');
                   }}
                   technicians={technicians}
                   locations={locations}
@@ -2113,6 +2205,8 @@ function ManagerDashboard() {
               />
             ) : activeTab === 'checklists' ? (
               <ChecklistsTab />
+            ) : activeTab === 'files' ? (
+              <FilesTab />
             ) : activeTab === 'parts' ? (
               <PartsInventoryTab />
             ) : activeTab === 'purchase-orders' ? (
@@ -2347,6 +2441,237 @@ function ManagerDashboard() {
     </div>
   );
 }
+
+const IntelligenceTab = ({
+  aiSentiment,
+  loadingAI,
+  aiError,
+  aiRecommendations,
+  aiSummary,
+  loadingRecs,
+  loadingSummary,
+  recsError,
+  summaryError,
+  exportToPDF,
+  exportToExcel,
+  issues = [],
+  technicians = [],
+  pendingRequests = [],
+  materialRequests = [],
+  setActiveTab
+}) => {
+  const openIssues = issues.filter((issue) => !['COMPLETE', 'COMPLETED', 'CLOSED'].includes(String(issue.status || '').toUpperCase()));
+  const overdueIssues = openIssues.filter((issue) => {
+    const dueDate = new Date(issue.fixDeadline || issue.dueDate || issue.scheduledFor || '');
+    return !Number.isNaN(dueDate.getTime()) && dueDate < new Date();
+  });
+  const urgentIssues = openIssues.filter((issue) => ['HIGH', 'URGENT'].includes(String(issue.priority || '').toUpperCase()));
+  const pendingMaterials = materialRequests.filter((request) => String(request.status || '').toUpperCase() === 'PENDING');
+
+  const signals = [
+    { label: 'Open work', value: openIssues.length, helper: 'Work orders not closed', tab: 'issues', color: 'text-blue-700 bg-blue-50 border-blue-100' },
+    { label: 'Overdue', value: overdueIssues.length, helper: 'Past due date', tab: 'issues', color: 'text-rose-700 bg-rose-50 border-rose-100' },
+    { label: 'Urgent', value: urgentIssues.length, helper: 'High or urgent priority', tab: 'issues', color: 'text-amber-700 bg-amber-50 border-amber-100' },
+    { label: 'Pending approvals', value: pendingRequests.length, helper: 'Requests awaiting review', tab: 'requests', color: 'text-indigo-700 bg-indigo-50 border-indigo-100' },
+    { label: 'Material queue', value: pendingMaterials.length, helper: 'Pending material requests', tab: 'material-requests', color: 'text-purple-700 bg-purple-50 border-purple-100' },
+    { label: 'Technicians', value: technicians.length, helper: 'Available people records', tab: 'people', color: 'text-emerald-700 bg-emerald-50 border-emerald-100' }
+  ];
+
+  return (
+    <div className="space-y-6">
+      <GlassCard className="p-6">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <div className="text-xs font-black uppercase tracking-[0.22em] text-blue-600">Operational Intelligence</div>
+            <h2 className="mt-2 text-2xl font-black text-slate-950">Live risk, workload, and AI signals</h2>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+              Use this view to spot the work that needs admin attention, then jump directly into the module that owns it.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button onClick={exportToPDF} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">
+              <Download className="h-4 w-4" />
+              PDF
+            </button>
+            <button onClick={exportToExcel} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700">
+              <Download className="h-4 w-4" />
+              CSV
+            </button>
+          </div>
+        </div>
+      </GlassCard>
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {signals.map((signal) => (
+          <button
+            key={signal.label}
+            type="button"
+            onClick={() => setActiveTab(signal.tab)}
+            className={`rounded-2xl border p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${signal.color}`}
+          >
+            <div className="text-xs font-black uppercase tracking-[0.18em] opacity-80">{signal.label}</div>
+            <div className="mt-3 text-3xl font-black">{signal.value}</div>
+            <div className="mt-2 text-sm opacity-80">{signal.helper}</div>
+          </button>
+        ))}
+      </div>
+
+      <AIInsights
+        aiSentiment={aiSentiment}
+        loadingAI={loadingAI}
+        aiError={aiError}
+        aiRecommendations={aiRecommendations}
+        aiSummary={aiSummary}
+        loadingRecs={loadingRecs}
+        loadingSummary={loadingSummary}
+        recsError={recsError}
+        summaryError={summaryError}
+        exportToPDF={exportToPDF}
+        exportToExcel={exportToExcel}
+      />
+    </div>
+  );
+};
+
+const StudioTab = ({ exportToPDF, exportToExcel, setActiveTab, openWorkOrderModal, fetchDashboardData, fetchMaterialRequests }) => {
+  const [refreshing, setRefreshing] = useState(false);
+
+  const refreshEverything = async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        fetchDashboardData ? fetchDashboardData() : Promise.resolve(),
+        fetchMaterialRequests ? fetchMaterialRequests() : Promise.resolve()
+      ]);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const actions = [
+    { title: 'Create Work Order', description: 'Open the admin work-order form.', icon: Wrench, action: () => openWorkOrderModal('Create Work Order'), tone: 'bg-blue-600 text-white hover:bg-blue-700' },
+    { title: 'Review Requests', description: 'Approve, decline, or assign incoming work.', icon: MessageSquare, action: () => setActiveTab('requests'), tone: 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50' },
+    { title: 'Export PDF', description: 'Generate a visual report from the current dashboard.', icon: FileText, action: exportToPDF, tone: 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50' },
+    { title: 'Export CSV', description: 'Download maintenance work data.', icon: Download, action: exportToExcel, tone: 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50' },
+    { title: refreshing ? 'Refreshing...' : 'Refresh Data', description: 'Reload work orders and material requests.', icon: Repeat, action: refreshEverything, tone: 'bg-slate-900 text-white hover:bg-slate-800', disabled: refreshing },
+    { title: 'System Settings', description: 'Manage platform security and maintenance mode.', icon: Settings, action: () => setActiveTab('settings'), tone: 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50' }
+  ];
+
+  return (
+    <div className="space-y-6">
+      <GlassCard className="p-6">
+        <div className="text-xs font-black uppercase tracking-[0.22em] text-blue-600">Admin Studio</div>
+        <h2 className="mt-2 text-2xl font-black text-slate-950">Command shortcuts and reporting</h2>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+          Quick actions for common admin workflows, reporting, and operational handoff.
+        </p>
+      </GlassCard>
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {actions.map((item) => {
+          const Icon = item.icon;
+          return (
+            <button
+              key={item.title}
+              type="button"
+              onClick={item.action}
+              disabled={item.disabled}
+              className={`rounded-2xl p-5 text-left shadow-sm transition disabled:cursor-not-allowed disabled:opacity-60 ${item.tone}`}
+            >
+              <Icon className="h-5 w-5" />
+              <div className="mt-4 text-lg font-black">{item.title}</div>
+              <div className="mt-2 text-sm opacity-80">{item.description}</div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+const FilesTab = () => {
+  const [files, setFiles] = useState([]);
+  const [loadingFiles, setLoadingFiles] = useState(false);
+  const [fileError, setFileError] = useState('');
+
+  const loadFiles = async () => {
+    setLoadingFiles(true);
+    setFileError('');
+    try {
+      const res = await api.get('/api/files');
+      setFiles(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      setFileError(err.response?.data?.error || err.message || 'Failed to load files');
+      setFiles([]);
+    } finally {
+      setLoadingFiles(false);
+    }
+  };
+
+  useEffect(() => {
+    loadFiles();
+  }, []);
+
+  const getFileName = (file, index) => file.name || file.title || file.filename || file.originalName || `Saved file ${index + 1}`;
+  const getFileUrl = (file) => file.url || file.link || file.path || file.fileUrl || file.downloadUrl || '';
+  const filePagination = usePagination(files, 12);
+
+  return (
+    <div className="space-y-6">
+      <GlassCard className="p-6">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <div className="text-xs font-black uppercase tracking-[0.22em] text-blue-600">Files</div>
+            <h2 className="mt-2 text-2xl font-black text-slate-950">Saved admin files</h2>
+            <p className="mt-2 text-sm text-slate-600">Browse records from the platform file collection and open linked assets when available.</p>
+          </div>
+          <button onClick={loadFiles} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">
+            <Repeat className="h-4 w-4" />
+            Refresh
+          </button>
+        </div>
+      </GlassCard>
+
+      <GlassCard className="overflow-hidden">
+        <div className="border-b border-slate-100 px-5 py-4 text-sm font-bold text-slate-900">
+          {loadingFiles ? 'Loading files...' : `${files.length} file${files.length === 1 ? '' : 's'}`}
+        </div>
+        {fileError ? (
+          <div className="p-8 text-sm text-rose-700">{fileError}</div>
+        ) : files.length === 0 && !loadingFiles ? (
+          <div className="p-10 text-center text-sm text-slate-500">No saved files found yet.</div>
+        ) : (
+          <div className="divide-y divide-slate-100">
+            {filePagination.pageItems.map((file, index) => {
+              const url = getFileUrl(file);
+              const absoluteIndex = filePagination.startIndex + index;
+              return (
+                <div key={file.id || file._id || index} className="flex flex-col gap-3 px-5 py-4 md:flex-row md:items-center md:justify-between">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-bold text-slate-950">{getFileName(file, absoluteIndex)}</div>
+                    <div className="mt-1 text-xs text-slate-500">
+                      {file.type || file.mimeType || file.category || 'File'}
+                      {file.createdAt ? ` • ${new Date(file.createdAt).toLocaleString()}` : ''}
+                    </div>
+                  </div>
+                  {url ? (
+                    <a href={getImageUrl(url)} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700">
+                      <Eye className="h-4 w-4" />
+                      Open
+                    </a>
+                  ) : (
+                    <span className="rounded-xl bg-slate-100 px-4 py-2 text-xs font-bold text-slate-500">No link</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+        <PaginationControls pagination={filePagination} label="files" />
+      </GlassCard>
+    </div>
+  );
+};
 
 
 const OverviewCards = ({ summary = {}, pendingRequests = [], issues = [], technicians = [], onOpenTab }) => {
@@ -2846,6 +3171,7 @@ const RequestsTab = ({
     });
   }, [pendingRequests, localSearch]);
   const selection = useBulkSelection(filteredRequests, (request) => request._id || request.id);
+  const requestPagination = usePagination(filteredRequests, 10);
   const requestStatusColor = (status) => {
     const s = String(status || '').toUpperCase();
     if (s === 'APPROVED') return 'bg-emerald-50 text-emerald-700 border-emerald-200';
@@ -2937,8 +3263,9 @@ const RequestsTab = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {filteredRequests.map((request, i) => {
+                {requestPagination.pageItems.map((request, i) => {
                   const reqId = request._id || request.id;
+                  const rowIndex = requestPagination.startIndex + i;
                   const title = request.title || request.items?.[0]?.title || 'Untitled';
                   const imagePath = request.beforePhoto || request.photo || request.image || request.beforeImage || request.afterImage || request.afterPhoto || (Array.isArray(request.files) ? request.files[0] : null);
                   const imageUrl = imagePath ? getImageUrl(imagePath) : '';
@@ -2975,7 +3302,7 @@ const RequestsTab = ({
                         : 'bg-gray-50 text-gray-400 border-gray-200';
 
                   return (
-                    <React.Fragment key={reqId || `pending-${i}`}>
+                    <React.Fragment key={reqId || `pending-${rowIndex}`}>
                       <tr
                         onClick={() => onOpenDetails && onOpenDetails('request', request)}
                         className="hover:bg-white/40 transition-all cursor-pointer group/row"
@@ -3062,6 +3389,7 @@ const RequestsTab = ({
               </tbody>
             </table>
           </div>
+          <PaginationControls pagination={requestPagination} label="requests" />
         </div>
       )}
     </div>
@@ -3130,6 +3458,7 @@ const MaterialRequestsTab = ({ materialRequests = [], onRefresh, onOpenDetails }
     });
   }, [filterStatus, materialRequests, searchQuery]);
   const selection = useBulkSelection(filtered, (req) => req.id || req._id);
+  const materialPagination = usePagination(filtered, 10);
 
   const counts = {
     ALL: materialRequests.length,
@@ -3263,7 +3592,7 @@ const MaterialRequestsTab = ({ materialRequests = [], onRefresh, onOpenDetails }
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {filtered.map((req, idx) => {
+                {materialPagination.pageItems.map((req, idx) => {
                   const reqId = req.id || req._id;
                   const materialTitle = req.items?.[0]?.title || req.items?.[0]?.materialId || '—';
                   const qty = req.items?.[0]?.quantity ?? '—';
@@ -3359,6 +3688,7 @@ const MaterialRequestsTab = ({ materialRequests = [], onRefresh, onOpenDetails }
               </tbody>
             </table>
           </div>
+          <PaginationControls pagination={materialPagination} label="material requests" />
         </div>
       )}
 
@@ -5017,6 +5347,7 @@ const AssetsTab = ({ assets = [], onAssetsUpdated }) => {
     });
   }, [assets, searchQuery]);
   const selection = useBulkSelection(filteredAssets, (asset) => asset._id || asset.id);
+  const assetPagination = usePagination(filteredAssets, 10);
 
   const handleDeleteSelected = async () => {
     if (selection.selectedIds.length === 0) return;
@@ -5113,7 +5444,7 @@ const AssetsTab = ({ assets = [], onAssetsUpdated }) => {
               </tr>
             </thead>
             <tbody>
-              {filteredAssets.map((a, idx) => (
+              {assetPagination.pageItems.map((a, idx) => (
                 <tr key={a.id || a._id || `asset-${idx}`} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
                   <td className="py-4 px-4">
                     <input
@@ -5142,6 +5473,7 @@ const AssetsTab = ({ assets = [], onAssetsUpdated }) => {
             </tbody>
           </table>
         </div>
+        <PaginationControls pagination={assetPagination} label="assets" />
       </div>
     </div>
   );
@@ -5177,6 +5509,7 @@ const LocationsTab = ({ locations = [], assets = [], onLocationUpdated, onLocati
     });
   }, [locations, searchQuery]);
   const selection = useBulkSelection(filteredLocations, (loc) => loc._id || loc.id);
+  const locationPagination = usePagination(filteredLocations, 10);
   const [editForm, setEditForm] = useState({
     name: '',
     address: '',
@@ -5343,7 +5676,7 @@ const LocationsTab = ({ locations = [], assets = [], onLocationUpdated, onLocati
               </tr>
             </thead>
             <tbody>
-              {filteredLocations.map((l, idx) => (
+              {locationPagination.pageItems.map((l, idx) => (
                 <tr
                   key={l._id || l.id || `loc-${idx}`}
                   onClick={() => openLocation(l)}
@@ -5379,6 +5712,7 @@ const LocationsTab = ({ locations = [], assets = [], onLocationUpdated, onLocati
             </tbody>
           </table>
         </div>
+        <PaginationControls pagination={locationPagination} label="locations" />
       </div>
 
       {selectedLocation && (
@@ -5584,6 +5918,8 @@ const PeopleTab = ({ technicians = [], allIssues = [], teams = [], onRefresh }) 
       return haystack.includes(normalizedSearch);
     });
   }, [normalizedSearch, teams]);
+  const technicianPagination = usePagination(filteredTechnicians, 10);
+  const teamPagination = usePagination(filteredTeams, 8);
 
   const exportCSV = () => {
     if (!filteredTechnicians || filteredTechnicians.length === 0) return;
@@ -5747,7 +6083,7 @@ const PeopleTab = ({ technicians = [], allIssues = [], teams = [], onRefresh }) 
                 if (filteredTechnicians.length === 0) {
                   return <tr><td colSpan="7" className="py-20 text-center"><p className="text-gray-500">No external technicians found</p></td></tr>;
                 }
-                return filteredTechnicians.map((t, idx) => (
+                return technicianPagination.pageItems.map((t, idx) => (
                   <tr key={t._id || t.id || `person-${idx}`} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
                     <td className="py-4 px-4"><div className="text-sm font-bold text-gray-900">{t.name || 'Unnamed Tech'}</div></td>
                     <td className="py-4 px-4 text-sm text-gray-600 font-mono">{String(t._id || t.id || '').slice(-8)}</td>
@@ -5792,6 +6128,7 @@ const PeopleTab = ({ technicians = [], allIssues = [], teams = [], onRefresh }) 
             </tbody>
           </table>
         </div>
+        <PaginationControls pagination={technicianPagination} label="people" />
       </div>
 
       <div>
@@ -5813,7 +6150,7 @@ const PeopleTab = ({ technicians = [], allIssues = [], teams = [], onRefresh }) 
               {filteredTeams.length === 0 ? (
                 <tr><td colSpan="3" className="py-20 text-center"><p className="text-gray-500">No teams found</p></td></tr>
               ) : (
-                filteredTeams.map((team, idx) => (
+                teamPagination.pageItems.map((team, idx) => (
                   <tr key={team._id || team.id || `team-${idx}`} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
                     <td className="py-4 px-4"><div className="text-sm font-bold text-gray-900">{team.name}</div></td>
                     <td className="py-4 px-4">
@@ -5849,6 +6186,7 @@ const PeopleTab = ({ technicians = [], allIssues = [], teams = [], onRefresh }) 
             </tbody>
           </table>
         </div>
+        <PaginationControls pagination={teamPagination} label="teams" />
       </div>
 
       {showAddTeam && (
