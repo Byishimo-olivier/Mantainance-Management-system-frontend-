@@ -5,7 +5,26 @@ import { getImageUrl } from '../utils/imageUrl';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Header from "./Header";
 import { useTranslation } from "../i18n/LanguageContext";
-import { MessageSquare, Search, ArrowUpDown, LayoutDashboard, SlidersHorizontal, MapPin, Flag, ChevronDown, MoreHorizontal, Image as ImageIcon } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowUpDown,
+  Calendar,
+  CheckCircle,
+  ChevronDown,
+  Circle,
+  ClipboardCheck,
+  Clock,
+  Flag,
+  Image as ImageIcon,
+  LayoutDashboard,
+  MapPin,
+  MessageSquare,
+  MoreHorizontal,
+  Package,
+  Search,
+  SlidersHorizontal,
+  Wrench
+} from "lucide-react";
 
 const isCompletedStatus = (status) => {
   const normalized = String(status || '').toUpperCase();
@@ -1438,6 +1457,32 @@ const TechnicianDashboard = () => {
     }, { assigned: 0, inProgress: 0, overdue: 0, completed: 0 });
   }, [jobs]);
 
+  const priorityJobs = useMemo(
+    () => jobs.filter((job) => ['HIGH', 'URGENT'].includes(String(job.priority || '').toUpperCase())),
+    [jobs]
+  );
+
+  const nextDueJob = useMemo(() => {
+    const dueJobs = jobs
+      .filter((job) => !['COMPLETE', 'COMPLETED'].includes(getJobStatus(job)))
+      .map((job) => ({ job, due: new Date(job.fixDeadline || job.dueDate || job.scheduledFor || '') }))
+      .filter((entry) => !Number.isNaN(entry.due.getTime()))
+      .sort((a, b) => a.due.getTime() - b.due.getTime());
+    return dueJobs[0] || null;
+  }, [jobs]);
+
+  const completionRate = useMemo(() => {
+    if (!jobs.length) return 0;
+    return Math.round((overviewJobCounts.completed / jobs.length) * 100);
+  }, [jobs.length, overviewJobCounts.completed]);
+
+  const formatCompactDateTime = (value) => {
+    if (!value) return 'Not scheduled';
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return 'Not scheduled';
+    return date.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  };
+
   const materialOverviewSummary = useMemo(() => {
     const summary = {
       total: materialRequests.length,
@@ -1749,6 +1794,7 @@ const TechnicianDashboard = () => {
 
   const handleSendDirectMessage = async () => {
     const recipientId = String(directMessageRecipientId || '').trim();
+    const recipientKey = String(recipientId);
     const text = String(directMessageDraft || '').trim();
     if (!recipientId) {
       alert('Choose who you want to message first.');
@@ -1772,8 +1818,7 @@ const TechnicianDashboard = () => {
         link: '/technician-dashboard'
       });
       setDirectMessageThreads((prev) => {
-        const key = String(recipientId);
-        return { ...prev, [key]: [...(prev[key] || []), outgoingMessage] };
+        return { ...prev, [recipientKey]: [...(prev[recipientKey] || []), outgoingMessage] };
       });
       try {
         const notificationsRes = await api.get('/api/notifications', { params: { limit: 100 } });
@@ -1782,7 +1827,7 @@ const TechnicianDashboard = () => {
         setDirectMessageNotifications(
           allNotifications.filter((entry) => String(entry?.type || '').toLowerCase().startsWith('direct_message'))
         );
-        setDirectMessageThreads((prev) => ({ ...prev, [key]: [] }));
+        setDirectMessageThreads((prev) => ({ ...prev, [recipientKey]: [] }));
       } catch (refreshErr) {
         console.error('Failed to refresh direct messages after send', refreshErr);
       }
@@ -1820,14 +1865,14 @@ const TechnicianDashboard = () => {
   };
 
   const technicianNavItems = [
-    { key: 'overview', label: 'Overview', description: 'Summary and activity' },
-    { key: 'workOrders', label: 'Work Orders', description: 'Assigned and active work' },
-    { key: 'pm', label: 'Preventive Maintenance', description: 'My assigned PM records' },
-    { key: 'scheduler', label: 'Schedule', description: 'Upcoming PM schedule times' },
-    { key: 'tasks', label: 'Tasks', description: 'Checklists and notes' },
-    { key: 'messages', label: 'Messages', description: 'Private messages and mentions' },
-    { key: 'materials', label: 'Materials', description: 'Requests and inventory needs' },
-    { key: 'history', label: 'History', description: 'Completed work' }
+    { key: 'overview', label: 'Overview', description: 'Today, risks, and activity', icon: LayoutDashboard, count: jobs.length },
+    { key: 'workOrders', label: 'Work Orders', description: 'Assigned and active work', icon: Wrench, count: openJobs.length },
+    { key: 'pm', label: 'Preventive Maintenance', description: 'Assigned PM records', icon: ClipboardCheck, count: techSchedules.length },
+    { key: 'scheduler', label: 'Schedule', description: 'Upcoming PM times', icon: Calendar, count: filteredSchedulerSchedules.length },
+    { key: 'tasks', label: 'Tasks', description: 'Checklists and private notes', icon: CheckCircle, count: myTasks.filter((task) => !task.completed).length },
+    { key: 'messages', label: 'Messages', description: 'Private messages and mentions', icon: MessageSquare, count: messageContacts.length },
+    { key: 'materials', label: 'Materials', description: 'Requests and inventory needs', icon: Package, count: materialRequests.length },
+    { key: 'history', label: 'History', description: 'Completed work', icon: Clock, count: overviewJobCounts.completed }
   ];
 
   const openTechnicianSection = (key) => {
@@ -1835,13 +1880,13 @@ const TechnicianDashboard = () => {
   };
 
   return (
-    <div className="glass-theme-blue min-h-screen text-slate-900 overflow-hidden relative" style={{ fontFamily: "'DM Sans', 'Segoe UI', system-ui, sans-serif" }}>
+    <div className="glass-theme-blue relative h-screen overflow-hidden text-slate-900" style={{ fontFamily: "'DM Sans', 'Segoe UI', system-ui, sans-serif" }}>
       <div className="video-background-container">
         <video autoPlay loop muted playsInline className="video-background text-transparent">
           <source src={backgroundVideo} type="video/mp4" />
         </video>
       </div>
-      <div className="relative z-10 min-h-screen px-4 pb-16 pt-6 md:px-8 overflow-y-auto">
+      <div className="relative z-10 h-screen overflow-y-auto px-4 pb-8 pt-4 md:px-6">
       {/* Reminders Panel */}
       {alerts.length > 0 && (
         <div className="fixed top-20 right-4 z-50 max-w-sm w-full">
@@ -1948,50 +1993,79 @@ const TechnicianDashboard = () => {
         </div>
       )}
 
-      {/* Header */}
-      <Header
-        title={t("technician.title")}
-        subtitle={t("technician.subtitle", { name: user.name || "" })}
-        user={user}
-        onNotificationNavigate={handleNotificationNavigate}
-        right={
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              onClick={() => focusMessageCenter()}
-              className="px-4 py-2 glass-ghost text-slate-700 rounded-full font-semibold hover:bg-white/80 transition inline-flex items-center gap-2"
-            >
-              <MessageSquare className="w-4 h-4" />
-              Messages
-            </button>
-            <button
-              onClick={() => {
-                setActiveSection('materials');
-                toggleMaterialRequestForm();
-              }}
-              className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-white/85 px-5 py-2.5 text-sm font-bold text-blue-700 shadow-[0_10px_30px_rgba(37,99,235,0.14)] transition hover:-translate-y-0.5 hover:bg-blue-50"
-            >
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-base leading-none text-white">+</span>
-              <span>New Material Request</span>
-            </button>
-            <button
-              onClick={() => {
-                setActiveSection('pm');
-                setShowPmForm(true);
-              }}
-              className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white/85 px-5 py-2.5 text-sm font-bold text-emerald-700 shadow-[0_10px_30px_rgba(16,185,129,0.14)] transition hover:-translate-y-0.5 hover:bg-emerald-50"
-            >
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-600 text-base leading-none text-white">+</span>
-              <span>Create PM</span>
-            </button>
-            <button
-              onClick={handleLogout}
-              className="px-5 py-2 glass-ghost text-slate-700 rounded-full font-semibold hover:bg-white/80 transition"
-            >
-              {t("technician.logout")}
-            </button>
+      <div className="hidden">
+        <Header
+          title={t("technician.title")}
+          subtitle={t("technician.subtitle", { name: user.name || "" })}
+          user={user}
+          onNotificationNavigate={handleNotificationNavigate}
+        />
+      </div>
+
+      <section className="hidden">
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-center">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-blue-700">
+              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              Technician Command Center
+            </div>
+            <h1 className="mt-4 text-3xl font-black tracking-tight text-slate-950 md:text-4xl">
+              {userName}, here is the work that needs your attention.
+            </h1>
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
+              Track active jobs, overdue items, material requests, and preventive maintenance from one focused workspace.
+            </p>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => setActiveSection('workOrders')}
+                className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700"
+              >
+                <Wrench className="h-4 w-4" />
+                Open Work Orders
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveSection('materials')}
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition hover:border-blue-200 hover:text-blue-700"
+              >
+                <Package className="h-4 w-4" />
+                Materials
+              </button>
+            </div>
           </div>
-        }
-      />
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Next Due</div>
+                <div className="mt-2 text-lg font-black text-slate-950">
+                  {nextDueJob?.job?.title || 'No scheduled work'}
+                </div>
+                <div className="mt-1 text-sm text-slate-600">
+                  {nextDueJob ? formatCompactDateTime(nextDueJob.due) : 'Your queue is clear for now.'}
+                </div>
+              </div>
+              <div className={`rounded-lg p-3 ${overviewJobCounts.overdue > 0 ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                {overviewJobCounts.overdue > 0 ? <AlertCircle className="h-5 w-5" /> : <CheckCircle className="h-5 w-5" />}
+              </div>
+            </div>
+            <div className="mt-5 grid grid-cols-3 gap-3">
+              <div className="rounded-lg bg-white p-3 text-center">
+                <div className="text-2xl font-black text-slate-950">{openJobs.length}</div>
+                <div className="mt-1 text-[11px] font-bold uppercase tracking-wide text-slate-500">Open</div>
+              </div>
+              <div className="rounded-lg bg-white p-3 text-center">
+                <div className="text-2xl font-black text-rose-600">{overviewJobCounts.overdue}</div>
+                <div className="mt-1 text-[11px] font-bold uppercase tracking-wide text-slate-500">Overdue</div>
+              </div>
+              <div className="rounded-lg bg-white p-3 text-center">
+                <div className="text-2xl font-black text-emerald-600">{completionRate}%</div>
+                <div className="mt-1 text-[11px] font-bold uppercase tracking-wide text-slate-500">Done</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* Material Request Form Modal */}
       {showMaterialRequestForm && (
@@ -2342,85 +2416,197 @@ const TechnicianDashboard = () => {
         </div>
       )}
 
-      <div className="mx-auto mt-6 grid max-w-[1600px] grid-cols-1 gap-6 xl:grid-cols-[300px_minmax(0,1fr)]">
-        <aside className="xl:sticky xl:top-6 xl:self-start">
-          <div className="rounded-[32px] border border-white/60 bg-white/70 p-5 shadow-[0_20px_60px_rgba(37,99,235,0.12)] backdrop-blur-xl">
-            <div className="border-b border-slate-200/70 px-2 pb-5">
-              <div className="text-[11px] font-black uppercase tracking-[0.38em] text-blue-600">Technician</div>
-              <h2 className="mt-3 text-[2.15rem] font-black leading-none text-slate-900">Workspace</h2>
-              <p className="mt-3 max-w-[22ch] text-sm leading-6 text-slate-500">Navigate your technician workflow with focused tabs, just like the client dashboard.</p>
+      <div className="mx-auto grid h-[calc(100vh-2rem)] max-w-[1600px] grid-cols-1 gap-0 overflow-hidden rounded-2xl border border-white/20 shadow-[0_24px_70px_rgba(15,23,42,0.16)] xl:grid-cols-[236px_minmax(0,1fr)]">
+        <aside className="glass-surface-strong hidden h-full shrink-0 flex-col overflow-hidden border-r border-white/20 xl:flex">
+          <div className="border-b border-white/15 p-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-700 to-blue-500 text-white">
+                <Wrench className="h-4 w-4" />
+              </div>
+              <div className="min-w-0">
+                <div className="truncate text-sm font-bold text-white">FixNest ID</div>
+                <div className="truncate text-[11px] text-white/70">Technician workspace</div>
+              </div>
             </div>
-            <div className="mt-5 space-y-3">
+          </div>
+          <div className="border-b border-slate-100 bg-white/80 px-4 py-3">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-50 text-sm font-black text-blue-700">
+                {(userName || 'T').charAt(0).toUpperCase()}
+              </div>
+              <div className="min-w-0">
+                <div className="truncate text-sm font-bold text-slate-950">{userName}</div>
+                <div className="truncate text-xs text-slate-500">{user?.companyName || 'Technician'}</div>
+              </div>
+            </div>
+          </div>
+          <div className="custom-scrollbar flex-1 overflow-y-auto bg-white/72 p-3">
+            <nav className="space-y-1">
               {technicianNavItems.map((item) => (
+                (() => {
+                  const Icon = item.icon || Circle;
+                  return (
                 <button
                   key={item.key}
                   type="button"
                   onClick={() => openTechnicianSection(item.key)}
-                  className={`group w-full rounded-[24px] border px-5 py-4 text-left transition-all duration-200 ${
+                  className={`group flex w-full items-center gap-3 rounded-xl border px-3 py-3 text-left transition ${
                     activeSection === item.key
-                      ? 'border-blue-200 bg-gradient-to-r from-blue-50 to-white text-blue-700 shadow-[0_12px_30px_rgba(37,99,235,0.12)]'
-                      : 'border-slate-200/70 bg-white/65 text-slate-700 hover:-translate-y-0.5 hover:border-blue-100 hover:bg-white hover:shadow-[0_12px_24px_rgba(15,23,42,0.08)]'
+                      ? 'border-blue-200 bg-blue-50 text-blue-700'
+                      : 'border-transparent bg-white text-slate-700 hover:border-slate-200 hover:bg-slate-50'
                   }`}
                 >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="text-base font-bold">{item.label}</div>
-                    <span className={`h-2.5 w-2.5 rounded-full transition ${
-                      activeSection === item.key ? 'bg-blue-500 shadow-[0_0_0_6px_rgba(59,130,246,0.12)]' : 'bg-slate-200 group-hover:bg-blue-200'
-                    }`} />
+                  <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
+                    activeSection === item.key ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500 group-hover:text-blue-600'
+                  }`}>
+                    <Icon className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="truncate text-sm font-bold">{item.label}</div>
+                      <div className="rounded-full bg-white px-2 py-0.5 text-[10px] font-black text-slate-500 shadow-sm">
+                        {item.count}
+                      </div>
+                    </div>
+                    <div className="mt-0.5 truncate text-xs text-slate-500">{item.description}</div>
                   </div>
-                  <div className="mt-2 text-sm leading-6 text-slate-500">{item.description}</div>
                 </button>
+                  );
+                })()
               ))}
-            </div>
+            </nav>
+          </div>
+          <div className="border-t border-slate-200 bg-white/80 p-3">
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+            >
+              {t("technician.logout")}
+            </button>
           </div>
         </aside>
 
-        <main className="min-w-0 flex-1 space-y-8">
+        <main className="min-w-0 flex-1 overflow-hidden bg-white/60">
+          <header className="glass-surface sticky top-0 z-30 flex h-[60px] items-center justify-between border-b border-white/20 px-4 md:px-6">
+            <div className="min-w-0">
+              <h1 className="truncate text-[17px] font-bold text-slate-950">
+                {technicianNavItems.find((item) => item.key === activeSection)?.label || 'Technician Dashboard'}
+              </h1>
+              <p className="truncate text-xs text-slate-500">
+                {nextDueJob ? `Next due: ${nextDueJob.job.title} at ${formatCompactDateTime(nextDueJob.due)}` : 'No scheduled work due right now'}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => focusMessageCenter()}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:text-blue-700"
+                title="Messages"
+              >
+                <MessageSquare className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveSection('materials');
+                  toggleMaterialRequestForm();
+                }}
+                className="hidden rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-blue-700 md:inline-flex"
+              >
+                New Material
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveSection('pm');
+                  setShowPmForm(true);
+                }}
+                className="hidden rounded-xl border border-emerald-200 bg-white px-4 py-2 text-sm font-bold text-emerald-700 transition hover:bg-emerald-50 md:inline-flex"
+              >
+                Create PM
+              </button>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-sm font-black text-slate-700"
+                title="Profile"
+              >
+                {(userName || 'T').charAt(0).toUpperCase()}
+              </button>
+            </div>
+          </header>
+          <div className="h-[calc(100%-60px)] overflow-y-auto px-4 py-5 md:px-6">
       {/* Stats Cards */}
       <div id="tech-section-overview" className={`${activeSection === 'overview' ? 'grid' : 'hidden'} grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-6 mb-8 scroll-mt-24`}>
-        <div className="glass-surface rounded-2xl shadow-lg p-6 border border-blue-100/60">
-          <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">{t("technician.stats.assigned")}</div>
-          <div className="text-3xl font-black text-slate-900 mt-2">
-            {overviewJobCounts.assigned}
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Assigned</div>
+              <div className="mt-2 text-3xl font-black text-slate-950">{overviewJobCounts.assigned}</div>
+            </div>
+            <div className="rounded-lg bg-slate-100 p-2 text-slate-600">
+              <ClipboardCheck className="h-5 w-5" />
+            </div>
           </div>
-          <p className="text-sm text-slate-500 mt-2">Open work waiting in your queue</p>
+          <p className="mt-3 text-sm text-slate-500">Open work waiting in your queue.</p>
         </div>
 
-        <div className="glass-surface rounded-2xl shadow-lg p-6 border border-blue-200/60">
-          <div className="text-xs font-bold text-blue-500 uppercase tracking-widest">{t("technician.stats.inProgress")}</div>
-          <div className="text-3xl font-black text-blue-600 mt-2">
-            {overviewJobCounts.inProgress}
+        <div className="rounded-2xl border border-blue-200 bg-white p-5 shadow-sm">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">In Progress</div>
+              <div className="mt-2 text-3xl font-black text-blue-700">{overviewJobCounts.inProgress}</div>
+            </div>
+            <div className="rounded-lg bg-blue-50 p-2 text-blue-600">
+              <Clock className="h-5 w-5" />
+            </div>
           </div>
-          <p className="text-sm text-slate-500 mt-2">Currently working on</p>
+          <p className="mt-3 text-sm text-slate-500">Jobs currently being worked.</p>
         </div>
 
-        <div className="rounded-2xl border border-rose-200/70 bg-gradient-to-br from-rose-50 to-white p-6 shadow-lg">
-          <div className="text-xs font-bold uppercase tracking-widest text-rose-600">Overdue</div>
-          <div className="mt-2 text-3xl font-black text-rose-700">
-            {overviewJobCounts.overdue}
+        <div className="rounded-2xl border border-rose-200 bg-white p-5 shadow-sm">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="text-xs font-bold uppercase tracking-[0.18em] text-rose-600">Overdue</div>
+              <div className="mt-2 text-3xl font-black text-rose-700">{overviewJobCounts.overdue}</div>
+            </div>
+            <div className="rounded-lg bg-rose-50 p-2 text-rose-600">
+              <AlertCircle className="h-5 w-5" />
+            </div>
           </div>
-          <p className="mt-2 text-sm text-rose-700/80">
+          <p className="mt-3 text-sm text-slate-500">
             {overviewJobCounts.overdue > 0 ? 'Needs attention now' : 'No overdue work right now'}
           </p>
         </div>
 
-        <div className="glass-surface rounded-2xl shadow-lg p-6 border border-emerald-200/60">
-          <div className="text-xs font-bold text-emerald-500 uppercase tracking-widest">{t("technician.stats.completed")}</div>
-          <div className="text-3xl font-black text-emerald-600 mt-2">
-            {overviewJobCounts.completed}
+        <div className="rounded-2xl border border-emerald-200 bg-white p-5 shadow-sm">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-600">Completed</div>
+              <div className="mt-2 text-3xl font-black text-emerald-700">{overviewJobCounts.completed}</div>
+            </div>
+            <div className="rounded-lg bg-emerald-50 p-2 text-emerald-600">
+              <CheckCircle className="h-5 w-5" />
+            </div>
           </div>
-          <p className="text-sm text-slate-500 mt-2">{t("technician.stats.finishedJobs")}</p>
+          <p className="mt-3 text-sm text-slate-500">Finished work orders.</p>
         </div>
 
-        <div className="glass-surface rounded-2xl shadow-lg p-6 border border-blue-200/60">
-          <div className="text-xs font-bold text-blue-600 uppercase tracking-widest">{t("technician.stats.materials")}</div>
-          <div className="text-3xl font-black text-blue-700 mt-2">{materialRequests.length}</div>
-          <p className="text-sm text-slate-500 mt-2">
-            {user?.companyName ? `Shared across ${user.companyName}` : t("technician.stats.requestsSubmitted")}
-          </p>
+        <div className="rounded-2xl border border-amber-200 bg-white p-5 shadow-sm">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="text-xs font-bold uppercase tracking-[0.18em] text-amber-700">High Priority</div>
+              <div className="mt-2 text-3xl font-black text-amber-700">{priorityJobs.length}</div>
+            </div>
+            <div className="rounded-lg bg-amber-50 p-2 text-amber-600">
+              <Flag className="h-5 w-5" />
+            </div>
+          </div>
+          <p className="mt-3 text-sm text-slate-500">Urgent and high priority work.</p>
         </div>
 
-        <div className="md:col-span-2 xl:col-span-5 rounded-[32px] border border-white/60 bg-white/72 p-8 shadow-[0_20px_60px_rgba(15,23,42,0.10)] backdrop-blur-xl">
+        <div className="md:col-span-2 xl:col-span-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           {overviewJobCounts.overdue > 0 && (
             <div className="mb-6 flex items-center justify-between gap-4 rounded-[24px] border border-rose-200 bg-rose-50 px-5 py-4">
               <div>
@@ -3597,6 +3783,7 @@ const TechnicianDashboard = () => {
         </div>
       </div>
 
+          </div>
         </main>
       </div>
 
