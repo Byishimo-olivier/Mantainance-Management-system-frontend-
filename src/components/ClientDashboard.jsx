@@ -18397,9 +18397,24 @@ function ClientDashboard() {
     );
   };
 
+  const hasRequestOrigin = (issue) => {
+    if (!issue || isPmLinkedIssue(issue)) return false;
+    const submissionType = String(issue?.submissionType || issue?.requestType || issue?.requestedType || '').toLowerCase();
+    const tags = Array.isArray(issue?.tags) ? issue.tags.map((tag) => String(tag || '').toLowerCase()) : [];
+    return Boolean(
+      issue?.requestorId
+      || issue?.requestorName
+      || issue?.requestedBy
+      || issue?.submittedAt
+      || submissionType.includes('request')
+      || tags.includes('request')
+      || tags.includes('requestor')
+    );
+  };
+
   const isRequestIssue = (issue) => {
     if (!issue || isRejectedRequest(issue)) return false;
-    if (isApprovedWorkOrder(issue)) return false;
+    if (isApprovedWorkOrder(issue) && !hasRequestOrigin(issue)) return false;
     return isRequestRecord(issue);
   };
 
