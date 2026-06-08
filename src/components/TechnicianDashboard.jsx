@@ -21,8 +21,10 @@ import {
   MessageSquare,
   MoreHorizontal,
   Package,
+  Plus,
   Search,
   SlidersHorizontal,
+  Trash2,
   Wrench
 } from "lucide-react";
 
@@ -522,7 +524,8 @@ const TechnicianDashboard = () => {
     urgency: "MEDIUM",
     linkedIssueId: "",
     assetName: "",
-    partId: ""
+    partId: "",
+    items: [{ partId: "", title: "", quantity: 1, unitOfMeasurement: "", unitCost: 0 }]
   });
   const [showPmForm, setShowPmForm] = useState(false);
   const [selectedPmSchedule, setSelectedPmSchedule] = useState(null);
@@ -615,7 +618,9 @@ const TechnicianDashboard = () => {
       quantity: 1,
       urgency: String(job.priority || 'MEDIUM').toUpperCase(),
       linkedIssueId: job._id || job.id || "",
-      assetName: job.assetName || job.asset?.name || ""
+      assetName: job.assetName || job.asset?.name || "",
+      partId: "",
+      items: [{ partId: "", title: job.assetName || job.asset?.name || job.title || "", quantity: 1, unitOfMeasurement: "", unitCost: 0 }]
     });
     setSelectedJob(job);
     setActiveSection('materials');
@@ -672,24 +677,79 @@ const TechnicianDashboard = () => {
     });
   };
 
+  const handleMaterialRequestItemChange = (index, e) => {
+    const { name, value } = e.target;
+    setMaterialRequestData(prev => {
+      const items = Array.isArray(prev.items) && prev.items.length
+        ? [...prev.items]
+        : [{ partId: "", title: prev.title || "", quantity: prev.quantity || 1, unitOfMeasurement: "", unitCost: 0 }];
+      const current = { ...items[index] };
+      current[name] = name === 'quantity'
+        ? Math.max(1, parseInt(value, 10) || 1)
+        : name === 'unitCost'
+          ? Math.max(0, Number(value) || 0)
+          : value;
+      if (name === 'partId') {
+        const selected = inventoryParts.find(p => String(p._id || p.id) === String(value));
+        current.title = selected?.name || '';
+        if (selected?.assetName && !prev.assetName) {
+          return { ...prev, assetName: selected.assetName, items: items.map((item, itemIndex) => itemIndex === index ? current : item) };
+        }
+      }
+      return { ...prev, items: items.map((item, itemIndex) => itemIndex === index ? current : item) };
+    });
+  };
+
+  const addMaterialRequestItem = () => {
+    setMaterialRequestData(prev => ({
+      ...prev,
+      items: [...(Array.isArray(prev.items) ? prev.items : []), { partId: "", title: "", quantity: 1, unitOfMeasurement: "", unitCost: 0 }]
+    }));
+  };
+
+  const removeMaterialRequestItem = (index) => {
+    setMaterialRequestData(prev => {
+      const items = Array.isArray(prev.items) ? prev.items : [];
+      if (items.length <= 1) return prev;
+      return { ...prev, items: items.filter((_, itemIndex) => itemIndex !== index) };
+    });
+  };
+
   const handleMaterialRequestSubmit = async (e) => {
     e.preventDefault();
     try {
       const currentUserId = user._id || user.id;
       const currentUserName = user.name || user.username || 'Technician';
+      const requestItems = (Array.isArray(materialRequestData.items) && materialRequestData.items.length
+        ? materialRequestData.items
+        : [{ partId: materialRequestData.partId, title: materialRequestData.title, quantity: materialRequestData.quantity, unitOfMeasurement: materialRequestData.unitOfMeasurement, unitCost: materialRequestData.unitCost }]
+      )
+        .map((item) => ({
+          partId: String(item.partId || '').trim(),
+          title: String(item.title || '').trim(),
+          quantity: Math.max(1, Number(item.quantity) || 1),
+          unitOfMeasurement: String(item.unitOfMeasurement || '').trim(),
+          unitCost: Math.max(0, Number(item.unitCost) || 0)
+        }))
+        .filter((item) => item.partId || item.title);
+
+      if (requestItems.length === 0) {
+        alert('Add at least one material item.');
+        return;
+      }
 
       // 1. Link to Parts & Inventory (Consolidated System)
-      if (materialRequestData.partId) {
+      for (const requestItem of requestItems.filter(item => item.partId)) {
         try {
-          const partId = materialRequestData.partId;
+          const partId = requestItem.partId;
           const partRes = await api.get(`/api/parts/${partId}`);
           const freshPart = partRes.data;
           
           const allocationRecord = {
             id: Math.random().toString(36).substr(2, 9),
             partId: partId,
-            partName: freshPart.name || materialRequestData.title,
-            quantity: materialRequestData.quantity,
+            partName: freshPart.name || requestItem.title,
+            quantity: requestItem.quantity,
             requestedBy: currentUserId,
             date: new Date().toISOString(),
             status: 'PENDING',
@@ -698,7 +758,7 @@ const TechnicianDashboard = () => {
 
           await api.put(`/api/parts/${partId}`, {
             allocationHistory: [allocationRecord, ...(freshPart.allocationHistory || [])],
-            allocated: (Number(freshPart.allocated) || 0) + materialRequestData.quantity
+            allocated: (Number(freshPart.allocated) || 0) + requestItem.quantity
           });
           console.log('Allocation record created for inventory part');
         } catch (allocErr) {
@@ -709,6 +769,17 @@ const TechnicianDashboard = () => {
       // 2. Submit Material Request (Legacy/Mirror)
       const requestData = {
         ...materialRequestData,
+        title: requestItems[0]?.title || materialRequestData.title,
+        quantity: requestItems[0]?.quantity || materialRequestData.quantity,
+        items: requestItems.map((item) => ({
+          materialId: item.partId || item.title,
+          title: item.title,
+          quantity: item.quantity,
+          unitOfMeasurement: item.unitOfMeasurement,
+          unitCost: item.unitCost,
+          amount: item.quantity * item.unitCost,
+          partId: item.partId || undefined
+        })),
         technicianId: currentUserId,
         technicianName: currentUserName,
         clientId: currentUserId,
@@ -727,7 +798,8 @@ const TechnicianDashboard = () => {
         urgency: "MEDIUM",
         linkedIssueId: "",
         assetName: "",
-        partId: ""
+        partId: "",
+        items: [{ partId: "", title: "", quantity: 1, unitOfMeasurement: "", unitCost: 0 }]
       });
       setShowMaterialRequestForm(false);
 
@@ -2086,33 +2158,89 @@ const TechnicianDashboard = () => {
             <form onSubmit={handleMaterialRequestSubmit} className="px-6 py-5">
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1">Link to Inventory Part (Optional)</label>
-                    <select
-                      name="partId"
-                      value={materialRequestData.partId}
-                      onChange={handleMaterialRequestChange}
-                      className="w-full rounded-xl glass-input px-3 py-2 text-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-300/60 outline-none"
-                    >
-                      <option value="">-- Select from Inventory --</option>
-                      {inventoryParts.map(part => (
-                        <option key={part._id || part.id} value={part._id || part.id}>
-                          {part.name} ({part.partNumber || 'No PN'}) - Stock: {part.quantity}
-                        </option>
+                    <div className="mb-2 flex items-center justify-between gap-3">
+                      <label className="block text-sm font-semibold text-slate-700">Materials *</label>
+                      <button
+                        type="button"
+                        onClick={addMaterialRequestItem}
+                        className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-100"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        Add item
+                      </button>
+                    </div>
+                    <div className="space-y-3">
+                      {(materialRequestData.items || [{ partId: "", title: "", quantity: 1 }]).map((item, index) => (
+                        <div key={index} className="rounded-xl border border-white/50 bg-white/50 p-3">
+                          <div className="grid gap-3 md:grid-cols-[1fr_84px_110px_110px_36px]">
+                            <div className="space-y-2">
+                              <select
+                                name="partId"
+                                value={item.partId || ""}
+                                onChange={(event) => handleMaterialRequestItemChange(index, event)}
+                                className="w-full rounded-xl glass-input px-3 py-2 text-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-300/60 outline-none"
+                              >
+                                <option value="">Custom material</option>
+                                {inventoryParts.map(part => (
+                                  <option key={part._id || part.id} value={part._id || part.id}>
+                                    {part.name} ({part.partNumber || 'No PN'}) - Stock: {part.quantity}
+                                  </option>
+                                ))}
+                              </select>
+                              <input
+                                type="text"
+                                name="title"
+                                value={item.title || ""}
+                                onChange={(event) => handleMaterialRequestItemChange(index, event)}
+                                className="w-full rounded-xl glass-input px-3 py-2 text-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-300/60 outline-none"
+                                placeholder="e.g., Paint, Nails, Wood Panels"
+                                required={!item.partId}
+                              />
+                            </div>
+                            <input
+                              type="number"
+                              name="quantity"
+                              value={item.quantity || 1}
+                              onChange={(event) => handleMaterialRequestItemChange(index, event)}
+                              className="w-full rounded-xl glass-input px-3 py-2 text-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-300/60 outline-none"
+                              min="1"
+                              required
+                              aria-label="Quantity"
+                            />
+                            <input
+                              type="text"
+                              name="unitOfMeasurement"
+                              value={item.unitOfMeasurement || ""}
+                              onChange={(event) => handleMaterialRequestItemChange(index, event)}
+                              className="w-full rounded-xl glass-input px-3 py-2 text-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-300/60 outline-none"
+                              placeholder="Unit"
+                              aria-label="Unit of measurement"
+                            />
+                            <input
+                              type="number"
+                              name="unitCost"
+                              value={item.unitCost || 0}
+                              onChange={(event) => handleMaterialRequestItemChange(index, event)}
+                              className="w-full rounded-xl glass-input px-3 py-2 text-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-300/60 outline-none"
+                              min="0"
+                              step="1"
+                              placeholder="Cost"
+                              aria-label="Unit cost"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removeMaterialRequestItem(index)}
+                              disabled={(materialRequestData.items || []).length <= 1}
+                              className="flex h-10 w-10 items-center justify-center rounded-xl text-slate-500 hover:bg-rose-50 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-40"
+                              title="Remove item"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
                       ))}
-                    </select>
-                    <p className="text-[10px] text-slate-400 mt-1 italic">Selecting a part ensures it appears in the "Parts & Inventory" pending requests.</p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1">{t("technician.modal.materialTitle")} *</label>
-                    <input
-                      type="text"
-                      name="title"
-                      value={materialRequestData.title}
-                      onChange={handleMaterialRequestChange}
-                      className="w-full rounded-xl glass-input px-3 py-2 text-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-300/60 outline-none"
-                      placeholder="e.g., Paint, Nails, Wood Panels"
-                      required
-                    />
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-1 italic">Select inventory parts when available, or type custom materials.</p>
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1">{t("technician.modal.description")} *</label>
@@ -2126,19 +2254,7 @@ const TechnicianDashboard = () => {
                       required
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-1">{t("technician.modal.quantity")} *</label>
-                      <input
-                        type="number"
-                        name="quantity"
-                        value={materialRequestData.quantity}
-                        onChange={handleMaterialRequestChange}
-                        className="w-full rounded-xl glass-input px-3 py-2 text-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-300/60 outline-none"
-                        min="1"
-                        required
-                      />
-                    </div>
+                  <div className="grid grid-cols-1 gap-4">
                     <div>
                       <label className="block text-sm font-semibold text-slate-700 mb-1">{t("technician.modal.urgency")} *</label>
                       <select

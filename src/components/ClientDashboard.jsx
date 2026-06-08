@@ -8136,6 +8136,7 @@ function ClientDashboard() {
   const [materialRequestPoStatusMap, setMaterialRequestPoStatusMap] = useState({});
   const [materialRequestStockInfo, setMaterialRequestStockInfo] = useState({});
   const [showCreateMaterialRequestModal, setShowCreateMaterialRequestModal] = useState(false);
+  const [materialRequestDetailModal, setMaterialRequestDetailModal] = useState({ open: false, request: null });
   const [materialRequestForm, setMaterialRequestForm] = useState({
     title: '',
     description: '',
@@ -8143,6 +8144,7 @@ function ClientDashboard() {
     urgency: 'MEDIUM',
     linkedIssueId: '',
     assetName: '',
+    items: [{ title: '', quantity: 1, unitOfMeasurement: '', unitCost: 0 }],
   });
   const [materialRequestSubmitBusy, setMaterialRequestSubmitBusy] = useState(false);
   const [materialRequestAdjustModal, setMaterialRequestAdjustModal] = useState({
@@ -16126,12 +16128,14 @@ function ClientDashboard() {
             quantity: targetRequest.quantity || 1,
           }];
 
+      const optionEntries = Array.isArray(options.entries) ? options.entries : [];
       const shortageItems = [];
 
-      requestedItems.forEach((item) => {
+      requestedItems.forEach((item, index) => {
         const quantityNeeded = Math.max(1, Number(item?.quantity || 1));
         const matchingPart = findInventoryPartMatch(partsList, item);
         const availableStock = matchingPart ? getPartAvailableStock(matchingPart) : 0;
+        const optionEntry = optionEntries[index] || {};
 
         if (!matchingPart || availableStock < quantityNeeded) {
           shortageItems.push({
@@ -16139,7 +16143,9 @@ function ClientDashboard() {
             part: matchingPart,
             quantityNeeded,
             availableStock,
-            shortage: matchingPart ? Math.max(quantityNeeded - availableStock, 0) : quantityNeeded,
+            shortage: Number(optionEntry.poQuantity || optionEntry.shortage || 0) || (matchingPart ? Math.max(quantityNeeded - availableStock, 0) : quantityNeeded),
+            unitOfMeasurement: optionEntry.unitOfMeasurement || item?.unitOfMeasurement || item?.unit || item?.uom || matchingPart?.unitOfMeasurement || matchingPart?.unit || '',
+            unitCost: Number(optionEntry.unitCost ?? item?.unitCost ?? matchingPart?.inventoryLines?.[0]?.cost ?? matchingPart?.cost ?? 0) || 0,
           });
         }
       });
@@ -16160,7 +16166,9 @@ function ClientDashboard() {
       const poItems = shortageItems.map((entry) => ({
         name: entry.item?.title || entry.item?.materialId || entry.part?.name || 'Material',
         quantity: Math.max(1, Number(entry.shortage || entry.quantityNeeded || 1)),
-        unitCost: Number(entry.part?.inventoryLines?.[0]?.cost || entry.part?.cost || 0),
+        unitOfMeasurement: entry.unitOfMeasurement || '',
+        unitCost: Number(entry.unitCost || 0),
+        amount: Math.max(1, Number(entry.shortage || entry.quantityNeeded || 1)) * (Number(entry.unitCost || 0)),
         partId: entry.part?._id || entry.part?.id || undefined,
         notes: `Raised from material request ${targetRequest.requestId || targetRequest.id || targetRequest._id}`,
       }));
@@ -16186,7 +16194,7 @@ function ClientDashboard() {
 
       const poNumber = poResponse?.data?.poNumber || poResponse?.data?.number || 'Draft PO';
       const shortageSummary = shortageItems
-        .map((entry) => `${entry.item?.title || entry.item?.materialId || entry.part?.name || 'Material'} (needed ${entry.quantityNeeded}, available ${entry.availableStock || 0})`)
+        .map((entry) => `${entry.item?.title || entry.item?.materialId || entry.part?.name || 'Material'} (needed ${entry.quantityNeeded}, available ${entry.availableStock || 0}, PO qty ${Math.max(1, Number(entry.shortage || entry.quantityNeeded || 1))})`)
         .join(', ');
 
       await api.put(`/api/material-requests/${id}`, {
@@ -16280,16 +16288,22 @@ function ClientDashboard() {
         const quantityNeeded = Math.max(1, Number(item?.quantity || 1));
         const matchingPart = findInventoryPartMatch(partsList, item);
         const availableStock = matchingPart ? getPartAvailableStock(matchingPart) : 0;
+        const shortage = Math.max(quantityNeeded - availableStock, matchingPart ? 0 : quantityNeeded);
+        const unitCost = Number(item?.unitCost ?? matchingPart?.inventoryLines?.[0]?.cost ?? matchingPart?.cost ?? 0) || 0;
         return {
           item,
           part: matchingPart,
           availableStock,
           quantityNeeded,
-          shortage: Math.max(quantityNeeded - availableStock, quantityNeeded),
+          shortage: Math.max(1, shortage || quantityNeeded),
+          poQuantity: Math.max(1, shortage || quantityNeeded),
+          unitOfMeasurement: item?.unitOfMeasurement || item?.unit || item?.uom || matchingPart?.unitOfMeasurement || matchingPart?.unit || '',
+          unitCost,
+          amount: Math.max(1, shortage || quantityNeeded) * unitCost,
           adjustmentQuantity: 0,
           reason: `Stock adjustment before creating PO for request ${targetRequest.requestId || targetRequest.id || targetRequest._id}`,
         };
-      }).filter((entry) => entry.part && entry.quantityNeeded > entry.availableStock);
+      }).filter((entry) => !entry.part || entry.quantityNeeded > entry.availableStock);
 
       if (shortageEntries.length === 0) {
         await handleApproveMaterial(id);
@@ -16308,6 +16322,26 @@ function ClientDashboard() {
     }
   }, [findInventoryPartMatch, getPartAvailableStock, handleApproveMaterial, materialRequests]);
 
+  const updateMaterialRequestAdjustEntry = useCallback((index, field, value) => {
+    setMaterialRequestAdjustModal((prev) => ({
+      ...prev,
+      entries: (prev.entries || []).map((entry, entryIndex) => {
+        if (entryIndex !== index) return entry;
+        const next = { ...entry };
+        if (field === 'poQuantity') {
+          next.poQuantity = Math.max(1, Number(value) || 1);
+        } else if (field === 'unitCost') {
+          next.unitCost = Math.max(0, Number(value) || 0);
+        } else {
+          next[field] = value;
+        }
+        next.amount = (Number(next.poQuantity || next.shortage || next.quantityNeeded || 1) || 1) * (Number(next.unitCost || 0) || 0);
+        next.shortage = Math.max(1, Number(next.poQuantity || next.shortage || 1) || 1);
+        return next;
+      }),
+    }));
+  }, []);
+
   const applyMaterialRequestAdjustments = useCallback(async () => {
     if (!materialRequestAdjustModal.requestId) return;
 
@@ -16321,6 +16355,7 @@ function ClientDashboard() {
       setMaterialRequestAdjustModal({ open: false, requestId: '', title: '', entries: [], vendorId: '' });
       await handleCreateMaterialPurchaseOrder(materialRequestAdjustModal.requestId, {
         vendorId: materialRequestAdjustModal.vendorId,
+        entries: materialRequestAdjustModal.entries,
       });
     } catch (err) {
       alert(err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Failed to create purchase order.');
@@ -18641,6 +18676,7 @@ function ClientDashboard() {
       urgency: 'MEDIUM',
       linkedIssueId: '',
       assetName: '',
+      items: [{ title: '', quantity: 1, unitOfMeasurement: '', unitCost: 0 }],
     });
   }, []);
   const handleClientMaterialRequestChange = useCallback((event) => {
@@ -18650,16 +18686,62 @@ function ClientDashboard() {
       [name]: name === 'quantity' ? Math.max(1, parseInt(value, 10) || 1) : value,
     }));
   }, []);
+  const handleClientMaterialRequestItemChange = useCallback((index, event) => {
+    const { name, value } = event.target;
+    setMaterialRequestForm((prev) => {
+      const items = Array.isArray(prev.items) && prev.items.length
+        ? [...prev.items]
+        : [{ title: prev.title || '', quantity: prev.quantity || 1, unitOfMeasurement: '', unitCost: 0 }];
+      return {
+        ...prev,
+        items: items.map((item, itemIndex) => (
+          itemIndex === index
+            ? {
+                ...item,
+                [name]: name === 'quantity'
+                  ? Math.max(1, parseInt(value, 10) || 1)
+                  : name === 'unitCost'
+                    ? Math.max(0, Number(value) || 0)
+                    : value
+              }
+            : item
+        )),
+      };
+    });
+  }, []);
+  const addClientMaterialRequestItem = useCallback(() => {
+    setMaterialRequestForm((prev) => ({
+      ...prev,
+      items: [...(Array.isArray(prev.items) ? prev.items : []), { title: '', quantity: 1, unitOfMeasurement: '', unitCost: 0 }],
+    }));
+  }, []);
+  const removeClientMaterialRequestItem = useCallback((index) => {
+    setMaterialRequestForm((prev) => {
+      const items = Array.isArray(prev.items) ? prev.items : [];
+      if (items.length <= 1) return prev;
+      return { ...prev, items: items.filter((_, itemIndex) => itemIndex !== index) };
+    });
+  }, []);
   const handleClientMaterialRequestSubmit = useCallback(async (event) => {
     event.preventDefault();
-    const trimmedTitle = String(materialRequestForm.title || '').trim();
     const trimmedDescription = String(materialRequestForm.description || '').trim();
     const trimmedAssetName = String(materialRequestForm.assetName || '').trim();
+    const requestItems = (Array.isArray(materialRequestForm.items) && materialRequestForm.items.length
+      ? materialRequestForm.items
+      : [{ title: materialRequestForm.title, quantity: materialRequestForm.quantity, unitOfMeasurement: materialRequestForm.unitOfMeasurement, unitCost: materialRequestForm.unitCost }]
+    )
+      .map((item) => ({
+        title: String(item.title || '').trim(),
+        quantity: Math.max(1, Number(item.quantity) || 1),
+        unitOfMeasurement: String(item.unitOfMeasurement || '').trim(),
+        unitCost: Math.max(0, Number(item.unitCost) || 0),
+      }))
+      .filter((item) => item.title);
     const currentUserId = currentUser?._id || currentUser?.id;
     const currentUserName = currentUser?.name || userName || currentUser?.email || 'Client';
 
-    if (!trimmedTitle || !trimmedDescription) {
-      alert('Enter a material title and description.');
+    if (requestItems.length === 0 || !trimmedDescription) {
+      alert('Add at least one material item and enter a description.');
       return;
     }
     if (!currentUserId) {
@@ -18670,9 +18752,17 @@ function ClientDashboard() {
     try {
       setMaterialRequestSubmitBusy(true);
       await api.post('/api/material-requests', {
-        title: trimmedTitle,
+        title: requestItems[0]?.title || '',
         description: trimmedDescription,
-        quantity: Math.max(1, Number(materialRequestForm.quantity) || 1),
+        quantity: requestItems[0]?.quantity || 1,
+        items: requestItems.map((item) => ({
+          materialId: item.title,
+          title: item.title,
+          quantity: item.quantity,
+          unitOfMeasurement: item.unitOfMeasurement,
+          unitCost: item.unitCost,
+          amount: item.quantity * item.unitCost,
+        })),
         urgency: materialRequestForm.urgency || 'MEDIUM',
         linkedIssueId: materialRequestForm.linkedIssueId || undefined,
         issueId: materialRequestForm.linkedIssueId || undefined,
@@ -27025,6 +27115,12 @@ function ClientDashboard() {
                         {isPending && (
                           <div className="p-3 bg-gray-50/50 border-t border-gray-50 flex gap-2">
                             <button
+                              onClick={() => setMaterialRequestDetailModal({ open: true, request: req })}
+                              className="flex-1 glass-ghost hover:bg-white text-slate-700 py-2 rounded-xl text-xs font-bold transition-all"
+                            >
+                              Details
+                            </button>
+                            <button
                               onClick={() => openMaterialRequestDecisionModal(req, 'APPROVED')}
                               className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-xl text-xs font-bold transition-colors shadow-sm"
                             >
@@ -27036,6 +27132,12 @@ function ClientDashboard() {
                         {isAdminApproved && stockInfo.requiresPo && (
                           <div className="p-3 bg-gray-50/50 border-t border-gray-50 flex gap-2">
                             <button
+                              onClick={() => setMaterialRequestDetailModal({ open: true, request: req })}
+                              className="flex-1 glass-ghost hover:bg-white text-slate-700 py-2 rounded-xl text-xs font-bold transition-all"
+                            >
+                              Details
+                            </button>
+                            <button
                               onClick={() => openMaterialRequestAdjustModal(reqId)}
                               className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-xl text-xs font-bold transition-colors shadow-sm"
                             >
@@ -27046,10 +27148,26 @@ function ClientDashboard() {
                         {isReadyToReceive && (
                           <div className="p-3 bg-gray-50/50 border-t border-gray-50 flex gap-2">
                             <button
+                              onClick={() => setMaterialRequestDetailModal({ open: true, request: req })}
+                              className="flex-1 glass-ghost hover:bg-white text-slate-700 py-2 rounded-xl text-xs font-bold transition-all"
+                            >
+                              Details
+                            </button>
+                            <button
                               onClick={() => handleReceiveMaterialRequestToInventory(reqId)}
                               className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-xl text-xs font-bold transition-colors shadow-sm"
                             >
                               Add to Parts & Inventory
+                            </button>
+                          </div>
+                        )}
+                        {!isPending && !(isAdminApproved && stockInfo.requiresPo) && !isReadyToReceive && (
+                          <div className="p-3 bg-gray-50/50 border-t border-gray-50 flex gap-2">
+                            <button
+                              onClick={() => setMaterialRequestDetailModal({ open: true, request: req })}
+                              className="flex-1 glass-ghost hover:bg-white text-slate-700 py-2 rounded-xl text-xs font-bold transition-all"
+                            >
+                              View Details
                             </button>
                           </div>
                         )}
@@ -27058,6 +27176,81 @@ function ClientDashboard() {
                   })}
                 </div>
               )}
+            </div>
+          )}
+
+          {materialRequestDetailModal.open && materialRequestDetailModal.request && (
+            <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-4">
+              <div className="w-full max-w-4xl rounded-2xl border border-gray-200 bg-white shadow-2xl">
+                <div className="flex items-center justify-between border-b border-gray-100 px-8 py-6">
+                  <div>
+                    <h3 className="text-[24px] font-bold tracking-tight text-gray-900">Material Request Details</h3>
+                    <p className="mt-1 text-sm text-gray-500">
+                      #{String(materialRequestDetailModal.request.id || materialRequestDetailModal.request._id || '').slice(-6).toUpperCase()} · {materialRequestDetailModal.request.status || 'PENDING'}
+                    </p>
+                  </div>
+                  <button type="button" onClick={() => setMaterialRequestDetailModal({ open: false, request: null })} className="p-1 text-gray-700 hover:text-gray-900">
+                    <X className="h-8 w-8" strokeWidth={1.75} />
+                  </button>
+                </div>
+                <div className="max-h-[70vh] overflow-auto px-8 py-6">
+                  <div className="mb-5 grid gap-4 md:grid-cols-3">
+                    <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                      <div className="text-xs font-bold uppercase text-gray-400">Requested By</div>
+                      <div className="mt-1 text-sm font-semibold text-gray-900">{materialRequestDetailModal.request.technicianName || 'Requester'}</div>
+                    </div>
+                    <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                      <div className="text-xs font-bold uppercase text-gray-400">Urgency</div>
+                      <div className="mt-1 text-sm font-semibold text-gray-900">{materialRequestDetailModal.request.urgency || 'MEDIUM'}</div>
+                    </div>
+                    <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                      <div className="text-xs font-bold uppercase text-gray-400">Created</div>
+                      <div className="mt-1 text-sm font-semibold text-gray-900">{materialRequestDetailModal.request.createdAt ? new Date(materialRequestDetailModal.request.createdAt).toLocaleString() : 'Not set'}</div>
+                    </div>
+                  </div>
+                  <div className="mb-5 rounded-xl border border-gray-200 p-4">
+                    <div className="text-xs font-bold uppercase text-gray-400">Description</div>
+                    <p className="mt-2 text-sm leading-6 text-gray-700">{materialRequestDetailModal.request.description || 'No description provided.'}</p>
+                  </div>
+                  <div className="overflow-hidden rounded-xl border border-gray-200">
+                    <table className="w-full text-left text-sm">
+                      <thead className="bg-gray-50 text-xs font-bold uppercase text-gray-500">
+                        <tr>
+                          <th className="px-4 py-3">Material</th>
+                          <th className="px-4 py-3">Qty</th>
+                          <th className="px-4 py-3">Unit</th>
+                          <th className="px-4 py-3">Unit Cost</th>
+                          <th className="px-4 py-3 text-right">Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {((materialRequestDetailModal.request.items || []).length
+                          ? materialRequestDetailModal.request.items
+                          : [{ title: materialRequestDetailModal.request.title || 'Material', quantity: materialRequestDetailModal.request.quantity || 1, unitOfMeasurement: materialRequestDetailModal.request.unitOfMeasurement || '', unitCost: materialRequestDetailModal.request.unitCost || 0 }]
+                        ).map((item, index) => {
+                          const quantity = Math.max(1, Number(item.quantity) || 1);
+                          const unitCost = Number(item.unitCost || item.cost || item.price || 0) || 0;
+                          const amount = Number(item.amount || quantity * unitCost) || 0;
+                          return (
+                            <tr key={item.id || index} className="border-t border-gray-100">
+                              <td className="px-4 py-3 font-semibold text-gray-900">{item.title || item.materialId || 'Material'}</td>
+                              <td className="px-4 py-3 text-gray-700">{quantity}</td>
+                              <td className="px-4 py-3 text-gray-700">{item.unitOfMeasurement || item.unit || item.uom || '-'}</td>
+                              <td className="px-4 py-3 text-gray-700">{new Intl.NumberFormat('en-RW', { style: 'currency', currency: 'RWF', maximumFractionDigits: 0 }).format(unitCost)}</td>
+                              <td className="px-4 py-3 text-right font-bold text-gray-900">{new Intl.NumberFormat('en-RW', { style: 'currency', currency: 'RWF', maximumFractionDigits: 0 }).format(amount)}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                <div className="flex justify-end border-t border-gray-100 px-8 py-4">
+                  <button type="button" onClick={() => setMaterialRequestDetailModal({ open: false, request: null })} className="rounded-xl border border-gray-300 bg-white px-5 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+                    Close
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 
@@ -27084,16 +27277,71 @@ function ClientDashboard() {
                 <form onSubmit={handleClientMaterialRequestSubmit} className="px-8 py-6">
                   <div className="grid gap-5">
                     <div>
-                      <label className="mb-2 block text-sm font-semibold text-gray-700">Material Title</label>
-                      <input
-                        type="text"
-                        name="title"
-                        value={materialRequestForm.title}
-                        onChange={handleClientMaterialRequestChange}
-                        placeholder="e.g. Paint, valves, filters"
-                        className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                        required
-                      />
+                      <div className="mb-2 flex items-center justify-between gap-3">
+                        <label className="block text-sm font-semibold text-gray-700">Materials</label>
+                        <button
+                          type="button"
+                          onClick={addClientMaterialRequestItem}
+                          className="inline-flex items-center gap-1 rounded-xl bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 transition hover:bg-blue-100"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                          Add item
+                        </button>
+                      </div>
+                      <div className="space-y-3">
+                        {(materialRequestForm.items || [{ title: '', quantity: 1, unitOfMeasurement: '', unitCost: 0 }]).map((item, index) => (
+                          <div key={index} className="grid gap-3 rounded-xl border border-gray-200 bg-gray-50 p-3 md:grid-cols-[1fr_90px_110px_120px_40px]">
+                            <input
+                              type="text"
+                              name="title"
+                              value={item.title || ''}
+                              onChange={(event) => handleClientMaterialRequestItemChange(index, event)}
+                              placeholder="e.g. Paint, valves, filters"
+                              className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                              required
+                            />
+                            <input
+                              type="number"
+                              name="quantity"
+                              min="1"
+                              value={item.quantity || 1}
+                              onChange={(event) => handleClientMaterialRequestItemChange(index, event)}
+                              className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                              required
+                              aria-label="Quantity"
+                            />
+                            <input
+                              type="text"
+                              name="unitOfMeasurement"
+                              value={item.unitOfMeasurement || ''}
+                              onChange={(event) => handleClientMaterialRequestItemChange(index, event)}
+                              placeholder="Unit"
+                              className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                              aria-label="Unit of measurement"
+                            />
+                            <input
+                              type="number"
+                              name="unitCost"
+                              min="0"
+                              step="1"
+                              value={item.unitCost || 0}
+                              onChange={(event) => handleClientMaterialRequestItemChange(index, event)}
+                              placeholder="Unit cost"
+                              className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                              aria-label="Unit cost"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removeClientMaterialRequestItem(index)}
+                              disabled={(materialRequestForm.items || []).length <= 1}
+                              className="flex h-11 w-11 items-center justify-center rounded-xl text-gray-500 transition hover:bg-rose-50 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-40"
+                              title="Remove item"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                     <div>
                       <label className="mb-2 block text-sm font-semibold text-gray-700">Description</label>
@@ -27107,19 +27355,7 @@ function ClientDashboard() {
                         required
                       />
                     </div>
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <div>
-                        <label className="mb-2 block text-sm font-semibold text-gray-700">Quantity</label>
-                        <input
-                          type="number"
-                          name="quantity"
-                          min="1"
-                          value={materialRequestForm.quantity}
-                          onChange={handleClientMaterialRequestChange}
-                          className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                          required
-                        />
-                      </div>
+                    <div className="grid gap-4 md:grid-cols-1">
                       <div>
                         <label className="mb-2 block text-sm font-semibold text-gray-700">Urgency</label>
                         <select
@@ -27256,6 +27492,44 @@ function ClientDashboard() {
                         </div>
                         <div className="mt-4 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
                           Purchase order quantity: {Math.max(1, Number(entry.shortage || entry.quantityNeeded || 1))}
+                        </div>
+                        <div className="mt-4 grid gap-3 md:grid-cols-4">
+                          <div>
+                            <label className="mb-1 block text-xs font-semibold text-gray-600">PO Quantity</label>
+                            <input
+                              type="number"
+                              min="1"
+                              value={entry.poQuantity || entry.shortage || entry.quantityNeeded || 1}
+                              onChange={(event) => updateMaterialRequestAdjustEntry(index, 'poQuantity', event.target.value)}
+                              className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-xs font-semibold text-gray-600">Unit</label>
+                            <input
+                              value={entry.unitOfMeasurement || ''}
+                              onChange={(event) => updateMaterialRequestAdjustEntry(index, 'unitOfMeasurement', event.target.value)}
+                              className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-500"
+                              placeholder="pcs, box, kg"
+                            />
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-xs font-semibold text-gray-600">Unit Cost</label>
+                            <input
+                              type="number"
+                              min="0"
+                              step="1"
+                              value={entry.unitCost || 0}
+                              onChange={(event) => updateMaterialRequestAdjustEntry(index, 'unitCost', event.target.value)}
+                              className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-xs font-semibold text-gray-600">Amount</label>
+                            <div className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-bold text-gray-900">
+                              {new Intl.NumberFormat('en-RW', { style: 'currency', currency: 'RWF', maximumFractionDigits: 0 }).format(Number(entry.amount || 0) || 0)}
+                            </div>
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -31419,8 +31693,8 @@ function ClientDashboard() {
               technicians={[...(allWorkers || []), ...(internalTechnicians || []), ...(people || []), ...(technicians || [])]}
               assets={assets}
               maintenanceSchedules={maintenanceSchedules}
-              requestItems={filteredRequests}
-              workOrderItems={filteredClientWorkOrders}
+              requestItems={pendingRequests}
+              workOrderItems={workOrders}
             />
           )}
 
@@ -34407,10 +34681,9 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
       const partRes = await api.get(`/api/parts/${partId}`);
       const part = partRes.data;
       
-      let updatedHistory = [...(part.allocationHistory || [])];
-      
       if (selectedRequest && selectedRequest.sourceType === 'allocation') {
         // Update existing pending record in inventory history
+        let updatedHistory = [...(part.allocationHistory || [])];
         updatedHistory = updatedHistory.map(h => {
           if (h.id === selectedRequest.id) {
             return {
@@ -34422,17 +34695,17 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
           }
           return h;
         });
+        // Use the dedicated recordAllocation endpoint to avoid name requirement
+        await api.put(`/api/parts/${partId}/record-allocation`, {
+          allocatedBy: newAllocation.allocatedBy,
+          requestedBy: newAllocation.requestedBy,
+          givenBy: newAllocation.givenBy,
+          receivedBy: newAllocation.receivedBy,
+          quantity: newAllocation.quantity,
+          notes: newAllocation.notes,
+          date: newAllocation.date
+        });
       } else {
-        // Add new fulfillment record (either from Material Request or direct allocation)
-        const allocationRecord = {
-          ...newAllocation,
-          id: Math.random().toString(36).substr(2, 9),
-          status: 'FULFILLED',
-          createdAt: new Date().toISOString(),
-          sourceRequest: selectedRequest?.id || undefined
-        };
-        updatedHistory = [allocationRecord, ...updatedHistory];
-
         // If it came from a general material request, update that too
         if (selectedRequest && selectedRequest.sourceType === 'materialRequest') {
           await api.put(`/api/material-requests/${selectedRequest.id}`, {
@@ -34440,16 +34713,26 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
             fulfilledAt: new Date().toISOString()
           });
         }
-      }
 
-      const updateData = { allocationHistory: updatedHistory };
-      
-      // If manual allocation (not a pending inventory allocation), we need to update allocated/quantity
-      if (!selectedRequest || selectedRequest.sourceType === 'materialRequest') {
-        updateData.allocated = (Number(part.allocated) || 0) + Number(newAllocation.quantity || 0);
+        // Record the allocation using dedicated endpoint
+        await api.put(`/api/parts/${partId}/record-allocation`, {
+          allocatedBy: newAllocation.allocatedBy,
+          requestedBy: newAllocation.requestedBy,
+          givenBy: newAllocation.givenBy,
+          receivedBy: newAllocation.receivedBy,
+          quantity: newAllocation.quantity,
+          notes: newAllocation.notes,
+          date: newAllocation.date
+        });
+        
+        // If manual allocation (not a pending inventory allocation), we need to update allocated/quantity
+        if (!selectedRequest || selectedRequest.sourceType === 'materialRequest') {
+          await api.put(`/api/parts/${partId}`, {
+            name: part.name,
+            allocated: (Number(part.allocated) || 0) + Number(newAllocation.quantity || 0)
+          });
+        }
       }
-
-      await api.put(`/api/parts/${partId}`, updateData);
       
       await loadInventoryData();
       window.dispatchEvent(new CustomEvent('refreshInventory'));
@@ -36513,6 +36796,7 @@ const ClientPurchaseOrdersTab = () => {
     requesterFax: '',
     itemName: '',
     quantity: 1,
+    unitOfMeasurement: '',
     unitCost: 0,
     poNumber: ''
   });
@@ -36569,6 +36853,70 @@ const ClientPurchaseOrdersTab = () => {
     currency: 'RWF',
     maximumFractionDigits: 0,
   }).format(Number(value) || 0);
+  const downloadPurchaseOrderPdf = async (po) => {
+    if (!po) return;
+    const { jsPDF } = await import('jspdf');
+    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 40;
+    let y = 44;
+    const vendorName = po.vendor?.name || po.vendorDetails?.name || po.vendor || 'Vendor';
+    const poNumber = po.poNumber || po.number || 'PO';
+    const rows = Array.isArray(po.items) ? po.items : [];
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(20);
+    doc.text('Purchase Order', margin, y);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`PO Number: ${poNumber}`, pageWidth - margin, y, { align: 'right' });
+    y += 24;
+    doc.text(`Vendor: ${vendorName}`, margin, y);
+    doc.text(`Status: ${normalizePoStatus(po.status)}`, pageWidth - margin, y, { align: 'right' });
+    y += 18;
+    doc.text(`Company: ${po.companyName || po.billing?.companyName || 'FixNest'}`, margin, y);
+    doc.text(`Date: ${formatDate(po.purchaseDate || po.createdAt || new Date())}`, pageWidth - margin, y, { align: 'right' });
+    y += 28;
+
+    doc.setFont('helvetica', 'bold');
+    doc.text('Items', margin, y);
+    y += 16;
+    doc.setFontSize(9);
+    const col = { item: margin, qty: 250, unit: 300, cost: 365, amount: 470 };
+    doc.text('Item', col.item, y);
+    doc.text('Qty', col.qty, y);
+    doc.text('Unit', col.unit, y);
+    doc.text('Unit Cost', col.cost, y);
+    doc.text('Amount', col.amount, y);
+    y += 8;
+    doc.line(margin, y, pageWidth - margin, y);
+    y += 16;
+    doc.setFont('helvetica', 'normal');
+    rows.forEach((item) => {
+      if (y > 740) {
+        doc.addPage();
+        y = 50;
+      }
+      const qty = Number(item.quantity) || 0;
+      const cost = Number(item.unitCost || item.cost) || 0;
+      const amount = Number(item.amount || qty * cost) || 0;
+      doc.text(String(item.name || 'Item').slice(0, 34), col.item, y);
+      doc.text(String(qty), col.qty, y);
+      doc.text(String(item.unitOfMeasurement || item.unit || item.uom || '-').slice(0, 10), col.unit, y);
+      doc.text(formatPoMoney(cost), col.cost, y);
+      doc.text(formatPoMoney(amount), col.amount, y);
+      y += 18;
+    });
+    y += 8;
+    doc.line(margin, y, pageWidth - margin, y);
+    y += 20;
+    doc.setFont('helvetica', 'bold');
+    doc.text(`Total: ${formatPoMoney(getPoTotal(po))}`, pageWidth - margin, y, { align: 'right' });
+    y += 30;
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Notes: ${po.notes || po.additionalDetails || 'None'}`, margin, y, { maxWidth: pageWidth - margin * 2 });
+    doc.save(`${String(poNumber).replace(/[^a-z0-9-]+/gi, '-')}.pdf`);
+  };
   const normalizePoStatus = (status) => {
     const normalized = String(status || 'Awaiting Approval').trim().toUpperCase().replace(/[_-]+/g, ' ');
     if (normalized === 'APPROVED') return 'Approved';
@@ -36580,7 +36928,7 @@ const ClientPurchaseOrdersTab = () => {
   };
   const PURCHASE_ORDER_STATUS_OPTIONS = ['Fulfilled', 'Approved', 'Partially Fulfilled', 'Awaiting Approval', 'Declined'];
   const resetForm = () => setForm({
-    title: '', vendor: '', vendorId: '', expectedDate: '', purchaseDate: '', shippingMethod: '', terms: '', fobShippingPoint: '', category: '', additionalDetails: '', requisitioner: '', shippingCompanyName: '', shippingAddress: '', shippingPhone: '', shippingFax: '', requesterCompanyName: '', requesterAddress: '', requesterPhone: '', requesterFax: '', itemName: '', quantity: 1, unitCost: 0, poNumber: ''
+    title: '', vendor: '', vendorId: '', expectedDate: '', purchaseDate: '', shippingMethod: '', terms: '', fobShippingPoint: '', category: '', additionalDetails: '', requisitioner: '', shippingCompanyName: '', shippingAddress: '', shippingPhone: '', shippingFax: '', requesterCompanyName: '', requesterAddress: '', requesterPhone: '', requesterFax: '', itemName: '', quantity: 1, unitOfMeasurement: '', unitCost: 0, poNumber: ''
   });
   const openPoEditor = (po) => {
     setForm({
@@ -36605,6 +36953,7 @@ const ClientPurchaseOrdersTab = () => {
       requesterFax: po?.billing?.fax || '',
       itemName: po?.items?.[0]?.name || '',
       quantity: po?.items?.[0]?.quantity || 1,
+      unitOfMeasurement: po?.items?.[0]?.unitOfMeasurement || '',
       unitCost: po?.items?.[0]?.unitCost || po?.items?.[0]?.cost || 0,
       poNumber: po?.poNumber || ''
     });
@@ -36695,7 +37044,13 @@ const ClientPurchaseOrdersTab = () => {
         status: editingId ? undefined : 'Awaiting Approval',
         vendorEmail: vendors.find((vendor) => String(vendor._id || vendor.id) === String(form.vendorId))?.email || undefined,
         notes: form.additionalDetails || '',
-        items: form.itemName ? [{ name: form.itemName, quantity: Number(form.quantity) || 1, unitCost: Number(form.unitCost) || 0 }] : [],
+        items: form.itemName ? [{
+          name: form.itemName,
+          quantity: Number(form.quantity) || 1,
+          unitOfMeasurement: form.unitOfMeasurement || '',
+          unitCost: Number(form.unitCost) || 0,
+          amount: (Number(form.quantity) || 1) * (Number(form.unitCost) || 0)
+        }] : [],
         sendVendorLink: Boolean(vendors.find((vendor) => String(vendor._id || vendor.id) === String(form.vendorId))?.email)
       };
       let res;
@@ -36778,6 +37133,7 @@ const ClientPurchaseOrdersTab = () => {
           <div className="flex flex-col gap-1"><label className="text-xs font-semibold text-gray-600">Category</label><input value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" placeholder="None" /></div>
           <div className="flex flex-col gap-1"><label className="text-xs font-semibold text-gray-600">Item</label><input value={form.itemName} onChange={e => setForm(f => ({ ...f, itemName: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" placeholder="Optional" /></div>
           <div className="flex flex-col gap-1"><label className="text-xs font-semibold text-gray-600">Quantity</label><input type="number" min="1" value={form.quantity} onChange={e => setForm(f => ({ ...f, quantity: Number(e.target.value) || 1 }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" /></div>
+          <div className="flex flex-col gap-1"><label className="text-xs font-semibold text-gray-600">Unit</label><input value={form.unitOfMeasurement || ''} onChange={e => setForm(f => ({ ...f, unitOfMeasurement: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" placeholder="pcs, box, kg" /></div>
           <div className="flex flex-col gap-1"><label className="text-xs font-semibold text-gray-600">Unit Cost (RWF)</label><input type="number" step="1" value={form.unitCost} onChange={e => setForm(f => ({ ...f, unitCost: Number(e.target.value) || 0 }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" /></div>
           <div className="flex flex-col gap-1"><label className="text-xs font-semibold text-gray-600">Shipping Method</label><input value={form.shippingMethod} onChange={e => setForm(f => ({ ...f, shippingMethod: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" placeholder="None" /></div>
           <div className="flex flex-col gap-1"><label className="text-xs font-semibold text-gray-600">Terms</label><input value={form.terms} onChange={e => setForm(f => ({ ...f, terms: e.target.value }))} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" placeholder="None" /></div>
@@ -36821,12 +37177,12 @@ const ClientPurchaseOrdersTab = () => {
       {selectedPo && showDetails && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={() => setShowDetails(false)}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-5xl max-h-[90vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100"><div><p className="text-xs uppercase font-bold text-gray-400">Purchase Order</p><h3 className="text-lg font-bold text-gray-900">#{selectedPo.poNumber || selectedPo.number || '—'} / {selectedPo.title || 'Untitled PO'}</h3><p className="text-sm text-gray-500">Status: {normalizePoStatus(selectedPo.status)}</p></div><div className="flex items-center gap-2"><button className="px-3 py-2 text-sm border rounded-lg" onClick={() => setShowDetails(false)}>Close</button><button className="px-3 py-2 text-sm border rounded-lg" onClick={() => openPoEditor(selectedPo)}>Edit</button><button className="px-3 py-2 text-sm bg-rose-500 text-white rounded-lg" onClick={() => updatePoStatus(selectedPo, 'Declined')}>Decline</button><button className="px-3 py-2 text-sm bg-blue-600 text-white rounded-lg" onClick={() => updatePoStatus(selectedPo, 'Approved')}>Approve</button></div></div>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100"><div><p className="text-xs uppercase font-bold text-gray-400">Purchase Order</p><h3 className="text-lg font-bold text-gray-900">#{selectedPo.poNumber || selectedPo.number || '—'} / {selectedPo.title || 'Untitled PO'}</h3><p className="text-sm text-gray-500">Status: {normalizePoStatus(selectedPo.status)}</p></div><div className="flex items-center gap-2"><button className="px-3 py-2 text-sm border rounded-lg" onClick={() => setShowDetails(false)}>Close</button><button className="px-3 py-2 text-sm border rounded-lg" onClick={() => downloadPurchaseOrderPdf(selectedPo)}>Download PDF</button><button className="px-3 py-2 text-sm border rounded-lg" onClick={() => openPoEditor(selectedPo)}>Edit</button><button className="px-3 py-2 text-sm bg-rose-500 text-white rounded-lg" onClick={() => updatePoStatus(selectedPo, 'Declined')}>Decline</button><button className="px-3 py-2 text-sm bg-blue-600 text-white rounded-lg" onClick={() => updatePoStatus(selectedPo, 'Approved')}>Approve</button></div></div>
             <div className="border-b border-gray-100 px-6"><div className="flex items-center gap-8 text-sm font-semibold text-gray-500"><button type="button" className="py-4 border-b-2 border-blue-600 text-gray-900">Details</button><button type="button" className="py-4">Activity</button><button type="button" className="py-4">Files</button></div></div>
             <div className="p-6 grid grid-cols-1 xl:grid-cols-[minmax(0,2fr)_320px] gap-6">
               <div className="space-y-6">
                 <div className="rounded-2xl border border-gray-200 overflow-hidden"><div className="px-6 py-4 bg-gray-50 text-lg font-bold text-gray-900">Shipping Information</div><div className="divide-y divide-gray-100 text-sm"><div className="grid grid-cols-2 gap-4 px-6 py-5"><span className="text-gray-500">Company Name</span><span className="font-medium text-gray-900">{selectedPo.shipping?.name || selectedPo.billing?.companyName || selectedPo.vendorDetails?.name || selectedPo.vendor?.name || selectedPo.vendor || '—'}</span></div><div className="grid grid-cols-2 gap-4 px-6 py-5"><span className="text-gray-500">Address</span><span className="font-medium text-gray-900">{selectedPo.shipping?.address || selectedPo.billing?.address || renderValue(selectedPo.address, '—')}</span></div><div className="grid grid-cols-2 gap-4 px-6 py-5"><span className="text-gray-500">Phone Number</span><span className="font-medium text-gray-900">{selectedPo.shipping?.phone || selectedPo.billing?.phone || selectedPo.vendorDetails?.phone || '—'}</span></div><div className="grid grid-cols-2 gap-4 px-6 py-5"><span className="text-gray-500">Fax</span><span className="font-medium text-gray-900">{selectedPo.billing?.fax || 'None'}</span></div></div></div>
-                <div className="rounded-2xl border border-gray-200 overflow-hidden"><div className="px-6 py-4 bg-gray-50 text-lg font-bold text-gray-900">Line Items</div><div className="overflow-x-auto"><table className="w-full text-left"><thead className="bg-gray-50 text-xs font-bold text-gray-600"><tr><th className="py-3 px-4">Item</th><th className="py-3 px-4">Cost</th><th className="py-3 px-4">Qty</th><th className="py-3 px-4 text-right">Total</th></tr></thead><tbody className="text-sm">{(selectedPo.items || []).map((item, idx) => { const qty = Number(item.quantity) || 0; const cost = Number(item.unitCost || item.cost) || 0; return (<tr key={idx} className="border-t border-gray-100"><td className="py-3 px-4"><div className="font-semibold text-gray-900">{item.name || 'Item'}</div>{item.description && <div className="text-xs text-gray-500 mt-1">{item.description}</div>}</td><td className="py-3 px-4 text-gray-700">{formatPoMoney(cost)}</td><td className="py-3 px-4 text-gray-700">{qty}</td><td className="py-3 px-4 text-right font-bold text-gray-900">{formatPoMoney(qty * cost)}</td></tr>); })}{(selectedPo.items || []).length === 0 && (<tr><td colSpan={4} className="py-8 text-center text-gray-400">No items</td></tr>)}</tbody></table></div></div>
+                <div className="rounded-2xl border border-gray-200 overflow-hidden"><div className="px-6 py-4 bg-gray-50 text-lg font-bold text-gray-900">Line Items</div><div className="overflow-x-auto"><table className="w-full text-left"><thead className="bg-gray-50 text-xs font-bold text-gray-600"><tr><th className="py-3 px-4">Item</th><th className="py-3 px-4">Qty</th><th className="py-3 px-4">Unit</th><th className="py-3 px-4">Unit Cost</th><th className="py-3 px-4 text-right">Amount</th></tr></thead><tbody className="text-sm">{(selectedPo.items || []).map((item, idx) => { const qty = Number(item.quantity) || 0; const cost = Number(item.unitCost || item.cost) || 0; const amount = Number(item.amount || qty * cost) || 0; return (<tr key={idx} className="border-t border-gray-100"><td className="py-3 px-4"><div className="font-semibold text-gray-900">{item.name || 'Item'}</div>{item.description && <div className="text-xs text-gray-500 mt-1">{item.description}</div>}</td><td className="py-3 px-4 text-gray-700">{qty}</td><td className="py-3 px-4 text-gray-700">{item.unitOfMeasurement || item.unit || item.uom || '-'}</td><td className="py-3 px-4 text-gray-700">{formatPoMoney(cost)}</td><td className="py-3 px-4 text-right font-bold text-gray-900">{formatPoMoney(amount)}</td></tr>); })}{(selectedPo.items || []).length === 0 && (<tr><td colSpan={5} className="py-8 text-center text-gray-400">No items</td></tr>)}</tbody></table></div></div>
                 <div className="rounded-2xl border border-gray-200 overflow-hidden"><div className="px-6 py-4 bg-gray-50 text-lg font-bold text-gray-900">Additional Details</div><div className="divide-y divide-gray-100 text-sm"><div className="grid grid-cols-2 gap-4 px-6 py-5"><span className="text-gray-500">Purchase Date</span><span className="font-medium text-gray-900">{formatDate(selectedPo.purchaseDate || selectedPo.createdAt)}</span></div><div className="grid grid-cols-2 gap-4 px-6 py-5"><span className="text-gray-500">Shipping Method</span><span className="font-medium text-gray-900">{selectedPo.shippingMethod || 'None'}</span></div><div className="grid grid-cols-2 gap-4 px-6 py-5"><span className="text-gray-500">Terms</span><span className="font-medium text-gray-900">{selectedPo.terms || 'None'}</span></div><div className="grid grid-cols-2 gap-4 px-6 py-5"><span className="text-gray-500">F.O.B. Shipping Point</span><span className="font-medium text-gray-900">{selectedPo.fobShippingPoint || 'None'}</span></div><div className="grid grid-cols-2 gap-4 px-6 py-5"><span className="text-gray-500">Notes</span><span className="font-medium text-gray-900">{selectedPo.notes || selectedPo.additionalDetails || 'None'}</span></div></div></div>
               </div>
               <div className="rounded-2xl border border-gray-200 bg-white"><div className="p-6 space-y-5"><div className="flex items-center justify-between gap-4"><span className="text-gray-500">Status</span><span className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold ${requestStatusColor(normalizePoStatus(selectedPo.status))}`}>{normalizePoStatus(selectedPo.status)}</span></div><div className="flex items-center justify-between gap-4"><span className="text-gray-500">Vendor</span><span className="font-medium text-gray-900 text-right">{selectedPo.vendor?.name || selectedPo.vendorDetails?.name || selectedPo.vendor || '—'}</span></div><div className="flex items-center justify-between gap-4"><span className="text-gray-500">Due Date</span><span className="font-medium text-gray-900 text-right">{formatDate(selectedPo.expectedDate)}</span></div><div className="flex items-center justify-between gap-4"><span className="text-gray-500">Added By</span><span className="font-medium text-gray-900 text-right">{selectedPo.createdBy?.name || selectedPo.createdBy?.email || '—'}</span></div><div className="flex items-center justify-between gap-4"><span className="text-gray-500">Date Added</span><span className="font-medium text-gray-900 text-right">{formatDate(selectedPo.createdAt)}</span></div><div className="flex items-center justify-between gap-4"><span className="text-gray-500">Cost</span><span className="font-medium text-gray-900 text-right">{formatPoMoney(getPoTotal(selectedPo))}</span></div><div className="flex items-center justify-between gap-4"><span className="text-gray-500">Category</span><span className="font-medium text-gray-900 text-right">{selectedPo.category || 'None'}</span></div><div className="flex items-start justify-between gap-4"><span className="text-gray-500">Public Link</span><div className="flex max-w-[240px] items-center gap-2 text-right"><span className="truncate font-medium text-blue-700">{selectedPo.publicLink || 'Not available'}</span>{selectedPo.publicLink ? <button type="button" className="rounded-lg border border-gray-200 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50" onClick={async () => { try { await navigator.clipboard.writeText(selectedPo.publicLink); alert('Public link copied.'); } catch (error) { alert(`Copy failed. Use this link manually:\n${selectedPo.publicLink}`); } }}>Copy Link</button> : null}</div></div><div className="border-t border-gray-100 pt-5"><div className="grid grid-cols-[96px_minmax(0,1fr)] gap-4 text-sm"><span className="text-gray-500">Additional Details</span><span className="font-medium text-gray-900">{selectedPo.notes || selectedPo.additionalDetails || 'None'}</span></div></div></div><div className="border-t border-gray-100 p-6"><h4 className="text-lg font-bold text-gray-900 mb-5">Requester Information</h4><div className="space-y-5 text-sm"><div className="flex items-start justify-between gap-4"><span className="text-gray-500">Requisitioner</span><span className="font-medium text-gray-900 text-right">{selectedPo.requisitioner || selectedPo.createdBy?.name || 'Requisitioner'}</span></div><div className="flex items-start justify-between gap-4"><span className="text-gray-500">Company Name</span><span className="font-medium text-gray-900 text-right">{selectedPo.billing?.companyName || selectedPo.shipping?.name || '—'}</span></div><div className="flex items-start justify-between gap-4"><span className="text-gray-500">Address</span><span className="font-medium text-gray-900 text-right">{selectedPo.billing?.address || selectedPo.shipping?.address || '—'}</span></div><div className="flex items-start justify-between gap-4"><span className="text-gray-500">Phone Number</span><span className="font-medium text-gray-900 text-right">{selectedPo.billing?.phone || selectedPo.shipping?.phone || '—'}</span></div><div className="flex items-start justify-between gap-4"><span className="text-gray-500">Fax</span><span className="font-medium text-gray-900 text-right">{selectedPo.billing?.fax || '—'}</span></div></div></div></div>
