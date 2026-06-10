@@ -15072,7 +15072,7 @@ function ClientDashboard() {
       if (selectedDirectoryPerson.kind === 'invite') {
         syncDirectoryPersonRecord(personId, payload);
       } else {
-        await api.put(`/api/users/${personId}`, payload);
+        await api.patch(`/api/users/${personId}`, payload);
         await refreshPeople();
       }
       setSelectedDirectoryPerson((prev) => prev ? { ...prev, ...payload } : prev);
@@ -15091,7 +15091,7 @@ function ClientDashboard() {
     syncDirectoryPersonRecord(personId, { status: nextStatus });
     try {
       if (selectedDirectoryPerson.kind !== 'invite') {
-        await api.put(`/api/users/${personId}`, { status: nextStatus });
+        await api.patch(`/api/users/${personId}`, { status: nextStatus });
         await refreshPeople();
       }
       setSelectedDirectoryPerson((prev) => prev ? { ...prev, status: nextStatus } : prev);
