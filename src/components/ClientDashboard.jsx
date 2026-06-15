@@ -1292,6 +1292,75 @@ const formatScheduleFrequency = (schedule) => {
   return `Every ${interval} ${unit}${interval > 1 ? 's' : ''}`;
 };
 
+const getScheduleRecurrence = (schedule = {}) => {
+  const calendarRule = schedule.calendarRule || {};
+  const rawUnit = String(calendarRule.unit || schedule.frequency || 'daily').toLowerCase();
+  const every = Number(calendarRule.every || schedule.interval || 1) || 1;
+  if (rawUnit.includes('week')) return { every, unit: 'week' };
+  if (rawUnit.includes('month')) return { every, unit: 'month' };
+  if (rawUnit.includes('year') || rawUnit.includes('annual')) return { every, unit: 'year' };
+  return { every, unit: 'day' };
+};
+
+const addScheduleInterval = (date, recurrence) => {
+  const next = new Date(date);
+  if (recurrence.unit === 'week') next.setDate(next.getDate() + recurrence.every * 7);
+  else if (recurrence.unit === 'month') next.setMonth(next.getMonth() + recurrence.every);
+  else if (recurrence.unit === 'year') next.setFullYear(next.getFullYear() + recurrence.every);
+  else next.setDate(next.getDate() + recurrence.every);
+  return next;
+};
+
+const getScheduleTimeParts = (schedule = {}) => {
+  const rawTime = String(schedule.time || schedule.startTime || schedule.scheduledTime || '').trim();
+  const match = rawTime.match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes) || hours > 23 || minutes > 59) return null;
+  return { hours, minutes };
+};
+
+const applyScheduleTime = (date, schedule = {}) => {
+  const next = new Date(date);
+  const time = getScheduleTimeParts(schedule);
+  if (time) next.setHours(time.hours, time.minutes, 0, 0);
+  return next;
+};
+
+const getNextScheduleOccurrence = (schedule = {}, fallbackDate) => {
+  const seed = normalizeDate(schedule.nextDate || fallbackDate || schedule.date || schedule.startDate || schedule.createdAt);
+  if (!seed) return null;
+  if (!schedule.routine) return applyScheduleTime(seed, schedule);
+
+  const recurrence = getScheduleRecurrence(schedule);
+  const hasTime = Boolean(getScheduleTimeParts(schedule));
+  const comparisonPoint = new Date();
+  if (!hasTime) comparisonPoint.setHours(0, 0, 0, 0);
+
+  let occurrence = new Date(seed);
+  occurrence.setHours(0, 0, 0, 0);
+  occurrence = applyScheduleTime(occurrence, schedule);
+
+  let guard = 0;
+  while (occurrence < comparisonPoint && guard < 1000) {
+    occurrence = applyScheduleTime(addScheduleInterval(occurrence, recurrence), schedule);
+    guard += 1;
+  }
+
+  return occurrence;
+};
+
+const formatPmScheduleDateTime = (date, schedule = {}) => {
+  if (!date) return '-';
+  const options = { month: '2-digit', day: '2-digit', year: '2-digit' };
+  if (getScheduleTimeParts(schedule)) {
+    options.hour = '2-digit';
+    options.minute = '2-digit';
+  }
+  return date.toLocaleString('en-US', options);
+};
+
 // â”€â”€ Status badge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function StatusBadge({ status }) {
   const s = (status || '').toUpperCase().replace(/_/g, ' ');
@@ -19822,7 +19891,7 @@ function ClientDashboard() {
     return matchesScheduleId || matchesAsset || matchesName || matchesWorkOrderTitle;
   })) : [];
   const selectedScheduleFrequency = selectedSchedule ? formatScheduleFrequency(selectedSchedule) : '';
-  const selectedScheduleNextDate = selectedSchedule ? normalizeDate(selectedSchedule.nextDate || selectedSchedule.date) : null;
+  const selectedScheduleNextDate = selectedSchedule ? getNextScheduleOccurrence(selectedSchedule) : null;
   const selectedScheduleStatus = selectedSchedule ? (selectedSchedule.status || 'Scheduled') : '';
   const selectedScheduleAssignedLabel = selectedScheduleAssignees.length ? selectedScheduleAssignees.join(', ') : 'Unassigned';
   const selectedScheduleChecklistGroups = React.useMemo(() => {
@@ -25184,14 +25253,13 @@ function ClientDashboard() {
                                     const rowAssetId = extractId(row.asset?._id || row.asset?.id || row.asset);
                                     return rowAssetId ? String(issueAssetId || '') === String(rowAssetId) : true;
                                   }) || selectedScheduleWorkOrders[0];
-                                  const nextDueDate = normalizeDate(row.endDate || selectedSchedule.nextDate || selectedSchedule.date);
-                                  const nextTriggerDate = normalizeDate(
-                                    lastWorkOrder?.createdAt ||
+                                  const nextDueDate = getNextScheduleOccurrence(selectedSchedule, row.endDate || row.startDate);
+                                  const nextTriggerDate = getNextScheduleOccurrence(
+                                    selectedSchedule,
                                     lastWorkOrder?.fixDeadline ||
                                     lastWorkOrder?.dueDate ||
                                     row.startDate ||
-                                    selectedSchedule.startDate ||
-                                    selectedSchedule.date
+                                    selectedSchedule.startDate
                                   );
                                   return (
                                     <tr key={row.key} className="hover:bg-gray-50/70">
@@ -25219,10 +25287,10 @@ function ClientDashboard() {
                                         ) : '-'}
                                       </td>
                                       <td className="px-6 py-5 text-[15px] text-gray-800">
-                                        {nextDueDate ? nextDueDate.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' }) : '-'}
+                                        {formatPmScheduleDateTime(nextDueDate, selectedSchedule)}
                                       </td>
                                       <td className="px-6 py-5 text-[15px] text-gray-800">
-                                        {nextTriggerDate ? nextTriggerDate.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' }) : '-'}
+                                        {formatPmScheduleDateTime(nextTriggerDate, selectedSchedule)}
                                       </td>
                                       <td className="px-6 py-5 text-[15px] text-gray-800">{row.assigneeName || '-'}</td>
                                       <td className="px-6 py-5 text-right text-gray-500">
