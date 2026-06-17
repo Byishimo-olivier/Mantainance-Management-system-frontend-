@@ -694,7 +694,7 @@ const createEmptyPropertyForm = () => ({
   name: '',
   type: '',
   address: '',
-  Bathroom: '',
+  baths: '',
   area: '',
   floors: '',
   blocks: '',
@@ -14623,28 +14623,28 @@ function ClientDashboard() {
         name: property.name || '',
         type: property.type || '',
         address: property.address || '',
-        Bathroom: property.Bathroom || '',
+        baths: property.baths ?? property.Bathroom ?? '',
         area: property.area || '',
-      floors: property.floors || '',
-      blocks: normalizedBlocks,
-      namedBlocks: normalizedBlocks ? normalizedBlocks.split(/[;,|]/).map((item) => item.trim()).filter(Boolean) : [],
-      rooms: property.rooms || '',
-      roomNames: Array.isArray(property.roomNames) ? property.roomNames : (property.roomNames ? String(property.roomNames).split(/[;,|]/).map((item) => item.trim()).filter(Boolean) : []),
-      latitude: property.latitude ?? '',
-      longitude: property.longitude ?? '',
-      includeMapCoordinates: property.includeMapCoordinates === true,
-      assignedWorkers: Array.isArray(property.assignedWorkers)
-        ? property.assignedWorkers.map((worker) => typeof worker === 'object' ? String(worker.id || worker._id || worker.value || worker.name || '') : String(worker))
-        : [],
-      assignedTeam: property.assignedTeam?.id || property.assignedTeam?._id || property.team?.id || property.team?._id || property.teamId || '',
-      vendors: Array.isArray(property.vendors)
-        ? property.vendors.map((vendor) => typeof vendor === 'object' ? String(vendor.id || vendor._id || vendor.value || vendor.name || '') : String(vendor))
-        : [],
-      customers: Array.isArray(property.customers)
-        ? property.customers.map((customer) => typeof customer === 'object' ? String(customer.id || customer._id || customer.value || customer.name || '') : String(customer))
-        : [],
-      customData: Array.isArray(property.customData) ? property.customData : [],
-    });
+        floors: property.floors || '',
+        blocks: normalizedBlocks,
+        namedBlocks: normalizedBlocks ? normalizedBlocks.split(/[;,|]/).map((item) => item.trim()).filter(Boolean) : [],
+        rooms: property.rooms || '',
+        roomNames: Array.isArray(property.roomNames) ? property.roomNames : (property.roomNames ? String(property.roomNames).split(/[;,|]/).map((item) => item.trim()).filter(Boolean) : []),
+        latitude: property.latitude ?? '',
+        longitude: property.longitude ?? '',
+        includeMapCoordinates: property.includeMapCoordinates === true,
+        assignedWorkers: Array.isArray(property.assignedWorkers)
+          ? property.assignedWorkers.map((worker) => typeof worker === 'object' ? String(worker.id || worker._id || worker.value || worker.name || '') : String(worker))
+          : [],
+        assignedTeam: property.assignedTeam?.id || property.assignedTeam?._id || property.team?.id || property.team?._id || property.teamId || '',
+        vendors: Array.isArray(property.vendors)
+          ? property.vendors.map((vendor) => typeof vendor === 'object' ? String(vendor.id || vendor._id || vendor.value || vendor.name || '') : String(vendor))
+          : [],
+        customers: Array.isArray(property.customers)
+          ? property.customers.map((customer) => typeof customer === 'object' ? String(customer.id || customer._id || customer.value || customer.name || '') : String(customer))
+          : [],
+        customData: Array.isArray(property.customData) ? property.customData : [],
+      });
   }, []);
   const closePropertyEditor = useCallback(() => {
     setEditingProperty(null);
@@ -21352,19 +21352,31 @@ function ClientDashboard() {
         };
       }
       const eid = editingAsset?._id || editingAsset?.id;
+      let savedAsset = null;
       if (eid) {
         const prev = originalAssetBlocks.map(String);
         const now = assetForm.locationType === 'property' ? (assetForm.blocks || []).map(String) : [];
         const remove = prev.filter((p) => !now.includes(p));
         if (remove.length) payload.removeBlocks = remove;
-        await api.put(`/api/assets/${eid}`, payload);
+        const response = await api.put(`/api/assets/${eid}`, payload);
+        savedAsset = response.data;
       } else {
         const userId = getCurrentUserId();
-        await api.post('/api/assets', { ...payload, userId });
+        const response = await api.post('/api/assets', { ...payload, userId });
+        savedAsset = response.data;
       }
       closeAssetEditor();
       const r = await api.get('/api/assets');
-      setAssets(r.data || []);
+      const nextAssets = r.data || [];
+      setAssets(nextAssets);
+      if (savedAsset) {
+        const updated = nextAssets.find((asset) => String(asset._id || asset.id) === String(savedAsset._id || savedAsset.id));
+        if (updated) {
+          setSelectedAsset(updated);
+        } else {
+          setSelectedAsset(savedAsset);
+        }
+      }
     } catch (error) {
       console.error('Failed to save asset', error);
       if (error.__subscriptionPlanNoticeShown) return;
@@ -27966,8 +27978,7 @@ function ClientDashboard() {
                       const userId = getCurrentUserId();
                       const payload = {
                         ...propertyForm,
-
-                        Bathroom: propertyForm.Bathroom ? +propertyForm.Bathroom : undefined,
+                        baths: propertyForm.baths ? +propertyForm.baths : undefined,
                         area: propertyForm.area ? +propertyForm.area : undefined,
                         floors: propertyForm.floors ? String(propertyForm.floors).trim() : undefined,
                         rooms: propertyForm.rooms ? +propertyForm.rooms : undefined,
@@ -27983,14 +27994,17 @@ function ClientDashboard() {
                       payload.blocksModifiable = true;
                       if (propertyForm.roomNames && Array.isArray(propertyForm.roomNames)) payload.roomNames = propertyForm.roomNames.join(',');
                       const eid = editingProperty._id || editingProperty.id;
+                      let savedProperty = null;
                       if (eid) {
-                        await api.put(`/api/properties/${eid}`, payload);
+                        const response = await api.put(`/api/properties/${eid}`, payload);
+                        savedProperty = response.data;
                       } else {
-                        const r = await api.post('/api/properties', payload);
+                        const response = await api.post('/api/properties', payload);
+                        savedProperty = response.data;
                         if (propertyFiles?.length) {
                           const fd = new FormData();
                           Array.from(propertyFiles).forEach(f => fd.append('photos', f));
-                          await api.post(`/api/properties/${r.data.id || r.data._id}/photos`, fd, { headers: { 'Content-Type': 'multipart/form-data' } }).catch(() => { });
+                          await api.post(`/api/properties/${response.data.id || response.data._id}/photos`, fd, { headers: { 'Content-Type': 'multipart/form-data' } }).catch(() => { });
                         }
                       }
                       if (eid && propertyFiles?.length) {
@@ -28000,7 +28014,16 @@ function ClientDashboard() {
                       }
                       closePropertyEditor();
                       const res = await api.get('/api/properties');
-                      setProperties(res.data || []);
+                      const nextProperties = res.data || [];
+                      setProperties(nextProperties);
+                      if (savedProperty) {
+                        const updated = nextProperties.find((property) => String(property._id || property.id) === String(savedProperty._id || savedProperty.id));
+                        if (updated) {
+                          setSelectedProperty(updated);
+                        } else {
+                          setSelectedProperty(savedProperty);
+                        }
+                      }
                     } catch {
                       alert('Failed to save property.');
                     }
@@ -28008,7 +28031,7 @@ function ClientDashboard() {
                     <div className="mx-auto max-w-[560px] px-6 py-10">
                       <div className="mb-8 text-[2rem] font-bold text-gray-900">Location Information</div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(1, minmax(0, 1fr))', gap: 20 }}>
-                      {[['Location Name', 'name', 'text', true], ['Type', 'type', 'text', true], ['Address', 'address', 'text', true], ['Bathroom', 'Bathroom', 'number'], ['Area (sqft)', 'area', 'number'], ['Floor Name(s)', 'floors', 'text'], ['Block Name(s)', 'blocks', 'text'], ['Rooms', 'rooms', 'number']].map(([ph, field, type, req]) => (
+                      {[['Location Name', 'name', 'text', true], ['Type', 'type', 'text', true], ['Address', 'address', 'text', true], ['Bathrooms', 'baths', 'number'], ['Area (sqft)', 'area', 'number'], ['Floor Name(s)', 'floors', 'text'], ['Block Name(s)', 'blocks', 'text'], ['Rooms', 'rooms', 'number']].map(([ph, field, type, req]) => (
                         <div key={field}>
                           <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{ph}</label>
                           <Input placeholder={ph} type={type} value={propertyForm[field]} onChange={e => setPropertyForm(f => ({ ...f, [field]: e.target.value }))} required={req} />
@@ -28263,7 +28286,7 @@ function ClientDashboard() {
                             ['Location Name', propertyForm.name || '—'],
                             ['Type', propertyForm.type || '—'],
                             ['Address', propertyForm.address || '—'],
-                            ['Bathroom', propertyForm.Bathroom || '—'],
+                            ['Bathrooms', propertyForm.baths || '—'],
                             ['Area (sqft)', propertyForm.area || '—'],
                             ['Floor Name(s)', propertyForm.floors || '—'],
                             ['Block Name(s)', propertyForm.blocks || '—'],
