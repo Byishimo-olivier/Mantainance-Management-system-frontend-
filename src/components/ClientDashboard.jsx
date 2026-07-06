@@ -5517,6 +5517,68 @@ const RequestFormSettingsModal = ({
           </div>
         </div>
       )}
+      {edgeShowDetails && edgeEditDevice && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => { setEdgeShowDetails(false); setEdgeSelectedDevice(null); setEdgeEditDevice(null); }} />
+          <div className="relative glass-surface-strong rounded-xl p-6 w-full max-w-lg z-10">
+            <h3 className="text-lg font-bold mb-3">Device Details</h3>
+            <div className="flex flex-col gap-2">
+              <input value={edgeEditDevice.name || ''} onChange={e => setEdgeEditDevice({ ...edgeEditDevice, name: e.target.value })} placeholder="Device name" className="p-2 border rounded" />
+              <select value={edgeEditDevice.type || 'Sensor'} onChange={e => setEdgeEditDevice({ ...edgeEditDevice, type: e.target.value })} className="p-2 border rounded">
+                {Object.keys(typeIcon).map(t => <option key={t}>{t}</option>)}
+              </select>
+              <div className="grid grid-cols-2 gap-2">
+                {locationOptions.length > 0 ? (
+                  <select value={edgeEditDevice.location || ''} onChange={e => setEdgeEditDevice({ ...edgeEditDevice, location: e.target.value })} className="p-2 border rounded">
+                    <option value="">Select location</option>
+                    {locationOptions.map((option) => (
+                      <option key={option.value} value={option.label}>{option.label}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input value={edgeEditDevice.location || ''} onChange={e => setEdgeEditDevice({ ...edgeEditDevice, location: e.target.value })} placeholder="Location" className="p-2 border rounded" />
+                )}
+                <select value={edgeEditDevice.status || 'Online'} onChange={e => setEdgeEditDevice({ ...edgeEditDevice, status: e.target.value })} className="p-2 border rounded">
+                  <option value="Online">Online</option>
+                  <option value="Offline">Offline</option>
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <input type="number" value={edgeEditDevice.signal ?? ''} onChange={e => setEdgeEditDevice({ ...edgeEditDevice, signal: e.target.value ? Number(e.target.value) : null })} placeholder="Signal (%)" className="p-2 border rounded" />
+                <input value={edgeEditDevice.firmware || ''} onChange={e => setEdgeEditDevice({ ...edgeEditDevice, firmware: e.target.value })} placeholder="Firmware" className="p-2 border rounded" />
+              </div>
+              <label className="text-sm text-gray-700">Assign to</label>
+              <select value={String(edgeEditDevice.assignedTo || '')} onChange={e => setEdgeEditDevice({ ...edgeEditDevice, assignedTo: e.target.value || null })} className="p-2 border rounded">
+                <option value="">Unassigned</option>
+                {assignOptions.map((p) => <option key={p._id || p.id} value={p._id || p.id}>{p.name || p.fullName || p.email || String(p._id || p.id)}</option>)}
+              </select>
+              <div className="flex justify-end gap-2 mt-3">
+                <button onClick={() => { setEdgeShowDetails(false); setEdgeSelectedDevice(null); setEdgeEditDevice(null); }} className="px-3 py-2 glass-ghost rounded">Close</button>
+                <button onClick={async () => {
+                  if (edgeSavingEdit) return;
+                  setEdgeSavingEdit(true);
+                  try {
+                    const id = edgeEditDevice.id || edgeEditDevice._id;
+                    const payload = { ...edgeEditDevice };
+                    // Clean up local-only fields
+                    delete payload.id; delete payload._id;
+                    const res = await api.put(`/api/devices/${id}`, payload);
+                    const updated = res?.data;
+                    if (updated) {
+                      setDevices(prev => (prev || []).map(d => (String(d.id || d._id) === String(updated.id || updated._id) ? updated : d)));
+                      setEdgeShowDetails(false);
+                      setEdgeSelectedDevice(null);
+                      setEdgeEditDevice(null);
+                    }
+                  } catch (err) {
+                    alert('Failed to save changes');
+                  } finally { setEdgeSavingEdit(false); }
+                }} disabled={edgeSavingEdit} className="px-3 py-2 bg-blue-600 text-white rounded disabled:opacity-60">{edgeSavingEdit ? 'Saving...' : 'Save'}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showWorkOrderStatusModal && (
         <div className="fixed inset-0 z-[1500] flex items-center justify-center bg-black/45 p-6">
@@ -18426,6 +18488,8 @@ function ClientDashboard() {
     const tags = Array.isArray(issue?.tags) ? issue.tags.map((tag) => String(tag || '').toLowerCase()) : [];
     return Boolean(
       issue?.createdBySchedule
+      || issue?.createdByEdgeAlert
+      || issue?.sourceType === 'edge-gateway'
       || issue?.scheduleId
       || issue?.parentScheduleId
       || issue?.maintenanceScheduleId
@@ -18439,7 +18503,7 @@ function ClientDashboard() {
       || normalizedReference.includes('workorder')
       || normalizedReference.includes('work order')
       || normalizedReference.includes('work_order')
-      || tags.some((tag) => tag.includes('prevent') || tag.includes('recurring-pm') || tag.includes('auto-generated'))
+      || tags.some((tag) => tag.includes('prevent') || tag.includes('recurring-pm') || tag.includes('auto-generated') || tag.includes('edge') || tag.includes('alert'))
     );
   };
 
@@ -31870,7 +31934,7 @@ function ClientDashboard() {
 
           {/* â”€â”€ Edge â”€â”€ */}
           {activeTab === 'edge' && (
-            <ClientEdgeTab />
+            <ClientEdgeTab properties={properties} people={people} internalTechnicians={internalTechnicians} />
           )}
 
           {/* Integrations (Lattice) */}
@@ -38495,6 +38559,8 @@ const ClientAnalyticsTab = ({
     const tags = Array.isArray(issue?.tags) ? issue.tags.map((tag) => String(tag || '').toLowerCase()) : [];
     return Boolean(
       issue?.createdBySchedule
+      || issue?.createdByEdgeAlert
+      || issue?.sourceType === 'edge-gateway'
       || issue?.scheduleId
       || issue?.parentScheduleId
       || issue?.maintenanceScheduleId
@@ -38508,7 +38574,7 @@ const ClientAnalyticsTab = ({
       || normalizedReference.includes('workorder')
       || normalizedReference.includes('work order')
       || normalizedReference.includes('work_order')
-      || tags.some((tag) => tag.includes('prevent') || tag.includes('recurring-pm') || tag.includes('auto-generated'))
+      || tags.some((tag) => tag.includes('prevent') || tag.includes('recurring-pm') || tag.includes('auto-generated') || tag.includes('edge') || tag.includes('alert'))
     );
   };
   const isApprovedWorkOrder = (issue) => {
@@ -44797,6 +44863,13 @@ const ClientMetersTab = ({
     category: '',
     image: '',
     imageName: '',
+    reminderEnabled: false,
+    reminderRuleType: 'weekly',
+    reminderWeekDays: [],
+    reminderMonthDay: 1,
+    reminderYearMonth: 1,
+    reminderYearDay: 1,
+    reminderTime: '09:00',
     reminderDay: 1,
     notifyAdmins: true,
     notifyCategoryTechnicians: true,
@@ -44997,6 +45070,36 @@ const ClientMetersTab = ({
   const resolveAssignedName = React.useCallback((worker) => {
     if (!worker) return '—';
     return worker;
+  }, []);
+  const getMeterReminderSummary = React.useCallback((meter) => {
+    if (!meter) return '—';
+    const time = String(meter.reminderTime || '09:00');
+    const ruleType = String(meter.reminderRuleType || 'monthly').toLowerCase();
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    if (meter.reminderEnabled) {
+      if (ruleType === 'weekly') {
+        const days = Array.isArray(meter.reminderWeekDays)
+          ? meter.reminderWeekDays.map(Number).filter((day) => Number.isFinite(day) && day >= 0 && day <= 6)
+          : [];
+        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        if (!days.length) return `Weekly reminder at ${time}`;
+        return `Weekly on ${days.map((day) => dayNames[day]).join(', ')} at ${time}`;
+      }
+      if (ruleType === 'monthly') {
+        const day = Number(meter.reminderMonthDay || meter.reminderDay || 1);
+        return `Monthly on day ${day} at ${time}`;
+      }
+      if (ruleType === 'yearly') {
+        const month = monthNames[Math.max(0, Math.min(11, Number(meter.reminderYearMonth || 1) - 1))] || 'January';
+        const day = Number(meter.reminderYearDay || 1);
+        return `Yearly on ${month} ${day} at ${time}`;
+      }
+      return `Repeats ${ruleType} at ${time}`;
+    }
+    if (meter.reminderDay) {
+      return `Monthly on day ${Number(meter.reminderDay)} at ${time}`;
+    }
+    return 'No reminder configured';
   }, []);
   const deriveReadings = React.useCallback((meter) => {
     const history = Array.isArray(meter?.readings) ? meter.readings : [];
@@ -45247,6 +45350,15 @@ const ClientMetersTab = ({
       category: selectedMeter.category || '',
       image: selectedMeter.image || '',
       imageName: selectedMeter.imageName || '',
+      reminderEnabled: selectedMeter.reminderEnabled === true,
+      reminderRuleType: selectedMeter.reminderRuleType || 'weekly',
+      reminderWeekDays: Array.isArray(selectedMeter.reminderWeekDays)
+        ? selectedMeter.reminderWeekDays.map((day) => Number(day)).filter((day) => Number.isFinite(day) && day >= 0 && day <= 6)
+        : [],
+      reminderMonthDay: Number(selectedMeter.reminderMonthDay) || 1,
+      reminderYearMonth: Number(selectedMeter.reminderYearMonth) || 1,
+      reminderYearDay: Number(selectedMeter.reminderYearDay) || 1,
+      reminderTime: selectedMeter.reminderTime || '09:00',
       reminderDay: selectedMeter.reminderDay || 1,
       notifyAdmins: selectedMeter.notifyAdmins !== false,
       notifyCategoryTechnicians: selectedMeter.notifyCategoryTechnicians !== false,
@@ -45276,6 +45388,15 @@ const ClientMetersTab = ({
         ...editMeter,
         reading: Number(editMeter.reading || 0),
         frequency: Number(editMeter.frequency || 0),
+        reminderEnabled: !!editMeter.reminderEnabled,
+        reminderRuleType: editMeter.reminderRuleType || 'weekly',
+        reminderWeekDays: Array.isArray(editMeter.reminderWeekDays)
+          ? editMeter.reminderWeekDays.map((day) => Number(day)).filter((day) => Number.isFinite(day) && day >= 0 && day <= 6)
+          : [],
+        reminderMonthDay: Number(editMeter.reminderMonthDay || 1),
+        reminderYearMonth: Number(editMeter.reminderYearMonth || 1),
+        reminderYearDay: Number(editMeter.reminderYearDay || 1),
+        reminderTime: editMeter.reminderTime || '09:00',
         reminderDay: Number(editMeter.reminderDay || 1),
         monthlyTarget: editMeter.monthlyTarget === '' ? '' : Number(editMeter.monthlyTarget || 0),
       };
@@ -45736,7 +45857,7 @@ const ClientMetersTab = ({
               <h4 className="mb-4 text-[1.3rem] font-bold text-gray-900">Email Notifications</h4>
               <div className="space-y-3">
                 <div className="rounded-xl bg-gray-50 px-4 py-3 text-[0.95rem] text-gray-700">
-                  Reminder day each month: <span className="font-semibold text-gray-900">{selectedMeter.reminderDay || 1}</span>
+                  Reminder schedule: <span className="font-semibold text-gray-900">{getMeterReminderSummary(selectedMeter)}</span>
                 </div>
                 <div className="rounded-xl bg-gray-50 px-4 py-3 text-[0.95rem] text-gray-700">
                   Technician category: <span className="font-semibold text-gray-900">{selectedMeter.technicianCategory || selectedMeter.category || selectedMeter.type || '—'}</span>
@@ -45884,13 +46005,119 @@ const ClientMetersTab = ({
                       ))}
                     </select>
                   </div>
-                  <div>
+                    <div>
                     <label className="mb-1 block text-sm font-semibold text-gray-700">Monthly target</label>
                     <input type="number" min="0" value={editMeter.monthlyTarget} onChange={(e) => setEditMeter({ ...editMeter, monthlyTarget: e.target.value })} className="w-full rounded-lg border p-3" />
                   </div>
-                  <div>
-                    <label className="mb-1 block text-sm font-semibold text-gray-700">Reminder day</label>
-                    <input type="number" min="1" max="31" value={editMeter.reminderDay} onChange={(e) => setEditMeter({ ...editMeter, reminderDay: e.target.value })} className="w-full rounded-lg border p-3" />
+                  <div className="md:col-span-2">
+                    <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
+                      <div className="mb-4 text-sm font-semibold text-gray-900">Reminder recurrence</div>
+                      <div className="grid gap-4 md:grid-cols-3">
+                        <label className="flex items-center gap-3 rounded-lg border p-3 text-sm text-gray-700">
+                          <input
+                            type="checkbox"
+                            checked={!!editMeter.reminderEnabled}
+                            onChange={(e) => setEditMeter({ ...editMeter, reminderEnabled: e.target.checked })}
+                            className="h-4 w-4"
+                          />
+                          Enable reminder
+                        </label>
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-1">Rule</label>
+                          <select
+                            value={editMeter.reminderRuleType}
+                            onChange={(e) => setEditMeter({ ...editMeter, reminderRuleType: e.target.value })}
+                            className="w-full rounded-lg border p-3"
+                          >
+                            <option value="weekly">Weekly</option>
+                            <option value="monthly">Monthly</option>
+                            <option value="yearly">Yearly</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-1">Reminder time</label>
+                          <input
+                            type="time"
+                            value={editMeter.reminderTime}
+                            onChange={(e) => setEditMeter({ ...editMeter, reminderTime: e.target.value })}
+                            className="w-full rounded-lg border p-3"
+                          />
+                        </div>
+                      </div>
+                      {editMeter.reminderEnabled && (
+                        <div className="mt-4 space-y-4">
+                          {editMeter.reminderRuleType === 'weekly' && (
+                            <div>
+                              <label className="block text-sm font-semibold text-gray-700 mb-2">Repeat on</label>
+                              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((label, index) => {
+                                  const selected = Array.isArray(editMeter.reminderWeekDays) && editMeter.reminderWeekDays.map(Number).includes(index);
+                                  return (
+                                    <label key={label} className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm text-gray-700">
+                                      <input
+                                        type="checkbox"
+                                        checked={selected}
+                                        onChange={(event) => {
+                                          const current = Array.isArray(editMeter.reminderWeekDays)
+                                            ? editMeter.reminderWeekDays.map(Number)
+                                            : [];
+                                          const next = event.target.checked
+                                            ? [...current, index]
+                                            : current.filter((day) => day !== index);
+                                          setEditMeter({ ...editMeter, reminderWeekDays: next.sort((a, b) => a - b) });
+                                        }}
+                                        className="h-4 w-4"
+                                      />
+                                      {label}
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                          {editMeter.reminderRuleType === 'monthly' && (
+                            <div>
+                              <label className="block text-sm font-semibold text-gray-700 mb-1">Day of month</label>
+                              <input
+                                type="number"
+                                min="1"
+                                max="31"
+                                value={editMeter.reminderMonthDay}
+                                onChange={(e) => setEditMeter({ ...editMeter, reminderMonthDay: Number(e.target.value) || 1 })}
+                                className="w-full rounded-lg border p-3"
+                              />
+                            </div>
+                          )}
+                          {editMeter.reminderRuleType === 'yearly' && (
+                            <div className="grid gap-4 md:grid-cols-2">
+                              <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-1">Month</label>
+                                <select
+                                  value={editMeter.reminderYearMonth}
+                                  onChange={(e) => setEditMeter({ ...editMeter, reminderYearMonth: Number(e.target.value) || 1 })}
+                                  className="w-full rounded-lg border p-3"
+                                >
+                                  {Array.from({ length: 12 }, (_, index) => (
+                                    <option key={index + 1} value={index + 1}>{new Date(0, index).toLocaleString('en-US', { month: 'long' })}</option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-1">Day</label>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  max="31"
+                                  value={editMeter.reminderYearDay}
+                                  onChange={(e) => setEditMeter({ ...editMeter, reminderYearDay: Number(e.target.value) || 1 })}
+                                  className="w-full rounded-lg border p-3"
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <div>
                     <label className="mb-1 block text-sm font-semibold text-gray-700">Technician category</label>
@@ -46405,9 +46632,115 @@ const ClientMetersTab = ({
                   <label className="block text-sm font-semibold text-gray-700 mb-1">Monthly target</label>
                   <input type="number" min="0" value={newMeter.monthlyTarget} onChange={e => setNewMeter({ ...newMeter, monthlyTarget: e.target.value })} placeholder="Optional target" className="w-full p-3 border rounded-lg" />
                 </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">Reminder day each month</label>
-                  <input type="number" min="1" max="31" value={newMeter.reminderDay} onChange={e => setNewMeter({ ...newMeter, reminderDay: e.target.value })} className="w-full p-3 border rounded-lg" />
+                <div className="md:col-span-2">
+                  <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
+                    <div className="mb-4 text-sm font-semibold text-gray-900">Reminder recurrence</div>
+                    <div className="grid gap-4 md:grid-cols-3">
+                      <label className="flex items-center gap-3 rounded-lg border p-3 text-sm text-gray-700">
+                        <input
+                          type="checkbox"
+                          checked={!!newMeter.reminderEnabled}
+                          onChange={(e) => setNewMeter({ ...newMeter, reminderEnabled: e.target.checked })}
+                          className="h-4 w-4"
+                        />
+                        Enable reminder
+                      </label>
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1">Rule</label>
+                        <select
+                          value={newMeter.reminderRuleType}
+                          onChange={(e) => setNewMeter({ ...newMeter, reminderRuleType: e.target.value })}
+                          className="w-full p-3 border rounded-lg"
+                        >
+                          <option value="weekly">Weekly</option>
+                          <option value="monthly">Monthly</option>
+                          <option value="yearly">Yearly</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1">Reminder time</label>
+                        <input
+                          type="time"
+                          value={newMeter.reminderTime}
+                          onChange={(e) => setNewMeter({ ...newMeter, reminderTime: e.target.value })}
+                          className="w-full p-3 border rounded-lg"
+                        />
+                      </div>
+                    </div>
+                    {newMeter.reminderEnabled && (
+                      <div className="mt-4 space-y-4">
+                        {newMeter.reminderRuleType === 'weekly' && (
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">Repeat on</label>
+                            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((label, index) => {
+                                const selected = Array.isArray(newMeter.reminderWeekDays) && newMeter.reminderWeekDays.map(Number).includes(index);
+                                return (
+                                  <label key={label} className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm text-gray-700">
+                                    <input
+                                      type="checkbox"
+                                      checked={selected}
+                                      onChange={(event) => {
+                                        const current = Array.isArray(newMeter.reminderWeekDays)
+                                          ? newMeter.reminderWeekDays.map(Number)
+                                          : [];
+                                        const next = event.target.checked
+                                          ? [...current, index]
+                                          : current.filter((day) => day !== index);
+                                        setNewMeter({ ...newMeter, reminderWeekDays: next.sort((a, b) => a - b) });
+                                      }}
+                                      className="h-4 w-4"
+                                    />
+                                    {label}
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                        {newMeter.reminderRuleType === 'monthly' && (
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-1">Day of month</label>
+                            <input
+                              type="number"
+                              min="1"
+                              max="31"
+                              value={newMeter.reminderMonthDay}
+                              onChange={(e) => setNewMeter({ ...newMeter, reminderMonthDay: Number(e.target.value) || 1 })}
+                              className="w-full p-3 border rounded-lg"
+                            />
+                          </div>
+                        )}
+                        {newMeter.reminderRuleType === 'yearly' && (
+                          <div className="grid gap-4 md:grid-cols-2">
+                            <div>
+                              <label className="block text-sm font-semibold text-gray-700 mb-1">Month</label>
+                              <select
+                                value={newMeter.reminderYearMonth}
+                                onChange={(e) => setNewMeter({ ...newMeter, reminderYearMonth: Number(e.target.value) || 1 })}
+                                className="w-full p-3 border rounded-lg"
+                              >
+                                {Array.from({ length: 12 }, (_, index) => (
+                                  <option key={index + 1} value={index + 1}>{new Date(0, index).toLocaleString('en-US', { month: 'long' })}</option>
+                                ))}
+                              </select>
+                            </div>
+                            <div>
+                              <label className="block text-sm font-semibold text-gray-700 mb-1">Day</label>
+                              <input
+                                type="number"
+                                min="1"
+                                max="31"
+                                value={newMeter.reminderYearDay}
+                                onChange={(e) => setNewMeter({ ...newMeter, reminderYearDay: Number(e.target.value) || 1 })}
+                                className="w-full p-3 border rounded-lg"
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1">Technician category</label>
@@ -46459,7 +46792,16 @@ const ClientMetersTab = ({
                         ...newMeter,
                         reading: Number(newMeter.reading) || 0,
                         frequency: Number(newMeter.frequency) || 0,
-                        reminderDay: Number(newMeter.reminderDay || 1),
+                        reminderEnabled: !!newMeter.reminderEnabled,
+                        reminderRuleType: newMeter.reminderRuleType || 'weekly',
+                        reminderWeekDays: Array.isArray(newMeter.reminderWeekDays)
+                          ? newMeter.reminderWeekDays.map((day) => Number(day)).filter((day) => Number.isFinite(day) && day >= 0 && day <= 6)
+                          : [],
+                        reminderMonthDay: Number(newMeter.reminderMonthDay || newMeter.reminderDay || 1),
+                        reminderYearMonth: Number(newMeter.reminderYearMonth || 1),
+                        reminderYearDay: Number(newMeter.reminderYearDay || 1),
+                        reminderTime: newMeter.reminderTime || '09:00',
+                        reminderDay: Number(newMeter.reminderMonthDay || newMeter.reminderDay || 1),
                         monthlyTarget: newMeter.monthlyTarget === '' ? '' : Number(newMeter.monthlyTarget || 0),
                       };
                       const res = await api.post('/api/meters', payload);
@@ -46800,14 +47142,50 @@ const Dynamics365IntegrationPanel = ({ currentUser = null, embedded = false }) =
   );
 };
 
-const ClientEdgeTab = () => {
+const ClientEdgeTab = ({ properties = [], people = [], internalTechnicians = [] }) => {
   const [devices, setDevices] = React.useState([]);
   const [search, setSearch] = React.useState('');
   const [filter, setFilter] = React.useState('All');
   const [showAdd, setShowAdd] = React.useState(false);
-  const [newDevice, setNewDevice] = React.useState({ name: '', type: 'Sensor', status: 'Online', signal: 80, firmware: 'v1.0.0', location: '', battery: null });
+  const [savingDevice, setSavingDevice] = React.useState(false);
+  const [edgeSelectedDevice, setEdgeSelectedDevice] = React.useState(null);
+  const [edgeShowDetails, setEdgeShowDetails] = React.useState(false);
+  const [edgeEditDevice, setEdgeEditDevice] = React.useState(null);
+  const [edgeSavingEdit, setEdgeSavingEdit] = React.useState(false);
+  const [newDevice, setNewDevice] = React.useState({
+    name: '',
+    type: 'Sensor',
+    status: 'Online',
+    signal: null,
+    firmware: 'v1.0.0',
+    location: '',
+    battery: null,
+    gatewayUrl: '',
+    gatewayMethod: 'GET',
+    gatewayApiKey: '',
+    gatewayHeaders: '',
+    gatewayBody: '',
+    triggerSensorName: '',
+    triggerOperator: '>=',
+    triggerTarget: '',
+    triggerSeverity: 'warning',
+    triggerMessage: '',
+    createWorkOrder: true
+  });
   const statuses = ['All', 'Online', 'Offline'];
-  const typeIcon = { Camera: 'ðŸ“·', Sensor: 'ðŸ“¡', Network: 'ðŸŒ', Lock: 'ðŸ”’', Controller: 'ðŸŽ›ï¸' };
+  const typeIcon = { Camera: 'CAM', Sensor: 'SNS', Network: 'NET', Lock: 'LCK', Controller: 'CTR' };
+  const locationOptions = React.useMemo(() => {
+    return (Array.isArray(properties) ? properties : [])
+      .filter((property) => Boolean(property?.name || property?.title || property?.address))
+      .map((property) => ({
+        value: String(property._id || property.id || ''),
+        label: String(property.name || property.title || property.address || '').trim(),
+      }));
+  }, [properties]);
+  const assignOptions = React.useMemo(() => {
+    const list = [...(people || []), ...(internalTechnicians || [])];
+    return dedupeById(list, item => item?._id || item?.id);
+  }, [people, internalTechnicians]);
   React.useEffect(() => { api.get('/api/devices').then(r => setDevices(r.data || [])).catch(() => setDevices([])); }, []);
   const filtered = devices.filter(d => (filter === 'All' || d.status === filter) && ((d.name || '').toLowerCase().includes(search.toLowerCase()) || (d.location || '').toLowerCase().includes(search.toLowerCase())));
   const online = devices.filter(d => d.status === 'Online').length;
@@ -46829,10 +47207,111 @@ const ClientEdgeTab = () => {
               <select value={newDevice.type} onChange={e => setNewDevice({ ...newDevice, type: e.target.value })} className="p-2 border rounded">
                 {Object.keys(typeIcon).map(t => <option key={t}>{t}</option>)}
               </select>
-              <input value={newDevice.location} onChange={e => setNewDevice({ ...newDevice, location: e.target.value })} placeholder="Location" className="p-2 border rounded" />
+              <div className="grid grid-cols-2 gap-2">
+                {locationOptions.length > 0 ? (
+                  <select value={newDevice.location} onChange={e => setNewDevice({ ...newDevice, location: e.target.value })} className="p-2 border rounded">
+                    <option value="">Select location</option>
+                    {locationOptions.map((option) => (
+                      <option key={option.value} value={option.label}>{option.label}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input value={newDevice.location} onChange={e => setNewDevice({ ...newDevice, location: e.target.value })} placeholder="Location" className="p-2 border rounded" />
+                )}
+                <select value={newDevice.status} onChange={e => setNewDevice({ ...newDevice, status: e.target.value })} className="p-2 border rounded">
+                  <option value="Online">Online</option>
+                  <option value="Offline">Offline</option>
+                </select>
+              </div>
+              <input value={newDevice.gatewayUrl} onChange={e => setNewDevice({ ...newDevice, gatewayUrl: e.target.value })} placeholder="Gateway URL" className="p-2 border rounded" />
+              <div className="grid grid-cols-2 gap-2">
+                <select value={newDevice.gatewayMethod} onChange={e => setNewDevice({ ...newDevice, gatewayMethod: e.target.value })} className="p-2 border rounded">
+                  <option>GET</option>
+                  <option>POST</option>
+                  <option>PUT</option>
+                  <option>PATCH</option>
+                </select>
+                <input value={newDevice.gatewayApiKey} onChange={e => setNewDevice({ ...newDevice, gatewayApiKey: e.target.value })} placeholder="Gateway API Key" className="p-2 border rounded" />
+              </div>
+              <textarea value={newDevice.gatewayHeaders} onChange={e => setNewDevice({ ...newDevice, gatewayHeaders: e.target.value })} placeholder="Gateway headers (JSON)" className="p-2 border rounded h-20" />
+              {newDevice.gatewayMethod !== 'GET' && (
+                <textarea value={newDevice.gatewayBody} onChange={e => setNewDevice({ ...newDevice, gatewayBody: e.target.value })} placeholder="Gateway body (JSON)" className="p-2 border rounded h-20" />
+              )}
+              <div className="grid grid-cols-2 gap-2">
+                <input value={newDevice.triggerSensorName} onChange={e => setNewDevice({ ...newDevice, triggerSensorName: e.target.value })} placeholder="Sensor name to monitor" className="p-2 border rounded" />
+                <select value={newDevice.triggerOperator} onChange={e => setNewDevice({ ...newDevice, triggerOperator: e.target.value })} className="p-2 border rounded">
+                  <option value=">=">&gt;=</option>
+                  <option value=">">&gt;</option>
+                  <option value="<=">&lt;=</option>
+                  <option value="<">&lt;</option>
+                  <option value="==">==</option>
+                  <option value="!=">!=</option>
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <input type="number" value={newDevice.triggerTarget ?? ''} onChange={e => setNewDevice({ ...newDevice, triggerTarget: e.target.value ? Number(e.target.value) : '' })} placeholder="Trigger target" className="p-2 border rounded" />
+                <select value={newDevice.triggerSeverity} onChange={e => setNewDevice({ ...newDevice, triggerSeverity: e.target.value })} className="p-2 border rounded">
+                  <option value="warning">Warning</option>
+                  <option value="critical">Critical</option>
+                  <option value="high">High</option>
+                </select>
+              </div>
+              <textarea value={newDevice.triggerMessage} onChange={e => setNewDevice({ ...newDevice, triggerMessage: e.target.value })} placeholder="Alert message" className="p-2 border rounded h-20" />
+              <label className="flex items-center gap-2 mt-1">
+                <input type="checkbox" checked={newDevice.createWorkOrder} onChange={e => setNewDevice({ ...newDevice, createWorkOrder: e.target.checked })} className="w-4 h-4 text-blue-600" />
+                <span className="text-sm text-gray-700">Create work order when triggered</span>
+              </label>
               <div className="flex justify-end gap-2 mt-3">
                 <button onClick={() => setShowAdd(false)} className="px-3 py-2 glass-ghost rounded">Cancel</button>
-                <button onClick={async () => { try { const res = await api.post('/api/devices', newDevice); setDevices(p => [res.data, ...p]); setShowAdd(false); } catch { alert('Failed to add device'); } }} className="px-3 py-2 bg-blue-600 text-white rounded">Create</button>
+                <button onClick={async () => {
+                  if (savingDevice) return;
+                  setSavingDevice(true);
+                  try {
+                    const payload = {
+                      ...newDevice,
+                      triggers: [{
+                        name: newDevice.triggerSensorName,
+                        operator: newDevice.triggerOperator,
+                        value: newDevice.triggerTarget,
+                        severity: newDevice.triggerSeverity,
+                        message: newDevice.triggerMessage,
+                        metadata: { createWorkOrder: newDevice.createWorkOrder }
+                      }]
+                    };
+                    const res = await api.post('/api/devices', payload);
+                    const created = res?.data;
+                    if (created) {
+                      setDevices((prev) => [created, ...(prev || []).filter((item) => String(item.id || item._id) !== String(created.id || created._id))]);
+                      setNewDevice({
+                        name: '',
+                        type: 'Sensor',
+                        status: 'Online',
+                        signal: null,
+                        firmware: 'v1.0.0',
+                        location: '',
+                        battery: null,
+                        gatewayUrl: '',
+                        gatewayMethod: 'GET',
+                        gatewayApiKey: '',
+                        gatewayHeaders: '',
+                        gatewayBody: '',
+                        triggerSensorName: '',
+                        triggerOperator: '>=',
+                        triggerTarget: '',
+                        triggerSeverity: 'warning',
+                        triggerMessage: '',
+                        createWorkOrder: true
+                      });
+                      setShowAdd(false);
+                    }
+                  } catch {
+                    alert('Failed to add device');
+                  } finally {
+                    setSavingDevice(false);
+                  }
+                }} disabled={savingDevice} className="px-3 py-2 bg-blue-600 text-white rounded disabled:opacity-60">
+                  {savingDevice ? 'Creating...' : 'Create'}
+                </button>
               </div>
             </div>
           </div>
@@ -46867,14 +47346,14 @@ const ClientEdgeTab = () => {
             </thead>
             <tbody>
               {filtered.map((d, idx) => (
-                <tr key={d.id || d._id || `dev-${idx}`} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+                <tr key={d.id || d._id || `dev-${idx}`} onClick={() => { setEdgeSelectedDevice(d); setEdgeEditDevice({ ...(d || {}) }); setEdgeShowDetails(true); }} className="cursor-pointer border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
                   <td className="py-4 px-4"><div className="flex items-center gap-3"><div className="w-10 h-10 bg-gray-50 border border-gray-100 rounded-xl flex items-center justify-center text-xl">{typeIcon[d.type] || 'ðŸ“Ÿ'}</div><div><p className="text-sm font-bold text-gray-900">{d.name}</p><p className="text-[10px] text-gray-400 mt-0.5 font-mono">{String(d.id || d._id || '').slice(-8)}</p></div></div></td>
                   <td className="py-4 px-4 text-sm text-gray-600">{d.type}</td>
                   <td className="py-4 px-4 text-sm text-gray-600">{d.location || 'â€”'}</td>
                   <td className="py-4 px-4"><span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${d.status === 'Online' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : d.status === 'Offline' ? 'bg-rose-50 text-rose-700 border-rose-100' : 'bg-amber-50 text-amber-700 border-amber-100'}`}>{d.status}</span></td>
                   <td className="py-4 px-4"><div className="flex items-center gap-2"><div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden"><div style={{ width: `${d.signal || 0}%` }} className={`h-full rounded-full ${(d.signal || 0) >= 80 ? 'bg-emerald-500' : (d.signal || 0) >= 50 ? 'bg-amber-500' : 'bg-rose-500'}`} /></div><span className="text-xs text-gray-500">{d.signal || 0}%</span></div></td>
                   <td className="py-4 px-4 text-xs font-mono text-gray-500">{d.firmware || 'â€”'}</td>
-                  <td className="py-4 px-4 text-right"><button className="p-1.5 hover:bg-gray-100 rounded-lg"><svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg></button></td>
+                  <td className="py-4 px-4 text-right"><button onClick={(e) => { e.stopPropagation(); setEdgeSelectedDevice(d); setEdgeEditDevice({ ...(d || {}) }); setEdgeShowDetails(true); }} className="p-1.5 hover:bg-gray-100 rounded-lg"><svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg></button></td>
                 </tr>
               ))}
               {filtered.length === 0 && <tr><td colSpan="7" className="py-16 text-center text-gray-500">No edge devices found. Add your first device above.</td></tr>}

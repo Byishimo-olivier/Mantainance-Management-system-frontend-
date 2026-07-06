@@ -16,12 +16,22 @@ function RequestsPage() {
     const tags = Array.isArray(issue.tags) ? issue.tags.map(tag => String(tag || '').toLowerCase()) : [];
     return Boolean(
       issue.createdBySchedule
+      || issue.createdByEdgeAlert
+      || issue.sourceType === 'edge-gateway'
       || issue.isPreventive
       || issue.pmTrigger
+      || issue.preventiveMaintenanceName
+      || issue.scheduleName
+      || issue.scheduleId
+      || issue.parentScheduleId
+      || issue.maintenanceScheduleId
+      || issue.pmId
+      || issue.pmInstanceId
+      || issue.pmName
       || normalizedReference.includes('workorder')
       || normalizedReference.includes('work order')
       || normalizedReference.includes('work_order')
-      || tags.some(tag => tag.includes('prevent') || tag.includes('recurring-pm') || tag.includes('auto-generated'))
+      || tags.some(tag => tag.includes('prevent') || tag.includes('recurring-pm') || tag.includes('auto-generated') || tag.includes('edge') || tag.includes('alert'))
     );
   };
 

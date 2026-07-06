@@ -751,12 +751,22 @@ function ManagerDashboard() {
     const tags = Array.isArray(issue.tags) ? issue.tags.map(tag => String(tag || '').toLowerCase()) : [];
     return Boolean(
       issue.createdBySchedule
+      || issue.createdByEdgeAlert
+      || issue.sourceType === 'edge-gateway'
       || issue.isPreventive
       || issue.pmTrigger
+      || issue.preventiveMaintenanceName
+      || issue.scheduleName
+      || issue.scheduleId
+      || issue.parentScheduleId
+      || issue.maintenanceScheduleId
+      || issue.pmId
+      || issue.pmInstanceId
+      || issue.pmName
       || normalizedReference.includes('workorder')
       || normalizedReference.includes('work order')
       || normalizedReference.includes('work_order')
-      || tags.some(tag => tag.includes('prevent') || tag.includes('recurring-pm') || tag.includes('auto-generated'))
+      || tags.some(tag => tag.includes('prevent') || tag.includes('recurring-pm') || tag.includes('auto-generated') || tag.includes('edge') || tag.includes('alert'))
     );
   };
   const [locations, setLocations] = useState([]);
@@ -5139,7 +5149,26 @@ const EdgeTab = () => {
 
   const online = (devices || []).filter(d => d.status === 'Online').length;
   const [showAddDeviceModal, setShowAddDeviceModal] = useState(false);
-  const [newDevice, setNewDevice] = useState({ name: '', type: 'Sensor', status: 'Online', signal: 80, firmware: 'v1.0.0', location: '', battery: null });
+  const [newDevice, setNewDevice] = useState({
+    name: '',
+    type: 'Sensor',
+    status: 'Online',
+    signal: 80,
+    firmware: 'v1.0.0',
+    location: '',
+    battery: null,
+    gatewayUrl: '',
+    gatewayMethod: 'GET',
+    gatewayApiKey: '',
+    gatewayHeaders: '',
+    gatewayBody: '',
+    triggerSensorName: '',
+    triggerOperator: '>=',
+    triggerTarget: '',
+    triggerSeverity: 'warning',
+    triggerMessage: '',
+    createWorkOrder: true,
+  });
 
   const handleDeleteSelected = async () => {
     if (selection.selectedIds.length === 0) return;
@@ -5184,17 +5213,62 @@ const EdgeTab = () => {
                 <option>Controller</option>
               </select>
               <input value={newDevice.location} onChange={e => setNewDevice({ ...newDevice, location: e.target.value })} placeholder="Location" className="p-2 border rounded" />
-              <div className="flex gap-2">
-                <input value={newDevice.firmware} onChange={e => setNewDevice({ ...newDevice, firmware: e.target.value })} placeholder="Firmware" className="p-2 border rounded flex-1" />
-                <input type="number" value={newDevice.battery ?? ''} onChange={e => setNewDevice({ ...newDevice, battery: e.target.value ? Number(e.target.value) : null })} placeholder="Battery %" className="p-2 border rounded w-28" />
+              <input value={newDevice.gatewayUrl} onChange={e => setNewDevice({ ...newDevice, gatewayUrl: e.target.value })} placeholder="Gateway URL" className="p-2 border rounded" />
+              <div className="grid grid-cols-2 gap-2">
+                <select value={newDevice.gatewayMethod} onChange={e => setNewDevice({ ...newDevice, gatewayMethod: e.target.value })} className="p-2 border rounded">
+                  <option>GET</option>
+                  <option>POST</option>
+                  <option>PUT</option>
+                  <option>PATCH</option>
+                </select>
+                <input value={newDevice.gatewayApiKey} onChange={e => setNewDevice({ ...newDevice, gatewayApiKey: e.target.value })} placeholder="Gateway API Key" className="p-2 border rounded" />
               </div>
+              <textarea value={newDevice.gatewayHeaders} onChange={e => setNewDevice({ ...newDevice, gatewayHeaders: e.target.value })} placeholder="Gateway headers (JSON)" className="p-2 border rounded h-20" />
+              {newDevice.gatewayMethod !== 'GET' && (
+                <textarea value={newDevice.gatewayBody} onChange={e => setNewDevice({ ...newDevice, gatewayBody: e.target.value })} placeholder="Gateway body (JSON)" className="p-2 border rounded h-20" />
+              )}
+              <div className="grid grid-cols-2 gap-2">
+                <input value={newDevice.triggerSensorName} onChange={e => setNewDevice({ ...newDevice, triggerSensorName: e.target.value })} placeholder="Sensor name to monitor" className="p-2 border rounded" />
+                <select value={newDevice.triggerOperator} onChange={e => setNewDevice({ ...newDevice, triggerOperator: e.target.value })} className="p-2 border rounded">
+                  <option value=">=">&gt;=</option>
+                  <option value=">">&gt;</option>
+                  <option value="<=">&lt;=</option>
+                  <option value="<">&lt;</option>
+                  <option value="==">==</option>
+                  <option value="!=">!=</option>
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <input type="number" value={newDevice.triggerTarget ?? ''} onChange={e => setNewDevice({ ...newDevice, triggerTarget: e.target.value ? Number(e.target.value) : '' })} placeholder="Trigger target" className="p-2 border rounded" />
+                <select value={newDevice.triggerSeverity} onChange={e => setNewDevice({ ...newDevice, triggerSeverity: e.target.value })} className="p-2 border rounded">
+                  <option value="warning">Warning</option>
+                  <option value="critical">Critical</option>
+                  <option value="high">High</option>
+                </select>
+              </div>
+              <textarea value={newDevice.triggerMessage} onChange={e => setNewDevice({ ...newDevice, triggerMessage: e.target.value })} placeholder="Alert message" className="p-2 border rounded h-20" />
+              <label className="flex items-center gap-2 mt-1">
+                <input type="checkbox" checked={newDevice.createWorkOrder} onChange={e => setNewDevice({ ...newDevice, createWorkOrder: e.target.checked })} className="w-4 h-4 text-blue-600" />
+                <span className="text-sm text-gray-700">Create work order when triggered</span>
+              </label>
               <div className="flex items-center justify-end gap-2 mt-3">
                 <button onClick={() => setShowAddDeviceModal(false)} className="px-3 py-2 bg-white border rounded">Cancel</button>
                 <button onClick={async () => {
                   try {
-                    const res = await api.post('/api/devices', newDevice);
+                    const payload = {
+                      ...newDevice,
+                      triggers: [{
+                        name: newDevice.triggerSensorName,
+                        operator: newDevice.triggerOperator,
+                        value: newDevice.triggerTarget,
+                        severity: newDevice.triggerSeverity,
+                        message: newDevice.triggerMessage,
+                        metadata: { createWorkOrder: newDevice.createWorkOrder }
+                      }]
+                    };
+                    const res = await api.post('/api/devices', payload);
                     setDevices(prev => [res.data, ...(prev || [])]);
-                    setNewDevice({ name: '', type: 'Sensor', status: 'Online', signal: 80, firmware: 'v1.0.0', location: '', battery: null });
+                    setNewDevice({ name: '', type: 'Sensor', status: 'Online', signal: 80, firmware: 'v1.0.0', location: '', battery: null, gatewayUrl: '', gatewayMethod: 'GET', gatewayApiKey: '', gatewayHeaders: '', gatewayBody: '', triggerSensorName: '', triggerOperator: '>=', triggerTarget: '', triggerSeverity: 'warning', triggerMessage: '', createWorkOrder: true });
                     setShowAddDeviceModal(false);
                   } catch (e) { console.error('Add device failed', e); alert('Failed to add device'); }
                 }} className="px-3 py-2 bg-blue-600 text-white rounded">Create</button>

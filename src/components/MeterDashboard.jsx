@@ -40,6 +40,13 @@ const EMPTY_METER = {
   location: '',
   threshold: '',
   status: 'active',
+  reminderEnabled: false,
+  reminderRuleType: 'weekly',
+  reminderWeekDays: [],
+  reminderMonthDay: 1,
+  reminderYearMonth: 1,
+  reminderYearDay: 1,
+  reminderTime: '09:00',
 };
 
 const unitByType = {
@@ -61,6 +68,36 @@ const formatDateLabel = (value) => {
   const date = value ? new Date(value) : new Date();
   if (Number.isNaN(date.getTime())) return '';
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+};
+
+const WEEK_DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+const formatMeterReminder = (meter) => {
+  if (!meter?.reminderEnabled) return '';
+  const ruleType = String(meter.reminderRuleType || 'weekly').toLowerCase();
+  const time = String(meter.reminderTime || '09:00');
+  if (ruleType === 'weekly') {
+    const days = Array.isArray(meter.reminderWeekDays)
+      ? meter.reminderWeekDays.map((day) => Number(day)).filter((d) => Number.isFinite(d) && d >= 0 && d <= 6)
+      : [];
+    if (days.length === 0) {
+      return `Weekly reminder at ${time}`;
+    }
+    const labels = days.map((day) => WEEK_DAYS[day] || '').filter(Boolean);
+    return `Weekly reminder on ${labels.join(', ')} at ${time}`;
+  }
+  if (ruleType === 'monthly') {
+    const day = Number(meter.reminderMonthDay) || 1;
+    return `Monthly reminder on day ${day} at ${time}`;
+  }
+  if (ruleType === 'yearly') {
+    const monthIndex = Number(meter.reminderYearMonth) || 1;
+    const day = Number(meter.reminderYearDay) || 1;
+    const monthLabel = MONTH_NAMES[monthIndex - 1] || 'January';
+    return `Yearly reminder on ${monthLabel} ${day} at ${time}`;
+  }
+  return `Reminder at ${time}`;
 };
 
 const normalizeReadings = (meter) => {
@@ -238,6 +275,15 @@ export default function MeterDashboard({ companyName, currentUser }) {
       location: selectedMeter.location || '',
       threshold: selectedMeter.threshold ?? selectedMeter.monthlyTarget ?? '',
       status: selectedMeter.status || 'active',
+      reminderEnabled: selectedMeter.reminderEnabled === true,
+      reminderRuleType: selectedMeter.reminderRuleType || 'weekly',
+      reminderWeekDays: Array.isArray(selectedMeter.reminderWeekDays)
+        ? selectedMeter.reminderWeekDays.map((day) => Number(day)).filter((day) => Number.isFinite(day) && day >= 0 && day <= 6)
+        : [],
+      reminderMonthDay: Number(selectedMeter.reminderMonthDay) || 1,
+      reminderYearMonth: Number(selectedMeter.reminderYearMonth) || 1,
+      reminderYearDay: Number(selectedMeter.reminderYearDay) || 1,
+      reminderTime: selectedMeter.reminderTime || '09:00',
     });
     setShowMeterModal(true);
   };
@@ -599,6 +645,13 @@ export default function MeterDashboard({ companyName, currentUser }) {
                     </div>
                   )}
 
+                  {selectedMeter?.reminderEnabled && (
+                    <div className="mt-4 rounded-2xl border border-sky-200 bg-sky-50 p-4">
+                      <div className="text-sm font-semibold text-sky-900">Reminder</div>
+                      <div className="mt-2 text-sm text-sky-800">{formatMeterReminder(selectedMeter)}</div>
+                    </div>
+                  )}
+
                   <div className="mt-6 flex w-fit rounded-lg border border-gray-200 bg-gray-50 p-1">
                     {[
                       ['details', 'Details'],
@@ -809,6 +862,118 @@ export default function MeterDashboard({ companyName, currentUser }) {
                     <option value="maintenance">Maintenance</option>
                   </select>
                 </label>
+              </div>
+              <div className="mt-4 rounded-2xl border border-sky-200 bg-sky-50 p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <div className="text-sm font-semibold text-sky-900">Reminder settings</div>
+                    <p className="text-sm text-sky-700">Configure recurring meter reminders with weekly, monthly, or yearly cadence.</p>
+                  </div>
+                  <label className="inline-flex items-center gap-2 text-sm font-medium text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={meterForm.reminderEnabled}
+                      onChange={(event) => setMeterForm((prev) => ({ ...prev, reminderEnabled: event.target.checked }))}
+                      className="h-4 w-4 rounded border-gray-300 text-blue-600"
+                    />
+                    Enabled
+                  </label>
+                </div>
+                {meterForm.reminderEnabled && (
+                  <div className="mt-4 space-y-4">
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <label className="block">
+                        <span className="mb-1 block text-sm font-semibold text-gray-700">Recurrence</span>
+                        <select
+                          value={meterForm.reminderRuleType}
+                          onChange={(event) => setMeterForm((prev) => ({ ...prev, reminderRuleType: event.target.value }))}
+                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                        >
+                          <option value="weekly">Weekly</option>
+                          <option value="monthly">Monthly</option>
+                          <option value="yearly">Yearly</option>
+                        </select>
+                      </label>
+                      <label className="block">
+                        <span className="mb-1 block text-sm font-semibold text-gray-700">Reminder time</span>
+                        <input
+                          type="time"
+                          value={meterForm.reminderTime}
+                          onChange={(event) => setMeterForm((prev) => ({ ...prev, reminderTime: event.target.value }))}
+                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                        />
+                      </label>
+                    </div>
+                    {meterForm.reminderRuleType === 'weekly' && (
+                      <div>
+                        <div className="mb-2 text-sm font-semibold text-gray-700">Repeat on</div>
+                        <div className="flex flex-wrap gap-2">
+                          {WEEK_DAYS.map((day, index) => {
+                            const selected = Array.isArray(meterForm.reminderWeekDays) && meterForm.reminderWeekDays.map(Number).includes(index);
+                            return (
+                              <button
+                                key={day}
+                                type="button"
+                                onClick={() => setMeterForm((prev) => {
+                                  const current = Array.isArray(prev.reminderWeekDays) ? prev.reminderWeekDays.map(Number) : [];
+                                  const next = current.includes(index)
+                                    ? current.filter((d) => d !== index)
+                                    : [...current, index];
+                                  return { ...prev, reminderWeekDays: next.sort((a, b) => a - b) };
+                                })}
+                                className={`rounded-lg border px-3 py-2 text-sm font-medium ${selected ? 'border-blue-600 bg-blue-600 text-white' : 'border-gray-300 bg-white text-gray-700'}`}
+                              >
+                                {day}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                    {meterForm.reminderRuleType === 'monthly' && (
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <label className="block">
+                          <span className="mb-1 block text-sm font-semibold text-gray-700">Day of month</span>
+                          <input
+                            type="number"
+                            min="1"
+                            max="31"
+                            value={meterForm.reminderMonthDay}
+                            onChange={(event) => setMeterForm((prev) => ({ ...prev, reminderMonthDay: Number(event.target.value) || 1 }))}
+                            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                          />
+                        </label>
+                      </div>
+                    )}
+                    {meterForm.reminderRuleType === 'yearly' && (
+                      <div className="grid gap-4 sm:grid-cols-3">
+                        <label className="block">
+                          <span className="mb-1 block text-sm font-semibold text-gray-700">Month</span>
+                          <select
+                            value={meterForm.reminderYearMonth}
+                            onChange={(event) => setMeterForm((prev) => ({ ...prev, reminderYearMonth: Number(event.target.value) || 1 }))}
+                            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                          >
+                            {MONTH_NAMES.map((name, idx) => (
+                              <option key={name} value={idx + 1}>{name}</option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="block">
+                          <span className="mb-1 block text-sm font-semibold text-gray-700">Day</span>
+                          <input
+                            type="number"
+                            min="1"
+                            max="31"
+                            value={meterForm.reminderYearDay}
+                            onChange={(event) => setMeterForm((prev) => ({ ...prev, reminderYearDay: Number(event.target.value) || 1 }))}
+                            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                          />
+                        </label>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
             <div className="mt-6 flex justify-end gap-3">
