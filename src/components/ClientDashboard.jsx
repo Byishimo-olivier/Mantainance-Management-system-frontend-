@@ -14589,8 +14589,7 @@ function ClientDashboard() {
 
   // Keep a selected property for the detail view (default to first result)
   useEffect(() => {
-    if (!properties || properties.length === 0) {
-      setSelectedProperty(null);
+    if (!Array.isArray(properties) || properties.length === 0) {
       return;
     }
     if (!selectedProperty) {
@@ -14600,7 +14599,14 @@ function ClientDashboard() {
     const match = properties.find(
       p => String(p._id || p.id) === String(selectedProperty._id || selectedProperty.id)
     );
-    if (match && match !== selectedProperty) {
+    if (!match) {
+      const fallback = properties[0];
+      if (fallback && fallback !== selectedProperty) {
+        setSelectedProperty(fallback);
+      }
+      return;
+    }
+    if (match !== selectedProperty) {
       setSelectedProperty(match);
     }
   }, [properties, selectedProperty]);
@@ -18416,16 +18422,24 @@ function ClientDashboard() {
   };
 
   const isPmLinkedIssue = (issue) => {
+    const normalizedReference = String(issue?.referenceType || issue?.recordType || '').toLowerCase();
+    const tags = Array.isArray(issue?.tags) ? issue.tags.map((tag) => String(tag || '').toLowerCase()) : [];
     return Boolean(
-      issue?.scheduleId ||
-      issue?.parentScheduleId ||
-      issue?.maintenanceScheduleId ||
-      issue?.pmId ||
-      issue?.pmInstanceId ||
-      issue?.pmTrigger ||
-      issue?.preventiveMaintenanceName ||
-      issue?.scheduleName ||
-      issue?.pmName
+      issue?.createdBySchedule
+      || issue?.scheduleId
+      || issue?.parentScheduleId
+      || issue?.maintenanceScheduleId
+      || issue?.pmId
+      || issue?.pmInstanceId
+      || issue?.pmTrigger
+      || issue?.preventiveMaintenanceName
+      || issue?.scheduleName
+      || issue?.pmName
+      || issue?.isPreventive
+      || normalizedReference.includes('workorder')
+      || normalizedReference.includes('work order')
+      || normalizedReference.includes('work_order')
+      || tags.some((tag) => tag.includes('prevent') || tag.includes('recurring-pm') || tag.includes('auto-generated'))
     );
   };
 
@@ -21367,14 +21381,36 @@ function ClientDashboard() {
       }
       closeAssetEditor();
       const r = await api.get('/api/assets');
-      const nextAssets = r.data || [];
-      setAssets(nextAssets);
+      const nextAssets = Array.isArray(r.data)
+        ? r.data
+        : Array.isArray(r.data?.data)
+          ? r.data.data
+          : [];
+      const normalizedNextAssets = dedupeById(nextAssets, (item) => item?._id || item?.id);
+      setAssets(normalizedNextAssets);
       if (savedAsset) {
-        const updated = nextAssets.find((asset) => String(asset._id || asset.id) === String(savedAsset._id || savedAsset.id));
-        if (updated) {
-          setSelectedAsset(updated);
-        } else {
-          setSelectedAsset(savedAsset);
+        const serverAsset = savedAsset && typeof savedAsset === 'object' && savedAsset.data && typeof savedAsset.data === 'object'
+          ? savedAsset.data
+          : savedAsset;
+        const fallbackAsset = {
+          ...(editingAsset || selectedAsset || {}),
+          ...(serverAsset || {}),
+          ...payload,
+          _id: (serverAsset?._id || serverAsset?.id || editingAsset?._id || editingAsset?.id || selectedAsset?._id || selectedAsset?.id || ''),
+          id: (serverAsset?.id || serverAsset?._id || editingAsset?.id || editingAsset?._id || selectedAsset?.id || selectedAsset?._id || ''),
+        };
+        const updated = serverAsset
+          ? normalizedNextAssets.find((asset) => String(asset._id || asset.id) === String(serverAsset._id || serverAsset.id))
+            || fallbackAsset
+          : fallbackAsset;
+        const normalizedAsset = updated || normalizedNextAssets[0] || fallbackAsset || null;
+        if (normalizedAsset) {
+          setSelectedAsset({
+            ...(normalizedAsset.data || normalizedAsset),
+            ...normalizedAsset,
+            _id: normalizedAsset._id || normalizedAsset.id || (editingAsset?._id || editingAsset?.id),
+            id: normalizedAsset.id || normalizedAsset._id || (editingAsset?._id || editingAsset?.id),
+          });
         }
       }
     } catch (error) {
@@ -27976,6 +28012,7 @@ function ClientDashboard() {
                     e.preventDefault();
                     try {
                       const userId = getCurrentUserId();
+                      const eid = editingProperty._id || editingProperty.id;
                       const payload = {
                         ...propertyForm,
                         baths: propertyForm.baths ? +propertyForm.baths : undefined,
@@ -27986,14 +28023,18 @@ function ClientDashboard() {
                         assignedTeam: propertyForm.assignedTeam || '',
                         vendors: Array.isArray(propertyForm.vendors) ? propertyForm.vendors : [],
                         customers: Array.isArray(propertyForm.customers) ? propertyForm.customers : [],
-                        customData: Array.isArray(propertyForm.customData) ? propertyForm.customData : [],
-                        clientId: userId,
-                        userId
+                        customData: Array.isArray(propertyForm.customData) ? propertyForm.customData : []
                       };
+                      if (!eid) {
+                        payload.clientId = userId;
+                        payload.userId = userId;
+                      } else {
+                        payload.clientId = editingProperty.clientId || editingProperty.userId || userId;
+                        payload.userId = editingProperty.userId || editingProperty.clientId || userId;
+                      }
                       payload.blocks = propertyForm.blocks ? String(propertyForm.blocks).trim() : undefined;
                       payload.blocksModifiable = true;
                       if (propertyForm.roomNames && Array.isArray(propertyForm.roomNames)) payload.roomNames = propertyForm.roomNames.join(',');
-                      const eid = editingProperty._id || editingProperty.id;
                       let savedProperty = null;
                       if (eid) {
                         const response = await api.put(`/api/properties/${eid}`, payload);
@@ -28014,15 +28055,38 @@ function ClientDashboard() {
                       }
                       closePropertyEditor();
                       const res = await api.get('/api/properties');
-                      const nextProperties = res.data || [];
-                      setProperties(nextProperties);
-                      if (savedProperty) {
-                        const updated = nextProperties.find((property) => String(property._id || property.id) === String(savedProperty._id || savedProperty.id));
-                        if (updated) {
-                          setSelectedProperty(updated);
-                        } else {
-                          setSelectedProperty(savedProperty);
-                        }
+                      const nextProperties = Array.isArray(res.data)
+                        ? res.data
+                        : Array.isArray(res.data?.data)
+                          ? res.data.data
+                          : [];
+                      const normalizedNextProperties = dedupeById(nextProperties, (item) => item?._id || item?.id);
+                      setProperties(normalizedNextProperties);
+                      const serverProperty = savedProperty && typeof savedProperty === 'object' && savedProperty.data && typeof savedProperty.data === 'object'
+                        ? savedProperty.data
+                        : savedProperty;
+                      const fallbackProperty = {
+                        ...(editingProperty || selectedProperty || {}),
+                        ...(serverProperty || {}),
+                        ...payload,
+                        _id: (serverProperty?._id || serverProperty?.id || editingProperty?._id || editingProperty?.id || selectedProperty?._id || selectedProperty?.id || eid || ''),
+                        id: (serverProperty?.id || serverProperty?._id || editingProperty?.id || editingProperty?._id || selectedProperty?.id || selectedProperty?._id || eid || ''),
+                      };
+                      const updatedProperty = serverProperty
+                        ? normalizedNextProperties.find((property) => String(property._id || property.id) === String(serverProperty._id || serverProperty.id))
+                          || fallbackProperty
+                        : fallbackProperty;
+                      const resolvedProperty = updatedProperty || normalizedNextProperties[0] || fallbackProperty || null;
+                      if (resolvedProperty) {
+                        const normalizedResolvedProperty = {
+                          ...(resolvedProperty.data || resolvedProperty),
+                          ...resolvedProperty,
+                          _id: resolvedProperty._id || resolvedProperty.id || (editingProperty?._id || editingProperty?.id) || eid,
+                          id: resolvedProperty.id || resolvedProperty._id || (editingProperty?.id || editingProperty?._id) || eid,
+                        };
+                        setSelectedProperty(normalizedResolvedProperty);
+                        setPropertyDetailTab('details');
+                        setPropertyModalOpen(true);
                       }
                     } catch {
                       alert('Failed to save property.');
@@ -38426,17 +38490,27 @@ const ClientAnalyticsTab = ({
     const status = String(issue?.status || '').toUpperCase();
     return status === 'REJECTED' || status === 'DECLINED';
   };
-  const isPmLinkedIssue = (issue) => Boolean(
-    issue?.scheduleId ||
-    issue?.parentScheduleId ||
-    issue?.pmId ||
-    issue?.maintenanceScheduleId ||
-    issue?.pmInstanceId ||
-    issue?.pmTrigger ||
-    issue?.preventiveMaintenanceName ||
-    issue?.scheduleName ||
-    issue?.pmName
-  );
+  const isPmLinkedIssue = (issue) => {
+    const normalizedReference = String(issue?.referenceType || issue?.recordType || '').toLowerCase();
+    const tags = Array.isArray(issue?.tags) ? issue.tags.map((tag) => String(tag || '').toLowerCase()) : [];
+    return Boolean(
+      issue?.createdBySchedule
+      || issue?.scheduleId
+      || issue?.parentScheduleId
+      || issue?.maintenanceScheduleId
+      || issue?.pmId
+      || issue?.pmInstanceId
+      || issue?.pmTrigger
+      || issue?.preventiveMaintenanceName
+      || issue?.scheduleName
+      || issue?.pmName
+      || issue?.isPreventive
+      || normalizedReference.includes('workorder')
+      || normalizedReference.includes('work order')
+      || normalizedReference.includes('work_order')
+      || tags.some((tag) => tag.includes('prevent') || tag.includes('recurring-pm') || tag.includes('auto-generated'))
+    );
+  };
   const isApprovedWorkOrder = (issue) => {
     const status = String(issue?.status || '').toUpperCase();
     const referenceType = String(issue?.referenceType || '').toLowerCase();

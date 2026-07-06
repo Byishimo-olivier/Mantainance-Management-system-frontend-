@@ -744,6 +744,21 @@ function ManagerDashboard() {
   const [technicians, setTechnicians] = useState([]);
   const [systemUsers, setSystemUsers] = useState([]);
   const [teams, setTeams] = useState([]);
+
+  const isPmLinkedIssue = (issue) => {
+    if (!issue) return false;
+    const normalizedReference = String(issue?.referenceType || issue?.recordType || '').toLowerCase();
+    const tags = Array.isArray(issue.tags) ? issue.tags.map(tag => String(tag || '').toLowerCase()) : [];
+    return Boolean(
+      issue.createdBySchedule
+      || issue.isPreventive
+      || issue.pmTrigger
+      || normalizedReference.includes('workorder')
+      || normalizedReference.includes('work order')
+      || normalizedReference.includes('work_order')
+      || tags.some(tag => tag.includes('prevent') || tag.includes('recurring-pm') || tag.includes('auto-generated'))
+    );
+  };
   const [locations, setLocations] = useState([]);
   const [assets, setAssets] = useState([]);
   const [summary, setSummary] = useState({
@@ -967,7 +982,7 @@ function ManagerDashboard() {
       setAllIssues(allIssuesData);
 
       const approvedWorkOrders = allIssuesData.filter(issue => issue.approved);
-      const pendingRequestsData = allIssuesData.filter(issue => !issue.approved && issue.status !== 'REJECTED');
+      const pendingRequestsData = allIssuesData.filter(issue => !isPmLinkedIssue(issue) && !issue.approved && issue.status !== 'REJECTED');
 
       setIssues(approvedWorkOrders);
       setPendingRequests(pendingRequestsData);

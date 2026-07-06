@@ -10,6 +10,21 @@ function RequestsPage() {
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [declineReason, setDeclineReason] = useState("");
 
+  const isPmLinkedIssue = (issue) => {
+    if (!issue) return false;
+    const normalizedReference = String(issue?.referenceType || issue?.recordType || '').toLowerCase();
+    const tags = Array.isArray(issue.tags) ? issue.tags.map(tag => String(tag || '').toLowerCase()) : [];
+    return Boolean(
+      issue.createdBySchedule
+      || issue.isPreventive
+      || issue.pmTrigger
+      || normalizedReference.includes('workorder')
+      || normalizedReference.includes('work order')
+      || normalizedReference.includes('work_order')
+      || tags.some(tag => tag.includes('prevent') || tag.includes('recurring-pm') || tag.includes('auto-generated'))
+    );
+  };
+
   const fetchPendingRequests = async () => {
     try {
       // Auth header handled by interceptor
@@ -20,6 +35,11 @@ function RequestsPage() {
 
       // More flexible filtering - show issues that need approval
       const pendingRequests = response.data.filter(issue => {
+        if (isPmLinkedIssue(issue)) {
+          console.log('Skipping PM linked issue from Requests page:', issue.title, issue);
+          return false;
+        }
+
         // Show if status is PENDING and not assigned
         if (issue.status === 'PENDING' && !issue.assignedTo) {
           console.log('Found pending request:', issue.title, issue);
