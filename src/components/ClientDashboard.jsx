@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import backgroundVideo from "../assets/136906-765457769_small.mp4";
 import companyLogoAsset from "../assets/fixnest-brand-logo.png";
+import companyLogoLightAsset from "../assets/fixnest-brand-wordmark-light.png";
 import { createPortal } from "react-dom";
 import api from "../api/axios";
 import subscriptionAPI from "../api/subscription";
@@ -12,12 +12,13 @@ import { WorkOrderForm } from './WorkOrder';
 import SubscriptionPlan from './SubscriptionPlan';
 import SubscriptionManagement from './SubscriptionManagement';
 import CompanySubscriptionDashboard from './CompanySubscriptionDashboard';
+import TaskDashboard from './TaskDashboard';
 import { useCompanySubscription } from '../hooks/useCompanySubscription';
 import useTrialStatus from '../hooks/useTrialStatus';
 import { useSubscription } from '../hooks/useSubscription';
 import { getImageUrl } from '../utils/imageUrl';
 import { useLanguage, useTranslation } from "../i18n/LanguageContext";
-import { Clock, Calendar, CheckCircle, ClipboardCheck, ClipboardList, X, Bell, Download, Package, ShoppingCart, Gauge, Plus, Search, Eye, MapPin, AlertCircle, Repeat, Edit, Pencil, ChevronLeft, ChevronRight, ChevronDown, SlidersHorizontal, Flag, MoreHorizontal, MoreVertical, Trash2, Image as ImageIcon, Tag, Paperclip, MessageSquare, Send, Navigation, DollarSign, Bookmark, Link2, FileText, Copy, Archive, ArrowUpDown, ArrowRight, ArrowLeft, LayoutDashboard, Settings, Users, RotateCcw, Zap, Globe, Activity, QrCode, GripVertical, Info, Box, CreditCard, Smartphone, Loader } from 'lucide-react';
+import { Clock, Calendar, CheckCircle, ClipboardCheck, ClipboardList, X, Bell, Download, Package, ShoppingCart, Gauge, Plus, Search, Eye, MapPin, AlertCircle, Repeat, Edit, Pencil, ChevronLeft, ChevronRight, ChevronDown, SlidersHorizontal, Flag, MoreHorizontal, MoreVertical, Trash2, Image as ImageIcon, Tag, Paperclip, MessageSquare, Send, Navigation, DollarSign, Bookmark, Link2, FileText, Copy, Archive, ArrowUpDown, ArrowRight, ArrowLeft, LayoutDashboard, Settings, Users, RotateCcw, Zap, Globe, Activity, QrCode, GripVertical, Info, Box, CreditCard, Smartphone, Loader, Maximize2 } from 'lucide-react';
 
 const ASSISTANT_ACTION_STORAGE_KEY = 'mms_assistant_action';
 const REQUEST_FORM_SETTINGS_STORAGE_KEY = 'mms_request_form_settings';
@@ -1115,7 +1116,7 @@ const CommentModal = ({ open, item, userName, people = [], onClose, onPosted }) 
   );
 };
 
-// â”€â”€ Icons â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Icons ─────────────────────────────────────────────────────────────────────
 const Icon = {
   Dashboard: () => (
     <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
@@ -1361,7 +1362,7 @@ const formatPmScheduleDateTime = (date, schedule = {}) => {
   return date.toLocaleString('en-US', options);
 };
 
-// â”€â”€ Status badge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Status badge ─────────────────────────────────────────────────────────────
 function StatusBadge({ status }) {
   const s = (status || '').toUpperCase().replace(/_/g, ' ');
   const map = {
@@ -1657,38 +1658,234 @@ const PriorityBadge = ({ priority }) => {
   );
 };
 
-// â”€â”€ Stat card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Stat card ─────────────────────────────────────────────────────────────────
+// KPI tile: title on top, coloured value + caption bottom-left, round coloured icon bottom-right.
+const STAT_CARD_COLORS = {
+  slate: '#0e9aa7',
+  amber: '#e8711a',
+  blue: '#2f80ed',
+  green: '#28a745',
+  red: '#c0392b',
+  indigo: '#7c3aed',
+};
+
 function StatCard({ label, value, sub, accent, icon, onClick }) {
-  const accents = {
-    blue: 'from-blue-50 to-indigo-50 border-blue-100',
-    green: 'from-emerald-50 to-teal-50 border-emerald-100',
-    red: 'from-rose-50 to-pink-50 border-rose-100',
-    indigo: 'from-indigo-50 to-purple-50 border-indigo-100',
-    amber: 'from-amber-50 to-yellow-50 border-amber-100',
-  };
-  const c = accents[accent] || accents.blue;
+  const color = STAT_CARD_COLORS[accent] || STAT_CARD_COLORS.blue;
   return (
     <div
       onClick={onClick}
-      className={`glass-surface rounded-xl p-4 xs:p-5 sm:p-6 flex items-start gap-3 sm:gap-4 border-l-4 overflow-hidden relative group transition-all hover:scale-[1.02] ${onClick ? 'cursor-pointer hover:ring-2 hover:ring-blue-100' : ''}`}
+      className={`oti-stat-card${onClick ? ' is-clickable' : ''}`}
+      style={{ '--stat-color': color }}
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : -1}
       onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } } : undefined}
     >
-      <div className={`absolute inset-0 bg-gradient-to-br ${c} opacity-90`} />
-      <div className="relative z-10 w-10 h-10 sm:w-12 sm:h-12 rounded-xl glass-mirror flex items-center justify-center text-blue-700 shadow-lg bg-white/80 border border-blue-100 shrink-0">
-        {icon}
-      </div>
-      <div className="relative z-10 min-w-0">
-        <div className="text-2xl xs:text-3xl font-black text-gray-900 tracking-tight truncate">{value}</div>
-        <div className="text-[10px] xs:text-xs sm:text-sm font-bold text-gray-700 uppercase tracking-wider mt-1 truncate">{label}</div>
-        {sub && <div className="hidden xs:block text-xs text-gray-600 mt-1 font-medium truncate">{sub}</div>}
+      <div className="oti-stat-label">{label}</div>
+      <div className="oti-stat-row">
+        <div className="min-w-0">
+          <div className="oti-stat-value">{value}</div>
+          {sub && <div className="oti-stat-sub">{sub}</div>}
+        </div>
+        <div className="oti-stat-icon" aria-hidden="true">{icon}</div>
       </div>
     </div>
   );
 }
 
-// â”€â”€ Section header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Analytics charts ──────────────────────────────────────────────────────────
+// All series in a chart share one y-axis with real tick values, so lines and bars
+// can be compared directly and read off the axis.
+const ANALYTICS_AXIS_TICKS = { color: '#64748b', font: { size: 11 } };
+const analyticsLegend = (show) => ({
+  display: show,
+  position: 'bottom',
+  labels: { color: '#1f2937', usePointStyle: true, pointStyle: 'circle', boxWidth: 8, boxHeight: 8, padding: 14, font: { size: 12 } },
+});
+
+function AnalyticsEmpty({ text = 'No data for this period yet.', height = 220 }) {
+  return <div className="oti-chart-empty" style={{ height }}>{text}</div>;
+}
+
+// Line chart over time. series: [{ label, data, color, dashed }]
+function AnalyticsLineChart({ labels = [], series = [], height = 260, yMax, formatValue = (v) => v, emptyText }) {
+  const hasData = series.some((s) => (s.data || []).some((v) => Number(v) > 0));
+  if (!hasData) return <AnalyticsEmpty text={emptyText} height={height} />;
+  const data = {
+    labels,
+    datasets: series.map((s) => ({
+      label: s.label,
+      data: (s.data || []).map((v) => Number(v) || 0),
+      borderColor: s.color,
+      backgroundColor: s.color,
+      pointBackgroundColor: s.color,
+      pointRadius: 3,
+      borderWidth: 2,
+      borderDash: s.dashed ? [6, 4] : undefined,
+      tension: 0,
+      fill: false,
+    })),
+  };
+  const options = {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: analyticsLegend(series.length > 1),
+      tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${formatValue(ctx.parsed.y)}` } },
+    },
+    scales: {
+      x: { offset: true, grid: { display: false }, ticks: { ...ANALYTICS_AXIS_TICKS, maxRotation: 0, autoSkipPadding: 12 }, border: { display: false } },
+      y: { beginAtZero: true, max: yMax, grid: { color: '#f1f3f7' }, ticks: { ...ANALYTICS_AXIS_TICKS, precision: 0, callback: (v) => formatValue(v) }, border: { display: false } },
+    },
+  };
+  return <div style={{ height }}><Chart type="line" data={data} options={options} style={{ height: '100%' }} /></div>;
+}
+
+// Bar chart. series: [{ label, data, color }]; stacked adds them up per column.
+function AnalyticsBarChart({ labels = [], series = [], height = 260, stacked = false, horizontal = false, formatValue = (v) => v, emptyText }) {
+  const hasData = series.some((s) => (s.data || []).some((v) => Number(v) > 0));
+  if (!hasData) return <AnalyticsEmpty text={emptyText} height={height} />;
+  const valueAxis = { beginAtZero: true, stacked, grid: { color: '#f1f3f7' }, ticks: { ...ANALYTICS_AXIS_TICKS, precision: 0, callback: (v) => formatValue(v) }, border: { display: false } };
+  const labelAxis = { stacked, grid: { display: false }, ticks: { ...ANALYTICS_AXIS_TICKS, color: '#1f2937', autoSkip: !horizontal, maxRotation: 0 }, border: { display: false } };
+  const data = {
+    labels,
+    datasets: series.map((s) => ({
+      label: s.label,
+      data: (s.data || []).map((v) => Number(v) || 0),
+      backgroundColor: s.color,
+      borderRadius: stacked ? 0 : 6,
+      maxBarThickness: horizontal ? 22 : 40,
+    })),
+  };
+  const options = {
+    indexAxis: horizontal ? 'y' : 'x',
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: analyticsLegend(series.length > 1),
+      tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${formatValue(horizontal ? ctx.parsed.x : ctx.parsed.y)}` } },
+    },
+    scales: horizontal ? { x: valueAxis, y: labelAxis } : { x: labelAxis, y: valueAxis },
+  };
+  return <div style={{ height }}><Chart type="bar" data={data} options={options} style={{ height: '100%' }} /></div>;
+}
+
+// Ranked horizontal bars from table rows (top N by value). Keeps zero rows out unless asked.
+function AnalyticsRankChart({ rows = [], valueKey, labelKey = 'name', label, color = '#1b2559', limit = 8, ascending = false, includeZero = false, formatValue, emptyText }) {
+  const ranked = [...rows]
+    .filter((row) => includeZero || Number(row?.[valueKey]) > 0)
+    .sort((a, b) => (ascending ? 1 : -1) * ((Number(a?.[valueKey]) || 0) - (Number(b?.[valueKey]) || 0)))
+    .slice(0, limit);
+  if (!ranked.length) return <AnalyticsEmpty text={emptyText} height={180} />;
+  return (
+    <AnalyticsBarChart
+      horizontal
+      height={Math.max(180, ranked.length * 36 + 40)}
+      labels={ranked.map((row) => String(row?.[labelKey] ?? '—'))}
+      series={[{ label, color, data: ranked.map((row) => Number((Number(row?.[valueKey]) || 0).toFixed(2))) }]}
+      formatValue={formatValue}
+      emptyText={emptyText}
+    />
+  );
+}
+
+// Combined bars (left axis) + line (right axis), e.g. count vs average age.
+function AnalyticsComboChart({ labels = [], bar, line, height = 300, emptyText }) {
+  const hasData = (bar?.data || []).some((v) => Number(v) > 0);
+  if (!hasData) return <AnalyticsEmpty text={emptyText} height={height} />;
+  const data = {
+    labels,
+    datasets: [
+      { type: 'bar', label: bar.label, data: bar.data, backgroundColor: bar.color, borderRadius: 6, maxBarThickness: 36, yAxisID: 'y', order: 2 },
+      { type: 'line', label: line.label, data: line.data, borderColor: line.color, backgroundColor: line.color, pointRadius: 4, borderWidth: 2, tension: 0, yAxisID: 'y1', order: 1 },
+    ],
+  };
+  const options = {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: { legend: analyticsLegend(true) },
+    scales: {
+      x: { grid: { display: false }, ticks: { ...ANALYTICS_AXIS_TICKS, maxRotation: 0 }, border: { display: false } },
+      y: { beginAtZero: true, position: 'left', title: { display: true, text: bar.label, color: '#64748b' }, grid: { color: '#f1f3f7' }, ticks: { ...ANALYTICS_AXIS_TICKS, precision: 0 }, border: { display: false } },
+      y1: { beginAtZero: true, position: 'right', title: { display: true, text: line.label, color: '#64748b' }, grid: { display: false }, ticks: ANALYTICS_AXIS_TICKS, border: { display: false } },
+    },
+  };
+  return <div style={{ height }}><Chart type="bar" data={data} options={options} style={{ height: '100%' }} /></div>;
+}
+
+// Chart card: title on the left, expand / download tools on the right, chart below.
+function DashChartCard({ title, subtitle, action, height = 280, children }) {
+  const bodyRef = useRef(null);
+  const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => {
+    if (!expanded) return undefined;
+    const onKey = (event) => { if (event.key === 'Escape') setExpanded(false); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [expanded]);
+
+  const handleDownload = () => {
+    const canvas = bodyRef.current?.querySelector('canvas');
+    if (!canvas) return;
+    // Paint onto white so the PNG isn't transparent.
+    const output = document.createElement('canvas');
+    output.width = canvas.width;
+    output.height = canvas.height;
+    const ctx = output.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, output.width, output.height);
+    ctx.drawImage(canvas, 0, 0);
+    const link = document.createElement('a');
+    link.href = output.toDataURL('image/png');
+    link.download = `${String(title).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'chart'}.png`;
+    link.click();
+  };
+
+  return (
+    <>
+      <div className="oti-card oti-chart-card">
+        <div className="oti-card-head">
+          <div className="min-w-0">
+            <div className="oti-card-title">{title}</div>
+            {subtitle && <div className="oti-card-sub">{subtitle}</div>}
+          </div>
+          <div className="oti-card-tools">
+            {action}
+            <button type="button" title="Expand" aria-label={`Expand ${title}`} onClick={() => setExpanded(true)}>
+              <Maximize2 className="h-4 w-4" />
+            </button>
+            <button type="button" title="Download as image" aria-label={`Download ${title} as image`} onClick={handleDownload}>
+              <Download className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+        <div className="oti-card-body" ref={bodyRef} style={{ height }}>
+          {children}
+        </div>
+      </div>
+      {expanded && createPortal(
+        <div className="oti-modal-backdrop" onClick={() => setExpanded(false)}>
+          <div className="oti-modal" role="dialog" aria-modal="true" aria-label={title} onClick={(event) => event.stopPropagation()}>
+            <div className="oti-card-head">
+              <div className="oti-card-title">{title}</div>
+              <div className="oti-card-tools">
+                <button type="button" title="Close" aria-label="Close" onClick={() => setExpanded(false)}>
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+            <div className="oti-modal-body">{children}</div>
+          </div>
+        </div>,
+        document.body
+      )}
+    </>
+  );
+}
+
+// ── Section header ────────────────────────────────────────────────────────────
 function SectionHeader({ title, count, action }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
@@ -1703,7 +1900,7 @@ function SectionHeader({ title, count, action }) {
   );
 }
 
-// â”€â”€ Table â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Table ─────────────────────────────────────────────────────────────────────
 // Centralized Popover (manager parity)
 const FilterPopover = ({ isOpen, onClose, title, children, className = "", anchorRef = null, bodyClassName = "" }) => {
   const [position, setPosition] = useState({ top: 0, left: 0, width: null });
@@ -2444,8 +2641,7 @@ const RequestFormSettingsModal = ({
     setAssetScheduleSaving(false);
     
     if (result?.id || result?._id) {
-      // Auto-select the newly created schedule
-      setAssetForm((prev) => ({ ...prev, operatingScheduleId: result.id || result._id }));
+      // (This settings modal has no asset form, so there is nothing to auto-select.)
       setShowAssetOperatingHoursBuilder(false);
       setAssetOperatingScheduleForm({ name: '', scheduleType: 'daily' });
     }
@@ -5517,69 +5713,6 @@ const RequestFormSettingsModal = ({
           </div>
         </div>
       )}
-      {edgeShowDetails && edgeEditDevice && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/40" onClick={() => { setEdgeShowDetails(false); setEdgeSelectedDevice(null); setEdgeEditDevice(null); }} />
-          <div className="relative glass-surface-strong rounded-xl p-6 w-full max-w-lg z-10">
-            <h3 className="text-lg font-bold mb-3">Device Details</h3>
-            <div className="flex flex-col gap-2">
-              <input value={edgeEditDevice.name || ''} onChange={e => setEdgeEditDevice({ ...edgeEditDevice, name: e.target.value })} placeholder="Device name" className="p-2 border rounded" />
-              <select value={edgeEditDevice.type || 'Sensor'} onChange={e => setEdgeEditDevice({ ...edgeEditDevice, type: e.target.value })} className="p-2 border rounded">
-                {Object.keys(typeIcon).map(t => <option key={t}>{t}</option>)}
-              </select>
-              <div className="grid grid-cols-2 gap-2">
-                {locationOptions.length > 0 ? (
-                  <select value={edgeEditDevice.location || ''} onChange={e => setEdgeEditDevice({ ...edgeEditDevice, location: e.target.value })} className="p-2 border rounded">
-                    <option value="">Select location</option>
-                    {locationOptions.map((option) => (
-                      <option key={option.value} value={option.label}>{option.label}</option>
-                    ))}
-                  </select>
-                ) : (
-                  <input value={edgeEditDevice.location || ''} onChange={e => setEdgeEditDevice({ ...edgeEditDevice, location: e.target.value })} placeholder="Location" className="p-2 border rounded" />
-                )}
-                <select value={edgeEditDevice.status || 'Online'} onChange={e => setEdgeEditDevice({ ...edgeEditDevice, status: e.target.value })} className="p-2 border rounded">
-                  <option value="Online">Online</option>
-                  <option value="Offline">Offline</option>
-                </select>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <input type="number" value={edgeEditDevice.signal ?? ''} onChange={e => setEdgeEditDevice({ ...edgeEditDevice, signal: e.target.value ? Number(e.target.value) : null })} placeholder="Signal (%)" className="p-2 border rounded" />
-                <input value={edgeEditDevice.firmware || ''} onChange={e => setEdgeEditDevice({ ...edgeEditDevice, firmware: e.target.value })} placeholder="Firmware" className="p-2 border rounded" />
-              </div>
-              <label className="text-sm text-gray-700">Assign to</label>
-              <select value={String(edgeEditDevice.assignedTo || '')} onChange={e => setEdgeEditDevice({ ...edgeEditDevice, assignedTo: e.target.value || null })} className="p-2 border rounded">
-                <option value="">Unassigned</option>
-                {assignOptions.map((p) => <option key={p._id || p.id} value={p._id || p.id}>{p.name || p.fullName || p.email || String(p._id || p.id)}</option>)}
-              </select>
-              <div className="flex justify-end gap-2 mt-3">
-                <button onClick={() => { setEdgeShowDetails(false); setEdgeSelectedDevice(null); setEdgeEditDevice(null); }} className="px-3 py-2 glass-ghost rounded">Close</button>
-                <button onClick={async () => {
-                  if (edgeSavingEdit) return;
-                  setEdgeSavingEdit(true);
-                  try {
-                    const id = edgeEditDevice.id || edgeEditDevice._id;
-                    const payload = { ...edgeEditDevice };
-                    // Clean up local-only fields
-                    delete payload.id; delete payload._id;
-                    const res = await api.put(`/api/devices/${id}`, payload);
-                    const updated = res?.data;
-                    if (updated) {
-                      setDevices(prev => (prev || []).map(d => (String(d.id || d._id) === String(updated.id || updated._id) ? updated : d)));
-                      setEdgeShowDetails(false);
-                      setEdgeSelectedDevice(null);
-                      setEdgeEditDevice(null);
-                    }
-                  } catch (err) {
-                    alert('Failed to save changes');
-                  } finally { setEdgeSavingEdit(false); }
-                }} disabled={edgeSavingEdit} className="px-3 py-2 bg-blue-600 text-white rounded disabled:opacity-60">{edgeSavingEdit ? 'Saving...' : 'Save'}</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {showWorkOrderStatusModal && (
         <div className="fixed inset-0 z-[1500] flex items-center justify-center bg-black/45 p-6">
           <div className="w-full max-w-[720px] rounded-[20px] bg-white shadow-2xl">
@@ -6566,7 +6699,7 @@ const Td = ({ children, mono, className = '', ...props }) => (
   <td {...props} className={`py-4 px-6 text-sm text-gray-800 ${mono ? 'font-mono' : ''} ${className}`.trim()}>{children ?? '—'}</td>
 );
 
-// â”€â”€ Input / Select â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Input / Select ────────────────────────────────────────────────────────────
 const Input = ({ className = '', ...props }) => (
   <input
     className={`glass-input rounded-xl px-4 py-2.5 text-sm text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-200 border-gray-200 w-full transition-all outline-none ${className}`}
@@ -6583,7 +6716,7 @@ const Select = ({ className = '', children, ...props }) => (
   </select>
 );
 
-// â”€â”€ Button â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Button ────────────────────────────────────────────────────────────────────
 function Btn({ children, variant = 'primary', size = 'md', onClick, disabled, type = 'button', className = '' }) {
   const variants = {
     primary: 'bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-500/20',
@@ -7169,36 +7302,22 @@ function CreateTeamModal({ open, onClose, people = [], onCreate, busy = false })
   );
 }
 
-// â”€â”€ Sidebar nav item â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Sidebar nav item ──────────────────────────────────────────────────────────
 function NavItem({ label, icon, active, onClick, danger, badge }) {
-  const badgeLabel = typeof badge === 'number' && badge > 99 ? '99+' : badge;
+  const count = Number(badge);
+  const showBadge = badge !== undefined && badge !== null && badge !== '' && !(Number.isFinite(count) && count === 0);
+  const badgeLabel = Number.isFinite(count) && count > 99 ? '99+' : badge;
   return (
     <button
+      type="button"
       onClick={onClick}
-      className={`w-full flex items-start gap-3 px-4 py-3 rounded-xl transition-all duration-200 group relative text-left ${active
-          ? 'bg-white/20 text-white shadow-lg shadow-black/5'
-          : 'text-white/60 hover:text-white hover:bg-white/10'
-        } ${danger ? 'hover:bg-rose-500/20 hover:text-rose-200' : ''}`}
+      title={label}
+      aria-current={active ? 'page' : undefined}
+      className={`oti-nav-item${active ? ' is-active' : ''}${danger ? ' is-danger' : ''}`}
     >
-      {active && (
-        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-white rounded-r-full shadow-glow-white" />
-      )}
-      <span className={`mt-0.5 shrink-0 transition-transform duration-200 group-hover:scale-110 ${active ? 'text-white' : 'text-white/40 group-hover:text-white/70'}`}>
-        {icon}
-      </span>
-      <span className="min-w-0 flex-1 whitespace-normal break-words text-sm font-bold leading-6 tracking-tight">
-        {label}
-      </span>
-      {badge !== undefined && badge !== null && (
-        <span
-          className={`ml-2 shrink-0 rounded-full px-2 py-0.5 text-[11px] font-black leading-5 ${active
-            ? 'bg-white text-blue-700'
-            : 'bg-white/15 text-white/90 group-hover:bg-white/20'}`
-          }
-        >
-          {badgeLabel}
-        </span>
-      )}
+      <span className="oti-nav-icon">{icon}</span>
+      <span className="oti-nav-label">{label}</span>
+      {showBadge && <span className="oti-nav-badge">{badgeLabel}</span>}
     </button>
   );
 }
@@ -7222,9 +7341,7 @@ function AssetEditorModal({
   getPropertyBlockOptions,
   maintenanceSchedules,
 }) {
-  if (editingAsset === null) return null;
-
-  const isEditing = Boolean(editingAsset?._id || editingAsset?.id);
+  // Hooks must run on every render, so they come before the early return.
   const [additionalWorkersOpen, setAdditionalWorkersOpen] = useState(false);
   const [additionalWorkersQuery, setAdditionalWorkersQuery] = useState('');
   const [addPartOpen, setAddPartOpen] = useState(false);
@@ -7233,16 +7350,6 @@ function AssetEditorModal({
   const [availableParts, setAvailableParts] = useState([]);
   const [partsLoading, setPartsLoading] = useState(false);
   const [partDraft, setPartDraft] = useState({ id: '', name: '', quantity: '1', cost: '', description: '', category: '', partNumber: '' });
-  const filteredAdditionalWorkerOptions = assetWorkerOptions.filter((worker) =>
-    worker.label.toLowerCase().includes(String(additionalWorkersQuery || '').trim().toLowerCase())
-  );
-  const selectedAdditionalWorkers = assetWorkerOptions.filter((worker) =>
-    (assetForm.additionalWorkerIds || []).includes(worker.id)
-  );
-  const filteredAvailableParts = availableParts.filter((part) => {
-    const haystack = `${part.name || ''} ${part.partNumber || ''} ${part.category || ''} ${part.description || ''}`.toLowerCase();
-    return haystack.includes(String(partSearch || '').trim().toLowerCase());
-  });
 
   useEffect(() => {
     if (!addPartOpen || availableParts.length) return;
@@ -7263,6 +7370,21 @@ function AssetEditorModal({
       mounted = false;
     };
   }, [addPartOpen, availableParts.length]);
+
+  if (editingAsset === null) return null;
+
+  const isEditing = Boolean(editingAsset?._id || editingAsset?.id);
+  const filteredAdditionalWorkerOptions = assetWorkerOptions.filter((worker) =>
+    worker.label.toLowerCase().includes(String(additionalWorkersQuery || '').trim().toLowerCase())
+  );
+  const selectedAdditionalWorkers = assetWorkerOptions.filter((worker) =>
+    (assetForm.additionalWorkerIds || []).includes(worker.id)
+  );
+  const filteredAvailableParts = availableParts.filter((part) => {
+    const haystack = `${part.name || ''} ${part.partNumber || ''} ${part.category || ''} ${part.description || ''}`.toLowerCase();
+    return haystack.includes(String(partSearch || '').trim().toLowerCase());
+  });
+
 
   return createPortal(
     <div className="fixed inset-0 z-[130] bg-white">
@@ -7792,7 +7914,7 @@ function AssetEditorModal({
   );
 }
 
-// â”€â”€ Main Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Main Component ────────────────────────────────────────────────────────────
 function ClientDashboard() {
   const navigate = useNavigate();
   const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
@@ -7816,6 +7938,13 @@ function ClientDashboard() {
     if (Number.isNaN(parsed.getTime())) return '';
     return parsed.toLocaleDateString();
   }, [trialStatus?.trialEndDate]);
+  const sidebarTrialProgress = React.useMemo(() => {
+    const start = new Date(trialStatus?.trialStartDate || '');
+    const end = new Date(trialStatus?.trialEndDate || '');
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) return null;
+    const usedShare = (Date.now() - start.getTime()) / (end.getTime() - start.getTime());
+    return Math.round(Math.min(1, Math.max(0, usedShare)) * 100);
+  }, [trialStatus?.trialStartDate, trialStatus?.trialEndDate]);
   const sidebarTrialCard = React.useMemo(() => {
     if (subscriptionVisibilityLoading || trialStatusLoading) {
       return {
@@ -7890,7 +8019,7 @@ function ClientDashboard() {
     }
   }, [backendBase]);
 
-  // â”€â”€ State â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── State ──────────────────────────────────────────────────────────────────
   const location = useLocation();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [featureResetNonce, setFeatureResetNonce] = useState(0);
@@ -9102,7 +9231,7 @@ function ClientDashboard() {
         : String(checklistTemplateCatalog[0]?.id || '')
     ));
   }, [checklistTemplateCatalog, checklistViewTab]);
-  const useChecklistTemplate = useCallback(async (template) => {
+  const applyChecklistTemplate = useCallback(async (template) => {
     if (!template) return;
     const payload = {
       name: template.name || template.title || 'Checklist Template',
@@ -9817,7 +9946,7 @@ function ClientDashboard() {
     const location = formData.location || item?.locationName || item?.propertyName || item?.assetLocation || 'Not specified';
     const dueDate = item?.fixDeadline || item?.dueDate || item?.nextDate || item?.scheduledFor || null;
     const createdAt = item?.createdAt || item?.date || item?.nextDate || null;
-    const status = item?.status || (item?.approved ? 'IN PROGRESS' : 'PENDING') || 'â€”';
+    const status = item?.status || (item?.approved ? 'IN PROGRESS' : 'PENDING') || '—';
     const description = item?.description || item?.details || 'No description provided.';
     const assignee = isIssue
       ? (typeof getAssignedTechName === 'function'
@@ -12724,7 +12853,7 @@ function ClientDashboard() {
                           item.items.map((it, idx) => (
                             <div key={idx} className="flex items-center justify-between p-3 text-sm">
                               <div className="font-medium text-gray-900">{it.title || it.materialId || 'Item'}</div>
-                              <div className="text-gray-500 font-semibold bg-gray-100 px-2 py-0.5 rounded">Qty: {it.quantity ?? it.qty ?? 'â€”'}</div>
+                              <div className="text-gray-500 font-semibold bg-gray-100 px-2 py-0.5 rounded">Qty: {it.quantity ?? it.qty ?? '—'}</div>
                             </div>
                           ))
                         ) : (
@@ -12769,7 +12898,7 @@ function ClientDashboard() {
                             {tasks.map((task, idx) => {
                               const taskTitle = typeof task === 'string' ? task : (task.title || task.text || task.name || `Task ${idx + 1}`);
                               const taskStatus = typeof task === 'string' ? 'Open' : (task.status || (task.completed ? 'Complete' : 'Open'));
-                              const taskAssignee = typeof task === 'string' ? 'â€”' : (task.assignedTo || task.assignee || task.owner || 'â€”');
+                              const taskAssignee = typeof task === 'string' ? '—' : (task.assignedTo || task.assignee || task.owner || '—');
                               const taskDue = typeof task === 'string' ? '' : (task.dueDate || task.deadline || task.due || '');
                               return (
                                 <tr key={idx} className="text-gray-700">
@@ -12790,7 +12919,7 @@ function ClientDashboard() {
                                     </span>
                                   </td>
                                   <td className="px-4 py-3">{taskAssignee}</td>
-                                  <td className="px-4 py-3">{taskDue ? formatDateTime(taskDue) : 'â€”'}</td>
+                                  <td className="px-4 py-3">{taskDue ? formatDateTime(taskDue) : '—'}</td>
                                 </tr>
                               );
                             })}
@@ -13109,7 +13238,7 @@ function ClientDashboard() {
                           <div key={f.id || `file-${idx}`} className="border border-gray-200 rounded-xl p-4 bg-white/70 flex items-center justify-between gap-3">
                             <div>
                               <div className="text-sm font-semibold text-gray-800">{f.name || `File ${idx + 1}`}</div>
-                              <div className="text-xs text-gray-500">{f.type || 'File'}{sizeLabel ? ` â€¢ ${sizeLabel}` : ''}</div>
+                              <div className="text-xs text-gray-500">{f.type || 'File'}{sizeLabel ? ` • ${sizeLabel}` : ''}</div>
                             </div>
                             {f.url ? (
                               <a href={f.url} target="_blank" rel="noreferrer" className="text-xs text-blue-600 font-semibold">Open</a>
@@ -13145,7 +13274,7 @@ function ClientDashboard() {
                           <div key={act.id || `activity-${idx}`} className="p-4 rounded-xl border border-gray-200 bg-white/70">
                             <div className="flex items-center justify-between">
                               <div className="text-sm font-semibold text-gray-800">{act.action || 'Update'}</div>
-                              <div className="text-xs text-gray-500">{when ? formatDateTime(when) : 'â€”'}</div>
+                              <div className="text-xs text-gray-500">{when ? formatDateTime(when) : '—'}</div>
                             </div>
                             {act.detail && <p className="text-xs text-gray-600 mt-2">{act.detail}</p>}
                             {(actorLabel || act.source === 'local') && (
@@ -14468,7 +14597,7 @@ function ClientDashboard() {
 
           
 
-  // â”€â”€ Helper Functions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Helper Functions ───────────────────────────────────────────────────────
   const getCurrentUser = useCallback(() => {
     try {
       const stored = localStorage.getItem('user');
@@ -15355,7 +15484,7 @@ function ClientDashboard() {
     }
   }, [activeTab]);
 
-  // â”€â”€ Data fetching â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Data fetching ──────────────────────────────────────────────────────────
   const fetchIssues = useCallback(async (context = {}) => {
     try {
       const res = await api.get('/api/issues');
@@ -18077,10 +18206,10 @@ function ClientDashboard() {
 
   // Resolve property name from issue (fallback to lookup by id)
   const getPropertyName = useCallback((issue) => {
-    if (!issue) return 'â€”';
+    if (!issue) return '—';
     if (issue.property && (issue.property.name || issue.property.title)) return issue.property.name || issue.property.title;
     const pid = extractId(issue.propertyId) || (issue.property && (issue.property.id || issue.property._id));
-    if (!pid) return 'â€”';
+    if (!pid) return '—';
     const p = properties.find(pp => {
       const ids = [pp._id, pp.id].filter(Boolean).map(String);
       return ids.includes(String(pid));
@@ -18115,10 +18244,10 @@ function ClientDashboard() {
       return String(firstNamedAssignee.name || firstNamedAssignee.fullName || firstNamedAssignee.email || firstNamedAssignee.label).trim();
     }
 
-    if (!issue) return 'â€”';
+    if (!issue) return '—';
     if (issue.assignedTo && typeof issue.assignedTo === 'object' && (issue.assignedTo.name || issue.assignedTo.fullName)) return issue.assignedTo.name || issue.assignedTo.fullName;
     const aid = extractId(issue.assignedTo) || extractId(issue.technician) || (issue.assignedTo && String(issue.assignedTo));
-    if (!aid) return 'â€”';
+    if (!aid) return '—';
     const matchesAssigned = (entry) => [entry?._id, entry?.id, entry?.userId, entry?.email, entry?.phone].filter(Boolean).map(String).includes(String(aid));
     // Look in internal technicians first
     let tech = internalTechnicians.find(matchesAssigned);
@@ -18392,7 +18521,8 @@ function ClientDashboard() {
 
     try {
       if (role === 'internal') {
-        await api.post('/api/internal-technicians/invite', { email, propertyId: loc || undefined });
+        // Internal technicians join as company users with the technician role.
+        await api.post('/api/users/invite', { email, role: 'technician' });
         alert('Invitation sent (internal)');
       } else {
         await api.post('/api/technicians/invite', { email, categories: [] });
@@ -18403,7 +18533,7 @@ function ClientDashboard() {
     }
   }, []);
 
-  // â”€â”€ Last 7 days chart â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Last 7 days chart ─────────────────────────────────────────────────────
   const last7 = Array.from({ length: 7 }).map((_, i) => {
     const day = new Date();
     day.setHours(0, 0, 0, 0);
@@ -19691,11 +19821,13 @@ function ClientDashboard() {
       legend: {
         position: 'bottom',
         labels: {
-          color: '#475569',
+          color: '#1f2937',
           usePointStyle: true,
-          boxWidth: 10,
-          boxHeight: 10,
-          font: { size: 12, weight: '600' },
+          pointStyle: 'circle',
+          boxWidth: 9,
+          boxHeight: 9,
+          padding: 16,
+          font: { size: 13, weight: '500' },
         },
       },
       tooltip: {
@@ -19707,6 +19839,8 @@ function ClientDashboard() {
     },
     scales: {
       x: {
+        // offset keeps the first/last bar (and line point) from being cut off at the chart edge
+        offset: true,
         grid: { display: false },
         ticks: { color: '#64748b', maxRotation: 0 },
         border: { display: false },
@@ -19714,7 +19848,7 @@ function ClientDashboard() {
       y: {
         beginAtZero: true,
         ticks: { color: '#64748b', precision: 0 },
-        grid: { color: '#e2e8f0' },
+        grid: { display: false },
         border: { display: false },
       },
     },
@@ -19726,11 +19860,13 @@ function ClientDashboard() {
       legend: {
         position: 'bottom',
         labels: {
-          color: '#475569',
+          color: '#1f2937',
           usePointStyle: true,
-          boxWidth: 10,
-          boxHeight: 10,
-          font: { size: 12, weight: '600' },
+          pointStyle: 'circle',
+          boxWidth: 9,
+          boxHeight: 9,
+          padding: 14,
+          font: { size: 13, weight: '500' },
         },
       },
       tooltip: {
@@ -19740,20 +19876,20 @@ function ClientDashboard() {
         padding: 12,
       },
     },
-    cutout: '62%',
+    cutout: 0,
   }), []);
   const dashboardStatusChartData = React.useMemo(() => ({
     labels: ['Open', 'Pending', 'In Progress', 'Completed', 'Overdue'],
     datasets: [{
       label: 'Items',
       data: [combinedOpen, combinedPending, combinedInProgress, combinedCompleted, combinedOverdue],
-      backgroundColor: ['#64748b', '#f59e0b', '#2563eb', '#10b981', '#e11d48'],
+      backgroundColor: ['#2f80ed', '#fbbf24', '#7c3aed', '#28a745', '#f0508c'],
       borderColor: '#ffffff',
-      borderWidth: 2,
+      borderWidth: 1,
     }],
   }), [combinedCompleted, combinedInProgress, combinedOpen, combinedOverdue, combinedPending]);
   const dashboardTaskChartData = React.useMemo(() => {
-    const source = taskCardItems.length > 0 ? taskCardItems : SAMPLE_TASKS;
+    const source = taskCardItems;
     const counts = ['upcoming', 'in-progress', 'overdue', 'completed'].map((status) => (
       source.filter((task) => String(task.status || '').toLowerCase() === status).length
     ));
@@ -19762,9 +19898,10 @@ function ClientDashboard() {
       datasets: [{
         label: 'Tasks',
         data: counts,
-        backgroundColor: ['#60a5fa', '#2563eb', '#e11d48', '#10b981'],
-        borderRadius: 10,
+        backgroundColor: ['#0e9aa7', '#7c3aed', '#f0508c', '#28a745'],
+        borderRadius: { topLeft: 8, topRight: 8 },
         borderSkipped: false,
+        maxBarThickness: 44,
       }],
     };
   }, [taskCardItems]);
@@ -19797,21 +19934,25 @@ function ClientDashboard() {
         {
           label: 'Work Orders',
           data: workOrderSeries,
-          borderColor: '#2563eb',
-          backgroundColor: 'rgba(37, 99, 235, 0.16)',
-          tension: 0.35,
-          borderWidth: 3,
-          pointRadius: 3,
-          fill: true,
+          borderColor: '#1b2559',
+          backgroundColor: '#e53935',
+          pointBackgroundColor: '#e53935',
+          pointBorderColor: '#e53935',
+          tension: 0,
+          borderWidth: 1.5,
+          pointRadius: 4,
+          fill: false,
         },
         {
           label: 'Requests',
           data: requestSeries,
-          borderColor: '#f59e0b',
-          backgroundColor: 'rgba(245, 158, 11, 0.16)',
-          tension: 0.35,
-          borderWidth: 3,
-          pointRadius: 3,
+          borderColor: '#0e9aa7',
+          backgroundColor: '#0e9aa7',
+          pointBackgroundColor: '#0e9aa7',
+          pointBorderColor: '#0e9aa7',
+          tension: 0,
+          borderWidth: 1.5,
+          pointRadius: 4,
           fill: false,
         },
       ],
@@ -21894,12 +22035,7 @@ function ClientDashboard() {
   ];
 
   return (
-    <div className="glass-theme-blue relative h-screen overflow-hidden text-slate-900" style={{ fontFamily: "'DM Sans', 'Segoe UI', system-ui, sans-serif" }}>
-      <div className="video-background-container">
-        <video autoPlay loop muted playsInline className="video-background text-transparent">
-          <source src={backgroundVideo} type="video/mp4" />
-        </video>
-      </div>
+    <div className="glass-theme-blue oti-dash relative h-screen overflow-hidden text-slate-900">
       <div className="relative z-10 flex h-screen overflow-hidden">
         {/* Mobile Backdrop */}
         {isMobileMenuOpen && (
@@ -21909,124 +22045,34 @@ function ClientDashboard() {
           />
         )}
 
-      {/* â”€â”€ Sidebar â”€â”€ */}
-      <aside className={`glass-surface-strong fixed inset-y-0 left-0 z-50 flex h-screen shrink-0 flex-col overflow-hidden border-r border-white/20 transition-transform duration-300 md:sticky md:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`} style={{ width: 236 }}>
-        <div style={{ padding: '16px', borderBottom: '1px solid rgba(255,255,255,0.12)' }}>
-          <div className="flex items-center justify-between gap-4">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ width: 32, height: 32, background: 'linear-gradient(135deg,#1D4ED8,#3B82F6)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <svg width="16" height="16" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-                  <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" /><polyline points="9 22 9 12 15 12 15 22" />
-                </svg>
-              </div>
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: 'white', lineHeight: 1.2 }}>FixNest ID</div>
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>Company operations hub</div>
-              </div>
-            </div>
-            <button 
-              onClick={() => setIsMobileMenuOpen(false)}
-              className="md:hidden p-2 text-white/70 hover:text-white"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          </div>
+      {/* ── Sidebar ── */}
+      <aside className={`glass-surface-strong oti-sidebar fixed inset-y-0 left-0 z-50 flex h-screen shrink-0 flex-col overflow-hidden transition-transform duration-300 md:sticky md:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`} style={{ width: 240 }}>
+        {/* Brand */}
+        <div className="oti-sb-brand">
+          <img src={companyLogoLightAsset} alt="FixNest" className="oti-sb-logo" />
+          <button type="button" onClick={() => setIsMobileMenuOpen(false)} className="oti-sb-close md:hidden" aria-label="Close menu">
+            <X className="h-5 w-5" />
+          </button>
         </div>
 
-        {/* User */}
-        <div style={{ padding: '12px 16px', borderBottom: '1px solid #F3F4F6' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 34, height: 34, borderRadius: '50%', background: 'linear-gradient(135deg,#EFF6FF,#DBEAFE)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#1D4ED8', flexShrink: 0 }}>
-              {(userName || 'U').charAt(0).toUpperCase()}
-            </div>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{userName}</div>
-              <div style={{ fontSize: 11, color: '#9CA3AF', textTransform: 'capitalize' }}>{getDashboardRoleLabel(currentUser?.role, 'Administrator')}</div>
-              <div style={{ fontSize: 11, color: '#6B7280', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {currentUser?.companyName || 'No company'}
-              </div>
-              <div style={{ fontSize: 10, color: '#9CA3AF', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                Company ID: {currentUser?.companyId || currentUser?.id || currentUser?._id || '—'}
-              </div>
-            </div>
-          </div>
-        </div>
-        {!trialStatusLoading && isInTrial && !hasPaidSubscription && (
-          <div style={{ padding: '12px 16px', borderBottom: '1px solid #F3F4F6' }}>
-            <button
-              type="button"
-              onClick={() => handleSidebarTabNavigation('subscription')}
-              style={{
-                width: '100%',
-                border: `1px solid ${sidebarTrialCard.border}`,
-                background: sidebarTrialCard.background,
-                borderRadius: 12,
-                padding: '12px',
-                textAlign: 'left',
-                cursor: 'pointer',
-                boxShadow: '0 6px 18px rgba(15, 23, 42, 0.08)',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                <div>
-                  <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: sidebarTrialCard.accent }}>
-                    {sidebarTrialCard.title}
-                  </div>
-                  <div style={{ marginTop: 4, fontSize: 22, fontWeight: 800, color: '#0F172A', lineHeight: 1 }}>
-                    {sidebarTrialCard.value}
-                  </div>
-                  <div style={{ marginTop: 6, fontSize: 11, color: '#475569' }}>
-                    {sidebarTrialCard.subtitle}
-                  </div>
-                  {sidebarTrialEndLabel ? (
-                    <div style={{ marginTop: 4, fontSize: 10, color: '#64748B' }}>
-                      Ends on {sidebarTrialEndLabel}
-                    </div>
-                  ) : null}
-                </div>
-                <div style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 10,
-                  background: sidebarTrialCard.iconBg,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: sidebarTrialCard.accent,
-                  flexShrink: 0,
-                }}>
-                  <Clock className="h-4 w-4" />
-                </div>
-              </div>
-            </button>
-          </div>
-        )}
-        <div style={{ padding: '10px 16px', borderBottom: '1px solid #F3F4F6' }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
-            {t("language.label")}
-          </div>
-          <select
-            value={language}
-            onChange={(e) => setLanguage(e.target.value)}
-            style={{ width: '100%', padding: '6px 8px', fontSize: 12, borderRadius: 8, border: '1px solid #E5E7EB', color: '#111827', background: 'white' }}
-          >
-            <option value="en">{t("language.english")}</option>
-            <option value="fr">{t("language.french")}</option>
-            <option value="rw">{t("language.kinyarwanda")}</option>
-          </select>
-        </div>
+        {/* Company */}
+        <button type="button" className="oti-sb-company" onClick={openCompanyProfileModal} title="View company profile">
+          <span className="oti-sb-avatar">{(currentUser?.companyName || userName || 'C').charAt(0).toUpperCase()}</span>
+          <span className="oti-sb-company-text">
+            <span className="oti-sb-company-name">{currentUser?.companyName || 'No company'}</span>
+            <span className="oti-sb-company-role">{getDashboardRoleLabel(currentUser?.role, 'Administrator')}</span>
+          </span>
+        </button>
 
         {/* Nav */}
-        <div className="custom-scrollbar flex-1 overflow-y-auto" style={{ padding: '12px 10px' }}>
+        <div className="custom-scrollbar oti-sb-nav flex-1 overflow-y-auto">
           <nav>
           {navItems.filter(n => !n.group).map(({ key, label, icon }) => (
             <NavItem key={key} label={label} icon={icon} badge={navBadgeCounts[key]} active={activeTab === key} onClick={() => handleSidebarTabNavigation(key)} />
           ))}
           {navSections.map(section => (
             <div key={section.key}>
-              <div style={{ marginTop: 12, marginBottom: 4, padding: '0 6px', fontSize: 10, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                {section.label}
-              </div>
+              <div className="oti-sb-section">{section.label}</div>
               {navItems.filter(n => n.group === section.key).map(({ key, label, icon }) => (
                 <NavItem key={key} label={label} icon={icon} badge={navBadgeCounts[key]} active={activeTab === key} onClick={() => handleSidebarTabNavigation(key)} />
               ))}
@@ -22035,35 +22081,42 @@ function ClientDashboard() {
           </nav>
         </div>
 
+        {/* Plan: trial status + upgrade, in one compact box */}
         {!subscriptionVisibilityLoading && !hasPaidSubscription && (
-          <div style={{ padding: '0 12px 12px' }}>
-            <button
-              onClick={() => handleSidebarTabNavigation('subscription')}
-              style={{
-                width: '100%',
-                padding: '10px',
-                borderRadius: '10px',
-                background: 'linear-gradient(135deg, #d3ac2a 0%, #b89624 100%)',
-                color: 'white',
-                fontWeight: '700',
-                fontSize: '13px',
-                border: 'none',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                boxShadow: '0 4px 12px rgba(211, 172, 42, 0.2)'
-              }}
-            >
+          <div className="oti-sb-plan">
+            {!trialStatusLoading && (isInTrial || hasExpired) && (
+              <div className="oti-sb-plan-row">
+                <span>Free trial</span>
+                <strong className={hasExpired ? 'is-expired' : (daysRemaining <= 2 ? 'is-ending' : '')}>
+                  {hasExpired ? 'Expired' : `${daysRemaining} day${daysRemaining === 1 ? '' : 's'} left`}
+                </strong>
+              </div>
+            )}
+            {!trialStatusLoading && isInTrial && sidebarTrialProgress !== null && (
+              <div className="oti-sb-plan-bar" title={sidebarTrialEndLabel ? `Ends on ${sidebarTrialEndLabel}` : undefined}>
+                <span style={{ width: `${sidebarTrialProgress}%` }} />
+              </div>
+            )}
+            <button type="button" className="oti-sb-upgrade" onClick={() => handleSidebarTabNavigation('subscription')}>
               <Zap className="h-4 w-4" />
-              Upgrade Plan
+              Upgrade plan
             </button>
           </div>
         )}
 
+        {/* Language */}
+        <label className="oti-sb-lang">
+          <Globe className="h-4 w-4" aria-hidden="true" />
+          <span className="sr-only">{t("language.label")}</span>
+          <select value={language} onChange={(e) => setLanguage(e.target.value)} aria-label={t("language.label")}>
+            <option value="en">{t("language.english")}</option>
+            <option value="fr">{t("language.french")}</option>
+            <option value="rw">{t("language.kinyarwanda")}</option>
+          </select>
+        </label>
+
         {/* Bottom actions */}
-        <div style={{ padding: '14px 12px', borderTop: '1px solid #E5E7EB', background: 'rgba(255,255,255,0.72)', backdropFilter: 'blur(12px)' }}>
+        <div className="oti-sb-footer">
           <input type="file" ref={importFileRef} accept=".csv" onChange={(e) => {
             const f = e.target.files?.[0];
             if (!f) return;
@@ -22079,34 +22132,21 @@ function ClientDashboard() {
             if (!f) return;
             handleImportAssetsFile(f);
           }} style={{ display: 'none' }} />
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-            <button
-              type="button"
-              onClick={() => handleSidebarTabNavigation('dashboard')}
-              title="Dashboard"
-              style={{ width: 42, height: 42, borderRadius: 12, border: activeTab === 'dashboard' ? '1px solid #CBD5E1' : '1px solid transparent', background: activeTab === 'dashboard' ? 'white' : 'transparent', color: activeTab === 'dashboard' ? '#334155' : '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: activeTab === 'dashboard' ? '0 6px 16px rgba(15,23,42,0.08)' : 'none' }}
-            >
-              <LayoutDashboard className="h-5 w-5" />
+          <div className="oti-sb-footer-row">
+            <button type="button" title="Help" aria-label="Help" onClick={() => setShowHelpModal(true)}>
+              <AlertCircle className="h-4 w-4" />
             </button>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <button type="button" title="Help" onClick={() => setShowHelpModal(true)} style={{ width: 34, height: 34, borderRadius: 999, border: 'none', background: 'transparent', color: '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <AlertCircle className="h-4 w-4" />
-              </button>
-              <button type="button" title="Contact" onClick={() => setShowContactSupportModal(true)} style={{ width: 34, height: 34, borderRadius: 999, border: 'none', background: 'transparent', color: '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <MessageSquare className="h-4 w-4" />
-              </button>
-              <button type="button" title="Subscription" onClick={() => handleSidebarTabNavigation('subscription')} style={{ width: 34, height: 34, borderRadius: 999, border: 'none', background: 'transparent', color: activeTab === 'subscription' ? '#2563EB' : '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Icon.Subscription />
-              </button>
-              <button type="button" title="Settings" onClick={() => setShowRequestSettingsModal(true)} style={{ width: 34, height: 34, borderRadius: 999, border: 'none', background: 'transparent', color: '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Settings className="h-4 w-4" />
-              </button>
-            </div>
+            <button type="button" title="Contact support" aria-label="Contact support" onClick={() => setShowContactSupportModal(true)}>
+              <MessageSquare className="h-4 w-4" />
+            </button>
+            <button type="button" title="Settings" aria-label="Settings" onClick={() => setShowRequestSettingsModal(true)}>
+              <Settings className="h-4 w-4" />
+            </button>
           </div>
         </div>
       </aside>
 
-      {/* â”€â”€ Main â”€â”€ */}
+      {/* ── Main ── */}
       <main className="flex min-w-0 flex-1 flex-col h-screen overflow-hidden">
 
         {/* Top bar */}
@@ -22118,11 +22158,15 @@ function ClientDashboard() {
             >
               {navItems.find(n => n.key === activeTab)?.icon || <LayoutDashboard className="h-6 w-6" />}
             </button>
-            <h1 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#111827' }} className="truncate">
+            <h1 className="oti-page-title truncate">
               {navItems.find(n => n.key === activeTab)?.label || t("manager.sidebar.dashboard")}
             </h1>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, position: 'relative' }}>
+            <div className="oti-topbar-user">
+              <div className="oti-topbar-email">{currentUser?.email || userName}</div>
+              <div className="oti-topbar-role">{getDashboardRoleLabel(currentUser?.role, 'Administrator')}</div>
+            </div>
             <div style={{ position: 'relative' }}>
               <button
                 type="button"
@@ -22211,55 +22255,11 @@ function ClientDashboard() {
           </div>
         </header>
 
-        {/* Reminder panel */}
-        {reminders.length > 0 && showReminderPanel && (
-          <div style={{ background: '#FFFBEB', borderBottom: '1px solid #FDE68A', padding: '12px 28px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700, color: '#92400E', fontSize: 13 }}>
-                <Icon.Alert />
-                {reminders.length} upcoming maintenance item{reminders.length > 1 ? 's' : ''} due within 24 hours
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <Btn size="sm" variant="ghost" onClick={snoozeAll}>Snooze All 1h</Btn>
-                <Btn size="sm" variant="ghost" onClick={dismissAll}>Dismiss All</Btn>
-                <button onClick={() => setShowReminderPanel(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF', display: 'flex', padding: 4 }}><Icon.X /></button>
-              </div>
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {reminders.map(r => {
-                const id = r._id || r.id;
-                return (
-                  <div key={id} style={{ background: 'white', border: '1px solid #FDE68A', borderRadius: 8, padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 10, fontSize: 12 }}>
-                    <span style={{ fontWeight: 600, color: '#111827' }}>{r.name || r.title || 'Maintenance'}</span>
-                    <span style={{ color: '#9CA3AF' }}>{r.nextDate ? new Date(r.nextDate).toLocaleDateString() : ''}</span>
-                    <button onClick={() => snoozeOne(id)} style={{ fontSize: 11, background: '#FEF3C7', border: 'none', borderRadius: 4, padding: '2px 7px', cursor: 'pointer', color: '#92400E', fontWeight: 600 }}>Snooze</button>
-                    <button onClick={() => dismissOne(id)} style={{ fontSize: 11, background: '#F3F4F6', border: 'none', borderRadius: 4, padding: '2px 7px', cursor: 'pointer', color: '#374151', fontWeight: 600 }}>Dismiss</button>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
         {/* Content */}
         <div className={`flex-1 overflow-y-auto ${activeTab === 'analytics' ? 'px-3 xs:px-4 sm:px-6 md:px-8 lg:px-10 pb-3 xs:pb-4 sm:pb-6 md:pb-8 lg:pb-10 pt-0' : 'responsive-padding'}`}>
 
           {activeTab === 'dashboard' && (
             <div>
-              {/* Welcome */}
-              <div className="glass-surface responsive-card mb-6 text-gray-900 flex items-center justify-between overflow-hidden relative shadow-2xl border border-gray-200/70">
-                <div style={{ position: 'absolute', right: -30, top: -30, width: 180, height: 180, borderRadius: '50%', background: 'rgba(255,255,255,0.05)' }} />
-                <div style={{ position: 'absolute', right: 40, bottom: -50, width: 220, height: 220, borderRadius: '50%', background: 'rgba(255,255,255,0.05)' }} />
-                <div style={{ position: 'relative' }}>
-                  <div style={{ fontSize: 13, opacity: 0.7, marginBottom: 4, color: '#4B5563' }}>{new Date().toLocaleDateString('en', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</div>
-                  <h2 style={{ margin: 0, fontSize: 26, fontWeight: 800, letterSpacing: '-0.02em', color: '#111827' }}>Welcome back, {userName.split(' ')[0]}!</h2>
-                  <p style={{ margin: '6px 0 0', opacity: 0.8, fontSize: 14, color: '#374151' }}>Here's your property activity overview.</p>
-                </div>
-                <div style={{ display: 'flex', gap: 10, position: 'relative', flexShrink: 0 }}>
-                  <Btn onClick={() => setActiveTab('requests')} style={{ background: '#1D4ED8', color: 'white', border: '1px solid #1D4ED8' }}>View Requests</Btn>
-                </div>
-              </div>
-
               {/* Stats */}
               <div className="responsive-grid-auto mb-6">
                 <StatCard label="Open" value={combinedOpen} sub="Ready to start" accent="slate" onClick={() => openDashboardStatusView('OPEN')}
@@ -22274,61 +22274,38 @@ function ClientDashboard() {
                   icon={<svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>} />
               </div>
 
-              <div className="mb-6 grid gap-6 xl:grid-cols-[1.35fr_0.85fr_0.85fr]">
-                <div className="glass-surface rounded-2xl border border-gray-200/70 p-6 shadow-xl">
-                  <div className="mb-5 flex items-start justify-between gap-4">
-                    <div>
-                      <div className="text-[20px] font-extrabold text-gray-900">Activity Trend</div>
-                      <div className="mt-1 text-[13px] text-gray-500">Requests and work orders created over the last 7 days.</div>
-                    </div>
-                    <button type="button" onClick={() => setActiveTab('analytics')} className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50">
-                      Analytics
+              <div className="mb-6 grid gap-6 xl:grid-cols-3">
+                <DashChartCard
+                  title="Activity Trend"
+                  subtitle="Requests and work orders created over the last 7 days."
+                  action={(
+                    <button type="button" title="Open Analytics" aria-label="Open Analytics" onClick={() => setActiveTab('analytics')}>
+                      <SlidersHorizontal className="h-4 w-4" />
                     </button>
-                  </div>
-                  <div className="h-[280px]">
-                    <Chart type="line" data={dashboardActivityTrendData} options={dashboardChartOptions} />
-                  </div>
-                </div>
+                  )}
+                >
+                  <Chart type="line" data={dashboardActivityTrendData} options={dashboardChartOptions} style={{ height: '100%' }} />
+                </DashChartCard>
 
-                <div className="glass-surface rounded-2xl border border-gray-200/70 p-6 shadow-xl">
-                  <div className="mb-5">
-                    <div className="text-[20px] font-extrabold text-gray-900">Status Mix</div>
-                    <div className="mt-1 text-[13px] text-gray-500">Current operational load by status.</div>
-                  </div>
-                  <div className="h-[280px]">
-                    <Chart type="doughnut" data={dashboardStatusChartData} options={dashboardDoughnutOptions} />
-                  </div>
-                </div>
-
-                <div className="glass-surface rounded-2xl border border-gray-200/70 p-6 shadow-xl">
-                  <div className="mb-5">
-                    <div className="text-[20px] font-extrabold text-gray-900">Task Pipeline</div>
-                    <div className="mt-1 text-[13px] text-gray-500">Upcoming, active, overdue, and completed tasks.</div>
-                  </div>
-                  <div className="h-[280px]">
-                    <Chart type="bar" data={dashboardTaskChartData} options={dashboardChartOptions} />
-                  </div>
-                </div>
-              </div>
-
-              {combinedOverdue > 0 && (
-                <div className="mb-6 rounded-2xl border border-rose-200 bg-gradient-to-r from-rose-50 to-white p-5 shadow-sm">
-                  <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                    <div>
-                      <div className="text-[11px] font-black uppercase tracking-[0.22em] text-rose-600">Attention Needed</div>
-                      <div className="mt-1 text-lg font-bold text-rose-900">
-                        {combinedOverdue} overdue {combinedOverdue === 1 ? 'item needs' : 'items need'} attention.
-                      </div>
-                      <div className="mt-1 text-sm text-rose-700/80">
-                        Review overdue work orders and requests before they fall further behind.
-                      </div>
+                <DashChartCard title="Status Mix" subtitle="Current operational load by status.">
+                  {combinedOpen + combinedPending + combinedInProgress + combinedCompleted + combinedOverdue > 0 ? (
+                    <Chart type="pie" data={dashboardStatusChartData} options={dashboardDoughnutOptions} style={{ height: '100%' }} />
+                  ) : (
+                    <div className="oti-chart-empty">
+                      <span className="oti-chart-empty-pie" aria-hidden="true" />
+                      No requests or work orders yet.
                     </div>
-                    <Btn onClick={() => openDashboardStatusView('OVERDUE')} style={{ background: '#E11D48', color: 'white', border: '1px solid #E11D48' }}>
-                      Review Overdue
-                    </Btn>
-                  </div>
-                </div>
-              )}
+                  )}
+                </DashChartCard>
+
+                <DashChartCard title="Task Pipeline" subtitle="Upcoming, active, overdue, and completed tasks.">
+                  {dashboardTaskChartData.datasets[0].data.some((count) => count > 0) ? (
+                    <Chart type="bar" data={dashboardTaskChartData} options={dashboardChartOptions} style={{ height: '100%' }} />
+                  ) : (
+                    <div className="oti-chart-empty">No tasks yet. Add one from My Tasks below.</div>
+                  )}
+                </DashChartCard>
+              </div>
 
               <div className="responsive-grid-2 mb-6">
                 <DashboardCardWrapper cardId="workOrders" title="My Work Orders">
@@ -22341,7 +22318,7 @@ function ClientDashboard() {
                     <Btn onClick={() => setActiveTab('workOrders')} variant="outline" className="!text-blue-700 !border-blue-200 !bg-white">Open List</Btn>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    {(combinedOverdue > 0 ? overdueOverviewItems : (workOrders.length > 0 ? workOrders.slice(0, 5) : SAMPLE_WORK_ORDERS.slice(0, 5))).map((issue) => (
+                    {(combinedOverdue > 0 ? overdueOverviewItems : workOrders.slice(0, 5)).map((issue) => (
                       <button
                         key={`dashboard-workorder-${issue._id || issue.id}`}
                         onClick={() => handleOpenRequestModal(issue)}
@@ -22469,9 +22446,9 @@ function ClientDashboard() {
                     <div style={{ textAlign: 'center', padding: '28px 16px', color: '#6B7280', fontSize: 14 }}>
                       Loading tasks...
                     </div>
-                  ) : (taskCardItems.filter(task => task.status === activeTaskTab).length > 0 || (taskCardItems.length === 0 && SAMPLE_TASKS.some(t => t.status === activeTaskTab))) ? (
+                  ) : taskCardItems.filter(task => task.status === activeTaskTab).length > 0 ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                      {(taskCardItems.length > 0 ? taskCardItems : SAMPLE_TASKS).filter(task => task.status === activeTaskTab).map((task, index) => (
+                      {taskCardItems.filter(task => task.status === activeTaskTab).map((task, index) => (
                         <div
                           key={task._id || task.id}
                           draggable={!task.linkedIssueId}
@@ -24000,7 +23977,7 @@ function ClientDashboard() {
                 <div className="glass-surface rounded-2xl border border-white/10 p-6 shadow-lg flex-1">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
                     <div>
-                      <div style={{ fontSize: 13, color: '#6B7280', fontWeight: 500 }}>Issues â€” Last 7 Days</div>
+                      <div style={{ fontSize: 13, color: '#6B7280', fontWeight: 500 }}>Issues — Last 7 Days</div>
                       <div style={{ fontSize: 22, fontWeight: 700, color: '#111827', marginTop: 2 }}>{last7.reduce((a, b) => a + b, 0)} total</div>
                     </div>
                     <div style={{ display: 'flex', gap: 8 }}>
@@ -24013,7 +23990,7 @@ function ClientDashboard() {
                       const max = Math.max(...last7, 1);
                       return (
                         <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, height: '100%', justifyContent: 'flex-end' }}>
-                          <div title={`${v} issues`} style={{ width: '100%', background: 'linear-gradient(180deg, #3B82F6, #1D4ED8)', borderRadius: '4px 4px 0 0', height: `${Math.max(4, (v / max) * 100)}%`, minHeight: 4, transition: 'height 0.4s ease' }} />
+                          <div title={`${v} issues`} style={{ width: '100%', background: '#f0508c', borderRadius: '6px 6px 0 0', height: `${Math.max(4, (v / max) * 100)}%`, minHeight: 4, transition: 'height 0.4s ease' }} />
                         </div>
                       );
                     })}
@@ -24052,7 +24029,7 @@ function ClientDashboard() {
 
               {issues.length === 0 ? (
                 <div className="text-center py-20 bg-white border border-gray-200 rounded-2xl text-gray-500 shadow-inner">
-                  {/* <div className="text-5xl mb-4 grayscale opacity-50">ðŸ“‹</div> */}
+                  {/* <div className="text-5xl mb-4 grayscale opacity-50">📋</div> */}
                   <div className="text-lg font-bold mb-1 text-gray-700">No issues found</div>
                   <div className="text-sm text-gray-500">Submit a new request to get started</div>
                 </div>
@@ -24114,7 +24091,7 @@ function ClientDashboard() {
                           {/* Assignees */}
                           {Array.isArray(issue.assignees) && issue.assignees.length > 0 && (
                             <div style={{ fontSize: 12, color: '#059669', fontWeight: 500, marginBottom: 8 }}>
-                              ðŸ‘¤ {issue.assignees.map(a => a.name || 'Unknown').join(', ')}
+                              👤 {issue.assignees.map(a => a.name || 'Unknown').join(', ')}
                             </div>
                           )}
 
@@ -24136,11 +24113,11 @@ function ClientDashboard() {
                           {(currentUser?.role === 'manager' || currentUser?.role === 'admin' || currentUser?.role === 'client' || currentUser?.role === 'requestor') && internalTechnicians.length > 0 && (
                             <div style={{ display: 'flex', gap: 8, marginTop: 10, alignItems: 'center' }}>
                               <Select style={{ flex: 1, fontSize: 12, padding: '5px 8px' }} value={(selectedTechs[id]?.internal) || ''} onChange={e => setSelectedTechs(s => ({ ...s, [id]: { ...s[id], internal: e.target.value } }))}>
-                                <option value="">Assign internal technicianâ€¦</option>
+                                <option value="">Assign internal technician…</option>
                                 {internalTechnicians.map((t, i) => <option key={`${t.id || t._id || 'internal'}-${i}`} value={t.id || t._id}>{t.name}{t.email ? ` (${t.email})` : ''}</option>)}
                               </Select>
                               <Btn size="sm" variant="primary" disabled={!selectedTechs[id]?.internal || assignLoading[id]} onClick={() => assignInternal(id, selectedTechs[id]?.internal)}>
-                                {assignLoading[id] ? 'â€¦' : 'Assign'}
+                                {assignLoading[id] ? '…' : 'Assign'}
                               </Btn>
                             </div>
                           )}
@@ -24149,11 +24126,11 @@ function ClientDashboard() {
                           {(currentUser?.role === 'manager' || currentUser?.role === 'admin') && technicians.length > 0 && (issue.status === 'APPROVED' || String(issue.status || '').toUpperCase().includes('PROGRESS')) && (
                             <div style={{ display: 'flex', gap: 8, marginTop: 8, alignItems: 'center' }}>
                               <Select style={{ flex: 1, fontSize: 12, padding: '5px 8px' }} value={(selectedTechs[id]?.external) || ''} onChange={e => setSelectedTechs(s => ({ ...s, [id]: { ...s[id], external: e.target.value } }))}>
-                                <option value="">Assign technicianâ€¦</option>
+                                <option value="">Assign technician…</option>
                                 {technicians.map((t, i) => <option key={`${t.id || t._id || 'tech'}-${i}`} value={t.id || t._id}>{t.name}{t.email ? ` (${t.email})` : ''}</option>)}
                               </Select>
                               <Btn size="sm" variant="primary" disabled={!selectedTechs[id]?.external || assignLoading[id]} onClick={() => assignToTech(id, selectedTechs[id]?.external)}>
-                                {assignLoading[id] ? 'â€¦' : 'Assign'}
+                                {assignLoading[id] ? '…' : 'Assign'}
                               </Btn>
                             </div>
                           )}
@@ -24167,6 +24144,8 @@ function ClientDashboard() {
                   })}
                 </div>
               )}
+
+              <div className="oti-dash-footer">© {new Date().getFullYear()} FixNest. All Rights Reserved.</div>
             </div>
           )}
 
@@ -24322,7 +24301,7 @@ function ClientDashboard() {
                             <div className="text-[1.35rem] font-bold text-gray-900">{selectedChecklistTemplatePreview.name}</div>
                             <button
                               type="button"
-                              onClick={() => useChecklistTemplate(selectedChecklistTemplatePreview)}
+                              onClick={() => applyChecklistTemplate(selectedChecklistTemplatePreview)}
                               className="rounded-lg bg-blue-600 px-4 py-2.5 text-[0.95rem] font-semibold text-white hover:bg-blue-700"
                             >
                               Use Template
@@ -26221,7 +26200,7 @@ function ClientDashboard() {
           {activeTab === 'vendors' && <ClientContactsTab key={`vendors-${featureResetNonce}`} type="vendor" />}
           {activeTab === 'customers' && <ClientContactsTab key={`customers-${featureResetNonce}`} type="customer" />}
 
-          {/* â”€â”€ Work Orders â”€â”€ */}
+          {/* ── Work Orders ── */}
           {activeTab === 'workOrders' && (
             <div>
               <div className="mb-6 overflow-visible rounded-[24px] border border-gray-200 bg-white shadow-sm">
@@ -26666,7 +26645,7 @@ function ClientDashboard() {
             </div>
           )}
 
-          {/* â”€â”€ Requests â”€â”€ */}
+          {/* ── Requests ── */}
           {activeTab === 'requests' && (
             <div className="overflow-hidden rounded-[24px] border border-gray-200 bg-white shadow-sm">
               <div className="flex items-center justify-between border-b border-gray-200 px-8 py-4">
@@ -27042,7 +27021,7 @@ function ClientDashboard() {
             </div>
           )}
 
-          {/* â”€â”€ Material Requests â”€â”€ */}
+          {/* ── Material Requests ── */}
           {activeTab === 'materialRequests' && (
             <div className="flex flex-col gap-6">
               <SectionHeader
@@ -27181,7 +27160,7 @@ function ClientDashboard() {
               </div>
               {filteredMaterialRequests.length === 0 ? (
                 <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 14, padding: 60, textAlign: 'center' }}>
-                  <div style={{ fontSize: 40, marginBottom: 16 }}>ðŸ“¦</div>
+                  <div style={{ fontSize: 40, marginBottom: 16 }}>📦</div>
                   <div style={{ fontWeight: 700, fontSize: 18, color: '#111827' }}>No Material Requests Found</div>
                   <p style={{ color: '#6B7280', fontSize: 14, marginTop: 4 }}>
                     {materialRequests.length === 0
@@ -27284,7 +27263,7 @@ function ClientDashboard() {
                           <div className="flex items-center gap-4 text-[11px] text-gray-400 font-bold border-t border-gray-50 pt-3 mt-3">
                             <div className="flex items-center gap-1.5">
                               <Icon.Clock style={{ width: 12, height: 12 }} />
-                              {req.createdAt ? new Date(req.createdAt).toLocaleDateString() : 'â€”'}
+                              {req.createdAt ? new Date(req.createdAt).toLocaleDateString() : '—'}
                             </div>
                             <div className="flex items-center gap-1.5 ml-auto">
                               <Icon.Alert style={{ width: 12, height: 12 }} />
@@ -27434,7 +27413,7 @@ function ClientDashboard() {
             </div>
           )}
 
-          {/* â”€â”€ Subscription â”€â”€ */}
+          {/* ── Subscription ── */}
           {showCreateMaterialRequestModal && (
             <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-4">
               <div className="w-full max-w-2xl rounded-2xl border border-gray-200 bg-white shadow-2xl">
@@ -27811,7 +27790,7 @@ function ClientDashboard() {
           )}
           {/* Tasks Tab */}
           {activeTab === 'tasks' && <TaskDashboard />}
-          {/* â”€â”€ Properties â”€â”€ */}
+          {/* ── Properties ── */}
           {activeTab === 'properties' && (
             <div className="-m-6 bg-[#f8fafc]">
               {editingProperty === null && !propertyModalOpen && (
@@ -28051,7 +28030,7 @@ function ClientDashboard() {
               </div>
               )}
 
-              {editingProperty === null && !propertyModalOpen && loading.properties && <div style={{ textAlign: 'center', padding: 40, color: '#9CA3AF' }}>Loadingâ€¦</div>}
+              {editingProperty === null && !propertyModalOpen && loading.properties && <div style={{ textAlign: 'center', padding: 40, color: '#9CA3AF' }}>Loading…</div>}
               {editingProperty === null && !propertyModalOpen && errors.properties && <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 10, padding: 14, margin: '24px', color: '#991B1B', fontSize: 13 }}>Error: {errors.properties}</div>}
 
               {/* Form */}
@@ -29248,7 +29227,7 @@ function ClientDashboard() {
               </div>
             </div>
           )}
-          {/* â”€â”€ Assets â”€â”€ */}
+          {/* ── Assets ── */}
           {activeTab === 'assets' && (
             <div className="-m-6 bg-[#f8fafc]">
                 <div className="border-b border-gray-200 bg-white">
@@ -29362,7 +29341,7 @@ function ClientDashboard() {
                   </div>
                 </div>
 
-              {loading.assets && <div style={{ textAlign: 'center', padding: 40, color: '#9CA3AF' }}>Loadingâ€¦</div>}
+              {loading.assets && <div style={{ textAlign: 'center', padding: 40, color: '#9CA3AF' }}>Loading…</div>}
               {errors.assets && <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 10, padding: 14, marginBottom: 16, color: '#991B1B', fontSize: 13 }}>Error: {errors.assets}</div>}
 
               <AssetEditorModal
@@ -30493,10 +30472,10 @@ function ClientDashboard() {
             </div>
           )}
 
-          {/* â”€â”€ Staff â”€â”€ */}
+          {/* ── Staff ── */}
           {activeTab === 'internalTechnicians' && (
             <div>
-              {loading.internalTechnicians && <div style={{ textAlign: 'center', padding: 40, color: '#9CA3AF' }}>Loadingâ€¦</div>}
+              {loading.internalTechnicians && <div style={{ textAlign: 'center', padding: 40, color: '#9CA3AF' }}>Loading…</div>}
               {errors.internalTechnicians && <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 10, padding: 14, marginBottom: 16, color: '#991B1B', fontSize: 13 }}>Error: {errors.internalTechnicians}</div>}
 
               <InviteUsersModal
@@ -31381,7 +31360,7 @@ function ClientDashboard() {
                         <Input placeholder="e.g. Plumbing, HVAC" value={techForm.specialty.join(', ')} onChange={e => setTechForm(f => ({ ...f, specialty: e.target.value.split(',').map(s => s.trim()) }))} />
                       </div>
                       <div>
-                        <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Rating (0â€“5)</label>
+                        <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Rating (0–5)</label>
                         <Input type="number" step="0.1" min="0" max="5" value={techForm.rating} onChange={e => setTechForm(f => ({ ...f, rating: parseFloat(e.target.value) || 0 }))} />
                       </div>
                       <div>
@@ -31392,7 +31371,7 @@ function ClientDashboard() {
                         <div>
                           <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Location</label>
                           <Select value={techForm.propertyId} onChange={e => setTechForm(f => ({ ...f, propertyId: e.target.value }))} required>
-                            <option value="">Select locationâ€¦</option>
+                            <option value="">Select location…</option>
                             {properties.map((p, idx) => (
                               <option key={`${p.id || p._id || 'property'}-${idx}`} value={p.id || p._id}>
                                 {p.name}
@@ -31889,7 +31868,7 @@ function ClientDashboard() {
               )}
             </div>
           )}
-          {/* â”€â”€ Parts & Inventory â”€â”€ */}
+          {/* ── Parts & Inventory ── */}
           {activeTab === 'parts' && (
             <ClientPartsTab
               key={`parts-${featureResetNonce}`}
@@ -31899,12 +31878,12 @@ function ClientDashboard() {
             />
           )}
 
-          {/* â”€â”€ Purchase Orders â”€â”€ */}
+          {/* ── Purchase Orders ── */}
           {activeTab === 'purchaseOrders' && (
             <ClientPurchaseOrdersTab key={`purchaseOrders-${featureResetNonce}`} />
           )}
 
-          {/* â”€â”€ Analytics â”€â”€ */}
+          {/* ── Analytics ── */}
           {activeTab === 'analytics' && (
             <ClientAnalyticsTab
               key={`analytics-${featureResetNonce}`}
@@ -31917,7 +31896,7 @@ function ClientDashboard() {
             />
           )}
 
-          {/* â”€â”€ Meters â”€â”€ */}
+          {/* ── Meters ── */}
           {activeTab === 'meters' && (
             <ClientMetersTab
               people={people}
@@ -31932,7 +31911,7 @@ function ClientDashboard() {
             />
           )}
 
-          {/* â”€â”€ Edge â”€â”€ */}
+          {/* ── Edge ── */}
           {activeTab === 'edge' && (
             <ClientEdgeTab properties={properties} people={people} internalTechnicians={internalTechnicians} />
           )}
@@ -32496,7 +32475,7 @@ function ClientDashboard() {
       </main>
 
 
-      {/* â”€â”€ Submit Request Modal â”€â”€ */}
+      {/* ── Submit Request Modal ── */}
       {dashboardConfirmDialog.open && (
         <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/35 p-4">
           <div className="w-full max-w-[660px] rounded-[22px] border border-gray-200 bg-white shadow-2xl">
@@ -32642,7 +32621,7 @@ function ClientDashboard() {
         currentUser={currentUser}
       />
 
-      {/* â”€â”€ Issue Assign Modal (For Client) â”€â”€ */}
+      {/* ── Issue Assign Modal (For Client) ── */}
       {issueAssignModalOpen && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 20 }}>
           <div style={{ background: 'white', borderRadius: 16, boxShadow: '0 20px 60px rgba(0,0,0,0.2)', maxWidth: 450, width: '100%', padding: 28 }}>
@@ -32660,7 +32639,7 @@ function ClientDashboard() {
                 value={selectedInternalTechForIssue}
                 onChange={e => setSelectedInternalTechForIssue(e.target.value)}
               >
-                <option value="">Select technicianâ€¦</option>
+                <option value="">Select technician…</option>
                 {internalTechnicians
                   .filter(t => {
                     const techPid = t.propertyId || (t.property && (t.property.id || t.property._id));
@@ -32691,7 +32670,7 @@ function ClientDashboard() {
         </div>
       )}
 
-      {/* â”€â”€ Assign Modal â”€â”€ */}
+      {/* ── Assign Modal ── */}
       {assignModalOpen && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 20 }}>
           <div style={{ background: 'white', borderRadius: 16, boxShadow: '0 20px 60px rgba(0,0,0,0.2)', maxWidth: 520, width: '100%', padding: 28 }}>
@@ -32705,7 +32684,7 @@ function ClientDashboard() {
 
             {assignableIssues.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '32px 24px', background: '#F9FAFB', borderRadius: 10, marginBottom: 20 }}>
-                <div style={{ fontSize: 36, marginBottom: 8 }}>ðŸ¤·</div>
+                <div style={{ fontSize: 36, marginBottom: 8 }}>🤷</div>
                 <div style={{ fontSize: 14, color: '#9CA3AF' }}>No pending issues for this property</div>
               </div>
             ) : (
@@ -34134,6 +34113,14 @@ const ClientIntelligenceTab = ({
   );
 };
 
+
+// Location label for an asset row (same rules as the Assets tab).
+const getPartAssetLocationLabel = (asset) => {
+  if (asset?.property?.name) return asset.property.name;
+  if (asset?.location?.branchName) return `${asset.location.branchName} (Branch)`;
+  if (asset?.location?.building) return asset.location.building;
+  return '';
+};
 
 const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
   const getAuthenticatedUserName = React.useCallback(() => {
@@ -36590,7 +36577,7 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
                   <td className="py-4 px-4 text-sm text-gray-600">{it.allocated || 0}</td>
                   <td className="py-4 px-4 text-sm text-gray-600">{it.onHand || 0}</td>
                   <td className="py-4 px-4 text-sm text-gray-600">{it.incoming || 0}</td>
-                  <td className="py-4 px-4 text-sm text-gray-600">{it.location || it.warehouse || 'â€”'}</td>
+                  <td className="py-4 px-4 text-sm text-gray-600">{it.location || it.warehouse || '—'}</td>
                   <td className="py-4 px-4 text-right"><button type="button" onClick={(e) => { e.stopPropagation(); openPartDetails(it); }} className="p-1.5 hover:bg-gray-100 rounded-lg"><svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg></button></td>
                 </tr>
               ))}
@@ -36861,7 +36848,7 @@ const ClientPartsTab = ({ properties = [], branches = [], people = [] }) => {
                                 <tr key={asset._id || asset.id || index} className="border-b border-gray-100">
                                   <td className="px-4 py-3 font-semibold text-gray-900">{asset.name || 'Asset'}</td>
                                   <td className="px-4 py-3 text-gray-600">{asset.type || '—'}</td>
-                                  <td className="px-4 py-3 text-gray-600">{getAssetLocationLabel(asset) || '—'}</td>
+                                  <td className="px-4 py-3 text-gray-600">{getPartAssetLocationLabel(asset) || '—'}</td>
                                   <td className="px-4 py-3 text-gray-600">{asset.location?.building || asset.location || '—'}</td>
                                 </tr>
                               ))}
@@ -38364,6 +38351,8 @@ const ClientAnalyticsTab = ({
   workOrderItems = [],
 }) => {
   const [subTab, setSubTab] = useState('team-performance');
+  // Hovered bar in the Work Order Status chart.
+  const [statusChartHover, setStatusChartHover] = useState(null);
   const [dateRange, setDateRange] = useState('Last 90 Days');
   const [showDateDropdown, setShowDateDropdown] = useState(false);
   const [customRange, setCustomRange] = useState({ start: '', end: '' });
@@ -38672,6 +38661,14 @@ const ClientAnalyticsTab = ({
       otherCost,
       totalCost,
     };
+  };
+  // Real time logged on a work order: its labor entries, or a logged-time field. Never elapsed time.
+  const extractIssueLoggedHours = (issue) => {
+    const laborEntries = Array.isArray(issue?.labor) ? issue.labor : Array.isArray(issue?.laborEntries) ? issue.laborEntries : [];
+    const fromEntries = laborEntries.reduce((sum, entry) => (
+      sum + toCostNumber(entry?.hours ?? entry?.time) + (toCostNumber(entry?.minutes) / 60) + (toCostNumber(entry?.seconds) / 3600)
+    ), 0);
+    return fromEntries || toCostNumber(issue?.timeSpent ?? issue?.totalTime ?? issue?.time ?? issue?.laborHours);
   };
   const getScheduleDueDate = (schedule) => normalizeDate(
     schedule?.nextDate ||
@@ -39001,11 +38998,20 @@ const ClientAnalyticsTab = ({
 
   const technicianLeaderboard = React.useMemo(() => {
     const counts = {};
+    const namesFromIssues = {};
     (allIssues || []).forEach((issue) => {
       if (!isCompleted(issue.status)) return;
-      const techId = issue.assignedTo || (Array.isArray(issue.assignees) && issue.assignees.length ? issue.assignees[0]?.id : null);
+      // assignedTo can be an id string or a populated user object
+      const assignee = issue.assignedTo || (Array.isArray(issue.assignees) && issue.assignees.length ? issue.assignees[0] : null);
+      if (!assignee) return;
+      const techId = typeof assignee === 'object' ? (assignee._id || assignee.id) : assignee;
       if (!techId) return;
-      counts[String(techId)] = (counts[String(techId)] || 0) + 1;
+      const key = String(techId);
+      counts[key] = (counts[key] || 0) + 1;
+      const name = typeof assignee === 'object'
+        ? (assignee.name || assignee.fullName || [assignee.firstName, assignee.lastName].filter(Boolean).join(' '))
+        : (issue.assignedToName || issue.assigneeName || '');
+      if (name && !namesFromIssues[key]) namesFromIssues[key] = name;
     });
 
     return Object.entries(counts)
@@ -39013,10 +39019,11 @@ const ClientAnalyticsTab = ({
       .slice(0, 5)
       .map(([id, count]) => {
         const tech = (technicians || []).find((item) => String(item.id || item._id) === String(id));
+        const techName = tech?.name || tech?.fullName || [tech?.firstName, tech?.lastName].filter(Boolean).join(' ');
         return {
           id,
           count,
-          name: tech?.name || tech?.fullName || 'Unassigned Technician',
+          name: techName || namesFromIssues[id] || 'Unknown technician',
         };
       });
   }, [allIssues, technicians]);
@@ -39073,9 +39080,9 @@ const ClientAnalyticsTab = ({
       // Monthly compliance data
       const issueDate = normalizeDate(issue.updatedAt || issue.createdAt);
       if (issueDate) {
-        const month = issueDate.toLocaleString('en-US', { month: 'short', year: '2-digit' });
+        const month = `${issueDate.getFullYear()}-${String(issueDate.getMonth() + 1).padStart(2, '0')}`;
         if (!monthlyData[month]) {
-          monthlyData[month] = { compliant: 0, total: 0, compliancePercent: 0 };
+          monthlyData[month] = { compliant: 0, total: 0, compliancePercent: 0, label: issueDate.toLocaleString('en-US', { month: 'short', year: '2-digit' }) };
         }
         monthlyData[month].total += 1;
         if (!issue.overdue) {
@@ -39093,7 +39100,7 @@ const ClientAnalyticsTab = ({
 
       // Hours planning
       totalEstimatedHours += Number(issue.estimatedDuration || 0);
-      const actualHours = (normalizeDate(issue.updatedAt) - normalizeDate(issue.createdAt)) / 3600000;
+      const actualHours = extractIssueLoggedHours(issue);
       totalActualHours += actualHours > 0 ? actualHours : 0;
     });
 
@@ -39117,9 +39124,9 @@ const ClientAnalyticsTab = ({
     const complianceRate = completedIssues.length ? ((compliantIssues.length / completedIssues.length) * 100).toFixed(1) : 0;
     const scheduleComplianceRate = preventiveCompleteCount ? ((scheduleCompliantCount / preventiveCompleteCount) * 100).toFixed(1) : 0;
     const monthlyTrend = Object.entries(monthlyData)
-      .sort((a, b) => new Date(a[0]) - new Date(b[0]))
-      .map(([month, data]) => ({
-        label: month,
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([, data]) => ({
+        label: data.label,
         compliance: Number(data.compliancePercent),
       }));
 
@@ -39218,7 +39225,7 @@ const ClientAnalyticsTab = ({
 
     inRangeCompleted.forEach((issue) => {
       const { laborCost, partsCost, otherCost } = extractIssueCostSummary(issue);
-      const hours = (normalizeDate(issue.updatedAt) - normalizeDate(issue.createdAt)) / 3600000;
+      const hours = extractIssueLoggedHours(issue);
       totalHours += hours > 0 ? hours : 0;
       totalPartCost += partsCost;
       totalLaborCost += laborCost;
@@ -39246,9 +39253,11 @@ const ClientAnalyticsTab = ({
       workerTimeData[worker].hours += hours > 0 ? hours : 0;
       workerTimeData[worker].laborCost += laborCost;
 
-      const month = normalizeDate(issue.updatedAt).toLocaleString('en-US', { month: 'short' });
+      const costDate = normalizeDate(issue.updatedAt);
+      if (!costDate) return;
+      const month = `${costDate.getFullYear()}-${String(costDate.getMonth() + 1).padStart(2, '0')}`;
       if (!costTrendsData[month]) {
-        costTrendsData[month] = { parts: 0, labor: 0, other: 0 };
+        costTrendsData[month] = { parts: 0, labor: 0, other: 0, label: costDate.toLocaleString('en-US', { month: 'short', year: '2-digit' }) };
       }
       costTrendsData[month].parts += partsCost;
       costTrendsData[month].labor += laborCost;
@@ -39266,9 +39275,9 @@ const ClientAnalyticsTab = ({
       .slice(0, 10);
 
     const costTrendsEntries = Object.entries(costTrendsData)
-      .sort((a, b) => new Date(a[0]) - new Date(b[0]))
-      .map(([month, data]) => ({
-        label: month,
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([, data]) => ({
+        label: data.label,
         parts: data.parts,
         labor: data.labor,
         other: data.other,
@@ -39543,7 +39552,7 @@ const ClientAnalyticsTab = ({
         .slice(0, 8),
       utilizationByLocation: toGroupedEntries(locationAgg, '#14b8a6'),
       utilizationByCategory: toGroupedEntries(categoryAgg, '#1d4ed8'),
-      utilizationSeries: utilizationSeries.map((value) => Number(value.toFixed(1))),
+      utilizationSeries: (rows.size || (assets || []).length) ? utilizationSeries.map((value) => Number(value.toFixed(1))) : utilizationSeries.map(() => 0),
       downtimeEventSeries,
     };
   }, [allIssues, assets, bucketIndexForDate, getIssueAnalyticsDate, labels, rangeEnd, rangeStart, stepDays]);
@@ -39865,7 +39874,7 @@ const ClientAnalyticsTab = ({
 
   const requestStatusChart = React.useMemo(() => {
     const items = [
-      { label: 'Approved', value: requestAnalytics.approved, color: '#10b981' },
+      { label: 'Approved', value: requestAnalytics.approved, color: '#0e9aa7' },
       { label: 'Pending', value: requestAnalytics.pending, color: '#f59e0b' },
       { label: 'Other', value: Math.max(0, requestAnalytics.submitted - requestAnalytics.approved - requestAnalytics.pending), color: '#94a3b8' },
     ];
@@ -39948,7 +39957,7 @@ const ClientAnalyticsTab = ({
         data: createdSeries,
         borderColor: '#3b82f6',
         backgroundColor: 'rgba(59, 130, 246, 0.18)',
-        tension: 0.35,
+        tension: 0,
         borderWidth: 3,
         pointRadius: 3,
         pointHoverRadius: 5,
@@ -39957,9 +39966,9 @@ const ClientAnalyticsTab = ({
       {
         label: 'Completed',
         data: completedSeries,
-        borderColor: '#10b981',
-        backgroundColor: 'rgba(16, 185, 129, 0.18)',
-        tension: 0.35,
+        borderColor: '#0e9aa7',
+        backgroundColor: 'rgba(14, 154, 167, 0.12)',
+        tension: 0,
         borderWidth: 3,
         pointRadius: 3,
         pointHoverRadius: 5,
@@ -40035,9 +40044,9 @@ const ClientAnalyticsTab = ({
       {
         label: 'Response Time (hrs)',
         data: responseStats.series,
-        borderColor: '#2563eb',
-        backgroundColor: 'rgba(37, 99, 235, 0.16)',
-        tension: 0.35,
+        borderColor: '#1b2559',
+        backgroundColor: 'rgba(27, 37, 89, 0.08)',
+        tension: 0,
         borderWidth: 3,
         pointRadius: 3,
         pointHoverRadius: 5,
@@ -40051,9 +40060,9 @@ const ClientAnalyticsTab = ({
       {
         label: 'Cycle Time (hrs)',
         data: cycleStats.series,
-        borderColor: '#10b981',
-        backgroundColor: 'rgba(16, 185, 129, 0.16)',
-        tension: 0.35,
+        borderColor: '#0e9aa7',
+        backgroundColor: 'rgba(14, 154, 167, 0.12)',
+        tension: 0,
         borderWidth: 3,
         pointRadius: 3,
         pointHoverRadius: 5,
@@ -40079,8 +40088,11 @@ const ClientAnalyticsTab = ({
       ...baseLineChartOptions.scales,
       y: {
         ...baseLineChartOptions.scales.y,
+        // whole hours only, so an empty chart doesn't print 0h,0h,…,1h,1h
+        suggestedMax: 1,
         ticks: {
           ...baseLineChartOptions.scales.y.ticks,
+          precision: 0,
           callback: (value) => `${compactAxisNumber(value)}h`,
         },
       },
@@ -40094,7 +40106,7 @@ const ClientAnalyticsTab = ({
         data: costSummary.weeklyTotals.map((entry) => entry.all),
         borderColor: '#111827',
         backgroundColor: 'rgba(17, 24, 39, 0.14)',
-        tension: 0.35,
+        tension: 0,
         borderWidth: 3,
         pointRadius: 3,
         pointHoverRadius: 5,
@@ -40103,9 +40115,9 @@ const ClientAnalyticsTab = ({
       {
         label: 'Preventive',
         data: costSummary.weeklyTotals.map((entry) => entry.preventive),
-        borderColor: '#2563eb',
-        backgroundColor: 'rgba(37, 99, 235, 0.14)',
-        tension: 0.35,
+        borderColor: '#1b2559',
+        backgroundColor: 'rgba(27, 37, 89, 0.08)',
+        tension: 0,
         borderWidth: 3,
         pointRadius: 3,
         pointHoverRadius: 5,
@@ -40116,7 +40128,7 @@ const ClientAnalyticsTab = ({
         data: costSummary.weeklyTotals.map((entry) => entry.reactive),
         borderColor: '#0f766e',
         backgroundColor: 'rgba(15, 118, 110, 0.14)',
-        tension: 0.35,
+        tension: 0,
         borderWidth: 3,
         pointRadius: 3,
         pointHoverRadius: 5,
@@ -40192,9 +40204,9 @@ const ClientAnalyticsTab = ({
       {
         label: 'Requests',
         data: requestsOverTimeSeries,
-        borderColor: '#2563eb',
-        backgroundColor: 'rgba(37, 99, 235, 0.16)',
-        tension: 0.35,
+        borderColor: '#1b2559',
+        backgroundColor: 'rgba(27, 37, 89, 0.08)',
+        tension: 0,
         borderWidth: 3,
         pointRadius: 3,
         pointHoverRadius: 5,
@@ -40254,7 +40266,7 @@ const ClientAnalyticsTab = ({
     (workOrderItems || []).forEach((issue) => {
       const bucketIndex = bucketIndexForDate(issue?.updatedAt || getIssueAnalyticsDate(issue));
       if (bucketIndex < 0) return;
-      buckets[bucketIndex] += Number(issue?.timeSpent || issue?.time || issue?.totalTime || issue?.estimatedDuration || issue?.estimatedHours || 0) || 0;
+      buckets[bucketIndex] += extractIssueLoggedHours(issue);
     });
     return buckets.map((value) => Number(value.toFixed(1)));
   }, [bucketIndexForDate, getIssueAnalyticsDate, labels, workOrderItems]);
@@ -40354,7 +40366,7 @@ const ClientAnalyticsTab = ({
     ];
   }, []);
   const activeDashboardLabel = selectedDashboardView === 'default'
-    ? subTabs.find((tab) => tab.id === subTab)?.label
+    ? (dashboardCatalog.find((dashboard) => dashboard.id === subTab)?.label || subTabs[0].label)
     : customDashboards.find((dashboard) => dashboard.id === selectedDashboardView)?.name || 'Custom Dashboard';
   const selectedCustomDashboard = selectedDashboardView === 'default'
     ? null
@@ -40372,10 +40384,10 @@ const ClientAnalyticsTab = ({
   ), []);
 
   const metricCards = [
-    { label: 'Created', value: statusCounts.total, tone: 'border-blue-200 bg-blue-50 text-blue-700' },
-    { label: 'Completed', value: statusCounts.completed, tone: 'border-emerald-200 bg-emerald-50 text-emerald-700' },
-    { label: 'Pending', value: statusCounts.pending, tone: 'border-amber-200 bg-amber-50 text-amber-700' },
-    { label: 'Overdue', value: statusCounts.overdue, tone: 'border-rose-200 bg-rose-50 text-rose-700' },
+    { label: 'Created', value: statusCounts.total, color: '#2f80ed', icon: <ClipboardList /> },
+    { label: 'Completed', value: statusCounts.completed, color: '#28a745', icon: <CheckCircle /> },
+    { label: 'Pending', value: statusCounts.pending, color: '#e8711a', icon: <Clock /> },
+    { label: 'Overdue', value: statusCounts.overdue, color: '#c0392b', icon: <AlertCircle /> },
   ];
   const completionTrendRows = React.useMemo(
     () => labels.map((label, index) => ({
@@ -40386,7 +40398,7 @@ const ClientAnalyticsTab = ({
     [labels, createdSeries, completedSeries]
   );
   const workOrderStatusBars = [
-    { key: 'completed', label: 'Completed', value: statusCounts.completed || 0, color: '#10b981' },
+    { key: 'completed', label: 'Completed', value: statusCounts.completed || 0, color: '#0e9aa7' },
     { key: 'in-progress', label: 'In Progress', value: statusCounts.inProgress || 0, color: '#3b82f6' },
     { key: 'pending', label: 'Pending', value: statusCounts.pending || 0, color: '#f59e0b' },
     { key: 'overdue', label: 'Overdue', value: statusCounts.overdue || 0, color: '#ef4444' },
@@ -41790,10 +41802,10 @@ const ClientAnalyticsTab = ({
   };
 
   return (
-    <div className="flex flex-col gap-0 bg-transparent min-h-screen -m-6 glass-theme-blue">
+    <div className="oti-analytics flex flex-col gap-0 bg-transparent min-h-screen -m-6 glass-theme-blue">
       <div className="sticky top-0 z-10 bg-white border-b border-gray-100">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-          <h1 className="text-[2rem] font-black tracking-tight text-gray-900">Fixnest Analytics</h1>
+          <h1 className="oti-an-heading">Fixnest Analytics</h1>
           <div className="flex items-center gap-3">
             {isCustomDashboardView ? (
               <button
@@ -41806,7 +41818,7 @@ const ClientAnalyticsTab = ({
             <button
               type="button"
               onClick={openCreateDashboardModal}
-              className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-5 py-3 text-sm font-bold text-white shadow-sm transition-colors hover:bg-blue-700"
+              className="oti-an-primary"
             >
               Create Custom Dashboard
             </button>
@@ -41821,7 +41833,7 @@ const ClientAnalyticsTab = ({
                   setSubTab(tab.id);
                   setSelectedDashboardView('default');
                 }}
-                className={`px-4 pb-5 pt-1 text-sm font-bold border-b-2 transition-colors ${subTab === tab.id ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                className={`oti-an-tab${subTab === tab.id ? ' is-active' : ''}`}
               >
                 {tab.label}
               </button>
@@ -41858,7 +41870,7 @@ const ClientAnalyticsTab = ({
                       }}
                       className={`w-full px-4 py-3 text-left text-sm font-semibold transition-colors ${selectedDashboardView === 'default' ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'}`}
                     >
-                      {subTabs.find((tab) => tab.id === subTab)?.label}
+                      {dashboardCatalog.find((dashboard) => dashboard.id === subTab)?.label || subTabs[0].label}
                     </button>
                     {recommendedDashboards
                       .filter((dashboard) => dashboard.id !== subTab)
@@ -42248,11 +42260,14 @@ const ClientAnalyticsTab = ({
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-2">
           {metricCards.map((card) => (
-            <div key={card.label} className={`rounded-2xl border p-5 shadow-sm ${card.tone}`}>
-              <p className="text-xs font-bold uppercase tracking-[0.2em] opacity-70">{card.label}</p>
-              <p className="mt-3 text-3xl font-black">{card.value}</p>
+            <div key={card.label} className="oti-stat-card" style={{ '--stat-color': card.color }}>
+              <div className="oti-stat-label">{card.label}</div>
+              <div className="oti-stat-row">
+                <div className="oti-stat-value">{card.value}</div>
+                <div className="oti-stat-icon" aria-hidden="true">{card.icon}</div>
+              </div>
             </div>
           ))}
         </div>
@@ -42432,80 +42447,61 @@ const ClientAnalyticsTab = ({
               <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
                 <div className="flex items-center justify-between mb-4">
                   <p className="text-sm font-bold text-gray-700">Backlog</p>
-                  <span className="text-xs font-semibold text-gray-400">{statusCounts.pending + statusCounts.inProgress} open work orders</span>
+                  <span className="text-xs font-semibold text-gray-400">{backlogTotal} open work orders</span>
                 </div>
-                <div className="grid grid-cols-1 gap-4 items-start">
-                  <div className="grid grid-cols-2 gap-3 2xl:grid-cols-1">
-                    {backlogByPriority.map((entry) => (
-                      <div key={entry.label} className="rounded-xl border border-gray-100 p-3 text-center">
-                        <p className="text-3xl font-black" style={{ color: entry.color }}>{entry.value}</p>
-                        <p className="mt-1 text-sm font-semibold text-gray-600">{entry.label}</p>
+                <div className="oti-backlog-tiles">
+                  {backlogByPriority.map((entry) => (
+                    <div key={entry.label} className="oti-backlog-tile" style={{ '--tile-color': entry.color }}>
+                      <span className="oti-backlog-tile-label">{entry.label} priority</span>
+                      <span className="oti-backlog-tile-value">{entry.value}</span>
+                      <span className="oti-backlog-tile-share">{backlogTotal ? Math.round((entry.value / backlogTotal) * 100) : 0}% of backlog</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="oti-backlog-panels">
+                  <div className="oti-backlog-panel">
+                    <div className="oti-backlog-panel-head">
+                      <span>By Priority</span>
+                      <strong>{backlogTotal} open</strong>
+                    </div>
+                    {backlogTotal > 0 ? (
+                      <div className="h-[180px]">
+                        <Chart type="pie" data={backlogPriorityPieData} options={miniPieChartOptions} className="h-full w-full" pt={{ canvas: { role: 'img', 'aria-label': 'Open work order priority pie chart' } }} />
                       </div>
-                    ))}
+                    ) : (
+                      <AnalyticsEmpty text="No open work orders." height={180} />
+                    )}
+                    <ul className="oti-backlog-legend">
+                      {backlogPriorityBars.map((entry) => (
+                        <li key={entry.label}>
+                          <span className="oti-backlog-dot" style={{ backgroundColor: entry.color }} />
+                          <span>{entry.label}</span>
+                          <strong>{entry.value} <em>({entry.share}%)</em></strong>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div className="rounded-2xl border border-gray-100 p-4">
-                      <p className="text-sm font-bold text-gray-700 mb-4">Priority</p>
-                      <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
-                        <div className="mb-3 flex items-center justify-between">
-                          <span className="text-sm font-semibold text-gray-600">Open work orders</span>
-                          <span className="text-2xl font-black text-gray-900">{backlogTotal}</span>
-                        </div>
-                        <div className="mb-4 h-[170px]">
-                          <Chart
-                            type="pie"
-                            data={backlogPriorityPieData}
-                            options={miniPieChartOptions}
-                            className="h-full w-full"
-                            pt={{ canvas: { role: 'img', 'aria-label': 'Open work order priority pie chart' } }}
-                          />
-                        </div>
-                        <div className="space-y-3">
-                          {backlogPriorityBars.map((entry) => (
-                            <div key={entry.label}>
-                              <div className="mb-1.5 flex items-center justify-between text-sm">
-                                <span className="font-semibold text-gray-700">{entry.label}</span>
-                                <span className="font-black" style={{ color: entry.color }}>{entry.value} ({entry.share}%)</span>
-                              </div>
-                              <div className="h-3 overflow-hidden rounded-full bg-white">
-                                <div className="h-full rounded-full" style={{ width: `${entry.share}%`, backgroundColor: entry.color }} />
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
+                  <div className="oti-backlog-panel">
+                    <div className="oti-backlog-panel-head">
+                      <span>Preventive vs Reactive</span>
+                      <strong>{preventiveShare}% preventive</strong>
                     </div>
-                    <div className="rounded-2xl border border-gray-100 p-4">
-                      <p className="text-sm font-bold text-gray-700 mb-4">Preventive vs Reactive</p>
-                      <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
-                        <div className="mb-3 flex items-center justify-between">
-                          <span className="text-sm font-semibold text-gray-600">Preventive share</span>
-                          <span className="text-2xl font-black text-gray-900">{preventiveShare}%</span>
-                        </div>
-                        <div className="mb-4 h-[170px]">
-                          <Chart
-                            type="pie"
-                            data={preventiveReactivePieData}
-                            options={miniPieChartOptions}
-                            className="h-full w-full"
-                            pt={{ canvas: { role: 'img', 'aria-label': 'Preventive versus reactive pie chart' } }}
-                          />
-                        </div>
-                        <div className="space-y-3">
-                          {preventiveReactiveBars.map((entry) => (
-                            <div key={entry.label}>
-                              <div className="mb-1.5 flex items-center justify-between text-sm">
-                                <span className="font-semibold text-gray-700">{entry.label}</span>
-                                <span className="font-black" style={{ color: entry.color }}>{entry.value}</span>
-                              </div>
-                              <div className="h-3 overflow-hidden rounded-full bg-white">
-                                <div className="h-full rounded-full" style={{ width: `${entry.share}%`, backgroundColor: entry.color }} />
-                              </div>
-                            </div>
-                          ))}
-                        </div>
+                    {totalPreventive + totalReactive > 0 ? (
+                      <div className="h-[180px]">
+                        <Chart type="pie" data={preventiveReactivePieData} options={miniPieChartOptions} className="h-full w-full" pt={{ canvas: { role: 'img', 'aria-label': 'Preventive versus reactive pie chart' } }} />
                       </div>
-                    </div>
+                    ) : (
+                      <AnalyticsEmpty text="No requests or work orders in this period." height={180} />
+                    )}
+                    <ul className="oti-backlog-legend">
+                      {preventiveReactiveBars.map((entry) => (
+                        <li key={entry.label}>
+                          <span className="oti-backlog-dot" style={{ backgroundColor: entry.color }} />
+                          <span>{entry.label}</span>
+                          <strong>{entry.value} <em>({entry.share}%)</em></strong>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 </div>
               </div>
@@ -42515,24 +42511,9 @@ const ClientAnalyticsTab = ({
                   <p className="text-sm font-bold text-gray-700">Upcoming Preventive Work Orders</p>
                   <span className="text-xs font-semibold text-gray-400">{upcomingPreventive.length} scheduled</span>
                 </div>
-                <div className="w-full">
-                  <div className="flex w-full items-end gap-2 h-[220px] sm:gap-3">
-                    {labels.map((label, index) => {
-                      const maxBar = Math.max(1, ...upcomingPreventiveSeries);
-                      const barHeight = `${Math.max(upcomingPreventiveSeries[index] ? 12 : 0, (upcomingPreventiveSeries[index] / maxBar) * 100)}%`;
-                      return (
-                        <div key={label} className="flex-1 flex flex-col items-center gap-2 h-full">
-                          <div className="flex items-end justify-center h-full w-full">
-                            <div className="w-full max-w-[52px] rounded-t bg-blue-500/95" style={{ height: barHeight }} />
-                          </div>
-                          <span className="max-w-full truncate text-center text-[9px] text-gray-400 sm:text-[10px]">
-                            {index % upcomingLabelStep === 0 ? label : ''}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
+                {upcomingPreventiveSeries.some((value) => value > 0) && (
+                  <AnalyticsBarChart labels={labels} series={[{ label: 'Scheduled', data: upcomingPreventiveSeries, color: '#2f80ed' }]} height={220} />
+                )}
                 <div className="mt-4 space-y-3">
                   {upcomingPreventive.length ? upcomingPreventive.map((schedule) => (
                     <div key={schedule._id || schedule.id} className="flex items-center justify-between rounded-xl border border-gray-100 px-4 py-3">
@@ -42558,7 +42539,6 @@ const ClientAnalyticsTab = ({
         {subTab === 'cost-of-maintenance' && (
           <div className="flex flex-col gap-6">
             <div>
-              <h2 className="text-2xl font-bold">Cost of Maintenance</h2>
               <p className="text-gray-500 mt-1">View your maintenance costs breakdown and trends.</p>
             </div>
 
@@ -42589,9 +42569,9 @@ const ClientAnalyticsTab = ({
                   { label: 'Reactive', value: costSummary.reactive, tone: 'text-teal-700 border-teal-100 bg-teal-50' },
                   { label: 'Preventive', value: costSummary.preventive, tone: 'text-blue-700 border-blue-100 bg-blue-50' },
                 ].map((card) => (
-                  <div key={card.label} className={`rounded-2xl border p-5 shadow-sm ${card.tone}`}>
-                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] opacity-80">{card.label}</p>
-                    <p className="mt-4 text-2xl font-black">{formatCost(card.value)}</p>
+                  <div key={card.label} className={`oti-an-kpi ${card.tone}`}>
+                    <p className="oti-an-kpi-label">{card.label}</p>
+                    <p className="oti-an-kpi-value">{formatCost(card.value)}</p>
                   </div>
                 ))}
               </div>
@@ -42741,7 +42721,11 @@ const ClientAnalyticsTab = ({
                 <p className="text-sm font-bold text-gray-700">Assets With Most Downtime</p>
                 <span className="text-xs font-semibold text-gray-400">{assetAnalytics.tableRows.length} assets ranked</span>
               </div>
-              <div className="overflow-x-auto">
+              <>
+                <AnalyticsRankChart rows={assetAnalytics.tableRows} valueKey="downtimeHours" label="Downtime (hours)" color="#e53935" formatValue={(v) => `${v}h`} emptyText="No asset downtime recorded in this period." />
+                <details className="oti-an-details">
+                  <summary>Show table</summary>
+                  <div className="overflow-x-auto">
                 <table className="min-w-full text-sm">
                   <thead>
                     <tr className="border-b border-gray-100 text-left text-gray-500">
@@ -42782,6 +42766,8 @@ const ClientAnalyticsTab = ({
                   </tbody>
                 </table>
               </div>
+                </details>
+              </>
             </div>
 
             <div ref={setAnalyticsChartRef('asset-utilization-breakdown')} className="grid grid-cols-1 xl:grid-cols-2 gap-6">
@@ -42846,21 +42832,7 @@ const ClientAnalyticsTab = ({
                   <span className="text-xs font-semibold text-gray-400">{dateRange}</span>
                 </div>
                 <div className="overflow-x-auto">
-                  <svg viewBox={`0 0 ${lineChartWidth} ${lineChartHeight}`} className="w-full min-w-[620px] h-[230px]">
-                    {[0, 1, 2, 3, 4].map((step) => {
-                      const y = linePadding + (linePlotHeight / 4) * step;
-                      return <line key={step} x1={linePadding} y1={y} x2={lineChartWidth - linePadding} y2={y} stroke="#e5e7eb" strokeDasharray="4 4" />;
-                    })}
-                    <path d={buildMetricPath(assetAnalytics.utilizationSeries)} fill="none" stroke="#1d4ed8" strokeWidth="3" strokeLinecap="round" />
-                    {assetAnalytics.utilizationSeries.map((value, index) => (
-                      <circle key={`${labels[index]}-${value}`} cx={linePadding + index * xStep} cy={getMetricPointY(assetAnalytics.utilizationSeries, value)} r="4.5" fill="#3b82f6" />
-                    ))}
-                    {labels.map((label, index) => (
-                      <text key={label} x={linePadding + index * xStep} y={lineChartHeight - 6} textAnchor="middle" className="fill-gray-400 text-[10px]">
-                        {label}
-                      </text>
-                    ))}
-                  </svg>
+                  <AnalyticsLineChart labels={labels} series={[{ label: 'Utilization', data: assetAnalytics.utilizationSeries, color: '#1b2559' }]} yMax={100} formatValue={(v) => `${v}%`} height={230} emptyText="No asset data for this period yet." />
                 </div>
               </div>
 
@@ -42870,21 +42842,7 @@ const ClientAnalyticsTab = ({
                   <span className="text-xs font-semibold text-gray-400">{assetAnalytics.downtimeEventSeries.reduce((sum, value) => sum + value, 0)} events</span>
                 </div>
                 <div className="overflow-x-auto">
-                  <svg viewBox={`0 0 ${lineChartWidth} ${lineChartHeight}`} className="w-full min-w-[620px] h-[230px]">
-                    {[0, 1, 2, 3, 4].map((step) => {
-                      const y = linePadding + (linePlotHeight / 4) * step;
-                      return <line key={step} x1={linePadding} y1={y} x2={lineChartWidth - linePadding} y2={y} stroke="#e5e7eb" strokeDasharray="4 4" />;
-                    })}
-                    <path d={buildMetricPath(assetAnalytics.downtimeEventSeries)} fill="none" stroke="#0f766e" strokeWidth="3" strokeLinecap="round" />
-                    {assetAnalytics.downtimeEventSeries.map((value, index) => (
-                      <circle key={`${labels[index]}-${value}`} cx={linePadding + index * xStep} cy={getMetricPointY(assetAnalytics.downtimeEventSeries, value)} r="4.5" fill="#14b8a6" />
-                    ))}
-                    {labels.map((label, index) => (
-                      <text key={label} x={linePadding + index * xStep} y={lineChartHeight - 6} textAnchor="middle" className="fill-gray-400 text-[10px]">
-                        {label}
-                      </text>
-                    ))}
-                  </svg>
+                  <AnalyticsBarChart labels={labels} series={[{ label: 'Downtime events', data: assetAnalytics.downtimeEventSeries, color: '#0e9aa7' }]} height={230} emptyText="No downtime events in this period." />
                 </div>
               </div>
             </div>
@@ -42893,18 +42851,6 @@ const ClientAnalyticsTab = ({
 
         {subTab === 'work-order-analysis' && (
           <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-1000 pb-12">
-            {/* Filter Bar */}
-            <div className="bg-white border text-[#495b6c] border-[#e4e7ec] rounded-2xl p-6 shadow-sm flex flex-wrap items-center gap-4 text-[11px] font-semibold">
-               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Date Completed Date</span><button className="px-3 py-1.5 bg-[#eef4ff] text-[#2563eb] border border-[#c7d7fe] rounded transition-colors whitespace-nowrap">Last 30 Days</button></div>
-               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Type</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap flex items-center gap-6 min-w-[140px]">any value <ChevronDown className="w-3.5 h-3.5 text-gray-400 ml-auto" /></button></div>
-               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Work Order Category</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap text-gray-700">is any value</button></div>
-               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Location Name</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap text-gray-700">is any value</button></div>
-               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Asset Name</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap text-gray-700">is any value</button></div>
-               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Asset Category</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap text-gray-700">is any value</button></div>
-               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Worker Assigned</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap text-gray-700">is any value</button></div>
-               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Team Assigned</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap text-gray-700">is any value</button></div>
-               <div className="flex flex-col gap-1.5 w-full md:w-auto"><span className="text-[10px]">Priority</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap text-gray-700">is any value</button></div>
-            </div>
 
             <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden flex flex-col items-center justify-center py-10 px-6">
                <div className="flex items-center gap-2 mb-10">
@@ -43001,32 +42947,12 @@ const ClientAnalyticsTab = ({
                      <Info className="w-4 h-4 text-gray-400" />
                   </div>
                   <div className="h-72 w-full mt-10 relative px-4">
-                     <svg viewBox={`0 0 ${lineChartWidth} ${lineChartHeight}`} className="w-full h-full overflow-visible">
-                        {[0,1,2,3,4].map(s => {
-                           const y = linePadding + (linePlotHeight / 4) * s;
-                           return <line key={s} x1={linePadding} y1={y} x2={lineChartWidth - linePadding} y2={y} stroke="#f1f5f9" strokeWidth="1" />;
-                        })}
-                        <path d={buildMetricPath(workOrderAnalysisData.completionTrend.map(t => t.complete))} fill="none" stroke="#2dd4bf" strokeWidth="2.5" />
-                        <path d={buildMetricPath(workOrderAnalysisData.completionTrend.map(t => t.compliant))} fill="none" stroke="#f472b6" strokeWidth="2.5" />
-                        <path d={buildMetricPath(workOrderAnalysisData.completionTrend.map(t => t.reactive))} fill="none" stroke="#84cc16" strokeWidth="2.5" />
-                        <path d={buildMetricPath(workOrderAnalysisData.completionTrend.map(t => t.recurring))} fill="none" stroke="#6366f1" strokeWidth="2.5" />
-
-                        {labels.map((l, i) => i % Math.max(1, Math.floor(labels.length / 5)) === 0 && (
-                          <text key={l} x={linePadding + i * xStep} y={lineChartHeight - 5} textAnchor="middle" className="fill-gray-400 text-[10px] font-bold">{l}</text>
-                        ))}
-                     </svg>
-                     <div className="mt-8 flex flex-wrap justify-center gap-x-6 gap-y-2">
-                        {[
-                          { label: 'Complete Count', color: 'bg-[#2dd4bf]' },
-                          { label: 'Compliant Count', color: 'bg-[#f472b6]' },
-                          { label: 'Reactive Count', color: 'bg-[#84cc16]' },
-                          { label: 'Recurring Count', color: 'bg-[#6366f1]' }
-                        ].map(item => (
-                          <div key={item.label} className="flex items-center gap-1.5 text-[10px] font-bold text-gray-600">
-                             <div className={`w-3 h-0.5 ${item.color}`} /> {item.label}
-                          </div>
-                        ))}
-                     </div>
+                     <AnalyticsLineChart labels={labels} height={280} emptyText="No completed work orders in this period." series={[
+                       { label: 'Complete', data: workOrderAnalysisData.completionTrend.map((t) => t.complete), color: '#0e9aa7' },
+                       { label: 'Compliant', data: workOrderAnalysisData.completionTrend.map((t) => t.compliant), color: '#f0508c' },
+                       { label: 'Reactive', data: workOrderAnalysisData.completionTrend.map((t) => t.reactive), color: '#7cb342' },
+                       { label: 'Recurring', data: workOrderAnalysisData.completionTrend.map((t) => t.recurring), color: '#7c3aed' },
+                     ]} />
                   </div>
                </div>
 
@@ -43035,28 +42961,10 @@ const ClientAnalyticsTab = ({
                      <h3 className="text-base font-bold text-gray-800">Labor Hour Trends</h3>
                   </div>
                   <div className="h-72 w-full mt-10 relative px-4">
-                     <svg viewBox={`0 0 ${lineChartWidth} ${lineChartHeight}`} className="w-full h-full overflow-visible">
-                        {[0,1,2,3,4].map(s => {
-                           const y = linePadding + (linePlotHeight / 4) * s;
-                           return <line key={s} x1={linePadding} y1={y} x2={lineChartWidth - linePadding} y2={y} stroke="#f1f5f9" strokeWidth="1" />;
-                        })}
-                        <path d={buildMetricPath(workOrderAnalysisData.laborHourTrends.map(t => t.reactive))} fill="none" stroke="#e11d48" strokeWidth="2.5" strokeDasharray="4 4" />
-                        <path d={buildMetricPath(workOrderAnalysisData.laborHourTrends.map(t => t.recurring))} fill="none" stroke="#2563eb" strokeWidth="2.5" strokeDasharray="4 4" />
-                        
-                        {labels.map((l, i) => i % Math.max(1, Math.floor(labels.length / 5)) === 0 && (
-                          <text key={l} x={linePadding + i * xStep} y={lineChartHeight - 5} textAnchor="middle" className="fill-gray-400 text-[10px] font-bold">{l}</text>
-                        ))}
-                     </svg>
-                     <div className="mt-8 flex flex-wrap justify-center gap-x-6 gap-y-2">
-                        {[
-                          { label: 'Reactive', color: 'bg-[#e11d48]' },
-                          { label: 'Recurring', color: 'bg-[#2563eb]' }
-                        ].map(item => (
-                          <div key={item.label} className="flex items-center gap-1.5 text-[10px] font-bold text-gray-600">
-                             <div className={`w-3 h-0.5 border-b border-dashed border-gray-400 ${item.color.replace('bg-', 'border-')}`} /> {item.label}
-                          </div>
-                        ))}
-                     </div>
+                     <AnalyticsLineChart labels={labels} height={280} formatValue={(v) => `${v}h`} emptyText="No labor hours logged in this period." series={[
+                       { label: 'Reactive', data: workOrderAnalysisData.laborHourTrends.map((t) => t.reactive), color: '#e53935', dashed: true },
+                       { label: 'Recurring', data: workOrderAnalysisData.laborHourTrends.map((t) => t.recurring), color: '#2f80ed', dashed: true },
+                     ]} />
                   </div>
                </div>
             </div>
@@ -43085,16 +42993,6 @@ const ClientAnalyticsTab = ({
 
         {subTab === 'maintenance-compliance' && (
           <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-1000 pb-12">
-            {/* Filter Bar */}
-            <div className="bg-white border text-[#495b6c] border-[#e4e7ec] rounded-2xl p-6 shadow-sm flex flex-wrap items-center gap-4 text-[11px] font-semibold">
-               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Date Completed</span><button className="px-3 py-1.5 bg-[#eef4ff] text-[#2563eb] border border-[#c7d7fe] rounded transition-colors whitespace-nowrap">Last 30 Days</button></div>
-               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Type</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap flex items-center gap-6 min-w-[140px]">any value <ChevronDown className="w-3.5 h-3.5 text-gray-400 ml-auto" /></button></div>
-               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Work Order Category</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap text-gray-700">is any value</button></div>
-               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Location</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap text-gray-700">is any value</button></div>
-               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Asset</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap text-gray-700">is any value</button></div>
-               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Asset Category</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap text-gray-700">is any value</button></div>
-               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Team Assigned</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap text-gray-700">is any value</button></div>
-            </div>
 
             <div className="bg-white border border-gray-100 rounded-2xl p-8 shadow-sm">
               <div className="text-center mb-12">
@@ -43172,7 +43070,7 @@ const ClientAnalyticsTab = ({
                     </div>
                     <div className="space-y-3">
                       {[
-                        { label: 'Compliant', value: maintenanceComplianceData.totalCompliant, color: '#10b981' },
+                        { label: 'Compliant', value: maintenanceComplianceData.totalCompliant, color: '#0e9aa7' },
                         { label: 'Non-Compliant', value: maintenanceComplianceData.totalNonCompliant, color: '#ef4444' },
                       ].map((item) => {
                         const share = maintenanceComplianceData.totalCompleted
@@ -43259,21 +43157,7 @@ const ClientAnalyticsTab = ({
               </div>
               {maintenanceComplianceData.monthlyTrend.length > 0 ? (
                 <div className="overflow-x-auto">
-                  <svg viewBox={`0 0 ${lineChartWidth} ${lineChartHeight}`} className="w-full min-w-[620px] h-[230px]">
-                    {[0, 1, 2, 3, 4].map((step) => {
-                      const y = linePadding + (linePlotHeight / 4) * step;
-                      return <line key={step} x1={linePadding} y1={y} x2={lineChartWidth - linePadding} y2={y} stroke="#e5e7eb" strokeDasharray="4 4" />;
-                    })}
-                    <path d={buildMetricPath(maintenanceComplianceData.monthlyTrend.map(t => t.compliance))} fill="none" stroke="#2563eb" strokeWidth="3" strokeLinecap="round" />
-                    {maintenanceComplianceData.monthlyTrend.map((item, index) => (
-                      <circle key={`${item.label}-${item.compliance}`} cx={linePadding + index * xStep} cy={getMetricPointY(maintenanceComplianceData.monthlyTrend.map(t => t.compliance), item.compliance)} r="4.5" fill="#3b82f6" />
-                    ))}
-                    {maintenanceComplianceData.monthlyTrend.map((item, index) => (
-                      <text key={item.label} x={linePadding + index * xStep} y={lineChartHeight - 6} textAnchor="middle" className="fill-gray-400 text-[10px]">
-                        {item.label}
-                      </text>
-                    ))}
-                  </svg>
+                  <AnalyticsLineChart labels={maintenanceComplianceData.monthlyTrend.map((t) => t.label)} series={[{ label: 'Compliance', data: maintenanceComplianceData.monthlyTrend.map((t) => t.compliance), color: '#1b2559' }]} yMax={100} formatValue={(v) => `${v}%`} height={240} emptyText="No completed work orders to measure yet." />
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center text-gray-400 py-20">
@@ -43287,17 +43171,6 @@ const ClientAnalyticsTab = ({
 
         {subTab === 'work-order-aging' && (
           <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-1000 pb-12">
-            {/* Filter Bar */}
-            <div className="bg-white border text-[#495b6c] border-[#e4e7ec] rounded-2xl p-6 shadow-sm flex flex-wrap items-center gap-4 text-[11px] font-semibold">
-               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Due Date Date</span><button className="px-3 py-1.5 bg-[#eef4ff] text-[#2563eb] border border-[#c7d7fe] rounded transition-colors whitespace-nowrap">Last 30 Days</button></div>
-               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Is Recurring (Yes / No)</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap flex items-center gap-6 min-w-[140px]">any value <ChevronDown className="w-3.5 h-3.5 text-gray-400 ml-auto" /></button></div>
-               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Category</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap text-gray-700">is any value</button></div>
-               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Location Name</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap text-gray-700">is any value</button></div>
-               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Asset Name</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap text-gray-700">is any value</button></div>
-               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Asset Category</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap text-gray-700">is any value</button></div>
-               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Priority</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap text-gray-700">is any value</button></div>
-               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Team Assigned</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap text-gray-700">is any value</button></div>
-            </div>
 
             <div className="text-center mb-4">
               <h3 className="text-xl font-semibold text-gray-900">How are our incomplete work orders aging?</h3>
@@ -43329,7 +43202,11 @@ const ClientAnalyticsTab = ({
                   <Info className="w-4 h-4 text-gray-400" />
                 </div>
                 {workOrderAgingData.workerAging.length > 0 ? (
-                  <div className="overflow-x-auto">
+                  <>
+                    <AnalyticsRankChart rows={workOrderAgingData.workerAging} labelKey="label" valueKey="count" label="Incomplete work orders" color="#0e9aa7" />
+                    <details className="oti-an-details">
+                      <summary>Show table</summary>
+                      <div className="overflow-x-auto">
                     <table className="min-w-full text-sm">
                       <thead>
                         <tr className="border-b border-gray-200">
@@ -43349,6 +43226,8 @@ const ClientAnalyticsTab = ({
                       </tbody>
                     </table>
                   </div>
+                    </details>
+                  </>
                 ) : (
                   <div className="text-center text-gray-400 py-8">No incomplete work orders</div>
                 )}
@@ -43363,30 +43242,7 @@ const ClientAnalyticsTab = ({
               </div>
               {workOrderAgingData.assetAging.length > 0 ? (
                 <div className="overflow-x-auto">
-                  <svg viewBox={`0 0 ${lineChartWidth} ${lineChartHeight}`} className="w-full min-w-[800px] h-[300px]">
-                    {[0, 1, 2, 3, 4].map((step) => {
-                      const y = linePadding + (linePlotHeight / 4) * step;
-                      return <line key={step} x1={linePadding} y1={y} x2={lineChartWidth - linePadding} y2={y} stroke="#e5e7eb" strokeDasharray="4 4" />;
-                    })}
-                    {workOrderAgingData.assetAging.map((item, index) => {
-                      const x = linePadding + (index * (lineChartWidth - 2 * linePadding)) / (workOrderAgingData.assetAging.length - 1 || 1);
-                      const barWidth = 30;
-                      const maxCount = Math.max(1, ...workOrderAgingData.assetAging.map(a => a.count));
-                      const barHeight = (item.count / maxCount) * linePlotHeight;
-                      const barY = linePadding + linePlotHeight - barHeight;
-                      return (
-                        <g key={item.label}>
-                          <rect x={x - barWidth / 2} y={barY} width={barWidth} height={barHeight} fill="#06b6d4" opacity="0.8" />
-                          <circle cx={x} cy={linePadding + linePlotHeight - (item.averageAgeDays / Math.max(5, ...workOrderAgingData.assetAging.map(a => a.averageAgeDays))) * linePlotHeight} r="5" fill="#ec4899" />
-                          <text x={x} y={lineChartHeight - 10} textAnchor="middle" className="fill-gray-500 text-[9px]">{item.label}</text>
-                        </g>
-                      );
-                    })}
-                  </svg>
-                  <div className="mt-4 flex items-center justify-center gap-8 text-xs">
-                    <span className="flex items-center gap-2"><span className="w-4 h-4 bg-cyan-400 rounded"></span>Incomplete Work Orders</span>
-                    <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-pink-500"></span>Average Age</span>
-                  </div>
+                  <AnalyticsComboChart labels={workOrderAgingData.assetAging.map((a) => a.label)} bar={{ label: 'Incomplete work orders', data: workOrderAgingData.assetAging.map((a) => a.count), color: '#0e9aa7' }} line={{ label: 'Average age (days)', data: workOrderAgingData.assetAging.map((a) => a.averageAgeDays), color: '#f0508c' }} height={300} />
                 </div>
               ) : (
                 <div className="text-center text-gray-400 py-8">No asset data</div>
@@ -43397,16 +43253,6 @@ const ClientAnalyticsTab = ({
 
         {subTab === 'time-cost' && (
           <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-1000 pb-12">
-            {/* Filter Bar */}
-            <div className="bg-white border text-[#495b6c] border-[#e4e7ec] rounded-2xl p-6 shadow-sm flex flex-wrap items-center gap-4 text-[11px] font-semibold">
-               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Date Completed Date</span><button className="px-3 py-1.5 bg-[#eef4ff] text-[#2563eb] border border-[#c7d7fe] rounded transition-colors whitespace-nowrap">Last 30 Days</button></div>
-               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Type</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap flex items-center gap-6 min-w-[140px]">any value <ChevronDown className="w-3.5 h-3.5 text-gray-400 ml-auto" /></button></div>
-               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Category</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap text-gray-700">is any value</button></div>
-               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Location</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap text-gray-700">is any value</button></div>
-               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Asset</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap text-gray-700">is any value</button></div>
-               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Team Assigned</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap text-gray-700">is any value</button></div>
-               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Worker Full Name</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap text-gray-700">is any value</button></div>
-            </div>
 
             <div className="text-center mb-4">
               <h3 className="text-xl font-semibold text-gray-900">How are we spending our time and money?</h3>
@@ -43415,7 +43261,11 @@ const ClientAnalyticsTab = ({
             {/* Costs Table */}
             <div className="bg-white border border-gray-100 rounded-2xl p-8 shadow-sm">
               <h3 className="text-base font-bold text-gray-800 mb-6">Costs</h3>
-              <div className="overflow-x-auto">
+              <>
+                <AnalyticsBarChart horizontal height={190} labels={['Parts', 'Labor', 'Additional']} series={[{ label: 'Cost', color: '#1b2559', data: [timeCostData.totalPartCost, timeCostData.totalLaborCost, timeCostData.totalOtherCost] }]} formatValue={(v) => formatCost(v)} emptyText="No costs recorded in this period." />
+                <details className="oti-an-details">
+                  <summary>Show table</summary>
+                  <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-gray-100">
                     <tr>
@@ -43437,6 +43287,8 @@ const ClientAnalyticsTab = ({
                   </tbody>
                 </table>
               </div>
+                </details>
+              </>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -43444,7 +43296,11 @@ const ClientAnalyticsTab = ({
               <div className="bg-white border border-gray-100 rounded-2xl p-8 shadow-sm">
                 <h3 className="text-base font-bold text-gray-800 mb-6">Worker Time</h3>
                 {timeCostData.workerTime.length > 0 ? (
-                  <div className="overflow-x-auto">
+                  <>
+                    <AnalyticsRankChart rows={timeCostData.workerTime} labelKey="label" valueKey="hours" label="Hours logged" color="#7c3aed" formatValue={(v) => `${v}h`} />
+                    <details className="oti-an-details">
+                      <summary>Show table</summary>
+                      <div className="overflow-x-auto">
                     <table className="min-w-full text-sm">
                       <thead className="border-b border-gray-200">
                         <tr>
@@ -43466,6 +43322,8 @@ const ClientAnalyticsTab = ({
                       </tbody>
                     </table>
                   </div>
+                    </details>
+                  </>
                 ) : (
                   <div className="text-center text-gray-400 py-8">No Results</div>
                 )}
@@ -43476,33 +43334,11 @@ const ClientAnalyticsTab = ({
                 <h3 className="text-base font-bold text-gray-800 mb-6">Cost Trends</h3>
                 {timeCostData.costTrends.length > 0 ? (
                   <div className="overflow-x-auto">
-                    <svg viewBox={`0 0 ${lineChartWidth} ${lineChartHeight}`} className="w-full min-w-[500px] h-[250px]">
-                      {[0, 1, 2, 3, 4].map((step) => {
-                        const y = linePadding + (linePlotHeight / 4) * step;
-                        return <line key={step} x1={linePadding} y1={y} x2={lineChartWidth - linePadding} y2={y} stroke="#e5e7eb" strokeDasharray="4 4" />;
-                      })}
-                      {timeCostData.costTrends.map((item, index) => {
-                        const x = linePadding + (index * (lineChartWidth - 2 * linePadding)) / (timeCostData.costTrends.length - 1 || 1);
-                        const maxCost = Math.max(1, ...timeCostData.costTrends.map(t => t.parts + t.labor + t.other));
-                        const partsHeight = (item.parts / maxCost) * linePlotHeight * 0.33;
-                        const laborHeight = (item.labor / maxCost) * linePlotHeight * 0.33;
-                        const otherHeight = (item.other / maxCost) * linePlotHeight * 0.33;
-
-                        return (
-                          <g key={item.label}>
-                            <rect x={x - 10} y={linePadding + linePlotHeight - partsHeight} width="6" height={partsHeight} fill="#a78bfa" />
-                            <rect x={x - 2} y={linePadding + linePlotHeight - partsHeight - laborHeight} width="6" height={laborHeight} fill="#22c55e" />
-                            <rect x={x + 6} y={linePadding + linePlotHeight - partsHeight - laborHeight - otherHeight} width="6" height={otherHeight} fill="#fbbf24" />
-                            <text x={x} y={lineChartHeight - 10} textAnchor="middle" className="fill-gray-500 text-[9px]">{item.label}</text>
-                          </g>
-                        );
-                      })}
-                    </svg>
-                    <div className="mt-4 flex items-center justify-center gap-6 text-xs">
-                      <span className="flex items-center gap-2"><span className="w-3 h-3 bg-purple-300 rounded"></span>Parts Cost</span>
-                      <span className="flex items-center gap-2"><span className="w-3 h-3 bg-green-500 rounded"></span>Labor Cost</span>
-                      <span className="flex items-center gap-2"><span className="w-3 h-3 bg-amber-400 rounded"></span>Additional Cost</span>
-                    </div>
+                    <AnalyticsBarChart stacked labels={timeCostData.costTrends.map((t) => t.label)} formatValue={(v) => formatCost(v)} height={260} series={[
+                        { label: 'Parts cost', data: timeCostData.costTrends.map((t) => t.parts), color: '#7c3aed' },
+                        { label: 'Labor cost', data: timeCostData.costTrends.map((t) => t.labor), color: '#28a745' },
+                        { label: 'Additional cost', data: timeCostData.costTrends.map((t) => t.other), color: '#fbbf24' },
+                      ]} />
                   </div>
                 ) : (
                   <div className="text-center text-gray-400 py-8">No data available</div>
@@ -43514,17 +43350,6 @@ const ClientAnalyticsTab = ({
 
         {subTab === 'status-report' && (
           <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
-            <div className="bg-white border text-[#495b6c] border-[#e4e7ec] rounded-2xl p-6 shadow-sm flex flex-wrap items-center gap-4 text-[11px] font-semibold">
-               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Due Date</span><button className="px-3 py-1.5 bg-[#eef4ff] text-[#2563eb] border border-[#c7d7fe] rounded transition-colors whitespace-nowrap">is in the last 30 days</button></div>
-               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Date Created</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap">is any time</button></div>
-               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Type</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap flex items-center gap-6 min-w-[140px]">any value <ChevronDown className="w-3.5 h-3.5 text-gray-400 ml-auto" /></button></div>
-               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Worker Assigned</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap">is any value</button></div>
-               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Work Order Category</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap">is any value</button></div>
-               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Location</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap">is any value</button></div>
-               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Asset</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap">is any value</button></div>
-               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Asset Category</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap">is any value</button></div>
-               <div className="flex flex-col gap-1.5"><span className="text-[10px]">Team Assigned</span><button className="px-3 py-1.5 border border-[#d2d6db] rounded hover:bg-gray-50 transition-colors whitespace-nowrap">is any value</button></div>
-            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                <div className="flex flex-col gap-6">
@@ -43691,14 +43516,13 @@ const ClientAnalyticsTab = ({
         {subTab === 'adoption-metrics' && (
           <div className="flex flex-col gap-6">
             <div>
-              <h2 className="text-2xl font-bold">Fixnest Adoption Metrics</h2>
               <p className="text-gray-500 mt-1">A quick view of platform adoption across users, assets, work orders, and meters.</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
               {adoptionMetrics.map((card) => (
-                <div key={card.label} className={`rounded-2xl border p-5 shadow-sm ${card.tone}`}>
-                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] opacity-80">{card.label}</p>
-                  <p className="mt-4 text-3xl font-black">{card.value}</p>
+                <div key={card.label} className={`oti-an-kpi ${card.tone}`}>
+                  <p className="oti-an-kpi-label">{card.label}</p>
+                  <p className="oti-an-kpi-value">{card.value}</p>
                 </div>
               ))}
             </div>
@@ -43710,7 +43534,7 @@ const ClientAnalyticsTab = ({
                 </div>
                 <div className="space-y-4">
                   {[
-                    { label: 'Completed Work Orders', value: statusCounts.completed, total: Math.max(1, statusCounts.total), color: '#2563eb' },
+                    { label: 'Completed Work Orders', value: statusCounts.completed, total: Math.max(1, statusCounts.total), color: '#1b2559' },
                     { label: 'Open Requests', value: requestAnalytics.pending, total: Math.max(1, requestAnalytics.submitted || 1), color: '#0f766e' },
                     { label: 'Operational Assets', value: assetAnalytics.summary.operationalCount, total: Math.max(1, assetAnalytics.summary.totalAssets || 1), color: '#f59e0b' },
                     { label: 'Meters With Readings', value: meterAnalytics.rows.filter((row) => row.readingsCount > 0).length, total: Math.max(1, meterAnalytics.rows.length || 1), color: '#7c3aed' },
@@ -43754,7 +43578,6 @@ const ClientAnalyticsTab = ({
         {subTab === 'reliability-dashboard' && (
           <div className="flex flex-col gap-6">
             <div>
-              <h2 className="text-2xl font-bold">Reliability Dashboard</h2>
               <p className="text-gray-500 mt-1">Reliability and maintenance intensity by asset across your portfolio.</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
@@ -43764,9 +43587,9 @@ const ClientAnalyticsTab = ({
                 { label: 'Not Operational', value: assetAnalytics.summary.notOperationalCount, tone: 'border-rose-100 bg-rose-50 text-rose-700' },
                 { label: 'Utilization', value: `${assetAnalytics.summary.utilization.toFixed(1)}%`, tone: 'border-amber-100 bg-amber-50 text-amber-700' },
               ].map((card) => (
-                <div key={card.label} className={`rounded-2xl border p-5 shadow-sm ${card.tone}`}>
-                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] opacity-80">{card.label}</p>
-                  <p className="mt-4 text-3xl font-black">{card.value}</p>
+                <div key={card.label} className={`oti-an-kpi ${card.tone}`}>
+                  <p className="oti-an-kpi-label">{card.label}</p>
+                  <p className="oti-an-kpi-value">{card.value}</p>
                 </div>
               ))}
             </div>
@@ -43776,7 +43599,11 @@ const ClientAnalyticsTab = ({
                   <p className="text-sm font-bold text-gray-700">Assets With Highest Maintenance Load</p>
                   <span className="text-xs font-semibold text-gray-400">{assetMaintenanceCostRows.length} assets</span>
                 </div>
-                <div className="overflow-x-auto">
+                <>
+                  <AnalyticsRankChart rows={assetMaintenanceCostRows} valueKey="workOrders" label="Work orders" color="#1b2559" emptyText="No work orders linked to assets yet." />
+                  <details className="oti-an-details">
+                    <summary>Show table</summary>
+                    <div className="overflow-x-auto">
                   <table className="w-full min-w-[640px] text-left">
                     <thead>
                       <tr className="border-b border-gray-100 text-xs uppercase tracking-[0.18em] text-gray-400">
@@ -43796,6 +43623,8 @@ const ClientAnalyticsTab = ({
                     </tbody>
                   </table>
                 </div>
+                  </details>
+                </>
               </div>
               <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
                 <div className="flex items-center justify-between mb-4">
@@ -43823,7 +43652,6 @@ const ClientAnalyticsTab = ({
         {subTab === 'total-maintenance-cost' && (
           <div className="flex flex-col gap-6">
             <div>
-              <h2 className="text-2xl font-bold">Total Maintenance Cost</h2>
               <p className="text-gray-500 mt-1">Asset-level cost concentration and spending exposure across your maintenance portfolio.</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
@@ -43833,9 +43661,9 @@ const ClientAnalyticsTab = ({
                 { label: 'Reactive', value: formatCost(costSummary.reactive), tone: 'border-teal-100 bg-teal-50 text-teal-700' },
                 { label: 'Preventive', value: formatCost(costSummary.preventive), tone: 'border-indigo-100 bg-indigo-50 text-indigo-700' },
               ].map((card) => (
-                <div key={card.label} className={`rounded-2xl border p-5 shadow-sm ${card.tone}`}>
-                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] opacity-80">{card.label}</p>
-                  <p className="mt-4 text-3xl font-black">{card.value}</p>
+                <div key={card.label} className={`oti-an-kpi ${card.tone}`}>
+                  <p className="oti-an-kpi-label">{card.label}</p>
+                  <p className="oti-an-kpi-value">{card.value}</p>
                 </div>
               ))}
             </div>
@@ -43867,7 +43695,6 @@ const ClientAnalyticsTab = ({
         {subTab === 'useful-life' && (
           <div className="flex flex-col gap-6">
             <div>
-              <h2 className="text-2xl font-bold">Useful Life</h2>
               <p className="text-gray-500 mt-1">Asset age, expected lifespan, and renewal pressure across the installed base.</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -43876,13 +43703,21 @@ const ClientAnalyticsTab = ({
                 { label: 'Near End of Life', value: usefulLifeRows.filter((row) => row.health <= 25).length, tone: 'border-rose-100 bg-rose-50 text-rose-700' },
                 { label: 'Healthy Assets', value: usefulLifeRows.filter((row) => row.health > 50).length, tone: 'border-emerald-100 bg-emerald-50 text-emerald-700' },
               ].map((card) => (
-                <div key={card.label} className={`rounded-2xl border p-5 shadow-sm ${card.tone}`}>
-                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] opacity-80">{card.label}</p>
-                  <p className="mt-4 text-3xl font-black">{card.value}</p>
+                <div key={card.label} className={`oti-an-kpi ${card.tone}`}>
+                  <p className="oti-an-kpi-label">{card.label}</p>
+                  <p className="oti-an-kpi-value">{card.value}</p>
                 </div>
               ))}
             </div>
-            <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm overflow-x-auto">
+            <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-sm font-bold text-gray-700">Remaining Useful Life</p>
+                <span className="text-xs font-semibold text-gray-400">Least life left first</span>
+              </div>
+              <AnalyticsRankChart rows={usefulLifeRows} valueKey="remainingYears" label="Remaining life (years)" color="#e8711a" ascending includeZero formatValue={(v) => `${v} yrs`} emptyText="No assets to show yet." />
+              <details className="oti-an-details">
+                <summary>Show table</summary>
+                <div className="overflow-x-auto">
               <table className="w-full min-w-[700px] text-left">
                 <thead>
                   <tr className="border-b border-gray-100 text-xs uppercase tracking-[0.18em] text-gray-400">
@@ -43910,13 +43745,14 @@ const ClientAnalyticsTab = ({
                 </tbody>
               </table>
             </div>
+              </details>
+            </div>
           </div>
         )}
 
         {subTab === 'explore-assets' && (
           <div className="flex flex-col gap-6">
             <div>
-              <h2 className="text-2xl font-bold">Explore Assets</h2>
               <p className="text-gray-500 mt-1">Browse utilization, downtime, and maintenance cost by asset.</p>
             </div>
             <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm overflow-x-auto">
@@ -43950,7 +43786,6 @@ const ClientAnalyticsTab = ({
         {['meters-dashboard', 'explore-meters'].includes(subTab) && (
           <div className="flex flex-col gap-6">
             <div>
-              <h2 className="text-2xl font-bold">{subTab === 'meters-dashboard' ? 'Meters' : 'Explore Meters'}</h2>
               <p className="text-gray-500 mt-1">Meter coverage, latest readings, and activity across connected assets and locations.</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -43959,9 +43794,9 @@ const ClientAnalyticsTab = ({
                 { label: 'Active', value: meterAnalytics.activeCount, tone: 'border-emerald-100 bg-emerald-50 text-emerald-700' },
                 { label: 'With Readings', value: meterAnalytics.rows.filter((row) => row.readingsCount > 0).length, tone: 'border-amber-100 bg-amber-50 text-amber-700' },
               ].map((card) => (
-                <div key={card.label} className={`rounded-2xl border p-5 shadow-sm ${card.tone}`}>
-                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] opacity-80">{card.label}</p>
-                  <p className="mt-4 text-3xl font-black">{card.value}</p>
+                <div key={card.label} className={`oti-an-kpi ${card.tone}`}>
+                  <p className="oti-an-kpi-label">{card.label}</p>
+                  <p className="oti-an-kpi-value">{card.value}</p>
                 </div>
               ))}
             </div>
@@ -43993,7 +43828,6 @@ const ClientAnalyticsTab = ({
         {['parts-consumption', 'parts-in-inventory', 'explore-parts-inventory', 'explore-parts-events'].includes(subTab) && (
           <div className="flex flex-col gap-6">
             <div>
-              <h2 className="text-2xl font-bold">{otherDashboardCatalog.find((d) => d.id === subTab)?.label}</h2>
               <p className="text-gray-500 mt-1">Inventory position, usage, and part-related maintenance activity across recent jobs.</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
@@ -44003,9 +43837,9 @@ const ClientAnalyticsTab = ({
                 { label: 'Consumed', value: formatMetricNumber(partsAnalytics.totalConsumed), tone: 'border-amber-100 bg-amber-50 text-amber-700' },
                 { label: 'Spend', value: formatCost(partsAnalytics.totalSpend), tone: 'border-violet-100 bg-violet-50 text-violet-700' },
               ].map((card) => (
-                <div key={card.label} className={`rounded-2xl border p-5 shadow-sm ${card.tone}`}>
-                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] opacity-80">{card.label}</p>
-                  <p className="mt-4 text-3xl font-black">{card.value}</p>
+                <div key={card.label} className={`oti-an-kpi ${card.tone}`}>
+                  <p className="oti-an-kpi-label">{card.label}</p>
+                  <p className="oti-an-kpi-value">{card.value}</p>
                 </div>
               ))}
             </div>
@@ -44081,7 +43915,6 @@ const ClientAnalyticsTab = ({
         {['requests-dashboard', 'explore-requests'].includes(subTab) && (
           <div className="flex flex-col gap-6">
             <div>
-              <h2 className="text-2xl font-bold">{subTab === 'requests-dashboard' ? 'Requests' : 'Explore Requests'}</h2>
               <p className="text-gray-500 mt-1">Request flow, response pace, and requester-level visibility into incoming demand.</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
@@ -44091,9 +43924,9 @@ const ClientAnalyticsTab = ({
                 { label: 'Pending', value: requestAnalytics.pending, tone: 'border-amber-100 bg-amber-50 text-amber-700' },
                 { label: 'Avg Response', value: `${formatMetricNumber(requestAnalytics.avgResponseHours, 1)}h`, tone: 'border-violet-100 bg-violet-50 text-violet-700' },
               ].map((card) => (
-                <div key={card.label} className={`rounded-2xl border p-5 shadow-sm ${card.tone}`}>
-                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] opacity-80">{card.label}</p>
-                  <p className="mt-4 text-3xl font-black">{card.value}</p>
+                <div key={card.label} className={`oti-an-kpi ${card.tone}`}>
+                  <p className="oti-an-kpi-label">{card.label}</p>
+                  <p className="oti-an-kpi-value">{card.value}</p>
                 </div>
               ))}
             </div>
@@ -44162,7 +43995,6 @@ const ClientAnalyticsTab = ({
         {['user-login', 'itemized-time-report', 'explore-users', 'explore-itemized-time-report'].includes(subTab) && (
           <div className="flex flex-col gap-6">
             <div>
-              <h2 className="text-2xl font-bold">{otherDashboardCatalog.find((d) => d.id === subTab)?.label}</h2>
               <p className="text-gray-500 mt-1">User access, login recency, completed work, and logged maintenance time by person.</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
@@ -44172,9 +44004,9 @@ const ClientAnalyticsTab = ({
                 { label: 'Completed Work', value: userAnalytics.rows.reduce((sum, row) => sum + row.completed, 0), tone: 'border-amber-100 bg-amber-50 text-amber-700' },
                 { label: 'Hours Logged', value: `${formatMetricNumber(userAnalytics.rows.reduce((sum, row) => sum + row.hours, 0), 1)}h`, tone: 'border-violet-100 bg-violet-50 text-violet-700' },
               ].map((card) => (
-                <div key={card.label} className={`rounded-2xl border p-5 shadow-sm ${card.tone}`}>
-                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] opacity-80">{card.label}</p>
-                  <p className="mt-4 text-3xl font-black">{card.value}</p>
+                <div key={card.label} className={`oti-an-kpi ${card.tone}`}>
+                  <p className="oti-an-kpi-label">{card.label}</p>
+                  <p className="oti-an-kpi-value">{card.value}</p>
                 </div>
               ))}
             </div>
@@ -44185,21 +44017,7 @@ const ClientAnalyticsTab = ({
                   <span className="text-xs font-semibold text-gray-400">{formatMetricNumber(userHoursSeries.reduce((sum, value) => sum + value, 0), 1)}h total</span>
                 </div>
                 <div className="overflow-x-auto">
-                  <svg viewBox={`0 0 ${lineChartWidth} ${lineChartHeight}`} className="w-full min-w-[620px] h-[230px]">
-                    {[0, 1, 2, 3, 4].map((step) => {
-                      const y = linePadding + (linePlotHeight / 4) * step;
-                      return <line key={step} x1={linePadding} y1={y} x2={lineChartWidth - linePadding} y2={y} stroke="#e5e7eb" strokeDasharray="4 4" />;
-                    })}
-                    <path d={buildMetricPath(userHoursSeries)} fill="none" stroke="#7c3aed" strokeWidth="3" strokeLinecap="round" />
-                    {userHoursSeries.map((value, index) => (
-                      <circle key={`${labels[index]}-${value}`} cx={linePadding + index * xStep} cy={getMetricPointY(userHoursSeries, value)} r="4.5" fill="#8b5cf6" />
-                    ))}
-                    {labels.map((label, index) => (
-                      <text key={label} x={linePadding + index * xStep} y={lineChartHeight - 6} textAnchor="middle" className="fill-gray-400 text-[10px]">
-                        {label}
-                      </text>
-                    ))}
-                  </svg>
+                  <AnalyticsLineChart labels={labels} series={[{ label: 'Logged hours', data: userHoursSeries, color: '#7c3aed' }]} formatValue={(v) => `${v}h`} height={230} emptyText="No time logged in this period." />
                 </div>
               </div>
               <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
@@ -44257,7 +44075,6 @@ const ClientAnalyticsTab = ({
         {subTab === 'explore-purchase-orders' && (
           <div className="flex flex-col gap-6">
             <div>
-              <h2 className="text-2xl font-bold">Explore Purchase Orders</h2>
               <p className="text-gray-500 mt-1">Track vendor commitments, open approvals, and purchasing spend over time.</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -44266,9 +44083,9 @@ const ClientAnalyticsTab = ({
                 { label: 'Open Approvals', value: purchaseOrderAnalytics.openCount, tone: 'border-amber-100 bg-amber-50 text-amber-700' },
                 { label: 'Committed Spend', value: formatCost(purchaseOrderAnalytics.spend), tone: 'border-emerald-100 bg-emerald-50 text-emerald-700' },
               ].map((card) => (
-                <div key={card.label} className={`rounded-2xl border p-5 shadow-sm ${card.tone}`}>
-                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] opacity-80">{card.label}</p>
-                  <p className="mt-4 text-3xl font-black">{card.value}</p>
+                <div key={card.label} className={`oti-an-kpi ${card.tone}`}>
+                  <p className="oti-an-kpi-label">{card.label}</p>
+                  <p className="oti-an-kpi-value">{card.value}</p>
                 </div>
               ))}
             </div>
@@ -44278,21 +44095,7 @@ const ClientAnalyticsTab = ({
                 <span className="text-xs font-semibold text-gray-400">{labels.length} periods</span>
               </div>
               <div className="overflow-x-auto">
-                <svg viewBox={`0 0 ${lineChartWidth} ${lineChartHeight}`} className="w-full min-w-[620px] h-[230px]">
-                  {[0, 1, 2, 3, 4].map((step) => {
-                    const y = linePadding + (linePlotHeight / 4) * step;
-                    return <line key={step} x1={linePadding} y1={y} x2={lineChartWidth - linePadding} y2={y} stroke="#e5e7eb" strokeDasharray="4 4" />;
-                  })}
-                  <path d={buildMetricPath(purchaseOrderMonthlySeries)} fill="none" stroke="#059669" strokeWidth="3" strokeLinecap="round" />
-                  {purchaseOrderMonthlySeries.map((value, index) => (
-                    <circle key={`${labels[index]}-${value}`} cx={linePadding + index * xStep} cy={getMetricPointY(purchaseOrderMonthlySeries, value)} r="4.5" fill="#10b981" />
-                  ))}
-                  {labels.map((label, index) => (
-                    <text key={label} x={linePadding + index * xStep} y={lineChartHeight - 6} textAnchor="middle" className="fill-gray-400 text-[10px]">
-                      {label}
-                    </text>
-                  ))}
-                </svg>
+                <AnalyticsLineChart labels={labels} series={[{ label: 'Spend', data: purchaseOrderMonthlySeries, color: '#28a745' }]} formatValue={(v) => formatCost(v)} height={230} emptyText="No purchase orders in this period." />
               </div>
             </div>
             <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm overflow-x-auto">
@@ -44323,7 +44126,6 @@ const ClientAnalyticsTab = ({
         {['asset-audit-trail', 'explore-audit-trail'].includes(subTab) && (
           <div className="flex flex-col gap-6">
             <div>
-              <h2 className="text-2xl font-bold">{otherDashboardCatalog.find((d) => d.id === subTab)?.label}</h2>
               <p className="text-gray-500 mt-1">Chronological activity across assets and work orders based on in-app history records.</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -44332,9 +44134,9 @@ const ClientAnalyticsTab = ({
                 { label: 'Asset Events', value: assetAuditTrailRows.filter((row) => row.entityType === 'Asset').length, tone: 'border-emerald-100 bg-emerald-50 text-emerald-700' },
                 { label: 'Work Order Events', value: assetAuditTrailRows.filter((row) => row.entityType === 'Work Order').length, tone: 'border-amber-100 bg-amber-50 text-amber-700' },
               ].map((card) => (
-                <div key={card.label} className={`rounded-2xl border p-5 shadow-sm ${card.tone}`}>
-                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] opacity-80">{card.label}</p>
-                  <p className="mt-4 text-3xl font-black">{card.value}</p>
+                <div key={card.label} className={`oti-an-kpi ${card.tone}`}>
+                  <p className="oti-an-kpi-label">{card.label}</p>
+                  <p className="oti-an-kpi-value">{card.value}</p>
                 </div>
               ))}
             </div>
@@ -47347,12 +47149,12 @@ const ClientEdgeTab = ({ properties = [], people = [], internalTechnicians = [] 
             <tbody>
               {filtered.map((d, idx) => (
                 <tr key={d.id || d._id || `dev-${idx}`} onClick={() => { setEdgeSelectedDevice(d); setEdgeEditDevice({ ...(d || {}) }); setEdgeShowDetails(true); }} className="cursor-pointer border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
-                  <td className="py-4 px-4"><div className="flex items-center gap-3"><div className="w-10 h-10 bg-gray-50 border border-gray-100 rounded-xl flex items-center justify-center text-xl">{typeIcon[d.type] || 'ðŸ“Ÿ'}</div><div><p className="text-sm font-bold text-gray-900">{d.name}</p><p className="text-[10px] text-gray-400 mt-0.5 font-mono">{String(d.id || d._id || '').slice(-8)}</p></div></div></td>
+                  <td className="py-4 px-4"><div className="flex items-center gap-3"><div className="w-10 h-10 bg-gray-50 border border-gray-100 rounded-xl flex items-center justify-center text-xl">{typeIcon[d.type] || '📟'}</div><div><p className="text-sm font-bold text-gray-900">{d.name}</p><p className="text-[10px] text-gray-400 mt-0.5 font-mono">{String(d.id || d._id || '').slice(-8)}</p></div></div></td>
                   <td className="py-4 px-4 text-sm text-gray-600">{d.type}</td>
-                  <td className="py-4 px-4 text-sm text-gray-600">{d.location || 'â€”'}</td>
+                  <td className="py-4 px-4 text-sm text-gray-600">{d.location || '—'}</td>
                   <td className="py-4 px-4"><span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${d.status === 'Online' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : d.status === 'Offline' ? 'bg-rose-50 text-rose-700 border-rose-100' : 'bg-amber-50 text-amber-700 border-amber-100'}`}>{d.status}</span></td>
                   <td className="py-4 px-4"><div className="flex items-center gap-2"><div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden"><div style={{ width: `${d.signal || 0}%` }} className={`h-full rounded-full ${(d.signal || 0) >= 80 ? 'bg-emerald-500' : (d.signal || 0) >= 50 ? 'bg-amber-500' : 'bg-rose-500'}`} /></div><span className="text-xs text-gray-500">{d.signal || 0}%</span></div></td>
-                  <td className="py-4 px-4 text-xs font-mono text-gray-500">{d.firmware || 'â€”'}</td>
+                  <td className="py-4 px-4 text-xs font-mono text-gray-500">{d.firmware || '—'}</td>
                   <td className="py-4 px-4 text-right"><button onClick={(e) => { e.stopPropagation(); setEdgeSelectedDevice(d); setEdgeEditDevice({ ...(d || {}) }); setEdgeShowDetails(true); }} className="p-1.5 hover:bg-gray-100 rounded-lg"><svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg></button></td>
                 </tr>
               ))}
@@ -47361,6 +47163,69 @@ const ClientEdgeTab = ({ properties = [], people = [], internalTechnicians = [] 
           </table>
         </div>
       </div>
+
+      {edgeShowDetails && edgeEditDevice && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => { setEdgeShowDetails(false); setEdgeSelectedDevice(null); setEdgeEditDevice(null); }} />
+          <div className="relative glass-surface-strong rounded-xl p-6 w-full max-w-lg z-10">
+            <h3 className="text-lg font-bold mb-3">Device Details</h3>
+            <div className="flex flex-col gap-2">
+              <input value={edgeEditDevice.name || ''} onChange={e => setEdgeEditDevice({ ...edgeEditDevice, name: e.target.value })} placeholder="Device name" className="p-2 border rounded" />
+              <select value={edgeEditDevice.type || 'Sensor'} onChange={e => setEdgeEditDevice({ ...edgeEditDevice, type: e.target.value })} className="p-2 border rounded">
+                {Object.keys(typeIcon).map(t => <option key={t}>{t}</option>)}
+              </select>
+              <div className="grid grid-cols-2 gap-2">
+                {locationOptions.length > 0 ? (
+                  <select value={edgeEditDevice.location || ''} onChange={e => setEdgeEditDevice({ ...edgeEditDevice, location: e.target.value })} className="p-2 border rounded">
+                    <option value="">Select location</option>
+                    {locationOptions.map((option) => (
+                      <option key={option.value} value={option.label}>{option.label}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input value={edgeEditDevice.location || ''} onChange={e => setEdgeEditDevice({ ...edgeEditDevice, location: e.target.value })} placeholder="Location" className="p-2 border rounded" />
+                )}
+                <select value={edgeEditDevice.status || 'Online'} onChange={e => setEdgeEditDevice({ ...edgeEditDevice, status: e.target.value })} className="p-2 border rounded">
+                  <option value="Online">Online</option>
+                  <option value="Offline">Offline</option>
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <input type="number" value={edgeEditDevice.signal ?? ''} onChange={e => setEdgeEditDevice({ ...edgeEditDevice, signal: e.target.value ? Number(e.target.value) : null })} placeholder="Signal (%)" className="p-2 border rounded" />
+                <input value={edgeEditDevice.firmware || ''} onChange={e => setEdgeEditDevice({ ...edgeEditDevice, firmware: e.target.value })} placeholder="Firmware" className="p-2 border rounded" />
+              </div>
+              <label className="text-sm text-gray-700">Assign to</label>
+              <select value={String(edgeEditDevice.assignedTo || '')} onChange={e => setEdgeEditDevice({ ...edgeEditDevice, assignedTo: e.target.value || null })} className="p-2 border rounded">
+                <option value="">Unassigned</option>
+                {assignOptions.map((p) => <option key={p._id || p.id} value={p._id || p.id}>{p.name || p.fullName || p.email || String(p._id || p.id)}</option>)}
+              </select>
+              <div className="flex justify-end gap-2 mt-3">
+                <button onClick={() => { setEdgeShowDetails(false); setEdgeSelectedDevice(null); setEdgeEditDevice(null); }} className="px-3 py-2 glass-ghost rounded">Close</button>
+                <button onClick={async () => {
+                  if (edgeSavingEdit) return;
+                  setEdgeSavingEdit(true);
+                  try {
+                    const id = edgeEditDevice.id || edgeEditDevice._id;
+                    const payload = { ...edgeEditDevice };
+                    // Clean up local-only fields
+                    delete payload.id; delete payload._id;
+                    const res = await api.put(`/api/devices/${id}`, payload);
+                    const updated = res?.data;
+                    if (updated) {
+                      setDevices(prev => (prev || []).map(d => (String(d.id || d._id) === String(updated.id || updated._id) ? updated : d)));
+                      setEdgeShowDetails(false);
+                      setEdgeSelectedDevice(null);
+                      setEdgeEditDevice(null);
+                    }
+                  } catch (err) {
+                    alert('Failed to save changes');
+                  } finally { setEdgeSavingEdit(false); }
+                }} disabled={edgeSavingEdit} className="px-3 py-2 bg-blue-600 text-white rounded disabled:opacity-60">{edgeSavingEdit ? 'Saving...' : 'Save'}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -49941,14 +49806,14 @@ const ImportExportTabs = ({
                         </tbody>
                       </table>
                     </div>
-                    {pmImportRows.length > 10 && (
+                    {importRows.length > 10 && (
                       <div className="mt-3 text-xs font-semibold text-gray-500">
-                        Showing first 10 rows. All {pmImportRows.length} rows will be imported.
+                        Showing first 10 rows. All {importRows.length} rows will be imported.
                       </div>
                     )}
                     <button
                       type="button"
-                      onClick={() => setPmImportStep(3)}
+                      onClick={() => setImportStep(3)}
                       className="mt-5 text-sm font-semibold text-blue-700 hover:text-blue-800"
                     >
                       Change column matching
@@ -49962,7 +49827,7 @@ const ImportExportTabs = ({
                   ref={fileInputRef}
                   type="file"
                   accept={dataset === 'Assets' ? '.xlsx,.xls,.csv' : '.csv'}
-                  onChange={(e) => handleImportAction(e.target.files?.[0])}
+                  onChange={(e) => handleFileUpload(e.target.files?.[0])}
                   disabled={busy}
                   className="block w-full rounded-xl border border-dashed border-gray-300 bg-white px-4 py-4 text-sm text-gray-700 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-600 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70"
                 />
@@ -50083,7 +49948,8 @@ function CreatePmModal({
       return 'Calendar or meter schedule';
     }
     if (schedule?.frequency) {
-      return getScheduleFrequencyLabel(schedule);
+      const { every, unit } = getScheduleRecurrence(schedule);
+      return `Every ${every} ${unit}${every > 1 ? 's' : ''}`;
     }
     return 'Saved schedule';
   }, []);
@@ -50401,7 +50267,7 @@ function CreatePmModal({
                     </div>
                     <div className="text-xs text-gray-600 mt-1">
                       WO due {scheduleConfig?.meterRule?.dueAfter || 1} {scheduleConfig?.meterRule?.dueUnit || 'day'}(s) after creation
-                      {` â€¢ Email reminder ${Number(scheduleConfig?.reminderLeadMinutes || 60)} min before`}
+                      {` • Email reminder ${Number(scheduleConfig?.reminderLeadMinutes || 60)} min before`}
                     </div>
                   </div>
                   <div className="flex gap-2">
@@ -50420,7 +50286,7 @@ function CreatePmModal({
                     </div>
                     <div className="text-xs text-gray-600 mt-1">
                       Creates work from whichever happens first at {scheduleConfig?.calendarRule?.time || '09:00'}
-                      {` â€¢ Email reminder ${Number(scheduleConfig?.reminderLeadMinutes || 60)} min before`}
+                      {` • Email reminder ${Number(scheduleConfig?.reminderLeadMinutes || 60)} min before`}
                     </div>
                   </div>
                   <div className="flex gap-2">

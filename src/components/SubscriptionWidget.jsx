@@ -38,6 +38,16 @@ const SubscriptionWidget = ({ userId }) => {
   const [properties, setProperties] = useState([]);
   const [pricing, setPricing] = useState(null);
   const [currency, setCurrency] = useState('USD');
+  // Declared early: the no-subscription branch below returns before the main render.
+  const formatMoney = (amount) => {
+    const numericAmount = Number(amount || 0);
+    try {
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(numericAmount);
+    } catch (err) {
+      return `${currency} ${numericAmount.toFixed(2)}`;
+    }
+  };
+
   const [pendingPaymentModal, setPendingPaymentModal] = useState({
     open: false,
     paymentId: '',
@@ -313,6 +323,7 @@ const SubscriptionWidget = ({ userId }) => {
         {showModal && (
           <SubscriptionModal
             mode={modalMode}
+            formatMoney={formatMoney}
             onClose={handleCloseModal}
             onSubmit={modalMode === 'create' ? handleCreateSubscription : handleUpdateSubscription}
             formData={{
@@ -378,15 +389,6 @@ const SubscriptionWidget = ({ userId }) => {
     if (isEnterprise) return 'bg-red-50 border-red-200';
     if (isProfessional) return 'bg-purple-50 border-purple-200';
     return 'bg-blue-50 border-blue-200';
-  };
-
-  const formatMoney = (amount) => {
-    const numericAmount = Number(amount || 0);
-    try {
-      return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(numericAmount);
-    } catch (err) {
-      return `${currency} ${numericAmount.toFixed(2)}`;
-    }
   };
 
   return (
@@ -473,6 +475,7 @@ const SubscriptionWidget = ({ userId }) => {
       {showModal && (
         <SubscriptionModal
           mode={modalMode}
+          formatMoney={formatMoney}
           onClose={handleCloseModal}
           onSubmit={modalMode === 'create' ? handleCreateSubscription : handleUpdateSubscription}
           formData={{
@@ -533,7 +536,8 @@ const SubscriptionModal = ({
   setFormData, 
   creating, 
   error, 
-  paymentStep
+  paymentStep,
+  formatMoney = (amount) => `${Number(amount || 0).toFixed(2)}`,
 }) => {
   const {
     plan,

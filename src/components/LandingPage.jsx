@@ -1,7 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { X, CheckCircle2, ArrowRight, Zap, Layout, Globe, Truck, GraduationCap, Building2, Factory, HeartPulse, Lightbulb } from 'lucide-react';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import {
+  X, CheckCircle2, ArrowRight, Layout, Globe, Truck, GraduationCap, Building2, Factory, HeartPulse, Lightbulb,
+  MessagesSquare, Database, Flame, EyeOff, TrendingUp, Home, Eye, RefreshCcw, ShieldCheck, LayoutDashboard,
+  Smartphone, ClipboardList, TrendingDown, Wallet, Timer, Users, Target, Wrench, School, Building, Warehouse,
+  Layers, Plug, ChevronLeft, ChevronRight,
+} from 'lucide-react';
 import AuthHeader from './auth/AuthHeader';
 import ContactWidget from './ContactWidget';
 import subscriptionAPI from '../api/subscription';
@@ -14,7 +19,6 @@ import PatrickImage from '../assets/Mbabazi Patrick.jpeg';
 import MirellieImage from '../assets/Umugwaneza mirellie.jpeg';
 import LauretteImage from '../assets/Kazenga Laurette.jpeg';
 import KelliaImage from '../assets/Kellia.jpeg';
-import DashboardScreenshot from '../assets/Dashboard.png';
 import RequestScreenshot from '../assets/Request.png';
 import AssetScreenshot from '../assets/Asset55.png';
 import AnalyticsScreenshot from '../assets/analytics.png';
@@ -84,6 +88,27 @@ const teamMembers = [
   
 ];
 
+const heroSlides = [
+  {
+    kicker: 'Fixnest CMMS',
+    title: 'Maintenance, organized.',
+    text: 'One platform for requests, work orders, preventive maintenance and assets, so every property runs on plan instead of on emergencies.',
+    image: 'https://images.unsplash.com/photo-1581092160562-40aa08e78837?auto=format&fit=crop&w=1920&q=80',
+  },
+  {
+    kicker: 'Preventive Maintenance',
+    title: 'Fix it before it breaks.',
+    text: 'Schedule recurring service, get reminders before work is due, and cut unplanned downtime across every site.',
+    image: 'https://images.unsplash.com/photo-1567789884554-0b844b597180?auto=format&fit=crop&w=1920&q=80',
+  },
+  {
+    kicker: 'Assets & Reporting',
+    title: 'Every asset, one clear view.',
+    text: 'Track the full history of each asset and turn work order data into reports your team can act on.',
+    image: 'https://images.unsplash.com/photo-1473341304170-971dccb5ac1e?auto=format&fit=crop&w=1920&q=80',
+  },
+];
+
 const products = [
   {
     name: 'CMMS',
@@ -92,14 +117,6 @@ const products = [
     icon: <Layout className="w-5 h-5" />,
     description: 'Mobile-first maintenance management that turns reactive firefighting into proactive operations.',
     details: 'Create work orders in seconds, automate PMs, and give your team real-time visibility from any device. Includes inventory tracking, labor costing, and digital checklists.'
-  },
-  {
-    name: 'FixNest Intelligence',
-    label: 'Intelligence',
-    image: 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=800&q=80',
-    icon: <Zap className="w-5 h-5" />,
-    description: 'Embedded AI tools that eliminate busywork and surface insights your team would never find manually.',
-    details: 'From smart scheduling to predictive recommendations, Intelligence helps you work faster and smarter without extra setup. Features AI-powered triage and automated incident root cause analysis.'
   },
   {
     name: 'Providers',
@@ -175,14 +192,14 @@ const planMetadata = {
   basic: {
     displayName: 'Basic',
     description: 'Small teams or single-site operations getting off spreadsheets and paper for the first time.',
-    features: ['Unlimited Work order', 'Request', 'AI'],
+    features: ['Unlimited Work order', 'Request'],
     cta: 'Try for free'
   },
   premium: {
     displayName: 'Premium',
     badge: 'Custom Quote',
     description: 'Growing maintenance teams ready to move from reactive to preventive maintenance.',
-    features: ['Unlimited work Order', 'Requests', 'Asset', 'Location', 'PM', 'Over AI', 'Analytics', 'Material Request', 'Purchase Order'],
+    features: ['Unlimited work Order', 'Requests', 'Asset', 'Location', 'PM', 'Analytics', 'Material Request', 'Purchase Order'],
     cta: 'Request Quotation',
     isPremium: true
   },
@@ -190,13 +207,13 @@ const planMetadata = {
     displayName: 'Professional',
     badge: 'Most Popular',
     description: 'Departments managing multiple asset types, needing field mobility and deeper analytics.',
-    features: ['Unlimited work Order', 'Requests', 'Asset', 'Location', 'PM', 'Over AI'],
+    features: ['Unlimited work Order', 'Requests', 'Asset', 'Location', 'PM'],
     cta: 'Schedule a Demo'
   },
   enterprise: {
     displayName: 'Enterprise',
     description: 'Multi-site organizations needing automation, integrations, and governance controls.',
-    features: ['Unlimited work Order', 'Requests', 'Asset', 'Location', 'PM', 'Over AI', 'Analytics', 'Material Request'],
+    features: ['Unlimited work Order', 'Requests', 'Asset', 'Location', 'PM', 'Analytics', 'Material Request'],
     cta: 'Schedule a Demo'
   }
 };
@@ -337,41 +354,116 @@ const liveDemoCardMotion = {
   intro: { initial: { opacity: 0, x: 0, y: -12, scale: 0.96 }, exit: { opacity: 0, x: 0, y: 12 } },
 };
 
-const landingAgentStarters = [
-  'Show overdue work orders',
-  'Build a PM schedule',
-  'Summarize site performance',
+const problemItems = [
+  { icon: MessagesSquare, title: 'Scattered Communication', desc: 'Lost service requests across emails, texts, and messages' },
+  { icon: Database, title: 'No Single Source', desc: 'Asset and maintenance data trapped in spreadsheets' },
+  { icon: Flame, title: 'Reactive Firefighting', desc: 'Always responding to emergencies, never preventing them' },
+  { icon: EyeOff, title: 'Limited Visibility', desc: 'Leadership has no real-time view of operations' },
+  { icon: TrendingUp, title: 'Growing Inefficiency', desc: 'Problems multiply as you scale' },
 ];
 
-const getLandingAgentReply = (message) => {
-  const normalized = String(message || '').toLowerCase();
+const transformationItems = [
+  { word: 'Predictable', desc: 'Scheduled, planned operations instead of surprises' },
+  { word: 'Measurable', desc: 'Real-time metrics and clear performance indicators' },
+  { word: 'Scalable', desc: 'Grow without losing control or visibility' },
+  { word: 'Strategic', desc: 'Data-driven decisions that drive business value' },
+];
 
-  if (normalized.includes('work order') || normalized.includes('request')) {
-    return 'I can organize incoming requests by priority, assign the right technician, and surface stalled work orders that need attention.';
-  }
+const audienceItems = [
+  { icon: HeartPulse, text: 'Hospitals' },
+  { icon: School, text: 'Universities' },
+  { icon: Building, text: 'Commercial Buildings' },
+  { icon: Home, text: 'Residential Portfolios' },
+  { icon: Warehouse, text: 'Industrial Facilities' },
+];
 
-  if (normalized.includes('pm') || normalized.includes('preventive') || normalized.includes('schedule')) {
-    return 'I can turn recurring maintenance needs into a preventive schedule with due dates, owners, and reminders based on asset usage or calendar rules.';
-  }
+const capabilityItems = [
+  { icon: Building2, title: 'Universal Property Management', desc: 'Manage all your properties in one unified platform' },
+  { icon: Eye, title: 'Complete Asset Visibility', desc: 'Know the status of every asset in real-time' },
+  { icon: Layers, title: 'Scalable Operations', desc: 'Grow without losing control or efficiency' },
+  { icon: ClipboardList, title: 'Centralized Work Orders', desc: 'Create, assign, and track all maintenance work' },
+  { icon: RefreshCcw, title: 'Asset Lifecycle Tracking', desc: 'Monitor assets from purchase to replacement' },
+  { icon: ShieldCheck, title: 'Preventive Maintenance', desc: 'Prevent failures before they happen' },
+  { icon: LayoutDashboard, title: 'Real-Time Dashboards', desc: 'Clear analytics your team can act on' },
+  { icon: Smartphone, title: 'Mobile-First Execution', desc: 'Technicians work efficiently from anywhere' },
+];
 
-  if (normalized.includes('report') || normalized.includes('analytics') || normalized.includes('dashboard')) {
-    return 'I can draft a dashboard view with MTTR, completion rates, asset downtime, and team workload so managers can review performance quickly.';
-  }
+const impactItems = [
+  { icon: TrendingDown, value: 'Reduce Downtime', desc: 'Minimize operational disruptions' },
+  { icon: Wallet, value: 'Lower Costs', desc: 'Proactive planning saves money' },
+  { icon: Timer, value: 'Extend Lifespan', desc: 'Assets last longer with care' },
+  { icon: Users, value: 'Better Coordination', desc: 'Teams work together seamlessly' },
+  { icon: Target, value: 'Data-Driven', desc: 'Make better-informed decisions' },
+];
 
-  if (normalized.includes('safety') || normalized.includes('incident') || normalized.includes('compliance')) {
-    return 'I can connect safety events to corrective actions, highlight recurring risks, and prepare a compliance-friendly summary for your team.';
-  }
+const differenceItems = [
+  { icon: Target, old: 'Just tracking work', new: 'Driving strategy' },
+  { icon: Database, old: 'Just storing data', new: 'Generating insights' },
+  { icon: Wrench, old: 'Just managing tasks', new: 'Transforming operations' },
+];
 
-  if (normalized.includes('asset') || normalized.includes('inventory')) {
-    return 'I can help structure assets, maintenance history, and parts visibility so teams always know what they own and what needs service next.';
-  }
+const coreFeatures = [
+  { title: 'Work Orders', desc: 'Manage requests and work orders in real-time. Create, assign, and track maintenance tasks from any device with complete visibility.' },
+  { title: 'Asset Management', desc: 'Maximize asset uptime and reliability. Track asset lifecycle, maintenance history, and performance metrics in one centralized location.' },
+  { title: 'Safety & Compliance', desc: 'Audit trails and regulatory compliance. Automated documentation and reporting to help you maintain standards and reduce risk.' },
+  { title: 'Preventive Maintenance', desc: 'Reduce downtime with proactive service. Recurring schedules create preventive maintenance tasks based on usage and best practices.' },
+  { title: 'Parts & Inventory', desc: 'Streamline parts tracking and purchasing. Manage stock levels, automate reorders, and reduce supply chain delays.' },
+  { title: 'Analytics & Reporting', desc: 'Customizable reports and dashboards. Track KPIs, identify trends, and make data-driven maintenance decisions.' },
+  { title: 'Integrations', desc: 'Unified maintenance operations. Connect with ERPs, sensors, IoT devices, and other systems for seamless data flow.' },
+];
 
-  return 'I can help with work orders, preventive maintenance, analytics, safety follow-up, and asset planning. Try asking for a dashboard, PM schedule, or overdue summary.';
-};
+const highlightCards = [
+  {
+    title: 'Easily Complete Work Orders from Anywhere',
+    desc: 'Create work orders in seconds with photos, checklists, and real-time updates from any device. Technicians close work on the spot, reducing admin time and improving response speed.',
+  },
+  {
+    title: 'Stay Ahead of Breakdowns with Automated PMs',
+    desc: 'Shift from reactive firefighting to proactive planning with recurring schedules based on actual usage. Assets run longer and downtime drops.',
+  },
+  {
+    title: 'Turn Safety Events into Preventive Action',
+    desc: 'Report safety events from any device - just scan a QR code, no downloads or logins needed. Every incident becomes a tracked corrective action so small issues do not become big problems.',
+  },
+];
+
+const easeOut = [0.22, 1, 0.36, 1];
 
 const LandingPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const prefersReducedMotion = useReducedMotion();
+
+
+  // Scroll-reveal for sections and staggered cards; disabled when the
+  // visitor prefers reduced motion.
+  const reveal = prefersReducedMotion ? {} : {
+    initial: { opacity: 0, y: 12 },
+    whileInView: { opacity: 1, y: 0 },
+    viewport: { once: true, amount: 0.12 },
+    transition: { duration: 0.4, ease: easeOut },
+  };
+  const stagger = prefersReducedMotion ? {} : {
+    initial: 'hidden',
+    whileInView: 'show',
+    viewport: { once: true, amount: 0.15 },
+    variants: { hidden: {}, show: { transition: { staggerChildren: 0.04 } } },
+  };
+  const staggerItem = prefersReducedMotion ? {} : {
+    variants: {
+      hidden: { opacity: 0 },
+      show: { opacity: 1, transition: { duration: 0.3, ease: easeOut } },
+    },
+  };
+  // Hero slider: advances every 7s; manual navigation restarts the timer.
+  const [heroIndex, setHeroIndex] = useState(0);
+  const showHeroSlide = (index) => setHeroIndex((index + heroSlides.length) % heroSlides.length);
+  useEffect(() => {
+    if (prefersReducedMotion) return undefined;
+    const timer = setTimeout(() => setHeroIndex((current) => (current + 1) % heroSlides.length), 7000);
+    return () => clearTimeout(timer);
+  }, [heroIndex, prefersReducedMotion]);
+
   const [pricing, setPricing] = useState(null);
   const [currency, setCurrency] = useState('USD');
   const [changingCurrency, setChangingCurrency] = useState(false);
@@ -382,7 +474,6 @@ const LandingPage = () => {
 
   const activeDemo = liveDemoSteps[activeDemoIndex];
   const activeDemoMotion = liveDemoCardMotion[activeDemo.cardPosition] || liveDemoCardMotion['right-center'];
-  const nextDemo = liveDemoSteps[(activeDemoIndex + 1) % liveDemoSteps.length];
   const isLastDemoStep = activeDemoIndex === liveDemoSteps.length - 1;
 
   const currencySymbols = {
@@ -405,7 +496,6 @@ const LandingPage = () => {
   // Product navigation mapping
   const productRoutes = {
     'CMMS': () => navigate('/product/cmms'),
-    'FixNest Intelligence': () => navigate('/product/intelligence'),
     'Safety': () => navigate('/product/safety'),
     'Providers': () => navigate('/product/providers'),
     'Lattice': () => navigate('/product/lattice'),
@@ -429,14 +519,6 @@ const LandingPage = () => {
   };
 
   const [selectedItem, setSelectedItem] = useState(null);
-  const [agentPrompt, setAgentPrompt] = useState('Create a dashboard to display analytics...');
-  const [agentSubmitting, setAgentSubmitting] = useState(false);
-  const [agentConversation, setAgentConversation] = useState([
-    {
-      role: 'assistant',
-      text: 'I can help you plan work orders, PM schedules, analytics, and safety follow-up.',
-    },
-  ]);
 
   const fetchPricingData = async () => {
     try {
@@ -509,53 +591,6 @@ const LandingPage = () => {
     setActiveDemoIndex(index);
   };
 
-  const handleLandingAgentSubmit = (event) => {
-    event.preventDefault();
-    const nextPrompt = agentPrompt.trim();
-    if (!nextPrompt || agentSubmitting) return;
-
-    const nextHistory = agentConversation.map((entry) => ({
-      role: entry.role === 'user' ? 'user' : 'model',
-      content: entry.text,
-    }));
-
-    setAgentConversation((current) => [...current, { role: 'user', text: nextPrompt }]);
-    setAgentPrompt('');
-    setAgentSubmitting(true);
-
-    api.post('/api/ai/chat', {
-      message: nextPrompt,
-      history: nextHistory,
-    }).then((response) => {
-      const payload = response.data?.response;
-      const responseText = typeof payload === 'string'
-        ? payload
-        : payload?.content || getLandingAgentReply(nextPrompt);
-
-      setAgentConversation((current) => [
-        ...current,
-        { role: 'assistant', text: responseText },
-      ]);
-    }).catch((error) => {
-      console.error('Landing agent error:', error);
-      const fallbackText = getLandingAgentReply(nextPrompt);
-      const errorMessage = error.response?.data?.message
-        ? `${error.response.data.message} ${fallbackText}`
-        : fallbackText;
-
-      setAgentConversation((current) => [
-        ...current,
-        { role: 'assistant', text: errorMessage },
-      ]);
-    }).finally(() => {
-      setAgentSubmitting(false);
-    });
-  };
-
-  const handleLandingStarterClick = (starter) => {
-    setAgentPrompt(starter);
-  };
-
   useEffect(() => {
     fetchPricingData();
   }, []);
@@ -583,158 +618,54 @@ const LandingPage = () => {
     : [];
 
   return (
-    <div className="landing-page">
-      <AuthHeader />
+    <div className="landing-page landing-glass">
 
-      <section className="landing-hero">
-        <div className="landing-hero-content">
-          <div className="landing-kicker">THE OPERATING SYSTEM FOR MAINTENANCE</div>
-          <h1 className="landing-title">Fixnest CMMS: The Intelligent Maintenance Platform</h1>
-          <p className="landing-subtitle">
-            For every asset. Every property. Any scale.
-          </p>
-          <p style={{ fontSize: '18px', color: '#64748b', marginTop: '16px', maxWidth: '600px', lineHeight: '1.7' }}>
-            Maintenance today is fragmented — spread across emails, spreadsheets, WhatsApp, and disconnected tools. Fixnest centralizes it all, transforming reactive firefighting into intelligent, predictable operations.
-          </p>
-          <div className="landing-cta-row">
-            <a className="landing-cta" href="/register">Start a Free Trial</a>
-            <a className="landing-cta landing-cta--ghost" href="/request-demo">Request a Demo</a>
+      <AuthHeader transparent />
+
+      {/* Hero: full-screen image slider with dark overlay */}
+      <section className="ol-hero" aria-roledescription="carousel" aria-label="Fixnest highlights">
+        {heroSlides.map((slide, index) => (
+          <div
+            key={slide.title}
+            className={`ol-hero-slide${index === heroIndex ? ' is-active' : ''}`}
+            style={{ backgroundImage: `url(${slide.image})` }}
+            aria-hidden={index !== heroIndex}
+          />
+        ))}
+        <div className="ol-hero-overlay" aria-hidden="true" />
+
+        <div className="ol-hero-content" key={heroIndex}>
+          <div className="ol-hero-kicker">{heroSlides[heroIndex].kicker}</div>
+          <h1 className="ol-hero-title">{heroSlides[heroIndex].title}</h1>
+          <p className="ol-hero-text">{heroSlides[heroIndex].text}</p>
+          <div className="ol-hero-actions">
+            <a className="ol-btn ol-btn--gold" href="/register">Start a Free Trial</a>
+            <a className="ol-btn ol-btn--outline-light" href="/request-demo">Request a Demo</a>
           </div>
         </div>
-        <div className="landing-hero-media hidden">
-          <div className="live-demo-shell">
-            <div className="hero-photo live-demo-stage" style={{ background: 'linear-gradient(145deg, #0f172a 0%, #1e293b 100%)', padding: '18px' }}>
-              <div className="live-demo-topbar">
-                <div className="live-demo-badge">Live Demo</div>
-                <div className="live-demo-counter">
-                  {String(activeDemoIndex + 1).padStart(2, '0')} / {String(liveDemoSteps.length).padStart(2, '0')}
-                </div>
-              </div>
 
-              <div className="live-demo-progress" aria-label="Live demo steps">
-                {liveDemoSteps.map((step, index) => (
-                  <button
-                    key={step.title}
-                    type="button"
-                    className={`live-demo-progress-step ${index === activeDemoIndex ? 'is-active' : ''}`}
-                    onClick={() => handleDemoStepSelect(index)}
-                    aria-label={`Show ${step.label}`}
-                  >
-                    <span
-                      className="live-demo-progress-fill"
-                      style={{
-                        backgroundColor: step.accent,
-                        transform: index <= activeDemoIndex ? 'scaleX(1)' : 'scaleX(0)',
-                      }}
-                    />
-                  </button>
-                ))}
-              </div>
+        <button type="button" className="ol-hero-arrow ol-hero-arrow--prev" aria-label="Previous slide" onClick={() => showHeroSlide(heroIndex - 1)}>
+          <ChevronLeft className="h-10 w-10" />
+        </button>
+        <button type="button" className="ol-hero-arrow ol-hero-arrow--next" aria-label="Next slide" onClick={() => showHeroSlide(heroIndex + 1)}>
+          <ChevronRight className="h-10 w-10" />
+        </button>
 
-              <AnimatePresence mode="wait" initial={false}>
-                <motion.img
-                  key={activeDemo.title}
-                  src={activeDemo.image}
-                  alt={activeDemo.title}
-                  className="live-demo-image"
-                  initial={{ opacity: 0, scale: 1.04, y: 18 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.98, y: -16 }}
-                  transition={{ duration: 0.55, ease: 'easeOut' }}
-                />
-              </AnimatePresence>
-
-              <div className="absolute inset-0 bg-gradient-to-tr from-slate-950/45 via-transparent to-slate-900/10" />
-
-              <AnimatePresence mode="wait" initial={false}>
-                <motion.div
-                  key={`${activeDemo.title}-card`}
-                  className="live-demo-card"
-                  initial={{ opacity: 0, y: 22 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 16 }}
-                  transition={{ duration: 0.4, ease: 'easeOut' }}
-                >
-                  <div className="live-demo-card-label" style={{ color: activeDemo.accent }}>
-                    {activeDemo.label}
-                  </div>
-                  <h3 className="live-demo-card-title">{activeDemo.title}</h3>
-                  <p className="live-demo-card-description">{activeDemo.description}</p>
-
-                  <div className="live-demo-point-list">
-                    {activeDemo.points.map((point) => (
-                      <div key={point} className="live-demo-point">
-                        <CheckCircle2 className="h-4 w-4 shrink-0" style={{ color: activeDemo.accent }} />
-                        <span>{point}</span>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="live-demo-actions">
-                    <button
-                      type="button"
-                      className="live-demo-next"
-                      onClick={handleDemoNext}
-                      style={{ backgroundColor: activeDemo.accent }}
-                    >
-                      <span>{isLastDemoStep ? 'Start free trial' : 'Next'}</span>
-                      <ArrowRight className="h-4 w-4" />
-                    </button>
-                  </div>
-
-                  <p className="live-demo-next-label">
-                    {isLastDemoStep ? 'Continue into Fixnest and launch your own workspace.' : `Next: ${nextDemo.label}`}
-                  </p>
-                </motion.div>
-              </AnimatePresence>
-            </div>
-
-            <div className="live-demo-step-tabs">
-              {liveDemoSteps.map((step, index) => (
-                <button
-                  key={step.label}
-                  type="button"
-                  className={`live-demo-step-tab ${index === activeDemoIndex ? 'is-active' : ''}`}
-                  onClick={() => handleDemoStepSelect(index)}
-                  style={index === activeDemoIndex ? { borderColor: step.accent, color: step.accent } : undefined}
-                >
-                  {step.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-        <div className="landing-hero-media">
-          <div className="hero-photo group" style={{ background: 'linear-gradient(145deg, #0f172a 0%, #1e293b 100%)', padding: '18px' }}>
-            <img 
-              src={DashboardScreenshot}
-              alt="Fixnest dashboard overview"
-              className="w-full h-full rounded-[24px] object-cover object-top transition-transform duration-700 group-hover:scale-[1.02]"
+        <div className="ol-hero-dots">
+          {heroSlides.map((slide, index) => (
+            <button
+              key={slide.title}
+              type="button"
+              className={`ol-hero-dot${index === heroIndex ? ' is-active' : ''}`}
+              aria-label={`Show slide ${index + 1}`}
+              aria-current={index === heroIndex}
+              onClick={() => showHeroSlide(index)}
             />
-            <div className="absolute inset-0 bg-gradient-to-tr from-slate-900/40 to-transparent" />
-            <div className="hero-card hero-card--task" style={{ width: '240px', padding: '10px', background: 'rgba(255,255,255,0.97)' }}>
-              <img
-                src={RequestScreenshot}
-                alt="Request workflow preview"
-                className="h-28 w-full rounded-2xl object-cover"
-              />
-              <div className="hero-card-title" style={{ marginTop: '10px' }}>Request to Approval Flow</div>
-              <div className="hero-card-meta">Open · 1 hour</div>
-            </div>
-            <div className="hero-card hero-card--metrics" style={{ width: '240px', padding: '10px', background: 'rgba(15,23,42,0.92)', color: '#fff' }}>
-              <img
-                src={AnalyticsScreenshot}
-                alt="Analytics preview"
-                className="h-28 w-full rounded-2xl object-cover"
-              />
-              <div className="hero-card-title" style={{ marginTop: '10px', color: '#cbd5e1' }}>Analytics Snapshot</div>
-              <div className="hero-card-metric">Live charts and export-ready reports</div>
-            </div>
-          </div>
+          ))}
         </div>
       </section>
 
-      <section className="landing-live-demo-section">
+      <motion.section className="landing-live-demo-section" {...reveal}>
         <div className="landing-live-demo-wrap">
           <div className="landing-live-demo-preview">
             <div className="landing-live-demo-screen">
@@ -744,10 +675,9 @@ const LandingPage = () => {
                 className="landing-live-demo-screen-image"
               />
               <div className="landing-live-demo-screen-overlay" />
+              <div className="landing-live-demo-screen-anchor">
               <motion.div
                 className="landing-live-demo-screen-card"
-                animate={{ y: [0, -6, 0], scale: [1, 1.01, 1] }}
-                transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
               >
                 <div className="landing-live-demo-screen-label">Fixnest Product Tour</div>
                 <h3>See the workflow step by step</h3>
@@ -760,12 +690,13 @@ const LandingPage = () => {
                   View a Live Demo
                 </button>
               </motion.div>
+              </div>
             </div>
           </div>
 
           <div className="landing-live-demo-copy">
             <div className="landing-kicker">Product Tour</div>
-            <h2>From work orders to asset intelligence</h2>
+            <h2>From work orders to asset insight</h2>
             <p>
               Show new users how Fixnest moves from request intake to work orders, preventive maintenance, asset tracking,
               and reporting with a guided walkthrough built from your real screenshots.
@@ -779,18 +710,19 @@ const LandingPage = () => {
             </button>
           </div>
         </div>
-      </section>
+      </motion.section>
 
-      <section className="landing-section" style={{ backgroundColor: '#fff', padding: '24px 24px 84px' }}>
+      <section className="landing-section glass-panel glass-panel--roomy">
         <div className="max-w-7xl mx-auto">
           {platformScreenshots.map((screen, index) => (
-            <div
+            <motion.div
               key={screen.title}
-              className={`grid items-center gap-14 py-16 lg:grid-cols-[1fr_1.08fr] ${index !== 0 ? 'border-t border-slate-200' : ''}`}
+              {...reveal}
+              className={`grid items-center gap-14 py-16 lg:grid-cols-[1fr_1.08fr] ${index !== 0 ? 'border-t border-white/70' : ''}`}
             >
               <div className={screen.reverse ? 'lg:order-2 max-w-[620px]' : 'max-w-[620px]'}>
                 <div
-                  className="inline-flex items-center text-sm font-semibold tracking-normal"
+                  className="glass-chip"
                   style={{ color: screen.accent }}
                 >
                   {screen.eyebrow}
@@ -811,7 +743,7 @@ const LandingPage = () => {
                 </div>
                 <a
                   href={screen.linkHref}
-                  className="mt-10 inline-flex items-center gap-3 text-[1.05rem] font-semibold"
+                  className="mt-10 inline-flex items-center gap-3 text-[1.05rem] font-semibold glass-link"
                   style={{ color: screen.accent }}
                 >
                   {screen.linkLabel}
@@ -820,20 +752,23 @@ const LandingPage = () => {
               </div>
 
               <div className={screen.reverse ? 'lg:order-1' : ''}>
-                <div className="rounded-[28px] border border-slate-200 bg-white p-3 shadow-[0_24px_64px_rgba(15,23,42,0.10)]">
+                <motion.div
+                  className="glass-frame"
+                  transition={{ type: 'spring', stiffness: 200, damping: 20 }}
+                >
                   <img
                     src={screen.image}
                     alt={screen.title}
                     className="w-full rounded-[22px] object-cover object-top"
                   />
-                </div>
+                </motion.div>
               </div>
-            </div>
+            </motion.div>
           ))}
         </div>
       </section>
 
-      <section className="landing-logos">
+      <motion.section className="landing-logos" {...reveal}>
         <div className="landing-logos-title">TRUSTED BY 40+ BUSINESSES</div>
         <div className="logos-slider-wrapper">
           <div className="logos-slider">
@@ -845,310 +780,235 @@ const LandingPage = () => {
             <div className="logo-pill">Yamaha</div>
             <div className="logo-pill">Stratasys</div>
             {/* Duplicate for seamless loop */}
-            <div className="logo-pill">FOHBOH STUDIO</div>
-            <div className="logo-pill">OVRENTALS</div>
-            <div className="logo-pill">Chevron</div>
-            <div className="logo-pill">Caterpillar</div>
-            <div className="logo-pill">Shell</div>
-            <div className="logo-pill">Yamaha</div>
-            <div className="logo-pill">Stratasys</div>
+            <div className="logo-pill" aria-hidden="true">FOHBOH STUDIO</div>
+            <div className="logo-pill" aria-hidden="true">OVRENTALS</div>
+            <div className="logo-pill" aria-hidden="true">Chevron</div>
+            <div className="logo-pill" aria-hidden="true">Caterpillar</div>
+            <div className="logo-pill" aria-hidden="true">Shell</div>
+            <div className="logo-pill" aria-hidden="true">Yamaha</div>
+            <div className="logo-pill" aria-hidden="true">Stratasys</div>
           </div>
         </div>
-      </section>
+      </motion.section>
 
       {/* The Problem Section */}
-      <section className="landing-section" style={{ backgroundColor: '#fff', padding: '80px 24px' }}>
+      <motion.section className="landing-section glass-panel" {...reveal}>
         <div className="max-w-6xl mx-auto">
-          <div style={{ textAlign: 'center', marginBottom: '60px' }}>
+          <div className="glass-section-head">
+            <div className="glass-pill glass-pill--danger"><span className="glass-pill-dot" />THE PROBLEM</div>
             <h2 className="text-4xl font-bold text-slate-900 mb-4">The Problem With Maintenance Today</h2>
             <p className="text-xl text-slate-600 max-w-2xl mx-auto">
               Maintenance is not lacking effort — it is lacking structure. Here's what's holding you back:
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-            {[
-              { icon: '💬', title: 'Scattered Communication', desc: 'Lost service requests across emails, texts, and messages' },
-              { icon: '🗂️', title: 'No Single Source', desc: 'Asset and maintenance data trapped in spreadsheets' },
-              { icon: '🔥', title: 'Reactive Firefighting', desc: 'Always responding to emergencies, never preventing them' },
-              { icon: '👁️', title: 'Limited Visibility', desc: 'Leadership has no real-time insights into operations' },
-              { icon: '📈', title: 'Growing Inefficiency', desc: 'Problems multiply as you scale' }
-            ].map((item, idx) => (
-              <motion.div 
-                key={idx}
-                whileHover={{ y: -8 }}
-                className="p-6 bg-gradient-to-br from-red-50 to-orange-50 border border-red-200 rounded-2xl text-center hover:shadow-lg transition-shadow"
+          <motion.div {...stagger} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+            {problemItems.map(({ icon: Icon, title, desc }) => (
+              <motion.div
+                key={title}
+                {...staggerItem}
+                className="glass-card glass-card--center"
               >
-                <div style={{ fontSize: '40px', marginBottom: '12px' }}>{item.icon}</div>
-                <h3 className="font-bold text-slate-900 mb-2 text-lg">{item.title}</h3>
-                <p className="text-sm text-slate-600">{item.desc}</p>
+                <div className="glass-icon glass-icon--danger"><Icon className="h-6 w-6" /></div>
+                <h3 className="font-bold text-slate-900 mb-2 text-lg">{title}</h3>
+                <p className="text-sm text-slate-600">{desc}</p>
               </motion.div>
             ))}
-          </div>
+          </motion.div>
 
           <div style={{ marginTop: '40px', textAlign: 'center' }}>
-            <p style={{ fontSize: '18px', color: '#64748b', fontStyle: 'italic' }}>
+            <p style={{ fontSize: '18px', color: '#475569', fontStyle: 'italic' }}>
               The result? Poor visibility. Rising costs. Reactive operations. <span style={{ fontWeight: 'bold', color: '#dc2626' }}>But it doesn't have to be this way.</span>
             </p>
           </div>
         </div>
-      </section>
+      </motion.section>
 
       {/* The Opportunity Section */}
-      <section className="landing-section" style={{ 
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        padding: '80px 24px',
-        color: '#fff'
-      }}>
-        <div className="max-w-6xl mx-auto">
-          <div style={{ textAlign: 'center', marginBottom: '60px' }}>
-            <h2 className="text-4xl font-bold mb-4">The Transformation Happens Here</h2>
-            <p className="text-xl text-blue-100 max-w-3xl mx-auto">
+      <motion.section className="landing-section glass-panel glass-panel--dark" {...reveal}>
+        <div className="max-w-6xl mx-auto relative">
+          <div className="glass-section-head">
+            <h2 className="text-4xl font-bold mb-4 text-white">The Transformation Happens Here</h2>
+            <p className="text-xl text-slate-300 max-w-3xl mx-auto">
               When maintenance is managed through a centralized CMMS, everything changes:
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[
-              { number: '1️⃣', word: 'Predictable', desc: 'Scheduled, planned operations instead of surprises' },
-              { number: '2️⃣', word: 'Measurable', desc: 'Real-time metrics and clear performance indicators' },
-              { number: '3️⃣', word: 'Scalable', desc: 'Grow without losing control or visibility' },
-              { number: '4️⃣', word: 'Strategic', desc: 'Data-driven decisions that drive business value' }
-            ].map((item, idx) => (
-              <motion.div 
-                key={idx}
-                whileHover={{ scale: 1.05 }}
-                className="p-8 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 text-center hover:bg-white/20 transition-all"
+          <motion.div {...stagger} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {transformationItems.map((item, idx) => (
+              <motion.div
+                key={item.word}
+                {...staggerItem}
+                className="glass-card glass-card--on-dark glass-card--center"
               >
-                <div style={{ fontSize: '48px', marginBottom: '12px' }}>{item.number}</div>
-                <h3 className="font-bold text-2xl mb-2">{item.word}</h3>
-                <p className="text-blue-100 text-sm">{item.desc}</p>
+                <div className="glass-number">{String(idx + 1).padStart(2, '0')}</div>
+                <h3 className="font-bold text-2xl mb-2 text-white">{item.word}</h3>
+                <p className="text-slate-300 text-sm">{item.desc}</p>
               </motion.div>
             ))}
-          </div>
+          </motion.div>
 
-          <div style={{ 
-            marginTop: '60px', 
-            textAlign: 'center', 
-            padding: '40px 32px',
-            backgroundColor: 'rgba(255,255,255,0.1)',
-            borderRadius: '20px',
-            backdropFilter: 'blur(10px)',
-            border: '1px solid rgba(255,255,255,0.2)'
-          }}>
-            <p className="text-2xl font-bold">This is where Fixnest delivers real transformation</p>
+          <div className="glass-banner">
+            <p className="text-2xl font-bold text-white">This is where Fixnest delivers real transformation</p>
           </div>
         </div>
-      </section>
+      </motion.section>
 
       {/* Fixnest Solution Section */}
-      <section className="landing-section" style={{ backgroundColor: '#fff', padding: '80px 24px' }}>
+      <motion.section className="landing-section glass-panel" {...reveal}>
         <div className="max-w-6xl mx-auto">
-          <div style={{ textAlign: 'center', marginBottom: '60px' }}>
-            <div className="landing-kicker">OUR SOLUTION</div>
+          <div className="glass-section-head">
+            <div className="glass-pill"><span className="glass-pill-dot" />OUR SOLUTION</div>
             <h2 className="text-4xl font-bold text-slate-900 mb-4">The Fixnest CMMS Platform</h2>
             <p className="text-xl text-slate-600 max-w-3xl mx-auto">
-              A modern, intelligent system designed to centralize and optimize maintenance operations across any environment
+              A modern, unified system designed to centralize and optimize maintenance operations across any environment
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div>
               <h3 className="text-2xl font-bold text-slate-900 mb-6">Built For Everyone</h3>
-              <div className="space-y-4">
-                {[
-                  { icon: '🏥', text: 'Hospitals' },
-                  { icon: '🎓', text: 'Universities' },
-                  { icon: '🏢', text: 'Commercial Buildings' },
-                  { icon: '🏘️', text: 'Residential Portfolios' },
-                  { icon: '🏭', text: 'Industrial Facilities' }
-                ].map((item, idx) => (
-                  <div key={idx} className="flex items-center gap-4 p-4 bg-gradient-to-r from-indigo-50 to-blue-50 rounded-xl border border-indigo-100">
-                    <span style={{ fontSize: '28px' }}>{item.icon}</span>
-                    <span className="font-semibold text-slate-900">{item.text}</span>
-                  </div>
+              <motion.div {...stagger} className="space-y-4">
+                {audienceItems.map(({ icon: Icon, text }) => (
+                  <motion.div key={text} {...staggerItem} className="glass-row">
+                    <span className="glass-icon glass-icon--sm"><Icon className="h-5 w-5" /></span>
+                    <span className="font-semibold text-slate-900">{text}</span>
+                  </motion.div>
                 ))}
-              </div>
+              </motion.div>
             </div>
 
             <div>
               <h3 className="text-2xl font-bold text-slate-900 mb-6">Why Choose Fixnest</h3>
-              <ul className="space-y-3">
+              <motion.ul {...stagger} className="space-y-3">
                 {[
                   'Adapts to your specific operations',
                   'Scales with your growth',
                   'Mobile-first field execution',
                   'Real-time visibility and control',
                   'Integrated with your existing tools'
-                ].map((item, idx) => (
-                  <li key={idx} className="text-lg text-slate-700 flex items-center gap-3">
-                    <span className="text-green-600 text-xl">✅</span>
+                ].map((item) => (
+                  <motion.li key={item} {...staggerItem} className="glass-row text-lg text-slate-700">
+                    <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" />
                     {item}
-                  </li>
+                  </motion.li>
                 ))}
-              </ul>
+              </motion.ul>
             </div>
           </div>
         </div>
-      </section>
+      </motion.section>
 
       {/* Capabilities Section */}
-      <section className="landing-section" style={{ backgroundColor: '#f8fafc', padding: '80px 24px' }}>
+      <motion.section className="landing-section glass-panel" {...reveal}>
         <div className="max-w-6xl mx-auto">
-          <div style={{ textAlign: 'center', marginBottom: '60px' }}>
+          <div className="glass-section-head">
             <h2 className="text-4xl font-bold text-slate-900 mb-4">What Fixnest CMMS Enables</h2>
             <p className="text-xl text-slate-600">Everything you need for complete maintenance excellence</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[
-              { icon: '🏠', title: 'Universal Property Management', desc: 'Manage all your properties in one unified platform' },
-              { icon: '👀', title: 'Complete Asset Visibility', desc: 'Know the status of every asset in real-time' },
-              { icon: '📈', title: 'Scalable Operations', desc: 'Grow without losing control or efficiency' },
-              { icon: '📋', title: 'Centralized Work Orders', desc: 'Create, assign, and track all maintenance work' },
-              { icon: '🔄', title: 'Asset Lifecycle Tracking', desc: 'Monitor assets from purchase to replacement' },
-              { icon: '🛡️', title: 'Preventive & Predictive', desc: 'Prevent failures before they happen' },
-              { icon: '📊', title: 'Real-Time Dashboards', desc: 'Beautiful analytics and actionable insights' },
-              { icon: '📱', title: 'Mobile-First Execution', desc: 'Technicians work efficiently from anywhere' }
-            ].map((cap, idx) => (
+          <motion.div {...stagger} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {capabilityItems.map(({ icon: Icon, title, desc }) => (
               <motion.div
-                key={idx}
-                whileHover={{ y: -12 }}
-                className="p-6 bg-white rounded-2xl shadow-md hover:shadow-2xl transition-shadow border border-slate-100"
+                key={title}
+                {...staggerItem}
+                className="glass-card"
               >
-                <div style={{ fontSize: '36px', marginBottom: '12px' }}>{cap.icon}</div>
-                <h3 className="font-bold text-slate-900 mb-2 text-lg">{cap.title}</h3>
-                <p className="text-slate-600 text-sm">{cap.desc}</p>
+                <div className="glass-icon"><Icon className="h-6 w-6" /></div>
+                <h3 className="font-bold text-slate-900 mb-2 text-lg">{title}</h3>
+                <p className="text-slate-600 text-sm">{desc}</p>
               </motion.div>
             ))}
-          </div>
+          </motion.div>
         </div>
-      </section>
+      </motion.section>
 
       {/* Business Impact Section */}
-      <section className="landing-section" style={{ 
-        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-        padding: '80px 24px',
-        color: '#fff'
-      }}>
-        <div className="max-w-6xl mx-auto">
-          <div style={{ textAlign: 'center', marginBottom: '60px' }}>
-            <h2 className="text-4xl font-bold mb-4">Real Business Impact</h2>
-            <p className="text-xl text-emerald-100 max-w-3xl mx-auto">
+      <motion.section className="landing-section glass-panel glass-panel--dark glass-panel--teal" {...reveal}>
+        <div className="max-w-6xl mx-auto relative">
+          <div className="glass-section-head">
+            <h2 className="text-4xl font-bold mb-4 text-white">Real Business Impact</h2>
+            <p className="text-xl text-slate-300 max-w-3xl mx-auto">
               With Fixnest CMMS, organizations achieve measurable results
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-            {[
-              { metric: '⬇️', value: 'Reduce Downtime', desc: 'Minimize operational disruptions' },
-              { metric: '💰', value: 'Lower Costs', desc: 'Proactive planning saves money' },
-              { metric: '⏱️', value: 'Extend Lifespan', desc: 'Assets last longer with care' },
-              { metric: '👥', value: 'Better Coordination', desc: 'Teams work together seamlessly' },
-              { metric: '🎯', value: 'Data-Driven', desc: 'Make smarter decisions' }
-            ].map((item, idx) => (
+          <motion.div {...stagger} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+            {impactItems.map(({ icon: Icon, value, desc }) => (
               <motion.div
-                key={idx}
-                whileHover={{ scale: 1.05 }}
-                className="p-6 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 text-center hover:bg-white/20 transition-all"
+                key={value}
+                {...staggerItem}
+                className="glass-card glass-card--on-dark glass-card--center"
               >
-                <div style={{ fontSize: '40px', marginBottom: '12px' }}>{item.metric}</div>
-                <h3 className="font-bold text-lg mb-2">{item.value}</h3>
-                <p className="text-emerald-100 text-sm">{item.desc}</p>
+                <div className="glass-icon glass-icon--on-dark"><Icon className="h-6 w-6" /></div>
+                <h3 className="font-bold text-lg mb-2 text-white">{value}</h3>
+                <p className="text-slate-300 text-sm">{desc}</p>
               </motion.div>
             ))}
-          </div>
+          </motion.div>
         </div>
-      </section>
+      </motion.section>
 
       {/* Why Fixnest is Different */}
-      <section className="landing-section" style={{ backgroundColor: '#fff', padding: '80px 24px' }}>
+      <motion.section className="landing-section glass-panel" {...reveal}>
         <div className="max-w-4xl mx-auto">
-          <div style={{ textAlign: 'center', marginBottom: '60px' }}>
+          <div className="glass-section-head">
             <h2 className="text-4xl font-bold text-slate-900 mb-4">Beyond Traditional CMMS</h2>
             <p className="text-xl text-slate-600">
               Fixnest is not just another CMMS. Here's what makes it different:
             </p>
           </div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="grid grid-cols-1 md:grid-cols-3 gap-8"
-          >
-            {[
-              {
-                icon: '🎯',
-                old: 'Just tracking work',
-                new: 'Driving strategy',
-              },
-              {
-                icon: '💾',
-                old: 'Just storing data',
-                new: 'Generating insights',
-              },
-              {
-                icon: '🔧',
-                old: 'Just managing tasks',
-                new: 'Transforming operations',
-              }
-            ].map((item, idx) => (
-              <div key={idx} className="p-8 border-2 border-slate-200 rounded-2xl hover:border-indigo-500 transition-colors">
-                <div style={{ fontSize: '48px', marginBottom: '20px' }}>{item.icon}</div>
+          <motion.div {...stagger} className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {differenceItems.map(({ icon: Icon, old, new: next }) => (
+              <motion.div key={next} {...staggerItem} className="glass-card">
+                <div className="glass-icon"><Icon className="h-6 w-6" /></div>
                 <div className="space-y-4">
-                  <div className="text-red-600 line-through text-lg">{item.old}</div>
+                  <div className="text-slate-400 line-through text-lg">{old}</div>
                   <div className="flex items-center gap-2">
-                    <ArrowRight className="w-5 h-5 text-green-600" />
-                    <span className="text-green-600 font-bold text-lg">{item.new}</span>
+                    <ArrowRight className="w-5 h-5 text-emerald-600" />
+                    <span className="text-emerald-700 font-bold text-lg">{next}</span>
                   </div>
                 </div>
-              </div>
+              </motion.div>
             ))}
           </motion.div>
 
-          <div style={{ 
-            marginTop: '60px', 
-            padding: '40px',
-            backgroundColor: 'linear-gradient(135deg, #667eea15 0%, #764ba215 100%)',
-            border: '2px solid #667eea',
-            borderRadius: '20px',
-            textAlign: 'center'
-          }}>
+          <div className="glass-callout">
             <h3 className="text-2xl font-bold text-slate-900 mb-2">Fixnest becomes the operating system for maintenance excellence.</h3>
-            <p className="text-slate-700 text-lg">One platform. Total visibility. Smarter maintenance at any scale.</p>
+            <p className="text-slate-700 text-lg">One platform. Total visibility. Better maintenance at any scale.</p>
           </div>
         </div>
-      </section>
+      </motion.section>
 
-      <section className="landing-section landing-products">
+      <motion.section className="landing-section landing-products" {...reveal}>
         <div className="landing-section-header">
           <div className="landing-section-title">Our Products</div>
-          <a className="landing-section-cta" href="/request-demo">Request a Demo</a>
+          <a className="landing-section-cta glass-button" href="/request-demo">Request a Demo</a>
         </div>
-        <div className="product-grid">
+        <motion.div {...stagger} className="product-grid">
           {products.map((product) => (
-            <motion.article 
-              key={product.name} 
-              className="product-card group cursor-pointer"
-              whileHover={{ y: -8, transition: { duration: 0.2 } }}
+            <motion.article
+              key={product.name}
+              {...staggerItem}
+              className="product-card glass-card group cursor-pointer"
               onClick={() => setSelectedItem(product)}
             >
               <div className="product-image-container mb-4 overflow-hidden rounded-xl h-40">
-                <img 
-                  src={product.image} 
-                  alt={product.name} 
+                <img
+                  src={product.image}
+                  alt={product.name}
                   className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                 />
               </div>
               <div className="flex items-center gap-2 mb-1">
-                <span className="text-indigo-600">{product.icon}</span>
+                <span className="text-[var(--brand-amber)]">{product.icon}</span>
                 <div className="product-label">{product.label}</div>
               </div>
               <h3 className="product-title">{product.name}</h3>
               <p className="product-description line-clamp-3">{product.description}</p>
-              <button 
-                className="product-link mt-4 flex items-center gap-2 group-hover:gap-3 transition-all" 
+              <button
+                className="product-link mt-4 flex items-center gap-2 group-hover:gap-3 transition-all"
                 type="button"
                 style={{ cursor: 'pointer' }}
               >
@@ -1156,34 +1016,33 @@ const LandingPage = () => {
               </button>
             </motion.article>
           ))}
-        </div>
-      </section>
+        </motion.div>
+      </motion.section>
 
-      <section className="landing-section landing-industries">
+      <motion.section className="landing-section landing-industries" {...reveal}>
         <div className="landing-section-header">
           <div className="landing-section-title">Industries We Serve</div>
-          <p className="text-gray-500 max-w-lg">Scalable solutions tailored for specialized operations across various sectors.</p>
+          <p className="text-slate-600 max-w-lg">Scalable solutions tailored for specialized operations across various sectors.</p>
         </div>
-        <div className="industry-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <motion.div {...stagger} className="industry-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {industries.map((industry) => (
-            <motion.div 
+            <motion.div
               key={industry.name}
+              {...staggerItem}
               className="industry-card relative rounded-2xl overflow-hidden h-72 cursor-pointer group"
-              whileHover={{ scale: 1.02 }}
               onClick={() => handleIndustryClick(industry)}
             >
-              <img 
-                src={industry.image} 
-                alt={industry.name} 
-                className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" 
+              <img
+                src={industry.image}
+                alt={industry.name}
+                className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/40 to-transparent" />
-              <div className="absolute bottom-0 left-0 p-6 w-full">
-                <div className="flex items-center gap-2 text-indigo-400 mb-2">
+              <div className="industry-glass-caption">
+                <div className="flex items-center gap-2 text-amber-300 mb-2">
                   {industry.icon}
                 </div>
                 <h3 className="text-white font-bold text-xl mb-2">{industry.name}</h3>
-                <p className="text-slate-300 text-sm line-clamp-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                <p className="text-slate-200 text-sm line-clamp-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                   {industry.description}
                 </p>
                 <div className="mt-3 flex items-center gap-2 text-white text-xs font-bold uppercase tracking-wider">
@@ -1192,8 +1051,8 @@ const LandingPage = () => {
               </div>
             </motion.div>
           ))}
-        </div>
-      </section>
+        </motion.div>
+      </motion.section>
 
       <AnimatePresence>
         {isLiveDemoOpen && (
@@ -1339,7 +1198,7 @@ const LandingPage = () => {
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-4xl bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row"
+              className="relative w-full max-w-4xl glass-modal rounded-3xl overflow-hidden flex flex-col md:flex-row"
             >
               <div className="w-full md:w-1/2 h-64 md:h-auto relative">
                 <img src={selectedItem.image} alt={selectedItem.name} className="w-full h-full object-cover" />
@@ -1354,14 +1213,14 @@ const LandingPage = () => {
                 >
                   <X className="w-6 h-6 text-slate-400" />
                 </button>
-                <div className="text-indigo-600 font-bold tracking-widest text-xs uppercase mb-2">
+                <div className="text-[var(--brand-amber)] font-bold tracking-widest text-xs uppercase mb-2">
                   {selectedItem.label || 'Industry Solution'}
                 </div>
                 <h2 className="text-3xl font-bold text-slate-900 mb-4">{selectedItem.name}</h2>
                 <p className="text-lg text-slate-600 font-medium mb-6 leading-relaxed">
                   {selectedItem.description}
                 </p>
-                <div className="bg-slate-50 p-6 rounded-2xl mb-8">
+                <div className="glass-inset p-6 rounded-2xl mb-8">
                   <h4 className="text-slate-900 font-bold mb-3 flex items-center gap-2">
                     <CheckCircle2 className="w-5 h-5 text-green-500" /> Key Capabilities
                   </h4>
@@ -1375,7 +1234,7 @@ const LandingPage = () => {
                       setSelectedItem(null);
                       if (selectedItem.label) handleProductClick(selectedItem.name);
                     }}
-                    className="px-6 py-3 bg-indigo-600 text-white rounded-full font-bold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200"
+                    className="landing-cta px-6 py-3 font-bold"
                   >
                     Learn More
                   </button>
@@ -1393,7 +1252,7 @@ const LandingPage = () => {
       </AnimatePresence>
 
       {pricingPlans.length > 0 && (
-        <section className="landing-section landing-pricing">
+        <motion.section className="landing-section landing-pricing glass-panel" {...reveal}>
           <div className="landing-section-header">
             <div>
               <div className="landing-kicker">FixNestPRICING</div>
@@ -1406,8 +1265,8 @@ const LandingPage = () => {
                 style={{ 
                   padding: '8px 16px', 
                   borderRadius: '6px',
-                  border: currency === 'USD' ? '2px solid #0066cc' : '1px solid #ddd',
-                  backgroundColor: currency === 'USD' ? '#f0f8ff' : '#fff',
+                  border: currency === 'USD' ? '2px solid #0066cc' : '1px solid rgba(255,255,255,0.8)',
+                  backgroundColor: currency === 'USD' ? 'rgba(240,248,255,0.85)' : 'rgba(255,255,255,0.55)',
                   color: currency === 'USD' ? '#0066cc' : '#333',
                   fontWeight: currency === 'USD' ? '600' : '500',
                   cursor: changingCurrency ? 'not-allowed' : 'pointer',
@@ -1423,8 +1282,8 @@ const LandingPage = () => {
                 style={{ 
                   padding: '8px 16px', 
                   borderRadius: '6px',
-                  border: currency === 'RWF' ? '2px solid #0066cc' : '1px solid #ddd',
-                  backgroundColor: currency === 'RWF' ? '#f0f8ff' : '#fff',
+                  border: currency === 'RWF' ? '2px solid #0066cc' : '1px solid rgba(255,255,255,0.8)',
+                  backgroundColor: currency === 'RWF' ? 'rgba(240,248,255,0.85)' : 'rgba(255,255,255,0.55)',
                   color: currency === 'RWF' ? '#0066cc' : '#333',
                   fontWeight: currency === 'RWF' ? '600' : '500',
                   cursor: changingCurrency ? 'not-allowed' : 'pointer',
@@ -1443,7 +1302,7 @@ const LandingPage = () => {
                 className={`pricing-card${plan.badge ? ' pricing-card--featured' : ''}${plan.key === 'premium' ? ' pricing-card--premium' : ''}`}
                 style={plan.key === 'premium' ? {
                   borderColor: '#9333ea',
-                  backgroundColor: '#faf5ff',
+                  backgroundColor: 'rgba(250,245,255,0.7)',
                   position: 'relative',
                   transform: 'scale(1.02)'
                 } : {}}
@@ -1488,48 +1347,32 @@ const LandingPage = () => {
               </article>
             ))}
           </div>
-        </section>
+        </motion.section>
       )}
 
-      <section className="landing-section landing-features">
+      <motion.section className="landing-section landing-features glass-panel" {...reveal}>
         <div className="landing-section-header">
-          <div className="landing-section-title">Core Features</div>
-          <p style={{ marginTop: '8px', fontSize: '16px', color: '#666' }}>Everything you need for complete maintenance management</p>
-        </div>
-        <div className="features-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px', marginTop: '40px' }}>
-          <div className="feature-card" style={{ padding: '24px', border: '1px solid #e0e0e0', borderRadius: '8px', backgroundColor: '#fafafa' }}>
-            <h3 style={{ marginBottom: '12px', fontSize: '18px', fontWeight: '600' }}>Work Orders</h3>
-            <p style={{ color: '#666', lineHeight: '1.6' }}>Manage requests and work orders in real-time. Create, assign, and track maintenance tasks from any device with complete visibility.</p>
-          </div>
-          <div className="feature-card" style={{ padding: '24px', border: '1px solid #e0e0e0', borderRadius: '8px', backgroundColor: '#fafafa' }}>
-            <h3 style={{ marginBottom: '12px', fontSize: '18px', fontWeight: '600' }}>Asset Management</h3>
-            <p style={{ color: '#666', lineHeight: '1.6' }}>Maximize asset uptime and reliability. Track asset lifecycle, maintenance history, and performance metrics in one centralized location.</p>
-          </div>
-          <div className="feature-card" style={{ padding: '24px', border: '1px solid #e0e0e0', borderRadius: '8px', backgroundColor: '#fafafa' }}>
-            <h3 style={{ marginBottom: '12px', fontSize: '18px', fontWeight: '600' }}>Safety & Compliance</h3>
-            <p style={{ color: '#666', lineHeight: '1.6' }}>Audit trails and regulatory compliance. Automated documentation and reporting to help you maintain standards and reduce risk.</p>
-          </div>
-          <div className="feature-card" style={{ padding: '24px', border: '1px solid #e0e0e0', borderRadius: '8px', backgroundColor: '#fafafa' }}>
-            <h3 style={{ marginBottom: '12px', fontSize: '18px', fontWeight: '600' }}>Preventive Maintenance</h3>
-            <p style={{ color: '#666', lineHeight: '1.6' }}>Reduce downtime with proactive service. AI-powered scheduling automatically creates preventive maintenance tasks based on usage and best practices.</p>
-          </div>
-          <div className="feature-card" style={{ padding: '24px', border: '1px solid #e0e0e0', borderRadius: '8px', backgroundColor: '#fafafa' }}>
-            <h3 style={{ marginBottom: '12px', fontSize: '18px', fontWeight: '600' }}>Parts & Inventory</h3>
-            <p style={{ color: '#666', lineHeight: '1.6' }}>Streamline parts tracking and purchasing. Manage stock levels, automate reorders, and reduce supply chain delays.</p>
-          </div>
-          <div className="feature-card" style={{ padding: '24px', border: '1px solid #e0e0e0', borderRadius: '8px', backgroundColor: '#fafafa' }}>
-            <h3 style={{ marginBottom: '12px', fontSize: '18px', fontWeight: '600' }}>Analytics & Reporting</h3>
-            <p style={{ color: '#666', lineHeight: '1.6' }}>Customizable reports and dashboards with deep insights. Track KPIs, identify trends, and make data-driven maintenance decisions.</p>
-          </div>
-          <div className="feature-card" style={{ padding: '24px', border: '1px solid #e0e0e0', borderRadius: '8px', backgroundColor: '#fafafa' }}>
-            <h3 style={{ marginBottom: '12px', fontSize: '18px', fontWeight: '600' }}>Integrations</h3>
-            <p style={{ color: '#666', lineHeight: '1.6' }}>Unified maintenance operations. Connect with ERPs, sensors, IoT devices, and other systems for seamless data flow.</p>
+          <div>
+            <div className="landing-section-title">Core Features</div>
+            <p style={{ marginTop: '8px', fontSize: '16px', color: '#475569' }}>Everything you need for complete maintenance management</p>
           </div>
         </div>
-      </section>
+        <motion.div {...stagger} className="features-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(300px, 100%), 1fr))', gap: '24px', marginTop: '16px' }}>
+          {coreFeatures.map((feature) => (
+            <motion.div
+              key={feature.title}
+              {...staggerItem}
+              className="feature-card glass-card"
+            >
+              <h3 style={{ marginBottom: '12px', fontSize: '18px', fontWeight: '600' }}>{feature.title}</h3>
+              <p style={{ color: '#475569', lineHeight: '1.6' }}>{feature.desc}</p>
+            </motion.div>
+          ))}
+        </motion.div>
+      </motion.section>
 
-      <section className="landing-section landing-integrations">
-        <div className="integration-card">
+      <motion.section className="landing-section landing-integrations" {...reveal}>
+        <div className="integration-card glass-panel">
           <div className="integration-text">
             <div className="landing-kicker">INTEGRATIONS</div>
             <h2>Connects to what you already use.</h2>
@@ -1544,116 +1387,53 @@ const LandingPage = () => {
             <div className="integration-node">Safety</div>
             <div className="integration-node">Learn</div>
             <div className="integration-node">Lattice</div>
-            <div className="integration-core">Over Agent</div>
+            <div className="integration-node">ERP</div>
+            <div className="integration-core"><Plug className="h-4 w-4" /> Fixnest Platform</div>
           </div>
         </div>
-      </section>
+      </motion.section>
 
-      <section className="landing-section landing-ai">
-        <div className="ai-panel">
-          <div className="ai-text">
-            <h2>Automate the tedious. Accelerate the complex.</h2>
-            <p>
-              Give your team AI that does real work. Over handles routine tasks and surfaces insights
-              that used to take hours.
-            </p>
-            <div className="ai-cta-row">
-              <a className="landing-cta" href="/register">Start a Free Trial</a>
-              <a className="landing-cta landing-cta--ghost" href="/request-demo">Request a Demo</a>
-            </div>
-          </div>
-          <div className="ai-visual">
-            <div className="ai-orb">AI</div>
-            <div className="ai-chat" id="landing-agent">
-              <div className="ai-chat-title">How can I help?</div>
-              <div className="ai-thread">
-                {agentConversation.slice(-4).map((entry, index) => (
-                  <div
-                    key={`${entry.role}-${index}-${entry.text}`}
-                    className={`ai-message ${entry.role === 'user' ? 'ai-message--user' : 'ai-message--assistant'}`}
-                  >
-                    {entry.text}
-                  </div>
-                ))}
-              </div>
-              {agentSubmitting ? <div className="ai-loading">Thinking...</div> : null}
-              <div className="ai-starters">
-                {landingAgentStarters.map((starter) => (
-                  <button
-                    key={starter}
-                    type="button"
-                    className="ai-starter"
-                    onClick={() => handleLandingStarterClick(starter)}
-                    disabled={agentSubmitting}
-                  >
-                    {starter}
-                  </button>
-                ))}
-              </div>
-              <form onSubmit={handleLandingAgentSubmit} className="ai-input-form">
-                <input
-                  className="ai-input"
-                  value={agentPrompt}
-                  onChange={(event) => setAgentPrompt(event.target.value)}
-                  placeholder="Ask the agent to help with maintenance work..."
-                  disabled={agentSubmitting}
-                />
-                <div className="ai-actions">
-                  <button type="submit" className="ai-chip ai-chip--send" aria-label="Send prompt" disabled={agentSubmitting} />
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-        <div className="ai-cards">
-          <div className="ai-card">
-            <h3>Easily Complete Work Orders from Anywhere</h3>
-            <p>
-              Create work orders in seconds with photos, checklists, and real-time updates from any device.
-              Technicians close work on the spot, reducing admin time and improving response speed.
-            </p>
-          </div>
-          <div className="ai-card">
-            <h3>Stay Ahead of Breakdowns with Automated PMs</h3>
-            <p>
-              Shift from reactive firefighting to proactive planning with automated schedules based on actual usage.
-              Smart scheduling keeps assets running longer and minimizes downtime.
-            </p>
-          </div>
-          <div className="ai-card">
-            <h3>Turn Safety Events into Preventive Action</h3>
-            <p>
-              Report safety events from any device - just scan a QR code, no downloads or logins needed.
-              AI turns incidents into preventive actions so small issues do not become big problems.
-            </p>
-          </div>
-        </div>
-      </section>
+      <motion.section className="landing-section landing-highlights" {...reveal}>
+        <motion.div {...stagger} className="highlight-cards">
+          {highlightCards.map((card) => (
+            <motion.div
+              key={card.title}
+              {...staggerItem}
+              className="glass-card"
+            >
+              <h3 className="text-xl font-bold text-slate-900 mb-3">{card.title}</h3>
+              <p className="text-slate-600 leading-relaxed">{card.desc}</p>
+            </motion.div>
+          ))}
+        </motion.div>
+      </motion.section>
 
-      <section className="landing-section landing-cta-hero relative overflow-hidden rounded-[40px] h-[500px] mb-24">
-        <img 
-          src="https://images.unsplash.com/photo-1552664730-d307ca884978?w=1200&q=80" 
-          alt="Team Collaboration" 
+      <motion.section className="landing-section landing-cta-hero relative overflow-hidden rounded-[40px] min-h-[500px] mb-24" {...reveal}>
+        <img
+          src="https://images.unsplash.com/photo-1552664730-d307ca884978?w=1200&q=80"
+          alt="Team Collaboration"
           className="absolute inset-0 w-full h-full object-cover"
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-slate-900/80 to-slate-900/40" />
-        <div className="relative z-10 h-full flex flex-col justify-center px-12 md:px-24 max-w-4xl">
-          <div className="landing-kicker text-indigo-400 mb-4">DRIVE EFFICIENCY TODAY</div>
-          <h2 className="text-4xl md:text-6xl font-bold text-white mb-6 leading-tight">
-            Stop reacting. <br />
-            Start predicting.
-          </h2>
-          <p className="text-xl text-slate-300 mb-8 max-w-xl">
-            Join 4,000+ businesses that have transformed their maintenance operations from reactive firefighting to intelligent asset management.
-          </p>
-          <div className="landing-cta-row">
-            <a className="landing-cta px-10 py-4 text-lg" href="/register">Start Your Free Trial</a>
-            <a className="landing-cta landing-cta--ghost px-10 py-4 text-lg border-white/20 text-black" href="/request-demo">Schedule a Tour</a>
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-900/80 via-slate-900/40 to-transparent" />
+        <div className="relative z-10 flex min-h-[500px] items-center px-6 py-10 md:px-16">
+          <div className="glass-cta-card">
+            <div className="landing-kicker mb-4" style={{ color: '#fdba74' }}>DRIVE EFFICIENCY TODAY</div>
+            <h2 className="text-4xl md:text-6xl font-bold text-white mb-6 leading-tight">
+              Stop reacting. <br />
+              Start planning.
+            </h2>
+            <p className="text-xl text-slate-200 mb-8 max-w-xl">
+              Join 4,000+ businesses that have transformed their maintenance operations from reactive firefighting to proactive asset management.
+            </p>
+            <div className="landing-cta-row">
+              <a className="landing-cta px-10 py-4 text-lg" href="/register">Start Your Free Trial</a>
+              <a className="landing-cta landing-cta--ghost-dark px-10 py-4 text-lg" href="/request-demo">Schedule a Tour</a>
+            </div>
           </div>
         </div>
-      </section>
+      </motion.section>
 
-      <section className="landing-section landing-proof">
+      <motion.section className="landing-section landing-proof glass-panel" {...reveal}>
         <div className="landing-proof-content">
           <div className="landing-section-title">Leading the Way to a Better Future for Maintenance and Reliability</div>
           <p>
@@ -1664,33 +1444,29 @@ const LandingPage = () => {
             <a className="landing-cta" href="/register">Start a Free Trial</a>
             <a className="landing-cta landing-cta--ghost" href="/request-demo">Request a Demo</a>
           </div>
-          {/* <div className="landing-badges">
-            <span className="badge-pill">IDC CMMS Leader 2021</span>
-            <span className="badge-pill">Gartner Peer Insights</span>
-          </div> */}
         </div>
-      </section>
+      </motion.section>
 
       {/* Team Section */}
-      <section className="landing-section" data-section="team" style={{ backgroundColor: '#fff', padding: '80px 24px' }}>
+      <motion.section className="landing-section glass-panel" data-section="team" {...reveal}>
         <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-16">
-            <div className="landing-kicker">OUR TEAM</div>
+          <div className="glass-section-head">
+            <div className="glass-pill"><span className="glass-pill-dot" />OUR TEAM</div>
             <h2 className="text-4xl font-bold text-slate-900 mb-4">The Minds Behind Fixnest</h2>
             <p className="text-xl text-slate-600 max-w-2xl mx-auto">
               A dedicated team of innovators and professionals committed to transforming maintenance management.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
+          <motion.div {...stagger} className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
             {teamMembers.map((member) => (
               <motion.div
                 key={member.name}
-                whileHover={{ y: -8 }}
-                className="overflow-hidden rounded-2xl bg-slate-50 shadow-md transition-shadow hover:shadow-xl"
+                {...staggerItem}
+                className="glass-card glass-card--flush"
               >
                 {member.image ? (
-                  <div className="relative h-64 overflow-hidden bg-gray-200">
+                  <div className="relative h-64 overflow-hidden bg-white/40">
                     <img
                       src={member.image}
                       alt={member.name}
@@ -1711,17 +1487,17 @@ const LandingPage = () => {
                 </div>
               </motion.div>
             ))}
-          </div>
+          </motion.div>
 
-          <div className="mt-16 text-center p-8 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-2xl border border-indigo-200">
+          <div className="glass-callout mt-16">
             <h3 className="text-2xl font-bold text-slate-900 mb-2">Join Our Growing Team</h3>
             <p className="text-slate-600 mb-6">We're always looking for talented individuals passionate about revolutionizing maintenance management.</p>
-            <a href="/careers" className="inline-block px-8 py-3 bg-indigo-600 text-white rounded-full font-bold hover:bg-indigo-700 transition-colors">
+            <a href="/careers" className="landing-cta inline-block">
               View Open Positions
             </a>
           </div>
         </div>
-      </section>
+      </motion.section>
 
       {/* Contact Widget */}
       <ContactWidget />

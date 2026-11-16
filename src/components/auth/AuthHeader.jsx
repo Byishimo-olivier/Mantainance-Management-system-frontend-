@@ -1,9 +1,11 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import companyLogo from '../../assets/fixnest-brand-wordmark.png';
+import companyLogoLight from '../../assets/fixnest-brand-wordmark-light.png';
 
-export default function AuthHeader() {
+export default function AuthHeader({ transparent = false }) {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState(null);
   const location = useLocation();
@@ -14,7 +16,6 @@ export default function AuthHeader() {
   // Product-to-tab mapping
   const productNavigation = {
     'CMMS': () => navigate('/product/cmms'),
-    'Intelligence': () => navigate('/product/intelligence'),
     'Learn': () => navigate('/product/learn'),
     'Safety': () => navigate('/product/safety'),
     'Providers': () => navigate('/product/providers'),
@@ -71,8 +72,6 @@ export default function AuthHeader() {
     'Maintenance Calculator': () => navigate('/resource/maintenance-calculator'),
     'QR Generator': () => navigate('/resource/qr-generator'),
     'Checklist Generator': () => navigate('/resource/checklist-generator'),
-    'Ask Anything': () => navigate('/resource/ask-anything'),
-    'AI Assessments': () => navigate('/resource/ai-assessments'),
   };
 
   useEffect(() => {
@@ -98,6 +97,15 @@ export default function AuthHeader() {
       document.body.style.overflow = '';
     };
   }, [isSearchOpen]);
+
+  // Transparent header (landing page): turn solid once the visitor scrolls past the top.
+  useEffect(() => {
+    if (!transparent) return undefined;
+    const onScroll = () => setIsScrolled(window.scrollY > 40);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, [transparent]);
 
   useEffect(() => {
     // Close mobile menu and dropdown when location changes
@@ -162,10 +170,10 @@ export default function AuthHeader() {
   };
 
   return (
-    <header className="auth-site-header">
+    <header className={`auth-site-header${transparent ? ' auth-site-header--overlay' : ''}${transparent && (isScrolled || isMobileMenuOpen) ? ' is-scrolled' : ''}`}>
       <div className="auth-nav">
         <Link to="/" className="auth-logo">
-          <img src={companyLogo} alt="FixNest logo" className="auth-logo-img" />
+          <img src={transparent ? companyLogoLight : companyLogo} alt="FixNest logo" className="auth-logo-img" />
         </Link>
 
         <nav className={`auth-nav-links ${isMobileMenuOpen ? 'mobile-open' : ''}`} aria-label="Primary">
@@ -186,7 +194,6 @@ export default function AuthHeader() {
                 <div className="mega-title">Products</div>
                 <div className="mega-chip-grid">
                   <button type="button" className="mega-chip" onClick={() => handleProductClick('CMMS')}>CMMS</button>
-                  <button type="button" className="mega-chip" onClick={() => handleProductClick('Intelligence')}>Intelligence</button>
                   <button type="button" className="mega-chip" onClick={() => handleProductClick('Safety')}>Safety</button>
                   <button type="button" className="mega-chip" onClick={() => handleProductClick('Providers')}>Providers</button>
                   <button type="button" className="mega-chip" onClick={() => handleProductClick('Learn')}>Learn</button>
@@ -388,12 +395,6 @@ export default function AuthHeader() {
                   <button type="button" className="mega-item" onClick={() => handleResourceClick('Checklist Generator')}>
                     Checklist Generator
                   </button>
-                  <button type="button" className="mega-item" onClick={() => handleResourceClick('Ask Anything')}>
-                    Ask Anything
-                  </button>
-                  <button type="button" className="mega-item" onClick={() => handleResourceClick('AI Assessments')}>
-                    AI Assessments
-                  </button>
                 </div>
               </div>
             </div>
@@ -401,6 +402,8 @@ export default function AuthHeader() {
 
           <button type="button" className="nav-link" onClick={handleTeamClick}>Team</button>
           <Link to="/pricing" className="nav-link">Pricing</Link>
+          {/* Phones (transparent header only): "Log in" moves into the menu to free up header space */}
+          {transparent && <Link to="/login" className="nav-link nav-link--menu-only">Log in</Link>}
         </nav>
 
         <div className="auth-nav-actions">
@@ -465,7 +468,7 @@ export default function AuthHeader() {
                   <span>Maintenance Management</span>
                   <span className="search-arrow">&gt;</span>
                 </button>
-                <button type="button" className="search-link" onClick={() => navigate('/product/intelligence')}>
+                <button type="button" className="search-link" onClick={() => navigate('/feature/asset-management')}>
                   <span>Enterprise Asset Management</span>
                   <span className="search-arrow">&gt;</span>
                 </button>

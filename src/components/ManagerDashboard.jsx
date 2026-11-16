@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import backgroundVideo from "../assets/136906-765457769_small.mp4";
 import api from "../api/axios";
 import { getImageUrl } from "../utils/imageUrl";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -743,6 +742,8 @@ function ManagerDashboard() {
   const [materialRequests, setMaterialRequests] = useState([]);
   const [technicians, setTechnicians] = useState([]);
   const [systemUsers, setSystemUsers] = useState([]);
+  // API paths that failed on the last dashboard load (shown as a warning instead of a silent empty page).
+  const [loadFailures, setLoadFailures] = useState([]);
   const [teams, setTeams] = useState([]);
 
   const isPmLinkedIssue = (issue) => {
@@ -801,6 +802,7 @@ function ManagerDashboard() {
   const [selectedAssignedTo, setSelectedAssignedTo] = useState([]);
   const [includeSubLocations, setIncludeSubLocations] = useState(false);
   const [locationSearch, setLocationSearch] = useState('');
+  const [assetSearch, setAssetSearch] = useState('');
   const [detailModal, setDetailModal] = useState({ open: false, type: null, item: null });
   const [commentModal, setCommentModal] = useState({ open: false, item: null });
   const [directMessageModal, setDirectMessageModal] = useState({
@@ -951,12 +953,13 @@ function ManagerDashboard() {
       });
   });
 
-  const safeApiGet = async (path, fallback, timeoutMs = 10000) => {
+  const safeApiGet = async (path, fallback, timeoutMs = 30000) => {
     try {
       const response = await requestWithTimeout(api.get(path), timeoutMs);
       return response?.data ?? fallback;
     } catch (error) {
       console.error(`Failed to load ${path}:`, error);
+      setLoadFailures((prev) => (prev.includes(path) ? prev : [...prev, path]));
       return fallback;
     }
   };
@@ -965,6 +968,7 @@ function ManagerDashboard() {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
+      setLoadFailures([]);
       const token = localStorage.getItem('token');
 
       // Check if token exists
@@ -1419,13 +1423,13 @@ function ManagerDashboard() {
   const NavItem = ({ active, onClick, icon: Icon, label, badge, badgeColor = "bg-blue-600" }) => (
     <button
       onClick={onClick}
-      className={`w-full flex items-start justify-between gap-3 px-4 py-3 rounded-xl transition-all duration-200 group relative mb-1 text-left ${active
-        ? 'bg-white/20 text-white shadow-lg shadow-black/5'
+      className={`admin-nav-item w-full flex items-start justify-between gap-3 px-4 py-3 rounded-xl transition-all duration-200 group relative mb-1 text-left ${active
+        ? 'is-active text-white'
         : 'text-white/60 hover:text-white hover:bg-white/10'
         }`}
     >
       {active && (
-        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-white rounded-r-full shadow-glow-white" />
+        <span className="admin-nav-marker absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-r-full" />
       )}
       <div className="flex min-w-0 flex-1 items-start gap-3">
         <span className={`mt-0.5 shrink-0 transition-transform duration-200 group-hover:scale-110 ${active ? 'text-white' : 'text-white/40 group-hover:text-white/70'}`}>
@@ -1443,8 +1447,8 @@ function ManagerDashboard() {
     </button>
   );
 
-  const TooltipButton = ({ icon: Icon, title }) => (
-    <button className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-all" title={title}>
+  const TooltipButton = ({ icon: Icon, title, onClick }) => (
+    <button type="button" onClick={onClick} aria-label={title} className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-all" title={title}>
       <Icon className="w-5 h-5" />
     </button>
   );
@@ -1456,14 +1460,7 @@ function ManagerDashboard() {
   );
 
   return (
-    <div className="glass-theme-blue min-h-screen text-slate-900 overflow-hidden relative" style={{ fontFamily: "'Space Grotesk', 'Manrope', 'Segoe UI', sans-serif" }}>
-      {/* Dynamic Background */}
-      <div className="video-background-container">
-        <video autoPlay loop muted playsInline>
-          <source src={backgroundVideo} type="video/mp4" />
-        </video>
-        <div className="video-overlay" />
-      </div>
+    <div className="glass-theme-blue admin-glass min-h-screen text-slate-900 overflow-hidden relative" style={{ fontFamily: "'Space Grotesk', 'Manrope', 'Segoe UI', sans-serif" }}>
 
       <div className="relative z-10 flex min-h-screen">
         {/* Sidebar Redesign */}
@@ -1471,25 +1468,25 @@ function ManagerDashboard() {
           {/* Sidebar Header */}
           <div style={{ padding: '24px 16px 20px', borderBottom: '1px solid rgba(255,255,255,0.12)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ width: 32, height: 32, background: 'linear-gradient(135deg,#1D4ED8,#3B82F6)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div className="admin-brand-mark">
                 <Shield className="w-4 h-4 text-white" />
               </div>
               <div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: 'white', lineHeight: 1.2 }}>MMS CORE</div>
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>Management</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: 'white', lineHeight: 1.2 }}>Fixnest</div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>Superadmin console</div>
               </div>
             </div>
           </div>
 
           {/* User */}
-          <div style={{ padding: '12px 16px', borderBottom: '1px solid #F3F4F6' }}>
+          <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ width: 34, height: 34, borderRadius: '50%', background: 'linear-gradient(135deg,#EFF6FF,#DBEAFE)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#1D4ED8', flexShrink: 0 }}>
+              <div className="admin-avatar">
                 {initials}
               </div>
               <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{userName}</div>
-                <div style={{ fontSize: 11, color: '#9CA3AF', textTransform: 'capitalize' }}>{userRole}</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#ffffff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{userName}</div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', textTransform: 'capitalize' }}>{userRole}</div>
               </div>
               <button
                 onClick={handleLogout}
@@ -1501,14 +1498,14 @@ function ManagerDashboard() {
             </div>
           </div>
 
-          <div style={{ padding: '10px 16px', borderBottom: '1px solid #F3F4F6' }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
+          <div style={{ padding: '10px 16px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
               {t("language.label")}
             </div>
             <select
               value={language}
               onChange={(e) => setLanguage(e.target.value)}
-              style={{ width: '100%', padding: '6px 8px', fontSize: 12, borderRadius: 8, border: '1px solid #E5E7EB', color: '#111827', background: 'white' }}
+              className="admin-sidebar-select"
             >
               <option value="en">{t("language.english")}</option>
               <option value="fr">{t("language.french")}</option>
@@ -1659,16 +1656,12 @@ function ManagerDashboard() {
             onClick={() => setActiveTab('parts')}
             icon={Package}
             label={t("manager.sidebar.partsInventory")}
-            badge="1"
-            badgeColor="bg-blue-600"
           />
           <NavItem
             active={activeTab === 'purchase-orders'}
             onClick={() => setActiveTab('purchase-orders')}
             icon={ShoppingCart}
             label={t("manager.sidebar.purchaseOrders")}
-            badge="1"
-            badgeColor="bg-blue-600"
           />
           <NavItem
             active={activeTab === 'vendors'}
@@ -1703,18 +1696,19 @@ function ManagerDashboard() {
             />
           </div>
           <div className="flex items-center justify-center gap-4 mt-4">
-            <TooltipButton icon={HelpCircle} title="Help" />
-            <TooltipButton icon={MessageSquare} title="Feedback" />
-            <TooltipButton icon={Info} title="Info" />
-            <TooltipButton icon={Settings} title="Settings" />
+            <TooltipButton icon={HelpCircle} title="Help center" onClick={() => navigate('/resource/support-center')} />
+            <TooltipButton icon={MessageSquare} title="Technician feedback" onClick={() => setActiveTab('feedback')} />
+            <TooltipButton icon={Settings} title="System settings" onClick={() => setActiveTab('settings')} />
           </div>
         </div>
       </aside>
 
       {/* Main Content Area */}
       <main className="flex-1 min-w-0 flex flex-col h-screen overflow-hidden">
+        {/* Work-order search and filters only apply to the Work Orders list */}
+        {activeTab === 'issues' && (<>
         {/* Results Header */}
-        <div className="h-14 border-b border-white/20 bg-white/10 flex items-center justify-between px-6 flex-shrink-0">
+        <div className="admin-toolbar h-14 border-b border-white/20 bg-white/10 flex items-center justify-between px-6 flex-shrink-0">
           <div className="flex items-center gap-3">
             <span className="text-sm font-bold text-white">{getFilteredIssues().length} {t("common.resultsReturned")}</span>
           </div>
@@ -1984,10 +1978,12 @@ function ManagerDashboard() {
                         type="text"
                         placeholder="Search assets..."
                         className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-100 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                        value={assetSearch}
+                        onChange={(e) => setAssetSearch(e.target.value)}
                       />
                     </div>
                     <div className="space-y-1 max-h-[200px] overflow-y-auto">
-                      {assets.filter(asset => (asset.name || asset.title || '').toLowerCase().includes(locationSearch.toLowerCase())).map((asset) => {
+                      {assets.filter(asset => (asset.name || asset.title || '').toLowerCase().includes(assetSearch.toLowerCase())).map((asset) => {
                         const assetId = asset._id || asset.id;
                         const assetName = asset.name || asset.title || 'Unknown Asset';
                         return (
@@ -2033,9 +2029,21 @@ function ManagerDashboard() {
           </div>
         </div>
 
+        </>)}
+
         {/* Main Content Scroll Area */}
         <div className="flex-1 overflow-y-auto p-6 bg-white/30 backdrop-blur-sm relative z-0">
           <div id="dashboard-content">
+            {loadFailures.length > 0 && !loading && (
+              <div role="alert" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                <span>
+                  Some data could not be loaded ({loadFailures.map((p) => p.replace('/api/', '')).join(', ')}), so parts of this page may look empty.
+                </span>
+                <button type="button" onClick={fetchDashboardData} className="rounded-lg border border-amber-300 bg-white px-3 py-1 text-xs font-semibold text-amber-900 hover:bg-amber-100">
+                  Retry
+                </button>
+              </div>
+            )}
             {loading && !hasLoadedDashboard ? (
               <div className="flex flex-col items-center justify-center py-20">
                 <div className="w-10 h-10 border-2 border-blue-100 border-t-blue-600 rounded-full animate-spin"></div>
@@ -2058,6 +2066,7 @@ function ManagerDashboard() {
                 recsError={recsError}
                 exportToPDF={exportToPDF}
                 exportToExcel={exportToExcel}
+                openCommentModal={openCommentModal}
               />
             ) : activeTab === 'requests' ? (
               <RequestsTab
@@ -2127,6 +2136,7 @@ function ManagerDashboard() {
                 onOpenDetails={openDetailModal}
                 onCreateWorkOrder={() => openWorkOrderModal('Create Work Order')}
                 onRefresh={fetchDashboardData}
+                openCommentModal={openCommentModal}
               />
             ) : activeTab === 'all-issues' ? (
               <AllIssuesTab
@@ -2774,7 +2784,8 @@ const OverviewTab = ({
   recsError,
   summaryError,
   exportToPDF,
-  exportToExcel
+  exportToExcel,
+  openCommentModal = () => {}
 }) => {
   const [privateNote, setPrivateNote] = useState('');
   const [mentionNotifications, setMentionNotifications] = useState([]);
@@ -3157,6 +3168,15 @@ const OverviewTab = ({
 };
 
 // Enhanced Requests Tab with Table
+// Badge colors for request / purchase-order statuses (shared by several tabs).
+const requestStatusColor = (status) => {
+  const s = String(status || '').toUpperCase();
+  if (s === 'APPROVED') return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+  if (s === 'DECLINED' || s === 'REJECTED') return 'bg-rose-50 text-rose-700 border-rose-200';
+  if (s === 'SUBMITTED' || s === 'PENDING') return 'bg-amber-50 text-amber-700 border-amber-200';
+  return 'bg-gray-50 text-gray-600 border-gray-200';
+};
+
 const RequestsTab = ({
   pendingRequests,
   setSelectedRequest,
@@ -3197,14 +3217,6 @@ const RequestsTab = ({
   }, [pendingRequests, localSearch]);
   const selection = useBulkSelection(filteredRequests, (request) => request._id || request.id);
   const requestPagination = usePagination(filteredRequests, 10);
-  const requestStatusColor = (status) => {
-    const s = String(status || '').toUpperCase();
-    if (s === 'APPROVED') return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-    if (s === 'DECLINED' || s === 'REJECTED') return 'bg-rose-50 text-rose-700 border-rose-200';
-    if (s === 'SUBMITTED' || s === 'PENDING') return 'bg-amber-50 text-amber-700 border-amber-200';
-    return 'bg-gray-50 text-gray-600 border-gray-200';
-  };
-
   const handleDeleteSelected = async () => {
     if (selection.selectedIds.length === 0) return;
     if (!window.confirm(`Delete ${selection.selectedIds.length} request(s)? This cannot be undone.`)) return;
@@ -8478,7 +8490,8 @@ const IssuesTab = ({
   getAssignedTechName,
   onOpenDetails,
   onRefresh,
-  onCreateWorkOrder
+  onCreateWorkOrder,
+  openCommentModal = () => {}
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState('table');
@@ -9667,24 +9680,40 @@ const UserManagementTab = ({ users = [], issues = [] }) => {
     }).length;
   };
 
-  const handleUserEdit = async (user) => {
-    const name = window.prompt('Update user name', user.name || '');
-    if (name === null) return;
-    const role = window.prompt('Update user role', user.role || '');
-    if (role === null) return;
-    const status = window.prompt('Update user status', user.status || 'active');
-    if (status === null) return;
+  // Edit form state: role and status come from fixed lists that match the backend.
+  const [editingUser, setEditingUser] = useState(null);
+  const [editForm, setEditForm] = useState({ name: '', role: '', status: 'active', companyName: '' });
+  const [editError, setEditError] = useState('');
 
+  const handleUserEdit = (user) => {
+    setEditingUser(user);
+    setEditError('');
+    setEditForm({
+      name: user.name || '',
+      role: String(user.role || 'client').toLowerCase(),
+      status: String(user.status || 'active').toLowerCase(),
+      companyName: user.companyName || '',
+    });
+  };
+
+  const handleUserEditSave = async (event) => {
+    event.preventDefault();
+    if (!editingUser) return;
+    if (!editForm.name.trim()) {
+      setEditError('Name is required.');
+      return;
+    }
     try {
-      setActionKey(`edit:${user._id || user.id}`);
-      await api.patch(`/api/users/${user._id || user.id}`, {
-        name: name.trim(),
-        role: role.trim().toLowerCase(),
-        status: status.trim().toLowerCase(),
+      setActionKey(`edit:${editingUser._id || editingUser.id}`);
+      await api.patch(`/api/users/${editingUser._id || editingUser.id}`, {
+        name: editForm.name.trim(),
+        role: editForm.role,
+        status: editForm.status,
+        companyName: editForm.companyName.trim(),
       });
       window.location.reload();
     } catch (err) {
-      alert('Failed to update user: ' + (err.response?.data?.error || err.message));
+      setEditError(err.response?.data?.error || err.message);
     } finally {
       setActionKey('');
     }
@@ -9797,6 +9826,85 @@ const UserManagementTab = ({ users = [], issues = [] }) => {
           </table>
         </div>
       </div>
+
+      {editingUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4" role="dialog" aria-modal="true" aria-labelledby="edit-user-title">
+          <form onSubmit={handleUserEditSave} className="admin-modal w-full max-w-md rounded-2xl p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 id="edit-user-title" className="text-lg font-bold text-gray-900">Edit user</h3>
+                <p className="text-xs text-gray-500 mt-1">{editingUser.email || 'No email'}</p>
+              </div>
+              <button type="button" onClick={() => setEditingUser(null)} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700" aria-label="Close">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="mt-5 space-y-4">
+              <label className="block">
+                <span className="text-xs font-semibold text-gray-600">Name</span>
+                <input
+                  value={editForm.name}
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, name: e.target.value }))}
+                  className="admin-input mt-1 w-full rounded-xl px-3 py-2 text-sm"
+                />
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="block">
+                  <span className="text-xs font-semibold text-gray-600">Role</span>
+                  <select
+                    value={editForm.role}
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, role: e.target.value }))}
+                    className="admin-input mt-1 w-full rounded-xl px-3 py-2 text-sm"
+                  >
+                    {['superadmin', 'admin', 'manager', 'technician', 'client', 'requestor', 'staff'].map((role) => (
+                      <option key={role} value={role}>{role}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block">
+                  <span className="text-xs font-semibold text-gray-600">Status</span>
+                  <select
+                    value={editForm.status}
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, status: e.target.value }))}
+                    className="admin-input mt-1 w-full rounded-xl px-3 py-2 text-sm"
+                  >
+                    <option value="active">active</option>
+                    <option value="inactive">inactive (cannot sign in)</option>
+                    <option value="locked">locked</option>
+                    <option value="pending">pending</option>
+                  </select>
+                </label>
+              </div>
+              <label className="block">
+                <span className="text-xs font-semibold text-gray-600">Company</span>
+                <input
+                  value={editForm.companyName}
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, companyName: e.target.value }))}
+                  className="admin-input mt-1 w-full rounded-xl px-3 py-2 text-sm"
+                />
+              </label>
+              {editForm.role === 'superadmin' && String(editingUser.role || '').toLowerCase() !== 'superadmin' && (
+                <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  This gives the user full control of the whole platform, including every company.
+                </p>
+              )}
+              {editError && <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">{editError}</p>}
+            </div>
+
+            <div className="mt-6 flex justify-end gap-2">
+              <button type="button" onClick={() => setEditingUser(null)} className="admin-ghost-btn rounded-xl px-4 py-2 text-sm font-semibold">Cancel</button>
+              <button
+                type="submit"
+                disabled={actionKey === `edit:${editingUser._id || editingUser.id}`}
+                className="admin-primary-btn rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-60"
+              >
+                {actionKey === `edit:${editingUser._id || editingUser.id}` ? 'Saving...' : 'Save changes'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 };
@@ -9872,6 +9980,10 @@ const CompanyManagementTab = ({ users = [], issues = [], assets = [], locations 
     try {
       setActionKey(`${action}:${companyName}`);
       let payload = { action, companyName };
+      if (action === 'suspend' && !window.confirm(`Suspend "${companyName}"? Every user in this company will be signed out and blocked from signing in until you activate it again.`)) {
+        setActionKey('');
+        return;
+      }
       if (action === 'rename') {
         const nextCompanyName = window.prompt('Enter the new company name', companyName);
         if (!nextCompanyName || !nextCompanyName.trim() || nextCompanyName.trim() === companyName) {
@@ -9926,7 +10038,7 @@ const CompanyManagementTab = ({ users = [], issues = [], assets = [], locations 
           <table className="w-full text-left border-collapse">
             <thead className="border-b border-gray-100">
               <tr>
-                {['Company', 'Users', 'Active Users', 'Admins', 'Technicians', 'Requests', 'Assets', 'Locations', 'Actions'].map((header) => (
+                {['Company', 'Status', 'Users', 'Active Users', 'Admins', 'Technicians', 'Requests', 'Assets', 'Locations', 'Actions'].map((header) => (
                   <th key={header} className="py-3 px-3 text-xs font-bold text-gray-500 uppercase tracking-wider">{header}</th>
                 ))}
               </tr>
@@ -9935,6 +10047,15 @@ const CompanyManagementTab = ({ users = [], issues = [], assets = [], locations 
               {filteredCompanies.map((company) => (
                 <tr key={company.name} className="border-b border-gray-50 hover:bg-gray-50/70">
                   <td className="py-3 px-3 font-semibold text-gray-900">{company.name}</td>
+                  <td className="py-3 px-3">
+                    {company.users > 0 && company.activeUsers === 0 ? (
+                      <span className="inline-flex rounded-full bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-700">Suspended</span>
+                    ) : company.activeUsers < company.users ? (
+                      <span className="inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700">Partly active</span>
+                    ) : (
+                      <span className="inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">Active</span>
+                    )}
+                  </td>
                   <td className="py-3 px-3 text-sm text-gray-700">{company.users}</td>
                   <td className="py-3 px-3 text-sm text-gray-700">{company.activeUsers}</td>
                   <td className="py-3 px-3 text-sm text-gray-700">{company.admins}</td>
@@ -9971,7 +10092,7 @@ const CompanyManagementTab = ({ users = [], issues = [], assets = [], locations 
               ))}
               {filteredCompanies.length === 0 && (
                 <tr>
-                  <td colSpan="9" className="py-14 text-center text-sm text-gray-500">No companies matched your search.</td>
+                  <td colSpan="10" className="py-14 text-center text-sm text-gray-500">No companies matched your search.</td>
                 </tr>
               )}
             </tbody>

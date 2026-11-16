@@ -179,12 +179,31 @@
 
 @media (max-width: 1024px) {
   .footer-top {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     gap: 48px;
   }
 }
 
 @media (max-width: 640px) {
+  /* Four link columns don't fit on a phone and made the whole page wider than the screen */
+  .footer-links-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 32px 24px;
+  }
+
+  .footer-newsletter-input {
+    min-width: 0;
+  }
+
+  .footer-links-column a {
+    overflow-wrap: anywhere;
+  }
+
+  .footer-legal-links {
+    flex-wrap: wrap;
+    gap: 12px 20px;
+  }
+
   .footer-bottom {
     flex-direction: column;
     gap: 24px;

@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../../api/axios';
-import backgroundVideo from '../../assets/136906-765457769_small.mp4';
 import AuthHeader from './AuthHeader';
+
+const LOGIN_BACKGROUND = 'https://images.unsplash.com/photo-1473341304170-971dccb5ac1e?auto=format&fit=crop&w=1920&q=80';
 
 const getHomeRouteForRole = (role) => {
   const normalizedRole = String(role || '').trim().toLowerCase();
@@ -66,27 +67,29 @@ export default function Login({ onLogin }) {
   };
 
   return (
-    <div className="auth-shell auth-shell--with-header">
-      <AuthHeader />
-      <div className="video-background-container">
-        <video autoPlay loop muted playsInline className="video-background">
-          <source src={backgroundVideo} type="video/mp4" />
-          Your browser does not support the video tag.
-        </video>
-        <div className="video-overlay" />
-      </div>
-      <form
-        onSubmit={handleSubmit}
-        className="auth-card auth-card--narrow"
-        noValidate
-      >
-        <div className="auth-header auth-header--left">
-          <h1 className="auth-title auth-title--left">Log In</h1>
-          <p className="auth-subtitle auth-subtitle--left">Continue to Fixnest</p>
+    <div className="auth-split" style={{ '--auth-split-bg': `url(${LOGIN_BACKGROUND})` }}>
+      <AuthHeader transparent />
+      <div className="auth-split-inner">
+        <div className="auth-split-welcome">
+          <h1 className="auth-split-heading">Welcome<br />Back</h1>
+          <p className="auth-split-lead">
+            Log in to see open work orders, upcoming preventive maintenance and the status of every asset
+            across your properties.
+          </p>
+          <p className="auth-split-switch">
+            New to Fixnest? <Link to="/register">Start a free trial</Link>
+          </p>
         </div>
 
+      <form
+        onSubmit={handleSubmit}
+        className="auth-split-card"
+        noValidate
+      >
+        <h2 className="auth-split-form-title">Sign in</h2>
+
         <div className="auth-field">
-          <label htmlFor="email" className="auth-label">Email</label>
+          <label htmlFor="email" className="auth-label">Email Address</label>
           <input
             id="email"
             type="email"
@@ -100,10 +103,7 @@ export default function Login({ onLogin }) {
         </div>
 
         <div className="auth-field">
-          <div className="auth-label-row">
-            <label htmlFor="password" className="auth-label">Password</label>
-            <Link to="/forgot-password" className="auth-link auth-link--sm">Forgot Password?</Link>
-          </div>
+          <label htmlFor="password" className="auth-label">Password</label>
           <div style={{ position: 'relative' }}>
             <input
               id="password"
@@ -157,10 +157,12 @@ export default function Login({ onLogin }) {
           disabled={isSubmitDisabled}
           aria-busy={isSubmitting}
         >
-          {isSubmitting ? 'Logging in...' : 'Log in'}
+          {isSubmitting ? 'Signing in...' : 'Sign in now'}
         </button>
 
         {error && <div className="auth-error" role="alert">{error}</div>}
+
+        <Link to="/forgot-password" className="auth-split-text-link">Lost your password?</Link>
 
         <div className="auth-divider-with-text"><span>or</span></div>
 
@@ -173,11 +175,12 @@ export default function Login({ onLogin }) {
           <Link to="/sso-login" className="auth-ghost-btn auth-ghost-link">Continue with company SSO</Link>
         </div>
 
-        <div className="auth-footer" style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
-          <div>New to Fixnest? <Link to="/register" className="auth-link">Sign up</Link></div>
-          <div style={{ fontSize: '0.85em', opacity: 0.8 }}>Interested in our plans? <Link to="/pricing" className="auth-link">See Pricing</Link></div>
-        </div>
+        <p className="auth-split-legal">
+          By clicking on &ldquo;Sign in now&rdquo; you agree to the<br />
+          <Link to="/terms-of-use">Terms of Use</Link> | <Link to="/privacy-policy">Privacy Policy</Link>
+        </p>
       </form>
+      </div>
     </div>
   );
 }

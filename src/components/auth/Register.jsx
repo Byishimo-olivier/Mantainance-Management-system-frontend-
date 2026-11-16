@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import backgroundVideo from '../../assets/136906-765457769_small.mp4';
 import AuthHeader from './AuthHeader';
 import subscriptionAPI from '../../api/subscription';
+
+const SIGNUP_BACKGROUND = 'https://images.unsplash.com/photo-1567789884554-0b844b597180?auto=format&fit=crop&w=1920&q=80';
 
 const initialForm = {
   firstName: '',
@@ -410,20 +411,27 @@ export default function Register() {
   };
 
   return (
-    <div className="auth-shell auth-shell--stack auth-shell--with-header">
-      <AuthHeader />
-      <div className="video-background-container">
-        <video autoPlay loop muted playsInline className="video-background">
-          <source src={backgroundVideo} type="video/mp4" />
-        </video>
-        <div className="video-overlay" />
-      </div>
-      <div className="auth-stack">
-        <form onSubmit={handleSubmit} className="auth-card">
-          <div className="auth-header">
-            <h1 className="auth-title">Sign Up For Free</h1>
-            <p className="auth-subtitle">Start organizing maintenance with a faster, clearer workflow.</p>
-          </div>
+    <div className="auth-split auth-split--signup" style={{ '--auth-split-bg': `url(${SIGNUP_BACKGROUND})` }}>
+      <AuthHeader transparent />
+      <div className="auth-split-inner">
+        <div className="auth-split-welcome">
+          <h1 className="auth-split-heading">Start Your<br />Free Trial</h1>
+          <p className="auth-split-lead">
+            Set up your workspace in minutes and bring requests, work orders, preventive maintenance and assets
+            into one place.
+          </p>
+          <ul className="auth-split-points">
+            <li>No credit card required</li>
+            <li>Invite your team from day one</li>
+            <li>Works on desktop and mobile</li>
+          </ul>
+          <p className="auth-split-switch">
+            Already have an account? <Link to="/login">Log in</Link>
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="auth-split-card auth-split-card--wide">
+          <h2 className="auth-split-form-title">Sign up</h2>
 
           <div className="auth-grid">
             <div className="auth-field">
@@ -677,7 +685,7 @@ export default function Register() {
 
           <div className="auth-divider" />
 
-          <div className="auth-section-title">Sign Up</div>
+          <div className="auth-section-title">Your Login Details</div>
 
           <div className="auth-field">
             <label htmlFor="email" className="auth-label">Email*</label>
@@ -722,16 +730,14 @@ export default function Register() {
             Not Ready Yet? <span className="auth-link">Schedule a tour</span>
           </div>
           <div className="auth-note auth-center">No Credit Card Required.</div>
-          <div className="auth-legal auth-center">
-            By clicking above, you agree to the <span className="auth-link">Fixnest Terms of Use</span>.
-          </div>
-
-          <div className="auth-footer" style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
-            <div>Already have an account? <Link to="/login" className="auth-link">Log in</Link></div>
-            <div style={{ fontSize: '0.85em', opacity: 0.8 }}>Explore our <Link to="/pricing" className="auth-link">Pricing Plans</Link></div>
-          </div>
+          <p className="auth-split-legal">
+            By clicking &ldquo;Start a Free Trial&rdquo; you agree to the<br />
+            <Link to="/terms-of-use">Terms of Use</Link> | <Link to="/privacy-policy">Privacy Policy</Link>
+          </p>
         </form>
+      </div>
 
+      <div className="auth-split-below">
         <section className="auth-features">
           <div className="auth-features-header">
             <h2 className="auth-features-title">Make Your Management Easy with these Features</h2>
