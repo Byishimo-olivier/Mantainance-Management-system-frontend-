@@ -6457,6 +6457,22 @@
     color: #fff;
   }
 
+  /* Sub-item (Studio under Intelligence): indented with a thin guide line */
+  .oti-nav-sub {
+    position: relative;
+    margin-left: 18px;
+    padding-left: 8px;
+    border-left: 1px solid rgba(255, 255, 255, 0.14);
+  }
+
+  .oti-nav-sub .oti-nav-item {
+    font-size: 13px;
+  }
+
+  .oti-nav-sub .oti-nav-item.is-active::before {
+    left: -9px;
+  }
+
   .oti-nav-item.is-active {
     background: rgba(255, 255, 255, 0.12);
     color: #fff;

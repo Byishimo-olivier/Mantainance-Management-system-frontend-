@@ -3,15 +3,17 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { MessageSquare, X, Send, Bot, User, Trash2, Maximize2, Minimize2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
+import { ASSISTANT_NAME, AssistantConfirmCard, isAssistantCommand, toAssistantMessage } from './ai/AssistantReply';
+import { PhotoButtons, PhotoPreview, usePhotoAttachment } from './ai/ChatAttachment';
 
 const ASSISTANT_ACTION_STORAGE_KEY = 'mms_assistant_action';
 const CHATBOT_QUICK_PROMPTS = [
-    'What should we fix first?',
-    'Which property has the most incidents?',
-    'Show open work orders this week',
-    'List unassigned requests',
-    'Which technician resolves issues fastest?',
-    'Where are we breaching SLA most often?'
+    'Show overdue work orders',
+    'Which requests are pending?',
+    'How much did we spend this month?',
+    'Which assets keep breaking down?',
+    'Prepare a maintenance report for management',
+    'What can you do?'
 ];
 const CHATBOT_QUICK_ACTIONS = [
     { label: 'Create Request', type: 'openRequestForm' },
@@ -176,9 +178,10 @@ const AIChatbot = () => {
     const [isOpen, setIsOpen] = useState(false);
     const [isMaximized, setIsMaximized] = useState(false);
     const [messages, setMessages] = useState([
-        { role: 'model', content: "Hello! I'm your maintenance AI assistant. Ask me about incident trends, risky properties, technician performance, SLA breaches, or what to prioritize first." }
+        { role: 'model', content: `Hi, I'm ${ASSISTANT_NAME}, your maintenance assistant. Ask me to find, create, update or assign work orders, check costs, or spot equipment that keeps failing. You can just say hello too!` }
     ]);
     const [input, setInput] = useState('');
+    const photo = usePhotoAttachment();
     const [isTyping, setIsTyping] = useState(false);
     const [summary, setSummary] = useState(null);
     const [loadingSummary, setLoadingSummary] = useState(false);
@@ -226,10 +229,11 @@ const AIChatbot = () => {
 
     const handleSend = async (e) => {
         e.preventDefault();
-        if (!input.trim() || isTyping) return;
+        const sentPhoto = photo.attachment;
+        if ((!input.trim() && !sentPhoto) || isTyping) return;
 
-        const content = input.trim();
-        const userMessage = { role: 'user', content };
+        const content = input.trim() || 'Photo attached';
+        const userMessage = { role: 'user', content: input.trim(), image: sentPhoto?.url };
         const validHistory = messages.filter((msg, index) => {
             if (!msg?.content) return false;
             if (index === 0 && msg.role !== 'user') return false;
@@ -237,9 +241,10 @@ const AIChatbot = () => {
         });
         setMessages(prev => [...prev, userMessage]);
         setInput('');
+        photo.clear();
         setIsTyping(true);
 
-        const actionResponse = buildAssistantActionResponse(content);
+        const actionResponse = sentPhoto || isAssistantCommand(content) ? null : buildAssistantActionResponse(content);
         if (actionResponse) {
             setMessages(prev => [...prev, actionResponse]);
             setIsTyping(false);
@@ -249,30 +254,16 @@ const AIChatbot = () => {
         try {
             const res = await api.post('/api/ai/chat', {
                 message: content,
-                history: validHistory
+                history: validHistory,
+                localHour: new Date().getHours(),
+                // Only the description goes to the server now; the photo itself is uploaded when you confirm.
+                attachment: sentPhoto ? { name: sentPhoto.name, type: sentPhoto.file.type, size: sentPhoto.file.size } : undefined,
             });
 
-            // Handle action-based responses (with links/buttons) or plain text responses
-            const response = res.data.response;
-            let messageToAdd;
-            
-            if (typeof response === 'string') {
-              // Plain text response
-              messageToAdd = { role: 'model', content: response };
-            } else if (response.kind === 'action' && response.action) {
-              // Action response with button/link
-              messageToAdd = {
-                role: 'model',
-                kind: 'action',
-                content: response.content,
-                action: response.action
-              };
-            } else {
-              // Fallback - treat as plain text
-              messageToAdd = { role: 'model', content: response.content || JSON.stringify(response) };
-            }
-            
-            setMessages(prev => [...prev, messageToAdd]);
+            // Plain text, an action button, or a confirmation card for a change
+            const reply = toAssistantMessage(res.data.response, { file: sentPhoto?.file });
+            if (reply.keepPhoto && sentPhoto) photo.restore(sentPhoto);
+            setMessages(prev => [...prev, reply]);
         } catch (error) {
             console.error("Chat error:", error);
             const errorMessage = error.response?.data?.message || error.response?.data?.error || "Sorry, I encountered an error. Please check your connection or try again later.";
@@ -284,7 +275,7 @@ const AIChatbot = () => {
 
     const clearChat = () => {
         if (window.confirm("Clear chat history?")) {
-            setMessages([{ role: 'model', content: "Hello again! Ask me about trends, repeated failures, risky properties, or what the team should fix first." }]);
+            setMessages([{ role: 'model', content: "Fresh start! What can I help you with?" }]);
         }
     };
 
@@ -330,7 +321,7 @@ const AIChatbot = () => {
                                     <Bot className="w-5 h-5 text-white" />
                                 </div>
                                 <div>
-                                    <h3 className="font-bold text-lg text-slate-900">KAT Assistant</h3>
+                                    <h3 className="font-bold text-lg text-slate-900">{ASSISTANT_NAME}</h3>
                                     <p className="text-xs text-slate-500">Ask me anything about maintenance</p>
                                 </div>
                             </div>
@@ -371,7 +362,9 @@ const AIChatbot = () => {
                                                 : 'bg-gray-100 text-slate-800 rounded-bl-none'
                                                 } ${isTableMessage ? 'overflow-hidden' : 'whitespace-pre-wrap'}`}
                                         >
-                                            {msg.kind === 'action' && msg.action ? (
+                                            {msg.kind === 'confirm' && msg.confirm ? (
+                                                <AssistantConfirmCard message={msg} />
+                                            ) : msg.kind === 'action' && msg.action ? (
                                                 <div className="space-y-3">
                                                     <div className="whitespace-pre-wrap text-sm font-medium text-slate-700">
                                                         {msg.content}
@@ -424,7 +417,10 @@ const AIChatbot = () => {
                                                     </div>
                                                 </div>
                                             ) : (
-                                                msg.content
+                                                <>
+                                                    {msg.image && <img src={msg.image} alt="Sent photo" className={`max-h-48 rounded-xl object-cover ${msg.content ? 'mb-2' : ''}`} />}
+                                                    {msg.content}
+                                                </>
                                             )}
                                         </div>
                                         {msg.role === 'user' && (
@@ -452,25 +448,27 @@ const AIChatbot = () => {
 
                         {/* Input Area - Minimalist */}
                         <div className="border-t border-gray-200 bg-white px-6 py-4">
-                            <form onSubmit={handleSend} className="flex gap-3">
+                            <PhotoPreview attachment={photo.attachment} error={photo.error} onRemove={photo.clear} />
+                            <form onSubmit={handleSend} className="flex items-center gap-2">
+                                <PhotoButtons onPick={photo.pick} disabled={isTyping} />
                                 <input
                                     type="text"
                                     value={input}
                                     onChange={(e) => setInput(e.target.value)}
-                                    placeholder="Type your question..."
-                                    className="flex-1 bg-gray-50 border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all placeholder-gray-500"
+                                    placeholder={photo.attachment ? "Describe the problem (optional)..." : "Type your question..."}
+                                    className="min-w-0 flex-1 bg-gray-50 border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all placeholder-gray-500"
                                 />
                                 <motion.button
                                     whileHover={{ scale: 1.08 }}
                                     whileTap={{ scale: 0.92 }}
                                     type="submit"
-                                    disabled={!input.trim() || isTyping}
+                                    disabled={(!input.trim() && !photo.attachment) || isTyping}
                                     className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-3 rounded-xl hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
                                 >
                                     <Send className="w-5 h-5" />
                                 </motion.button>
                             </form>
-                            <p className="mt-2 text-xs text-slate-500 text-center">Ask about trends, priorities, how-tos, or create new items</p>
+                            <p className="mt-2 text-xs text-slate-500 text-center">Ask anything, or add a photo to report a problem</p>
                         </div>
                     </motion.div>
                 )}

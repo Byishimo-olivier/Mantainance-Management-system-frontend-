@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import api from '../api/axios';
+import { StudioFormSection, commitStudioValues, missingStudioFields } from './studio/StudioRuntime';
 
 export function WorkOrderForm({
   onSubmitted,
@@ -100,6 +101,11 @@ export function WorkOrderForm({
       alert('Title and description are required.');
       return;
     }
+    const studioMissing = missingStudioFields('request:create');
+    if (studioMissing.length) {
+      alert(`Please fill in: ${studioMissing.join(', ')}.`);
+      return;
+    }
     setSubmitting(true);
     try {
       const fd = new FormData();
@@ -118,6 +124,8 @@ export function WorkOrderForm({
       const response = await api.post('/api/issues', fd, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
+      // Answers to the company's published Studio form for requests
+      await commitStudioValues('request:create', response?.data?.id || response?.data?._id);
 
       setForm((prev) => ({
         ...prev,
@@ -253,6 +261,8 @@ export function WorkOrderForm({
         </button>
       </div>
       )}
+
+      <StudioFormSection target="request" storeKey="request:create" />
 
       <div className="flex items-center justify-between border-t border-gray-200 pt-7">
         <button

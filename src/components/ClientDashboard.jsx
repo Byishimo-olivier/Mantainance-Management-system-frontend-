@@ -5,6 +5,10 @@ import { createPortal } from "react-dom";
 import api from "../api/axios";
 import subscriptionAPI from "../api/subscription";
 import MobileMoneyPendingModal from './payments/MobileMoneyPendingModal';
+import { ASSISTANT_NAME, AssistantConfirmCard, AssistantText, isAssistantCommand, toAssistantMessage } from './ai/AssistantReply';
+import { PhotoButtons, PhotoPreview, usePhotoAttachment } from './ai/ChatAttachment';
+import FixNestStudio from './studio/FixNestStudio';
+import { StudioFormSection, StudioRecordPanel, commitStudioValues, missingStudioFields } from './studio/StudioRuntime';
 import { useNavigate, Link, useLocation } from "react-router-dom";
 import 'chart.js/auto';
 import { Chart } from 'primereact/chart';
@@ -7739,6 +7743,9 @@ function AssetEditorModal({
                 Track Check Ins/Outs
               </label>
             </div>
+            <div className="px-8 pb-10">
+              <StudioFormSection target="asset" storeKey="asset:edit" recordId={editingAsset?._id || editingAsset?.id || null} title="Custom fields" />
+            </div>
           </aside>
         </div>
       </form>
@@ -12864,6 +12871,18 @@ function ClientDashboard() {
                   )}
                     </>
                   )
+              )}
+
+              {activeTabId === 'overview' && (isIssue || isRequest) && itemId && (
+                <div className="mt-6">
+                  <StudioRecordPanel
+                    target={isRequest ? 'request' : 'work_order'}
+                    recordId={String(itemId)}
+                    record={item}
+                    companyName={currentUser?.companyName || ''}
+                    assigneeName={typeof assignee === 'string' ? assignee : ''}
+                  />
+                </div>
               )}
 
               {activeTabId === 'tasks' && (
@@ -21584,6 +21603,7 @@ function ClientDashboard() {
         const response = await api.post('/api/assets', { ...payload, userId });
         savedAsset = response.data;
       }
+      await commitStudioValues('asset:edit', savedAsset?._id || savedAsset?.id || savedAsset?.data?._id || savedAsset?.data?.id || eid);
       closeAssetEditor();
       const r = await api.get('/api/assets');
       const nextAssets = Array.isArray(r.data)
@@ -21912,6 +21932,10 @@ function ClientDashboard() {
   const navItems = [
     { key: 'dashboard', label: t("manager.sidebar.dashboard"), icon: <Icon.Dashboard /> },
     { key: 'intelligence', label: t("manager.sidebar.intelligence"), icon: <Icon.Analytics /> },
+    // Studio sits under Intelligence and is only for company admins / managers
+    ...(['client', 'admin', 'manager', 'superadmin'].includes(String(currentUser?.role || 'client').toLowerCase())
+      ? [{ key: 'studio', label: 'Studio', icon: <Icon.Templates />, sub: true }]
+      : []),
 
     { key: 'workOrders', label: t("manager.sidebar.workOrders"), icon: <Icon.Requests />, group: 'core' },
     { key: 'preventiveMaintenance', label: t("manager.sidebar.preventiveMaintenance"), icon: <Icon.Templates />, group: 'core' },
@@ -22067,8 +22091,10 @@ function ClientDashboard() {
         {/* Nav */}
         <div className="custom-scrollbar oti-sb-nav flex-1 overflow-y-auto">
           <nav>
-          {navItems.filter(n => !n.group).map(({ key, label, icon }) => (
-            <NavItem key={key} label={label} icon={icon} badge={navBadgeCounts[key]} active={activeTab === key} onClick={() => handleSidebarTabNavigation(key)} />
+          {navItems.filter(n => !n.group).map(({ key, label, icon, sub }) => (
+            <div key={key} className={sub ? 'oti-nav-sub' : undefined}>
+              <NavItem label={label} icon={icon} badge={navBadgeCounts[key]} active={activeTab === key} onClick={() => handleSidebarTabNavigation(key)} />
+            </div>
           ))}
           {navSections.map(section => (
             <div key={section.key}>
@@ -24147,6 +24173,10 @@ function ClientDashboard() {
 
               <div className="oti-dash-footer">© {new Date().getFullYear()} FixNest. All Rights Reserved.</div>
             </div>
+          )}
+
+          {activeTab === 'studio' && (
+            <FixNestStudio key={`studio-${featureResetNonce}`} companyName={currentUser?.companyName} />
           )}
 
           {activeTab === 'intelligence' && (
@@ -29794,6 +29824,16 @@ function ClientDashboard() {
                               <div className="mb-3 text-base font-bold text-gray-900">Description</div>
                               <p className="text-sm leading-7 text-gray-600">{renderValue(selectedAsset.description, 'No description provided.')}</p>
                             </div>
+                            <div className="lg:col-span-2">
+                              <StudioRecordPanel
+                                target="asset"
+                                recordId={String(selectedAsset._id || selectedAsset.id)}
+                                record={selectedAsset}
+                                companyName={currentUser?.companyName || ''}
+                                workOrders={selectedAssetWorkOrders}
+                                locationLabel={getAssetLocationLabel(selectedAsset)}
+                              />
+                            </div>
                           </div>
                         )}
 
@@ -31991,6 +32031,7 @@ function ClientDashboard() {
 <WorkOrderDetailsModal
             open={showStandaloneWorkOrderCreate}
             showDates={true}
+            studioTarget="work_order"
             onClose={() => {
               setShowStandaloneWorkOrderCreate(false);
               setStandaloneWorkOrderDraft({
@@ -32058,6 +32099,7 @@ function ClientDashboard() {
                 const res = await api.post('/api/issues', fd, {
                   headers: { 'Content-Type': 'multipart/form-data' },
                 });
+                await commitStudioValues('work_order:create', res?.data?.id || res?.data?._id);
                 
                 await fetchIssues();
                 setShowStandaloneWorkOrderCreate(false);
@@ -33418,9 +33460,10 @@ const ClientIntelligenceTab = ({
   const [predictionLoading, setPredictionLoading] = React.useState(false);
   const [predictionError, setPredictionError] = React.useState('');
   const [chatMessages, setChatMessages] = React.useState([
-    { role: 'model', content: 'Ask Intelligence for help with maintenance planning, issue triage, and operational trends.' }
+    { role: 'model', content: `Hi, I'm ${ASSISTANT_NAME}, your maintenance assistant. Ask me to find, create, update or assign work orders, check costs, or spot equipment that keeps failing.` }
   ]);
   const [chatInput, setChatInput] = React.useState('');
+  const chatPhoto = usePhotoAttachment();
   const [chatLoading, setChatLoading] = React.useState(false);
 
   const opsDatasets = React.useMemo(() => buildOpsDatasets({ assets, issues, technicians, properties, people }), [assets, issues, technicians, properties, people]);
@@ -33574,11 +33617,19 @@ const ClientIntelligenceTab = ({
   };
 
   const sendChatMessage = async () => {
-    const content = String(chatInput || '').trim();
-    if (!content || chatLoading) return;
-    const nextMessages = [...chatMessages, { role: 'user', content }];
-    const tableResponse = buildOpsTableResponse(content, opsDatasets);
-    const actionResponse = buildOpsActionResponse(content);
+    const sentPhoto = chatPhoto.attachment;
+    const typed = String(chatInput || '').trim();
+    if ((!typed && !sentPhoto) || chatLoading) return;
+    const content = typed || 'Photo attached';
+    const nextMessages = [...chatMessages, { role: 'user', content: typed, image: sentPhoto?.url }];
+    // Work orders, requests, analysis questions and commands go to the server assistant (MIA), which
+    // answers from live data and remembers the list for follow-ups like "assign the first one".
+    // Local tables remain for assets, technicians, locations and people.
+    const localList = parseOpsListIntent(content);
+    const serverHandles = isAssistantCommand(content)
+      && (!localList || ['workOrders', 'requests', 'issues'].includes(localList.datasetKey) || /\b(fail\w*|broke\w*|breakdowns?|costs?|spen[dt]|report|assign|mark|overdue)\b/i.test(content));
+    const tableResponse = serverHandles || sentPhoto ? null : buildOpsTableResponse(content, opsDatasets);
+    const actionResponse = sentPhoto || isAssistantCommand(content) ? null : buildOpsActionResponse(content);
     const validHistory = chatMessages.filter((message, index) => {
       if (!message?.content) return false;
       if (index === 0 && message.role !== 'user') return false;
@@ -33586,6 +33637,7 @@ const ClientIntelligenceTab = ({
     });
     setChatMessages(nextMessages);
     setChatInput('');
+    chatPhoto.clear();
     if (tableResponse) {
       setChatMessages((prev) => [...prev, tableResponse]);
       return;
@@ -33599,8 +33651,12 @@ const ClientIntelligenceTab = ({
       const res = await api.post('/api/ai/chat', {
         message: content,
         history: validHistory,
+        localHour: new Date().getHours(),
+        attachment: sentPhoto ? { name: sentPhoto.name, type: sentPhoto.file.type, size: sentPhoto.file.size } : undefined,
       });
-      setChatMessages((prev) => [...prev, { role: 'model', content: res?.data?.response || 'No response received.' }]);
+      const reply = toAssistantMessage(res?.data?.response || 'No response received.', { file: sentPhoto?.file });
+      if (reply.keepPhoto && sentPhoto) chatPhoto.restore(sentPhoto);
+      setChatMessages((prev) => [...prev, reply]);
     } catch (err) {
       console.error('Failed to send AI chat message', err);
       setChatMessages((prev) => [...prev, { role: 'model', content: err?.response?.data?.message || err?.message || 'The assistant is unavailable right now.' }]);
@@ -34046,6 +34102,10 @@ const ClientIntelligenceTab = ({
                       </div>
                     )}
                   </div>
+                ) : message.kind === 'confirm' && message.confirm ? (
+                  <div className="w-full max-w-[92%] rounded-3xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-800 shadow-sm">
+                    <AssistantConfirmCard message={message} />
+                  </div>
                 ) : message.kind === 'action' && message.action ? (
                   <div className="w-full max-w-[92%] rounded-3xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-800 shadow-sm">
                     <div className="text-sm text-gray-700">{message.content}</div>
@@ -34072,8 +34132,9 @@ const ClientIntelligenceTab = ({
                     </div>
                   </div>
                 ) : (
-                  <div className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm shadow-sm ${message.role === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-50 text-gray-800 border border-gray-200'}`}>
-                    {message.content}
+                  <div className={`${message.role === 'user' ? 'max-w-[80%]' : 'max-w-[92%]'} rounded-2xl px-4 py-3 text-sm shadow-sm ${message.role === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-50 text-gray-800 border border-gray-200'}`}>
+                    {message.image && <img src={message.image} alt="Sent photo" className={`max-h-48 rounded-xl object-cover ${message.content ? 'mb-2' : ''}`} />}
+                    {message.role === 'user' ? message.content : <AssistantText content={message.content} />}
                   </div>
                 )}
               </div>
@@ -34088,10 +34149,12 @@ const ClientIntelligenceTab = ({
             <div className="mb-3 text-xs text-gray-500">
               Ask for operational lists in natural language using the exact person, place, date, status, priority, category, or name you type.
             </div>
-            <div className="flex gap-3">
+            <PhotoPreview attachment={chatPhoto.attachment} error={chatPhoto.error} onRemove={chatPhoto.clear} />
+            <div className="flex items-center gap-2">
+              <PhotoButtons onPick={chatPhoto.pick} disabled={chatLoading} />
               <input
-                className="flex-1 rounded-2xl border border-gray-300 bg-gray-50 px-4 py-3 text-sm text-gray-900 outline-none focus:border-blue-500"
-                placeholder="Try: list work orders assigned to the technician name you enter this week"
+                className="min-w-0 flex-1 rounded-2xl border border-gray-300 bg-gray-50 px-4 py-3 text-sm text-gray-900 outline-none focus:border-blue-500"
+                placeholder={chatPhoto.attachment ? 'Describe the problem (optional)' : 'Try: show overdue work orders, or add a photo to report a problem'}
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
                 onKeyDown={(e) => {
@@ -34101,7 +34164,7 @@ const ClientIntelligenceTab = ({
                   }
                 }}
               />
-              <button type="button" onClick={sendChatMessage} disabled={!String(chatInput || '').trim() || chatLoading} className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60">
+              <button type="button" onClick={sendChatMessage} disabled={(!String(chatInput || '').trim() && !chatPhoto.attachment) || chatLoading} className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60">
                 <Send className="h-4 w-4" />
                 Send
               </button>
@@ -50494,7 +50557,7 @@ function CreatePmModal({
 }
 
 // --- Work Order Details Modal (for PM) ---
-function WorkOrderDetailsModal({ open, onClose, onSave, mode = 'create', tasks = [], setTasks, workOrderDetails, setWorkOrderDetails, checklist = [], setChecklist, checklistLibrary = [], setChecklistLibrary, companyAssets = [], companyProperties = [], technicians = [], teams = [], onChecklistSaved, launchChecklistBuilderDirect = false, showDates = false }) {
+function WorkOrderDetailsModal({ open, onClose, onSave, mode = 'create', tasks = [], setTasks, workOrderDetails, setWorkOrderDetails, checklist = [], setChecklist, checklistLibrary = [], setChecklistLibrary, companyAssets = [], companyProperties = [], technicians = [], teams = [], onChecklistSaved, launchChecklistBuilderDirect = false, showDates = false, studioTarget = null }) {
   const imageInputRef = React.useRef(null);
   const fileInputRef = React.useRef(null);
   const checklistImportInputRef = React.useRef(null);
@@ -50633,12 +50696,19 @@ function WorkOrderDetailsModal({ open, onClose, onSave, mode = 'create', tasks =
       ...(mode === 'edit-pm' ? { pmTitle: titleValue } : { title: titleValue }),
       description: descriptionValue,
     };
+    if (studioTarget) {
+      const studioMissing = missingStudioFields(`${studioTarget}:create`);
+      if (studioMissing.length) {
+        alert(`Please fill in: ${studioMissing.join(', ')}.`);
+        return;
+      }
+    }
     if (typeof onSave === 'function') {
       await onSave(payload);
       return;
     }
     onClose?.();
-  }, [mode, onClose, onSave, requiredWorkOrderTitle, workOrderDetails]);
+  }, [mode, onClose, onSave, requiredWorkOrderTitle, workOrderDetails, studioTarget]);
   const locationOptions = React.useMemo(
     () => {
       const propertyOptions = (Array.isArray(companyProperties) ? companyProperties : [])
@@ -51714,6 +51784,11 @@ function WorkOrderDetailsModal({ open, onClose, onSave, mode = 'create', tasks =
           )}
         </div>
 
+      {studioTarget && (
+        <div className="px-6 pb-4">
+          <StudioFormSection target={studioTarget} storeKey={`${studioTarget}:create`} />
+        </div>
+      )}
       <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100">
         <button onClick={onClose} className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50">Cancel</button>
         <button
